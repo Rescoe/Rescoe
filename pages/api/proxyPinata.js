@@ -28,7 +28,7 @@ export default async function handler(req, res) {
         res.status(200).json(data);
       } else {
         const errorText = await response.text();
-        console.error('Erreur Pinata:' Text);
+        console.error('Erreur Pinata:');
         res.status(response.status).json({ message: 'Une erreur est survenue avec le service externe.' });
       }
     } catch (error) {
