@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Heading, Text, Grid, GridItem, VStack, Icon, Button, Divider } from '@chakra-ui/react';
-import { FaBookOpen, FaUsers, FaLightbulb, FaHandsHelping, FaBlockchain  } from 'react-icons/fa';
+import { FaBookOpen, FaUsers, FaLightbulb, FaHandsHelping  } from 'react-icons/fa';
 //import useCheckMembership from '../../../utils/useCheckMembership';
 import NextLink from 'next/link';
 import { JsonRpcProvider, ethers, Contract } from 'ethers';
@@ -191,7 +191,7 @@ Bienvenue sur le premier réseau solidaire expérimental <br /> d'art digital en
           color="white"
           textAlign="center"
         >
-          <HeroSection nfts={nfts} haikus={haikus} />
+          {/*<HeroSection nfts={nfts} haikus={haikus} />*/}
         </Box>
 
         <Box mt={6}>
@@ -238,7 +238,7 @@ RESCOE soutient les artistes émergents en leur offrant un accès privilégié �
   </GridItem>
   <GridItem>
     <Box textAlign="center">
-      <Icon as={FaBlockchain} boxSize={8} mb={3} />
+      <Icon as={FaBookOpen} boxSize={8} mb={3} />
       <Heading as="h2" size="lg" mb={2}>La poésie et la technologie</Heading>
       <Text fontSize="md">
         RESCOE permet aux artistes et poètes de créer, vendre et protéger leurs droits, en garantissant l'authenticité de leur propriété intellectuelle via la blockchain, tout en explorant les potentialités des technologies et du numérique dans l'art et la poésie.
