@@ -191,7 +191,7 @@ Bienvenue sur le premier réseau solidaire expérimental <br /> d'art digital en
           color="white"
           textAlign="center"
         >
-          {/*<HeroSection nfts={nfts} haikus={haikus} />*/}
+          <HeroSection nfts={nfts} haikus={haikus} />
         </Box>
 
         <Box mt={6}>

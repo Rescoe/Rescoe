@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { signIn, signOut } from 'next-auth/react';
 import { useAccount, useDisconnect, useSignMessage } from 'wagmi';
 import { Button, Text, HStack, Avatar, useToast, Tooltip, Box } from '@chakra-ui/react';
-import { getEllipsisTxt } from 'utils/format';
+import { getEllipsisTxt } from '../../../utils/format';
 import { useAuth } from '../../../utils/authContext';
 import { useAuthRequestChallengeEvm } from '@moralisweb3/next';
 import { ConnectButton as RainbowConnectButton } from '@rainbow-me/rainbowkit';

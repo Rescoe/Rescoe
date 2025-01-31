@@ -1,6 +1,8 @@
 import { FC, ReactNode } from 'react';
 import { Container } from '@chakra-ui/react';
-import { Footer, Header } from 'components/modules';
+import { Footer } from '../../modules/Footer';
+import { Header } from '../../modules/Header';
+
 import Head from 'next/head';
 
 const Default: FC<{ children: ReactNode; pageName: string }> = ({ children, pageName }) => (

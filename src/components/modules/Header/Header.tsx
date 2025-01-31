@@ -2,9 +2,11 @@ import { Box, Container, Button, Menu, MenuButton, MenuList, MenuItem, Drawer, D
 import { FaBug, FaEye, FaEyeSlash, FaBars } from 'react-icons/fa';
 import { ChevronDownIcon } from '@chakra-ui/icons';
 import React, { useRef, useState, useEffect } from 'react';
-import { ColorModeButton, NavBar } from 'components/elements';
+import { ColorModeButton } from '../../../components/elements/ColorModeButton';
+import { NavBar } from '../../../components/elements/Navigation/NavBar';
+
 import { ConnectBouton } from '../ConnectBouton';
-import { GenerativeLogo } from 'components/elements';
+import { GenerativeLogo } from '../../../components/elements/RescoeLogo';
 import NextLink from 'next/link';
 import { useAuth } from '../../../utils/authContext';
 import Insecte from '../MoovingInsect';
