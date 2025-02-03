@@ -11,15 +11,38 @@ import HeroSection from '../../../utils/HeroSection'; // Assurez-vous d'importer
 import ABIRESCOLLECTION from '../../ABI/ABI_Collections.json';
 import { useRouter } from 'next/router';
 
-const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT;
+const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!;
 
 
 const Home = () => {
   const [collections, setCollections] = useState([]);
-const [nfts, setNfts] = useState([]);
-const [haikus, setHaikus] = useState([]); // Changer 'poems' en 'haikus'
 const [isLoading, setIsLoading] = useState(false);
 const router = useRouter();
+
+interface Haiku {
+  tokenId: string;
+  poemText: any; // Remplace 'any' par un type plus précis si possible, par exemple 'string' ou 'string[]'
+}
+
+const [haikus, setHaikus] = useState<Haiku[]>([]); // Typage de l'état
+
+
+interface Nft {
+  tokenId: string;
+  name: string;
+  imageUrl: string;
+  // Ajoute d'autres propriétés si nécessaire
+}
+
+interface Collection {
+  id: string;
+  collectionType: string;
+  mintContractAddress: string;
+}
+
+// Typage de l'état `nfts` avec `Nft[]` (un tableau d'objets de type Nft)
+const [nfts, setNfts] = useState<Nft[]>([]);
+
 
 const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
 const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
@@ -31,15 +54,28 @@ const fetchCollections = async () => {
     const total = await contract.getTotalCollectionsMinted();
     const collectionsPaginated = await contract.getCollectionsPaginated(0, total);
 
+    type CollectionTuple = [number, string, string, string, string[], boolean, boolean];
+
+
+    interface Collection {
+      id: string;
+      name: string;
+      collectionType: string;
+      imageUrl: string;
+      mintContractAddress: string[];
+      isFeatured: boolean;
+    }
+
+    const [collections, setCollections] = useState<Collection[]>([]); // Typage de l'état
+
     const collectionsData = await Promise.all(
-      collectionsPaginated.map(async (tuple) => {
+      collectionsPaginated.map(async (tuple: CollectionTuple) => {
         const [id, name, collectionType, creator, associatedAddresses, isActive, isFeatured] = tuple;
         const uri = await contract.getCollectionURI(id);
 
         const mintContractAddress = associatedAddresses;
 
         const cachedMetadata = localStorage.getItem(uri);
-
 
         const response = await fetch(`/api/proxyPinata?ipfsHash=${uri.split('/').pop()}`);
         const metadata = await response.json();
@@ -56,17 +92,23 @@ const fetchCollections = async () => {
       })
     );
 
-    const sortedCollections = collectionsData.sort((a, b) => b.isFeatured - a.isFeatured);
-    setCollections(sortedCollections);
-  } catch (error) {
-    console.error('Error fetching collections:' );
-  } finally {
-    setIsLoading(false);
-  }
+    const sortedCollections = collectionsData.sort((a, b) => {
+      const featuredA = a.isFeatured ? 1 : 0;
+      const featuredB = b.isFeatured ? 1 : 0;
+      return featuredB - featuredA;
+    });
+
+    setCollections(sortedCollections); // Mise à jour de l'état avec le bon type
+
+} catch (error) {
+  console.error('Error fetching collections:' );
+} finally {
+  setIsLoading(false);
+}
 };
 
 // Récupérer les poèmes (haikus)
-const fetchPoems = async (collectionId, associatedAddress) => {
+const fetchPoems = async (collectionId: string, associatedAddress: string) => {
   setIsLoading(true);
   try {
     const collectionContract = new Contract(associatedAddress, haikuContractABI, provider);
@@ -106,14 +148,14 @@ const fetchPoems = async (collectionId, associatedAddress) => {
 };
 
 // Récupérer les NFTs
-const fetchNFTs = async (collectionId, associatedAddress) => {
+const fetchNFTs = async (collectionId: string, associatedAddress: string) => {
   setIsLoading(true);
   try {
     const collectionContract = new Contract(associatedAddress, nftContractABI, provider);
     const tokenIds = await collectionContract.getTokenPaginated(0, 10);
 
     const nftsData = await Promise.all(
-      tokenIds.map(async (tokenId) => {
+      tokenIds.map(async (tokenId: string) => {
         const tokenURI = await collectionContract.tokenURI(tokenId);
         const cachedMetadata = localStorage.getItem(tokenURI);
         const metadata = cachedMetadata ? JSON.parse(cachedMetadata) : await (await fetch(`/api/proxyPinata?ipfsHash=${tokenURI.split('/').pop()}`)).json();
@@ -146,134 +188,144 @@ useEffect(() => {
   fetchCollections();
 }, []);
 
+/*
 useEffect(() => {
   if (collections.length > 0) {
-    const artCollections = collections.filter((collection) => collection.collectionType === 'Art');
-    const poetryCollections = collections.filter((collection) => collection.collectionType === 'Poesie');
+    const artCollections = collections.filter((collection: Collection) => collection.collectionType === 'Art');
+    const poetryCollections = collections.filter((collection: Collection) => collection.collectionType === 'Poesie');
 
     if (artCollections.length > 0) {
       const randomArtCollection = artCollections[Math.floor(Math.random() * artCollections.length)];
-      fetchNFTs(randomArtCollection.id, randomArtCollection.mintContractAddress);
+      if (typeof randomArtCollection.id === 'string' && Array.isArray(randomArtCollection.mintContractAddress) && randomArtCollection.mintContractAddress.length > 0 && typeof randomArtCollection.mintContractAddress[0] === 'string') {
+        const artCollectionId = randomArtCollection.id;
+        const artCollectionMintContractAddress = randomArtCollection.mintContractAddress[0];
+        fetchNFTs(artCollectionId, artCollectionMintContractAddress);
+      } else {
+        console.error('Propriétés id et/ou mintContractAddress manquantes ou de type invalide dans l\'objet randomArtCollection');
+      }
     }
 
     if (poetryCollections.length > 0) {
       const randomPoetryCollection = poetryCollections[Math.floor(Math.random() * poetryCollections.length)];
-      fetchPoems(randomPoetryCollection.id, randomPoetryCollection.mintContractAddress);
+      if (typeof randomPoetryCollection.id === 'string' && Array.isArray(randomPoetryCollection.mintContractAddress) && randomPoetryCollection.mintContractAddress.length > 0 && typeof randomPoetryCollection.mintContractAddress[0] === 'string') {
+        const poetryCollectionId = randomPoetryCollection.id;
+        const poetryCollectionMintContractAddress = randomPoetryCollection.mintContractAddress[0];
+        fetchPoems(poetryCollectionId, poetryCollectionMintContractAddress);
+      } else {
+        console.error('Propriétés id et/ou mintContractAddress manquantes ou de type invalide dans l\'objet randomPoetryCollection');
+      }
     }
   }
 }, [collections]);
+*/
+
+
 
 // Vérifie la longueur des données pour éviter d'essayer d'afficher des éléments vides
-const getRandomItems = (array, count) => {
+const getRandomItems = (array: Collection[], count: number): Collection[] => {
   return array.length > 0 ? array.sort(() => 0.5 - Math.random()).slice(0, Math.min(count, array.length)) : [];
 };
 
     const maxBoxHeight = "150px"; // Hauteur max pour toutes les boîtes
 
     return (
-
       <Box p={5} textAlign="center">
-      {/* Ajout de marge entre le HeroSection et le titre */}
-
-
-      <Heading as="h1" size="xl" mb={5}>
-Bienvenue sur le premier réseau solidaire expérimental <br /> d'art digital en France
-</Heading>
-
+        {/* Ajout de marge entre le HeroSection et le titre */}
+        <Heading as="h1" size="xl" mb={5}>
+          Bienvenue sur le premier réseau solidaire expérimental <br /> d'art digital en France
+        </Heading>
 
         <Box
           bgSize="cover"
           bgPosition="center"
           py={10}
           mt={10}
-          textAlign="center"
           p={4}
           color="white"
           textAlign="center"
         >
-          <HeroSection nfts={nfts} haikus={haikus} />
+          {/*<HeroSection nfts={nfts} haikus={haikus} />*/}
         </Box>
 
         <Box mt={6}>
-        <Text fontSize="lg" mb={6}>
-          Découvrez, soutenez, participez.
-        </Text>
-        <NextLink href="/adhesion" passHref>
-          <Button colorScheme="pink" size="lg">Adhérez Maintenant</Button>
-        </NextLink>
+          <Text fontSize="lg" mb={6}>
+            Découvrez, soutenez, participez.
+          </Text>
+          <NextLink href="/adhesion" passHref>
+            <Button colorScheme="pink" size="lg">Adhérez Maintenant</Button>
+          </NextLink>
         </Box>
 
-        <Heading size="xl" mb={6}  mt={12}>  {/* Augmentation de mb={6} pour plus d'espace */}
+        <Heading size="xl" mb={6} mt={12}>
           Rejoignez un réseau d'art numérique et de poésie solidaire
         </Heading>
 
-<VStack spacing={8} mt={10} textAlign="center" >
-<Heading as="h2" size="lg" mb={5}>
-  Nos missions :
-</Heading>
-<Text fontSize="md" maxW="700px" mx="auto">
-RESCOE soutient les artistes émergents en leur offrant un accès privilégié à des outils numériques innovants, leur permettant de développer leur art à travers l'art génératif, la blockchain et l'art digital. <br /> Notre mission est de favoriser l'émergence de ce nouveau courant artistique en organisant des ateliers d'initiation au crypto-art, où chacun peut créer et minter ses premières œuvres sur notre plateforme décentralisée, tout en assurant la vente et la protection de ses droits.
-</Text>
+        <VStack spacing={8} mt={10} textAlign="center">
+          <Heading as="h2" size="lg" mb={5}>
+            Nos missions :
+          </Heading>
+          <Text fontSize="md" maxW="700px" mx="auto">
+            RESCOE soutient les artistes émergents en leur offrant un accès privilégié à des outils numériques innovants, leur permettant de développer leur art à travers l'art génératif, la blockchain et l'art digital. <br /> Notre mission est de favoriser l'émergence de ce nouveau courant artistique en organisant des ateliers d'initiation au crypto-art, où chacun peut créer et minter ses premières œuvres sur notre plateforme décentralisée, tout en assurant la vente et la protection de ses droits.
+          </Text>
 
-<Divider my={6} borderColor="gray.200" w="80%" mx="auto" />
+          <Divider my={6} borderColor="gray.200" w="80%" mx="auto" />
 
-<Grid templateColumns={{ base: '1fr', md: 'repeat(3, 1fr)' }} gap={6}>
-  <GridItem>
-    <Box textAlign="center">
-      <Icon as={FaLightbulb} boxSize={8} mb={3} />
-      <Heading as="h2" size="lg" mb={2}>Un réseau solidaire</Heading>
-      <Text fontSize="md">
-        Faites partie d'un réseau unique, dédié à la promotion de l'art digital et à l'intégration de la blockchain dans les pratiques artistiques, tout en soutenant l'accès aux outils numériques pour les artistes.
-      </Text>
-    </Box>
-  </GridItem>
-  <GridItem>
-    <Box textAlign="center">
-      <Icon as={FaHandsHelping} boxSize={8} mb={3} />
-      <Heading as="h2" size="lg" mb={2}>Engagé pour l'art</Heading>
-      <Text fontSize="md">
-        En rejoignant RESCOE, vous soutenez directement des artistes émergents et contribuez à un projet artistique innovant visant à dynamiser la scène artistique française.
-      </Text>
-    </Box>
-  </GridItem>
-  <GridItem>
-    <Box textAlign="center">
-      <Icon as={FaBookOpen} boxSize={8} mb={3} />
-      <Heading as="h2" size="lg" mb={2}>La poésie et la technologie</Heading>
-      <Text fontSize="md">
-        RESCOE permet aux artistes et poètes de créer, vendre et protéger leurs droits, en garantissant l'authenticité de leur propriété intellectuelle via la blockchain, tout en explorant les potentialités des technologies et du numérique dans l'art et la poésie.
-      </Text>
-    </Box>
-  </GridItem>
-  </Grid>
+          <Grid templateColumns={{ base: '1fr', md: 'repeat(3, 1fr)' }} gap={6}>
+            <GridItem>
+              <Box textAlign="center">
+                <Icon as={FaLightbulb} boxSize={8} mb={3} />
+                <Heading as="h2" size="lg" mb={2}>Un réseau solidaire</Heading>
+                <Text fontSize="md">
+                  Faites partie d'un réseau unique, dédié à la promotion de l'art digital et à l'intégration de la blockchain dans les pratiques artistiques, tout en soutenant l'accès aux outils numériques pour les artistes.
+                </Text>
+              </Box>
+            </GridItem>
+            <GridItem>
+              <Box textAlign="center">
+                <Icon as={FaHandsHelping} boxSize={8} mb={3} />
+                <Heading as="h2" size="lg" mb={2}>Engagé pour l'art</Heading>
+                <Text fontSize="md">
+                  En rejoignant RESCOE, vous soutenez directement des artistes émergents et contribuez à un projet artistique innovant visant à dynamiser la scène artistique française.
+                </Text>
+              </Box>
+            </GridItem>
+            <GridItem>
+              <Box textAlign="center">
+                <Icon as={FaBookOpen} boxSize={8} mb={3} />
+                <Heading as="h2" size="lg" mb={2}>La poésie et la technologie</Heading>
+                <Text fontSize="md">
+                  RESCOE permet aux artistes et poètes de créer, vendre et protéger leurs droits, en garantissant l'authenticité de leur propriété intellectuelle via la blockchain, tout en explorant les potentialités des technologies et du numérique dans l'art et la poésie.
+                </Text>
+              </Box>
+            </GridItem>
+          </Grid>
 
-  <Divider my={6} borderColor="gray.200" w="80%" mx="auto" />
+          <Divider my={6} borderColor="gray.200" w="80%" mx="auto" />
 
-  <Button
-      colorScheme="teal"
-      size="lg"
-      mt={6}
-      as="a"
-      href="/association/rescoe"
-      _hover={{ textDecoration: 'none' }}
-  >
-      En savoir plus sur l'association
-  </Button>
+          <Button
+            colorScheme="teal"
+            size="lg"
+            mt={6}
+            as="a"
+            href="/association/rescoe"
+            _hover={{ textDecoration: 'none' }}
+          >
+            En savoir plus sur l'association
+          </Button>
 
-  <Divider my={6} borderColor="gray.200" w="80%" mx="auto" />
-  <Heading as="h2" size="lg" mb={5}>
-    Quelques créations et poèmes associés aléatoirement :
-  </Heading>
-  <Text fontSize="md" maxW="700px" mx="auto">
-Parfois les artistes et poètes collaborent, parfois le hasard les fait se rencontrer ! </Text>
+          <Divider my={6} borderColor="gray.200" w="80%" mx="auto" />
+          <Heading as="h2" size="lg" mb={5}>
+            Quelques créations et poèmes associés aléatoirement :
+          </Heading>
+          <Text fontSize="md" maxW="700px" mx="auto">
+            Parfois les artistes et poètes collaborent, parfois le hasard les fait se rencontrer !
+          </Text>
 
-                <DynamicCarousel nfts={nfts} haikus={haikus} />
-
-            </VStack>
-
-
-        </Box>
+          <DynamicCarousel nfts={nfts} haikus={haikus} />
+        </VStack>
+      </Box>
     );
-};
+  };
+
 
 export default Home;

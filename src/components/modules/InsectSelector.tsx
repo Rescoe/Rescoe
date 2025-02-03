@@ -1,43 +1,54 @@
-// SelectInsect.tsx
 import React, { useEffect, useState } from 'react';
 import { Box, Button, Image, VStack } from '@chakra-ui/react';
 import { useAuth } from '../../utils/authContext';
-import { JsonRpcProvider } from 'ethers';
-import { Contract } from 'ethers';
+import { JsonRpcProvider, Contract } from 'ethers';
 import ABI from '../ABI/ABIAdhesion.json';
 
-const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS;
+import { BigNumberish } from 'ethers';
 
-const SelectInsect = ({ onSelect }) => {
+
+const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS!;
+
+
+
+
+const SelectInsect = ({ onSelect }: { onSelect: (insect: Insect) => void }) => {
   const { address } = useAuth();
-  const [insects, setInsects] = useState([]);
-  const [selectedInsect, setSelectedInsect] = useState(null);
+  const [insects, setInsects] = useState<Insect[]>([]);
+  const [selectedInsect, setSelectedInsect] = useState<Insect | null>(null);
+
 
   const fetchInsects = async () => {
     const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+
+    if (!contractAddress) {
+      console.error("L'adresse du contrat n'est pas définie.");
+      return;
+    }
+
     const contract = new Contract(contractAddress, ABI, provider);
-    const tokenIds = await contract.getTokensByOwner(address);
+    const tokenIds: BigNumberish[] = await contract.getTokensByOwner(address);
 
-    const fetchedInsects = await Promise.all(tokenIds.map(async (tokenId) => {
-      try {
-        const tokenURI = await contract.tokenURI(tokenId);
-        const response = await  fetch(tokenURI);
+    const fetchedInsects = await Promise.all(
+      tokenIds.map(async (tokenId: BigNumberish) => {
+        try {
+          const tokenURI = await contract.tokenURI(tokenId);
+          const response = await fetch(tokenURI);
 
-        if (!response.ok) {
-          throw new Error('Erreur lors de la récupération de URI :');
+          if (!response.ok) {
+            throw new Error('Erreur lors de la récupération de URI');
+          }
+
+          const metadata = await response.json();
+          return { id: Number(tokenId), image: metadata.image }; // Utilisation de BigNumber.from()
+        } catch (error) {
+          console.error("Erreur lors de la récupération de l'insecte :", error);
+          return null;
         }
+      })
+    );
 
-        const metadata = await response.json();
-        return { id: tokenId, image: metadata.image };
-      } catch (error) {
-        console.error("Erreur lors de la récupération de l'insecte :" );
-        return null; // Retournez null pour les insectes qui échouent
-      }
-    }));
-
-    // Filtrer les insectes nulls
-    const validInsects = fetchedInsects.filter(insect => insect !== null);
-    setInsects(validInsects);
+    setInsects(fetchedInsects.filter((insect): insect is Insect => insect !== null));
   };
 
 
@@ -47,10 +58,10 @@ const SelectInsect = ({ onSelect }) => {
     }
   }, [address]);
 
-  const handleInsectSelect = (insect) => {
-      setSelectedInsect(insect);
-      onSelect(insect); // Envoie l'objet complet
-      localStorage.setItem('savedInsect', JSON.stringify(insect)); // Optionnel: Si vous voulez aussi le stocker ici
+  const handleInsectSelect = (insect: Insect) => {
+    setSelectedInsect(insect);
+    onSelect(insect);
+    localStorage.setItem('savedInsect', JSON.stringify(insect));
   };
 
   return (
@@ -58,7 +69,7 @@ const SelectInsect = ({ onSelect }) => {
       {insects.map((insect) => (
         <Box key={insect.id} display="flex" alignItems="center">
           <Image src={insect.image} alt={`Insecte ${insect.id}`} boxSize="45px" />
-          <Button onClick={() => handleInsectSelect(insect.image)} variant="outline" ml={2}>
+          <Button onClick={() => handleInsectSelect(insect)} variant="outline" ml={2}>
             Sélectionner
           </Button>
         </Box>
@@ -66,5 +77,12 @@ const SelectInsect = ({ onSelect }) => {
     </VStack>
   );
 };
+
+export type Insect = {
+  id: number;
+  name: string;
+  image: string;
+};
+
 
 export default SelectInsect;

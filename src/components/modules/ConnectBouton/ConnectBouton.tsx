@@ -23,7 +23,13 @@ const ConnectBouton: React.FC = () => {
 
     try {
       const challenge = await requestChallengeAsync({ address: account, chainId: 11155111 });
+
+      if (!challenge || !challenge.message) {
+        throw new Error("Challenge non valide.");
+      }
+
       const signature = await signMessageAsync({ message: challenge.message });
+
       await signIn('moralis-auth', {
         message: challenge.message,
         signature,
@@ -33,13 +39,12 @@ const ConnectBouton: React.FC = () => {
 
       setAddress(account.toLowerCase());
       setIsAuthenticated(true);
-
-      // Stocker l'adresse dans localStorage
       localStorage.setItem('connectedAddress', account.toLowerCase());
     } catch (e) {
+      console.error("Erreur lors de l'authentification:", e);
       toast({
         title: 'Oops, something went wrong...',
-        description:'Petite erreur, revenez plus tard',
+        description: 'Petite erreur, revenez plus tard',
         status: 'error',
         position: 'top-right',
         isClosable: true,
@@ -48,6 +53,7 @@ const ConnectBouton: React.FC = () => {
       setIsConnecting(false);
     }
   };
+
 
   // Gérer la déconnexion
   const handleDisconnect = async () => {

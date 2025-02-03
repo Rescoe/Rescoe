@@ -3,7 +3,7 @@ import { FaBug, FaEye, FaEyeSlash, FaBars } from 'react-icons/fa';
 import { ChevronDownIcon } from '@chakra-ui/icons';
 import React, { useRef, useState, useEffect } from 'react';
 import { ColorModeButton } from '../../../components/elements/ColorModeButton';
-import { NavBar } from '../../../components/elements/Navigation/NavBar';
+import { NavBar } from '../../../components/elements/navigation/NavBar';
 
 import { ConnectBouton } from '../ConnectBouton';
 import { GenerativeLogo } from '../../../components/elements/RescoeLogo';
@@ -12,23 +12,29 @@ import { useAuth } from '../../../utils/authContext';
 import Insecte from '../MoovingInsect';
 import SelectInsect from '../InsectSelector';
 
+import { Insect } from '../InsectSelector';
+
+
+
 const Header = () => {
   const headerRef = useRef<HTMLDivElement>(null);
-  const { isAdmin, isArtist, isPoet, isTrainee, isContributor, address, hasInsect, isMember } = useAuth();
+  const { isAdmin, isArtist, isPoet, isTrainee, isContributor, address, isMember } = useAuth();
   const [isInsectVisible, setIsInsectVisible] = useState(true);
-  const [selectedInsect, setSelectedInsect] = useState(null);
-  const [insectImage, setInsectImage] = useState(null);
+  const [selectedInsect, setSelectedInsect] = useState<Insect | null>(null);
+  const [insectImage, setInsectImage] = useState<string | null>(null);
   const { isOpen, onOpen, onClose } = useDisclosure();
 
   const toggleInsectVisibility = () => {
     setIsInsectVisible((prev) => !prev);
   };
 
-  const handleSelectInsect = (insect) => {
+  const handleSelectInsect = (insect: Insect) => {
     setSelectedInsect(insect);
     localStorage.setItem('savedInsect', JSON.stringify(insect));
     setInsectImage(insect.image);
   };
+
+
 
   useEffect(() => {
     const savedVisibility = localStorage.getItem('insectVisibility');
@@ -137,7 +143,7 @@ const Header = () => {
                   <MenuList>
                     <Box mt={4} display="flex" justifyContent="center">
                     </Box>
-                    <MenuItem onClick={toggleInsectVisibility} size="sm">
+                    <MenuItem onClick={toggleInsectVisibility}>
                       {isInsectVisible ? (
                         <>
                           <FaEyeSlash />
@@ -160,9 +166,14 @@ const Header = () => {
 
             {isMember ? (
               <Box mt={4} display="flex" justifyContent="center">
-                {isInsectVisible && selectedInsect && (
-                  <Insecte headerRef={headerRef} selectedInsect={selectedInsect} />
-                )}
+              // Dans le fichier Header.tsx
+              {isInsectVisible && selectedInsect && (
+                <Insecte
+                  headerRef={headerRef}
+                  selectedInsect={selectedInsect.image}
+                />
+              )}
+
               </Box>
             ) : (
               <NextLink href="/adhesion" passHref>

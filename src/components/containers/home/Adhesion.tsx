@@ -31,10 +31,9 @@ const RoleBasedNFTPage = () => {
     const [mintPrice, setMintPrice] = useState<string>(''); // État pour le prix du mint
     const [showBananas, setShowBananas] = useState(false);  // Add state to control when to show Bananas
     const [name, setName] = useState(''); // Ajouter état pour le nom
-        const [bio, setBio] = useState(''); // Ajouter état pour la biographie
+    const [bio, setBio] = useState(''); // Ajouter état pour la biographie
 
     const Bananas = dynamic(() => import('../../modules/Bananas'), { ssr: false });
-
 
     const roles = [
         { value: 'Artiste', label: 'Artiste' },
@@ -43,7 +42,9 @@ const RoleBasedNFTPage = () => {
         { value: 'Contributeur', label: 'Contributeur' },
     ];
 
-    const roleMapping = {
+    type RoleKey = 'Artiste' | 'Poete' | 'Stagiaire' | 'Contributeur';
+
+    const roleMapping: { [key in RoleKey]: number } = {
         Artiste: 0,
         Poete: 1,
         Stagiaire: 2,
@@ -68,34 +69,38 @@ const RoleBasedNFTPage = () => {
         initWeb3();
     }, []);
 
-    const fetchMintPrice = async (web3Instance) => {
-        const contract = new web3Instance.eth.Contract(ABI, contractAddress);
-        const price = await contract.methods.mintPrice().call(); // Récupérez le prix du mint
-        const ethPrice = web3Instance.utils.fromWei(price, 'ether'); // Utilisez web3Instance au lieu de web3
-        setMintPrice(ethPrice); // Stockez le prix dans l'état local
+    const fetchMintPrice = async (web3Instance: Web3) => {
+        if (web3Instance) {
+            const contract = new web3Instance.eth.Contract(ABI, contractAddress);
+            const price = await contract.methods.mintPrice().call(); // Récupérez le prix du mint
+            if (typeof price === 'string') {
+                const ethPrice = parseFloat(web3Instance.utils.fromWei(price, 'ether'));
+                setMintPrice(ethPrice.toString()); // Stockez le prix dans l'état local sous forme de chaîne de caractères
+            } else {
+                console.error('Unexpected type for price:', typeof price);
+            }
+        }
     };
 
 
     const generateImage = async () => {
         const gifUrl = await getRandomInsectGif(); // Attendre que le GIF soit généré
-        setGeneratedImageUrl(gifUrl); // Met à jour l’état avec l’URL obtenue
+        setGeneratedImageUrl(gifUrl); // Met à jour l'état avec l'URL obtenue
     };
 
-
     const handleConfirmRole = async () => {
-      if (!name || !bio) {
-    alert("Veuillez entrer un nom et une biographie.");
-    return;
-}
+        if (!name || !bio) {
+            alert("Veuillez entrer un nom et une biographie.");
+            return;
+        }
         setRoleConfirmed(true);
         await uploadFileToIPFS(generatedImageUrl);
     };
 
-    const uploadFileToIPFS = async (imageUrl) => {
+    const uploadFileToIPFS = async (imageUrl: string | null) => {
         setIsUploading(true); // Assurez-vous de suivre l'état de téléchargement
 
         try {
-
             if (imageUrl) {
                 const formData = new FormData();
                 const response = await fetch(imageUrl);
@@ -105,7 +110,7 @@ const RoleBasedNFTPage = () => {
                 // Upload du GIF sur IPFS
                 const imageResponse = await axios.post('https://api.pinata.cloud/pinning/pinFileToIPFS', formData, {
                     headers: {
-                      'Authorization': `Bearer ${process.env.PINATA_JWT}`,
+                        'Authorization': `Bearer ${process.env.PINATA_JWT}`,
                         'Content-Type': 'multipart/form-data'
                     }
                 });
@@ -115,7 +120,7 @@ const RoleBasedNFTPage = () => {
                 // Créer l'objet de métadonnées
                 const metadataJson = {
                     name: name,
-                    bio:bio,
+                    bio: bio,
                     description: "Vous êtes " + selectedRole,
                     image: imageIpfsUrl,
                     role: selectedRole,
@@ -147,15 +152,17 @@ const RoleBasedNFTPage = () => {
             setIsMinting(true);
             try {
                 const contract = new web3.eth.Contract(ABI, contractAddress);
-                const priceInWei = web3.utils.toWei(mintPrice, 'ether'); // Convertir le prix en wei
+                const priceInWei = web3.utils.toWei(mintPrice.toString(), 'ether'); // Convertir le prix en wei
 
                 // Envoyer le prix lors de la méthode mint
-                await contract.methods.safeMint(ipfsUrl, roleMapping[selectedRole], name, bio).send({ from: account, value: priceInWei });
-                setShowBananas(true);
-
-
+                if (roleMapping.hasOwnProperty(selectedRole)) {
+                    await contract.methods.safeMint(ipfsUrl, roleMapping[selectedRole as RoleKey], name, bio).send({ from: account, value: priceInWei });
+                    setShowBananas(true);
+                } else {
+                    console.error(`Rôle sélectionné "${selectedRole}" non trouvé dans le mapping`);
+                }
             } catch (error) {
-                console.error('Error minting NFT:' );
+                console.error('Error minting NFT:', error);
                 alert('Error minting NFT:');
             } finally {
                 setIsMinting(false);
@@ -164,6 +171,8 @@ const RoleBasedNFTPage = () => {
             alert("Veuillez assurez-vous que l'URL IPFS est définie.");
         }
     };
+
+
 
     return (
         <Box p={5} textAlign="center">

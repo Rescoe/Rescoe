@@ -4,7 +4,7 @@ import NAV_LINKS from './paths';
 import { useAuth } from '../../../../utils/authContext';
 
 const NavBar = () => {
-  const { account, isAdmin, isArtist, connectWallet } = useAuth();
+  const { address, isAdmin, isArtist } = useAuth();
   // Vérifie si c'est un affichage mobile
   const isMobile = useBreakpointValue({ base: true, md: false });
 

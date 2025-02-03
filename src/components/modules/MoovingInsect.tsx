@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, RefObject } from 'react';
 import { Box, Image } from '@chakra-ui/react';
-import { JsonRpcProvider } from 'ethers';
-import ABI from '../ABI/ABIAdhesion.json';
-import { Contract } from 'ethers';
 import { useAuth } from '../../utils/authContext';
 
-const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS;
 
-const Insecte = ({ headerRef, selectedInsect }) => {
+interface InsecteProps {
+  headerRef: RefObject<HTMLElement>;
+  selectedInsect: string | null;
+}
+
+const Insecte = ({ headerRef, selectedInsect }: InsecteProps) => {
   const { address } = useAuth();
   const [insectPosition, setInsectPosition] = useState<number>(0);
   const [leftPosition, setLeftPosition] = useState<number>(10);
@@ -35,9 +36,9 @@ const Insecte = ({ headerRef, selectedInsect }) => {
       sx={{
         '@keyframes moveInsect': {
           '0%': { transform: 'translateX(0) scaleX(-1)' },
-          '50%': { transform: 'translateX(90vw) ' },
+          '50%': { transform: 'translateX(90vw)' },
           '49%': { transform: 'translateX(90vw) scaleX(-1)' },
-          '98%': { transform: 'translateX(0) ' },
+          '98%': { transform: 'translateX(0)' },
         },
         animation: 'moveInsect 1200s linear infinite',
       }}
@@ -47,7 +48,7 @@ const Insecte = ({ headerRef, selectedInsect }) => {
         alt="Insecte"
         boxSize="45px"
         objectFit="contain"
-        transform='rotate(20deg) scaleY(0.98)'
+        transform="rotate(20deg) scaleY(0.98)"
       />
     </Box>
   );

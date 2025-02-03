@@ -1,4 +1,4 @@
-import { FaHome, FaHandshake, FaEthereum, FaImages, FaPalette, FaChalkboardTeacher, FaImage , FaSketch , FaNewspaper, FaCalendarAlt, FaFeather, FaRegAddressCard, FaUserCheck, FaUsers, FaPaintBrush, FaPen, FaBookOpen, FaCode, FaGem, FaComputer, FaBug } from 'react-icons/fa';
+import { FaHome, FaHandshake, FaEthereum, FaImages, FaPalette, FaChalkboardTeacher, FaImage , FaSketch , FaNewspaper, FaCalendarAlt, FaFeather, FaRegAddressCard, FaUserCheck, FaUsers, FaPaintBrush, FaPen, FaBookOpen, FaCode, FaGem, FaBug } from 'react-icons/fa';
 import { ISubNav } from '../SubNav/SubNav';
 
 const NAV_LINKS: ISubNav[] = [

@@ -3,7 +3,7 @@ import Web3 from 'web3';
 import detectEthereumProvider from '@metamask/detect-provider';
 import ABI from '../components/ABI/ABIAdhesion.json'; // Votre ABI de contrat ici.
 
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS; // Mettez à jour avec votre adresse de contrat.
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS!; // Mettez à jour avec votre adresse de contrat.
 
 type AuthContextType = {
   address: string | null;
@@ -31,7 +31,7 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
-const roleMapping = {
+const roleMapping: { [key: number]: 'admin' | 'artist' | 'poet' | 'trainee' | 'contributor' } = {
   0: 'artist',
   1: 'poet',
   2: 'contributor',
@@ -61,35 +61,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const fetchRole = async (userAddress: string) => {
-      setLoading(true);
-      try {
-        if (web3 && address) {
-          const contract = new web3.eth.Contract(ABI, CONTRACT_ADDRESS);
+  setLoading(true);
+  try {
+    if (web3 && address) {
+      const contract = new web3.eth.Contract(ABI, CONTRACT_ADDRESS);
 
-          // Vérifier si l'utilisateur est le propriétaire du contrat (admin)
-          const owner = await contract.methods.owner().call();
-          if (userAddress.toLowerCase() === owner.toLowerCase()) {
-            setRole('admin');
-            return;
-          }
-
-          // Récupérer les informations du membre
-          const memberInfo = await contract.methods.members(userAddress).call();
-          const userRoleIndex = memberInfo.role;
-
-          // Déterminer le rôle basé sur l'index
-          if (roleMapping[userRoleIndex] !== undefined) {
-            setRole(roleMapping[userRoleIndex]);
-          } else {
-            setRole(null);
-          }
+      // Vérifier si l'utilisateur est le propriétaire du contrat (admin)
+      const owner = await contract.methods.owner().call();
+      if (typeof userAddress === 'string' && userAddress !== '' && owner) {
+        if (userAddress.toLowerCase() === owner.toLowerCase()) {
+          setRole('admin');
+          return;
         }
-      } catch (error) {
-        console.error("Erreur lors de la récupération du rôle:" );
-      } finally {
-        setLoading(false);
       }
-    };
+
+      // Récupérer les informations du membre
+      const memberInfo = await contract.methods.members(userAddress).call();
+      const userRoleIndex = memberInfo.role;
+
+      // Déterminer le rôle basé sur l'index
+      const mappedRole = roleMapping[userRoleIndex as keyof typeof roleMapping];
+      if (mappedRole) {
+        setRole(mappedRole);
+      } else {
+        setRole(null);
+      }
+    }
+  } catch (error) {
+    console.error("Erreur lors de la récupération du rôle:", error);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
     if (address) {
       fetchRole(address.toLowerCase());
@@ -113,7 +117,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       isTrainee: role === 'trainee',
       isContributor: role === 'contributor',
       isMember,
-
     }}>
       {loading ? <div>Loading...</div> : children}
     </AuthContext.Provider>
