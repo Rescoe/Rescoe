@@ -6,8 +6,8 @@ import NextLink from 'next/link';
 import { JsonRpcProvider, ethers, Contract } from 'ethers';
 import haikuContractABI from '../../ABI/HaikuEditions.json';
 import nftContractABI from '../../ABI/ABI_ART.json';
-import DynamicCarousel from '../../../utils/DynamicCarousel'; // Assurez-vous d'importer le bon chemin
-import HeroSection from '../../../utils/HeroSection'; // Assurez-vous d'importer le bon chemin
+//import DynamicCarousel from '../../../utils/DynamicCarousel'; // Assurez-vous d'importer le bon chemin
+//import HeroSection from '../../../utils/HeroSection'; // Assurez-vous d'importer le bon chemin
 import ABIRESCOLLECTION from '../../ABI/ABI_Collections.json';
 import { useRouter } from 'next/router';
 
@@ -321,7 +321,7 @@ const getRandomItems = (array: Collection[], count: number): Collection[] => {
             Parfois les artistes et poètes collaborent, parfois le hasard les fait se rencontrer !
           </Text>
 
-          <DynamicCarousel nfts={nfts} haikus={haikus} />
+          {/* }<DynamicCarousel nfts={nfts} haikus={haikus} /> */}
         </VStack>
       </Box>
     );

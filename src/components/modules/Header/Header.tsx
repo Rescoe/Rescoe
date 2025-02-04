@@ -166,7 +166,6 @@ const Header = () => {
 
             {isMember ? (
               <Box mt={4} display="flex" justifyContent="center">
-              // Dans le fichier Header.tsx
               {isInsectVisible && selectedInsect && (
                 <Insecte
                   headerRef={headerRef}

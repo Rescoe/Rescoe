@@ -38,11 +38,17 @@ const roleMapping: { [key: number]: 'admin' | 'artist' | 'poet' | 'trainee' | 'c
   3: 'trainee',
 };
 
+interface MemberInfo {
+  role: number; // ou string si `role` est un string
+}
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [address, setAddress] = useState<string | null>(null);
   const [role, setRole] = useState<'admin' | 'artist' | 'poet' | 'trainee' | 'contributor' | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [web3, setWeb3] = useState<Web3 | null>(null);
+  const [userAddress, setUserAddress] = useState<string | null>(null);
+
 
   useEffect(() => {
     const initWeb3 = async () => {
@@ -67,16 +73,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const contract = new web3.eth.Contract(ABI, CONTRACT_ADDRESS);
 
       // Vérifier si l'utilisateur est le propriétaire du contrat (admin)
-      const owner = await contract.methods.owner().call();
-      if (typeof userAddress === 'string' && userAddress !== '' && owner) {
+      const owner = (await contract.methods.owner().call()) as string;
+      if (typeof userAddress === 'string' && userAddress.trim() !== '' && typeof owner === 'string' && owner.trim() !== '') {
         if (userAddress.toLowerCase() === owner.toLowerCase()) {
           setRole('admin');
           return;
         }
       }
 
+
       // Récupérer les informations du membre
-      const memberInfo = await contract.methods.members(userAddress).call();
+      const memberInfo = (await contract.methods.members(userAddress).call()) as MemberInfo;
       const userRoleIndex = memberInfo.role;
 
       // Déterminer le rôle basé sur l'index

@@ -70,17 +70,18 @@ const RoleBasedNFTPage = () => {
     }, []);
 
     const fetchMintPrice = async (web3Instance: Web3) => {
-        if (web3Instance) {
-            const contract = new web3Instance.eth.Contract(ABI, contractAddress);
-            const price = await contract.methods.mintPrice().call(); // Récupérez le prix du mint
-            if (typeof price === 'string') {
-                const ethPrice = parseFloat(web3Instance.utils.fromWei(price, 'ether'));
-                setMintPrice(ethPrice.toString()); // Stockez le prix dans l'état local sous forme de chaîne de caractères
-            } else {
-                console.error('Unexpected type for price:', typeof price);
-            }
+        const contract = new web3Instance.eth.Contract(ABI, contractAddress);
+
+        try {
+            const price: string = await contract.methods.mintPrice().call(); // Le prix est renvoyé en wei sous forme de string
+            const ethPrice: string = web3Instance.utils.fromWei(price, 'ether'); // Converti en ethers sous forme de string
+            setMintPrice(ethPrice); // Stocke le prix dans l'état local
+        } catch (error) {
+            console.error("Erreur lors de la récupération du prix du mint :", error);
         }
     };
+
+
 
 
     const generateImage = async () => {
@@ -98,59 +99,75 @@ const RoleBasedNFTPage = () => {
     };
 
     const uploadFileToIPFS = async (imageUrl: string | null) => {
-        setIsUploading(true); // Assurez-vous de suivre l'état de téléchargement
+        setIsUploading(true);
 
         try {
-            if (imageUrl) {
-                const formData = new FormData();
-                const response = await fetch(imageUrl);
-                const blob = await response.blob();
-                formData.append('file', blob, 'insect.gif');
-
-                // Upload du GIF sur IPFS
-                const imageResponse = await axios.post('https://api.pinata.cloud/pinning/pinFileToIPFS', formData, {
-                    headers: {
-                        'Authorization': `Bearer ${process.env.PINATA_JWT}`,
-                        'Content-Type': 'multipart/form-data'
-                    }
-                });
-
-                const imageIpfsUrl = `https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${imageResponse.data.IpfsHash}`;
-
-                // Créer l'objet de métadonnées
-                const metadataJson = {
-                    name: name,
-                    bio: bio,
-                    description: "Vous êtes " + selectedRole,
-                    image: imageIpfsUrl,
-                    role: selectedRole,
-                    tags: ["Adhesion", selectedRole],
-                };
-
-                // Upload des métadonnées sur IPFS
-                const metadataResponse = await axios.post('https://api.pinata.cloud/pinning/pinJSONToIPFS', metadataJson, {
-                    headers: {
-                        'Authorization': `Bearer ${process.env.PINATA_JWT}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-
-                setIpfsUrl(`https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`);
-            } else {
+            if (!imageUrl) {
                 alert("Veuillez vous assurer que l'image est générée.");
+                setIsUploading(false);
+                return;
             }
+
+            console.log("Image URL:", imageUrl);
+
+            const formData = new FormData();
+            const response = await fetch(imageUrl);
+            const blob = await response.blob();
+            formData.append("file", blob, "insect.gif");
+
+            console.log("Uploading image to IPFS...");
+            const imageResponse = await axios.post("https://api.pinata.cloud/pinning/pinFileToIPFS", formData, {
+                headers: {
+                    Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT}`,
+                    "Content-Type": "multipart/form-data"
+                }
+            });
+
+            const imageIpfsUrl = `https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${imageResponse.data.IpfsHash}`;
+            console.log("Image IPFS URL:", imageIpfsUrl);
+
+            // Métadonnées
+            const metadataJson = {
+                name: name || "Nom inconnu",
+                bio: bio || "Aucune bio",
+                description: `Vous êtes ${selectedRole}`,
+                image: imageIpfsUrl,
+                role: selectedRole || "Membre",
+                tags: ["Adhesion", selectedRole || "Membre"]
+            };
+
+            console.log("Metadata JSON:", JSON.stringify(metadataJson, null, 2));
+
+            console.log("Uploading metadata to IPFS...");
+            const metadataResponse = await axios.post(
+                "https://api.pinata.cloud/pinning/pinJSONToIPFS",
+                metadataJson,
+                {
+                    headers: {
+                        Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT}`,
+                        "Content-Type": "application/json"
+                    }
+                }
+            );
+
+            setIpfsUrl(`https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`);
+            console.log("Metadata IPFS URL:", metadataResponse.data);
         } catch (error) {
-            console.error('Error uploading to IPFS:');
-            alert('Error uploading to IPFS: ');
+            console.error("Error uploading to IPFS:", error);
+            alert("Erreur lors de l'upload sur IPFS.");
         } finally {
             setIsUploading(false);
         }
     };
 
+
     const mintNFT = async () => {
         if (ipfsUrl && web3) {
             setIsMinting(true);
             try {
+              console.log("mintPrice avant conversion :", mintPrice);
+console.log("Type de mintPrice :", typeof mintPrice);
+
                 const contract = new web3.eth.Contract(ABI, contractAddress);
                 const priceInWei = web3.utils.toWei(mintPrice.toString(), 'ether'); // Convertir le prix en wei
 
