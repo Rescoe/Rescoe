@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { signIn, signOut } from 'next-auth/react';
 import { useAccount, useDisconnect, useSignMessage } from 'wagmi';
-import { Button, Text, HStack, Avatar, useToast, Tooltip, Box } from '@chakra-ui/react';
+import { Button, Text, HStack, useToast, Tooltip, Box } from '@chakra-ui/react';
 import { getEllipsisTxt } from '../../../utils/format';
 import { useAuth } from '../../../utils/authContext';
 import { useAuthRequestChallengeEvm } from '@moralisweb3/next';
@@ -17,17 +17,16 @@ const ConnectBouton: React.FC = () => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+  // Fonction pour gérer l'authentification utilisateur via RainbowKit
   const handleAuth = async (account: string, chainId: number) => {
     setIsConnecting(true);
     try {
       const challenge = await requestChallengeAsync({ address: account, chainId: 11155111 });
-
       if (!challenge || !challenge.message) {
         throw new Error("Challenge non valide.");
       }
 
       const signature = await signMessageAsync({ message: challenge.message });
-
       const result = await signIn('moralis-auth', {
         message: challenge.message,
         signature,
@@ -35,7 +34,8 @@ const ConnectBouton: React.FC = () => {
         redirect: false,
       });
 
-      if (result.error) {
+      // Vérification de 'result' avant d'accéder à 'error'
+      if (result && result.error) {
         throw new Error(result.error);
       }
 
@@ -56,6 +56,7 @@ const ConnectBouton: React.FC = () => {
     }
   };
 
+  // Gérer la déconnexion
   const handleDisconnect = async () => {
     await disconnectAsync();
     signOut({ callbackUrl: '/' });
@@ -63,16 +64,18 @@ const ConnectBouton: React.FC = () => {
     localStorage.removeItem('connectedAddress');
   };
 
+  // Récupérer l'adresse depuis le localStorage au chargement de la page
   useEffect(() => {
     const storedAddress = localStorage.getItem('connectedAddress');
     if (storedAddress && isConnected) {
       setAddress(storedAddress);
       setIsAuthenticated(true);
-    } else if (!storedAddress) {
+    } else {
       setIsAuthenticated(false);
     }
   }, [isConnected, setAddress]);
 
+  // Déterminer le rôle de l'utilisateur
   const getUserRole = () => {
     if (!address) return 'User';
     return role ? role.charAt(0).toUpperCase() + role.slice(1) : 'User';
