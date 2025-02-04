@@ -21,12 +21,17 @@ const ConnectBouton: React.FC = () => {
   const handleAuth = async (account: string, chainId: number) => {
     setIsConnecting(true);
     try {
-      const challenge = await requestChallengeAsync({ address: account, chainId: 11155111 });
+      // Demande de challenge
+      const challenge = await requestChallengeAsync({ address: account, chainId });
+
       if (!challenge || !challenge.message) {
-        throw new Error("Challenge non valide.");
+        throw new Error('Challenge non valide.');
       }
 
+      // Signature du challenge
       const signature = await signMessageAsync({ message: challenge.message });
+
+      // Connexion à l'API
       const result = await signIn('moralis-auth', {
         message: challenge.message,
         signature,
@@ -34,16 +39,15 @@ const ConnectBouton: React.FC = () => {
         redirect: false,
       });
 
-      // Vérification de 'result' avant d'accéder à 'error'
       if (result && result.error) {
         throw new Error(result.error);
       }
 
+      // Mettez à jour l'adresse et le statut d'authentification
       setAddress(account.toLowerCase());
       setIsAuthenticated(true);
       localStorage.setItem('connectedAddress', account.toLowerCase());
     } catch (e) {
-      console.error("Erreur lors de l'authentification:", e);
       toast({
         title: 'Oops, quelque chose s\'est mal passé...',
         description: 'Petite erreur, revenez plus tard',
@@ -61,7 +65,7 @@ const ConnectBouton: React.FC = () => {
     await disconnectAsync();
     signOut({ callbackUrl: '/' });
     setIsAuthenticated(false);
-    localStorage.removeItem('connectedAddress');
+    localStorage.removeItem('connectedAddress'); // Supprimez l'adresse lors de la déconnexion
   };
 
   // Récupérer l'adresse depuis le localStorage au chargement de la page
@@ -70,8 +74,6 @@ const ConnectBouton: React.FC = () => {
     if (storedAddress && isConnected) {
       setAddress(storedAddress);
       setIsAuthenticated(true);
-    } else {
-      setIsAuthenticated(false);
     }
   }, [isConnected, setAddress]);
 
@@ -107,20 +109,16 @@ const ConnectBouton: React.FC = () => {
             );
           }
 
-          if (isAuthenticated) {
-            return (
-              <Box>
-                <Tooltip label={`Connecté : ${getUserRole()}`} aria-label="User Role Tooltip" hasArrow placement="bottom">
-                  <HStack onClick={handleDisconnect} cursor="pointer" gap={'20px'} spacing={{ base: 2, md: 4 }} direction={{ base: 'column', md: 'row' }}>
-                    <Text fontWeight="medium">{getEllipsisTxt(account.address)}</Text>
-                    <Text fontSize="sm" color="gray.500">{chain.name}</Text>
-                  </HStack>
-                </Tooltip>
-              </Box>
-            );
-          }
-
-          return null; // Should not reach here in a proper flow
+          return (
+            <Box>
+              <Tooltip label={`Connecté : ${getUserRole()}`} aria-label="User Role Tooltip" hasArrow placement="bottom">
+                <HStack onClick={handleDisconnect} cursor="pointer" gap={'20px'} spacing={{ base: 2, md: 4 }} direction={{ base: 'column', md: 'row' }}>
+                  <Text fontWeight="medium">{getEllipsisTxt(account.address)}</Text>
+                  <Text fontSize="sm" color="gray.500">{chain.name}</Text>
+                </HStack>
+              </Tooltip>
+            </Box>
+          );
         }}
       </RainbowConnectButton.Custom>
     </Box>
