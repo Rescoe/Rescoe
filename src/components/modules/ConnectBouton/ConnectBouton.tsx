@@ -17,10 +17,8 @@ const ConnectBouton: React.FC = () => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // Fonction pour gérer l'authentification utilisateur via RainbowKit
   const handleAuth = async (account: string, chainId: number) => {
     setIsConnecting(true);
-
     try {
       const challenge = await requestChallengeAsync({ address: account, chainId: 11155111 });
 
@@ -30,12 +28,16 @@ const ConnectBouton: React.FC = () => {
 
       const signature = await signMessageAsync({ message: challenge.message });
 
-      await signIn('moralis-auth', {
+      const result = await signIn('moralis-auth', {
         message: challenge.message,
         signature,
         network: 'Evm',
         redirect: false,
       });
+
+      if (result.error) {
+        throw new Error(result.error);
+      }
 
       setAddress(account.toLowerCase());
       setIsAuthenticated(true);
@@ -43,7 +45,7 @@ const ConnectBouton: React.FC = () => {
     } catch (e) {
       console.error("Erreur lors de l'authentification:", e);
       toast({
-        title: 'Oops, something went wrong...',
+        title: 'Oops, quelque chose s\'est mal passé...',
         description: 'Petite erreur, revenez plus tard',
         status: 'error',
         position: 'top-right',
@@ -54,27 +56,23 @@ const ConnectBouton: React.FC = () => {
     }
   };
 
-
-  // Gérer la déconnexion
   const handleDisconnect = async () => {
     await disconnectAsync();
     signOut({ callbackUrl: '/' });
     setIsAuthenticated(false);
-
-    // Supprimer l'adresse du localStorage lors de la déconnexion
     localStorage.removeItem('connectedAddress');
   };
 
-  // Récupérer l'adresse depuis le localStorage au chargement de la page
   useEffect(() => {
     const storedAddress = localStorage.getItem('connectedAddress');
     if (storedAddress && isConnected) {
       setAddress(storedAddress);
       setIsAuthenticated(true);
+    } else if (!storedAddress) {
+      setIsAuthenticated(false);
     }
   }, [isConnected, setAddress]);
 
-  // Déterminer le rôle de l'utilisateur
   const getUserRole = () => {
     if (!address) return 'User';
     return role ? role.charAt(0).toUpperCase() + role.slice(1) : 'User';
@@ -99,24 +97,27 @@ const ConnectBouton: React.FC = () => {
                 onClick={() => handleAuth(account.address, chain.id)}
                 colorScheme="green"
                 isLoading={isConnecting}
-                loadingText="Verification de l'adhésion..."
+                loadingText="Vérification de l'adhésion..."
               >
                 Espace Adhérents
               </Button>
             );
           }
 
-          return (
-            <Box>
-              <Tooltip label={`Connecté : ${getUserRole()}`} aria-label="User Role Tooltip" hasArrow placement="bottom">
-                <HStack onClick={handleDisconnect} cursor="pointer" gap={'20px'} spacing={{ base: 2, md: 4 }} direction={{ base: 'column', md: 'row' }}>
+          if (isAuthenticated) {
+            return (
+              <Box>
+                <Tooltip label={`Connecté : ${getUserRole()}`} aria-label="User Role Tooltip" hasArrow placement="bottom">
+                  <HStack onClick={handleDisconnect} cursor="pointer" gap={'20px'} spacing={{ base: 2, md: 4 }} direction={{ base: 'column', md: 'row' }}>
+                    <Text fontWeight="medium">{getEllipsisTxt(account.address)}</Text>
+                    <Text fontSize="sm" color="gray.500">{chain.name}</Text>
+                  </HStack>
+                </Tooltip>
+              </Box>
+            );
+          }
 
-                  <Text fontWeight="medium">{getEllipsisTxt(account.address)}</Text>
-                  <Text fontSize="sm" color="gray.500">{chain.name}</Text>
-                </HStack>
-              </Tooltip>
-            </Box>
-          );
+          return null; // Should not reach here in a proper flow
         }}
       </RainbowConnectButton.Custom>
     </Box>
