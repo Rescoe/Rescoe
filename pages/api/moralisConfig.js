@@ -3,7 +3,7 @@ import Moralis from 'moralis';
 
 const initializeMoralis = async () => {
   await Moralis.start({
-    apiKey: process.env.NEXT_PUBLIC_MORALIS_API_KEY, // Assurez-vous que cette clé est définie dans votre fichier .env
+    apiKey: process.env.MORALIS_API_KEY, // Assurez-vous que cette clé est définie dans votre fichier .env
   });
 };
 

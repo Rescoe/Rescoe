@@ -108,14 +108,12 @@ const RoleBasedNFTPage = () => {
                 return;
             }
 
-            console.log("Image URL:", imageUrl);
 
             const formData = new FormData();
             const response = await fetch(imageUrl);
             const blob = await response.blob();
             formData.append("file", blob, "insect.gif");
 
-            console.log("Uploading image to IPFS...");
             const imageResponse = await axios.post("https://api.pinata.cloud/pinning/pinFileToIPFS", formData, {
                 headers: {
                     Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT}`,
@@ -124,7 +122,6 @@ const RoleBasedNFTPage = () => {
             });
 
             const imageIpfsUrl = `https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${imageResponse.data.IpfsHash}`;
-            console.log("Image IPFS URL:", imageIpfsUrl);
 
             // Métadonnées
             const metadataJson = {
@@ -136,9 +133,7 @@ const RoleBasedNFTPage = () => {
                 tags: ["Adhesion", selectedRole || "Membre"]
             };
 
-            console.log("Metadata JSON:", JSON.stringify(metadataJson, null, 2));
 
-            console.log("Uploading metadata to IPFS...");
             const metadataResponse = await axios.post(
                 "https://api.pinata.cloud/pinning/pinJSONToIPFS",
                 metadataJson,
@@ -151,7 +146,6 @@ const RoleBasedNFTPage = () => {
             );
 
             setIpfsUrl(`https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`);
-            console.log("Metadata IPFS URL:", metadataResponse.data);
         } catch (error) {
             console.error("Error uploading to IPFS:", error);
             alert("Erreur lors de l'upload sur IPFS.");
@@ -165,8 +159,6 @@ const RoleBasedNFTPage = () => {
         if (ipfsUrl && web3) {
             setIsMinting(true);
             try {
-              console.log("mintPrice avant conversion :", mintPrice);
-console.log("Type de mintPrice :", typeof mintPrice);
 
                 const contract = new web3.eth.Contract(ABI, contractAddress);
                 const priceInWei = web3.utils.toWei(mintPrice.toString(), 'ether'); // Convertir le prix en wei
