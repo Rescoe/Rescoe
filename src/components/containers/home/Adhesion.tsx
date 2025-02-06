@@ -176,7 +176,7 @@ const RoleBasedNFTPage = () => {
                 setIsMinting(false);
             }
         } else {
-            alert("Veuillez assurez-vous que l'URL IPFS est définie.");
+            alert("Assurez vous d'être connecté, si vous êtes déjà connecté, essayez depuis le navigateur intégré à votre wallet. ");
         }
     };
 
@@ -255,9 +255,6 @@ const RoleBasedNFTPage = () => {
               </div>
             )}
 
-            {ipfsUrl && (
-                <Text mt={3}>URL IPFS: {ipfsUrl}</Text>
-            )}
         </Box>
     );
 };

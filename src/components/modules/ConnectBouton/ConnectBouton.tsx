@@ -21,21 +21,17 @@ const ConnectBouton: React.FC = () => {
     setIsConnecting(true);
     try {
       // Étape 1: Demander le challenge à Moralis
-      console.log("Demande de challenge avec adresse:", account, "et chainId:", chainId);
       const challenge = await requestChallengeAsync({ address: account, chainId: 11155111 });
 
       // Vérifier la validité du challenge
-      console.log("Challenge reçu:", challenge);
       if (!challenge || !challenge.message) {
         throw new Error("Challenge non valide.");
       }
 
       // Étape 2: Signer le message du challenge
-      console.log("Message à signer:", challenge.message);
       const signature = await signMessageAsync({ message: challenge.message });
 
       // Vérifier la signature
-      console.log("Signature générée:", signature);
 
       // Étape 3: Authentification avec Moralis
       const result = await signIn('moralis-auth', {
@@ -45,8 +41,6 @@ const ConnectBouton: React.FC = () => {
         redirect: false,
       });
 
-      // Vérifier la réponse de l'authentification
-      console.log("Résultat de l'authentification:", result);
 
       // Vérification d'erreur dans la réponse de signIn
       if (result && result.error) {
@@ -55,21 +49,18 @@ const ConnectBouton: React.FC = () => {
 
       // Étape 4: Mise à jour de l'adresse et de l'état d'authentification
       setAddress(account.toLowerCase());
-      console.log("Adresse mise à jour:", account.toLowerCase());
 
       setIsAuthenticated(true);
-      console.log("Utilisateur authentifié:", account.toLowerCase());
 
       // Sauvegarde dans localStorage
       localStorage.setItem('connectedAddress', account.toLowerCase());
       localStorage.setItem('isAuthenticated', 'true');
-      console.log("Données sauvegardées dans localStorage");
 
     } catch (e) {
       console.error("Erreur lors de l'authentification:", e);
       toast({
         title: 'Oops, quelque chose s\'est mal passé...',
-        description: 'Petite erreur, revenez plus tard',
+        description: 'Essayez depuis le navigateur de votre wallet',
         status: 'error',
         position: 'top-right',
         isClosable: true,

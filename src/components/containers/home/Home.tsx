@@ -234,9 +234,20 @@ const getRandomItems = (array: Collection[], count: number): Collection[] => {
         <Heading as="h1" size="xl" mb={5}>
           Bienvenue sur le premier réseau solidaire expérimental <br /> d'art digital en France
         </Heading>
-        <Text fontSize="lg" mb={9}>
-          Si vous êtes sur téléphone : <br />Pour une meilleure expérience, utilisez le navigateur intégré à votre wallet
-        </Text>
+        <Box
+          mt={10}
+          textAlign="center"
+          p={4}
+          borderWidth={1}
+          borderRadius="lg"
+          borderColor="gray.300"
+          maxWidth="80%" // Limite la largeur de la box
+          mx="auto"
+        >
+          <Text fontSize="lg" mb={9}>
+            Pour une meilleure expérience sur smartphone, <br /> utilisez le navigateur intégré à votre wallet
+          </Text>
+        </Box>
 
         <Box
           bgSize="cover"
