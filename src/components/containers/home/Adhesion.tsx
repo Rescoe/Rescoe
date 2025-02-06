@@ -51,7 +51,7 @@ const RoleBasedNFTPage = () => {
         Contributeur: 3,
     };
 
-    const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS; // Mettez à jour avec votre adresse de contrat
+    const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS!; // Mettez à jour avec votre adresse de contrat
 
     useEffect(() => {
         const initWeb3 = async () => {
@@ -62,12 +62,11 @@ const RoleBasedNFTPage = () => {
                 const accounts = await web3Instance.eth.getAccounts();
                 setAccount(accounts[0]);
                 await fetchMintPrice(web3Instance); // Récupérer le prix lors de l'initialisation
-            } else {
-                alert('Veuillez installer MetaMask !');
             }
         };
         initWeb3();
     }, []);
+
 
     const fetchMintPrice = async (web3Instance: Web3) => {
         const contract = new web3Instance.eth.Contract(ABI, contractAddress);

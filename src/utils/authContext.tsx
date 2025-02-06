@@ -58,12 +58,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setWeb3(web3Instance);
         const accounts = await web3Instance.eth.getAccounts();
         setAddress(accounts[0]); // Définir l'adresse connectée
-      } else {
-        alert('Veuillez installer MetaMask !');
       }
     };
     initWeb3();
   }, []);
+
 
   useEffect(() => {
     const fetchRole = async (userAddress: string) => {
