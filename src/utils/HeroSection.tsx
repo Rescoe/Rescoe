@@ -31,21 +31,22 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
   useEffect(() => {
     const selectedHaikus = haikus.sort(() => 0.5 - Math.random()).slice(0, 5);
     const selectedNfts = nfts.sort(() => 0.5 - Math.random()).slice(0, 5);
+    console.log(selectedNfts);
 
     localStorage.setItem("selectedItems", JSON.stringify({ selectedHaikus, selectedNfts }));
 
     const interval = setInterval(() => {
       setIndex((prevIndex) => (prevIndex + 1) % selectedNfts.length);
-    }, 5000); // Correction du commentaire pour 5 secondes
+    }, 3600000); // Correction du commentaire pour 3600 secondes
 
     return () => clearInterval(interval);
   }, [nfts, haikus]);
 
   const handleClick = (item: Nft | Haiku) => {
     if ("content" in item) {
-      const nftId = item.content.tokenId; 
-      const collectionAddress = item.content.mintContractAddress; 
-      router.push(`/tokenId/${collectionAddress}/${nftId}`); 
+      const nftId = item.content.tokenId;
+      const collectionAddress = item.content.mintContractAddress;
+      router.push(`/tokenId/${collectionAddress}/${nftId}`);
     } else {
       alert("Haiku cliqué");
     }

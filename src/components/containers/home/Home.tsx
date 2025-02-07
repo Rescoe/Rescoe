@@ -7,7 +7,7 @@ import { JsonRpcProvider, ethers, Contract } from 'ethers';
 import haikuContractABI from '../../ABI/HaikuEditions.json';
 import nftContractABI from '../../ABI/ABI_ART.json';
 //import DynamicCarousel from '../../../utils/DynamicCarousel'; // Assurez-vous d'importer le bon chemin
-//import HeroSection from '../../../utils/HeroSection'; // Assurez-vous d'importer le bon chemin
+import HeroSection from '../../../utils/HeroSection'; // Assurez-vous d'importer le bon chemin
 import ABIRESCOLLECTION from '../../ABI/ABI_Collections.json';
 import { useRouter } from 'next/router';
 
@@ -15,33 +15,40 @@ const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!;
 
 
 const Home = () => {
-  const [collections, setCollections] = useState([]);
 const [isLoading, setIsLoading] = useState(false);
 const router = useRouter();
 
 interface Haiku {
-  tokenId: string;
-  poemText: any; // Remplace 'any' par un type plus précis si possible, par exemple 'string' ou 'string[]'
+  poemText: string;
+  poet?: string;
 }
 
 const [haikus, setHaikus] = useState<Haiku[]>([]); // Typage de l'état
 
 
 interface Nft {
-  tokenId: string;
-  name: string;
-  imageUrl: string;
-  // Ajoute d'autres propriétés si nécessaire
+  image: string;
+  name?: string;
+  artist?: string;
+  content: {
+    tokenId: string;
+    mintContractAddress: string;
+  };
 }
 
-interface Collection {
-  id: string;
-  collectionType: string;
-  mintContractAddress: string;
-}
+    interface Collection {
+      id: string;
+      name: string;
+      collectionType: string;
+      imageUrl: string;
+      mintContractAddress: string[];
+      isFeatured: boolean;
+    }
 
 // Typage de l'état `nfts` avec `Nft[]` (un tableau d'objets de type Nft)
 const [nfts, setNfts] = useState<Nft[]>([]);
+
+const [collections, setCollections] = useState<Collection[]>([]);
 
 
 const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
@@ -56,23 +63,10 @@ const fetchCollections = async () => {
 
     type CollectionTuple = [number, string, string, string, string[], boolean, boolean];
 
-
-    interface Collection {
-      id: string;
-      name: string;
-      collectionType: string;
-      imageUrl: string;
-      mintContractAddress: string[];
-      isFeatured: boolean;
-    }
-
-    const [collections, setCollections] = useState<Collection[]>([]); // Typage de l'état
-
     const collectionsData = await Promise.all(
       collectionsPaginated.map(async (tuple: CollectionTuple) => {
         const [id, name, collectionType, creator, associatedAddresses, isActive, isFeatured] = tuple;
         const uri = await contract.getCollectionURI(id);
-
         const mintContractAddress = associatedAddresses;
 
         const cachedMetadata = localStorage.getItem(uri);
@@ -188,7 +182,7 @@ useEffect(() => {
   fetchCollections();
 }, []);
 
-/*
+
 useEffect(() => {
   if (collections.length > 0) {
     const artCollections = collections.filter((collection: Collection) => collection.collectionType === 'Art');
@@ -196,9 +190,13 @@ useEffect(() => {
 
     if (artCollections.length > 0) {
       const randomArtCollection = artCollections[Math.floor(Math.random() * artCollections.length)];
-      if (typeof randomArtCollection.id === 'string' && Array.isArray(randomArtCollection.mintContractAddress) && randomArtCollection.mintContractAddress.length > 0 && typeof randomArtCollection.mintContractAddress[0] === 'string') {
+
+      if (
+        typeof randomArtCollection.id === 'string' &&
+        typeof randomArtCollection.mintContractAddress === 'string' // On vérifie que c'est bien une string
+      ) {
         const artCollectionId = randomArtCollection.id;
-        const artCollectionMintContractAddress = randomArtCollection.mintContractAddress[0];
+        const artCollectionMintContractAddress = randomArtCollection.mintContractAddress; // On récupère directement la string
         fetchNFTs(artCollectionId, artCollectionMintContractAddress);
       } else {
         console.error('Propriétés id et/ou mintContractAddress manquantes ou de type invalide dans l\'objet randomArtCollection');
@@ -207,9 +205,13 @@ useEffect(() => {
 
     if (poetryCollections.length > 0) {
       const randomPoetryCollection = poetryCollections[Math.floor(Math.random() * poetryCollections.length)];
-      if (typeof randomPoetryCollection.id === 'string' && Array.isArray(randomPoetryCollection.mintContractAddress) && randomPoetryCollection.mintContractAddress.length > 0 && typeof randomPoetryCollection.mintContractAddress[0] === 'string') {
+
+      if (
+        typeof randomPoetryCollection.id === 'string' &&
+        typeof randomPoetryCollection.mintContractAddress === 'string'
+      ) {
         const poetryCollectionId = randomPoetryCollection.id;
-        const poetryCollectionMintContractAddress = randomPoetryCollection.mintContractAddress[0];
+        const poetryCollectionMintContractAddress = randomPoetryCollection.mintContractAddress;
         fetchPoems(poetryCollectionId, poetryCollectionMintContractAddress);
       } else {
         console.error('Propriétés id et/ou mintContractAddress manquantes ou de type invalide dans l\'objet randomPoetryCollection');
@@ -217,7 +219,8 @@ useEffect(() => {
     }
   }
 }, [collections]);
-*/
+
+
 
 
 
@@ -258,7 +261,9 @@ const getRandomItems = (array: Collection[], count: number): Collection[] => {
           color="white"
           textAlign="center"
         >
-          {/*<HeroSection nfts={nfts} haikus={haikus} />*/}
+          <HeroSection nfts={nfts} haikus={haikus} />
+
+
         </Box>
 
         <Box mt={6}>
