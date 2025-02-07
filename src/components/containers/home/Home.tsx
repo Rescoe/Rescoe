@@ -40,9 +40,11 @@ interface Nft {
       id: string;
       name: string;
       collectionType: string;
+      artist?: string;
       imageUrl: string;
       mintContractAddress: string[];
       isFeatured: boolean;
+
     }
 
 // Typage de l'état `nfts` avec `Nft[]` (un tableau d'objets de type Nft)
@@ -82,6 +84,7 @@ const fetchCollections = async () => {
           imageUrl: metadata.image,
           mintContractAddress,
           isFeatured,
+          creator,
         };
       })
     );
@@ -166,6 +169,8 @@ const fetchNFTs = async (collectionId: string, associatedAddress: string) => {
           price: metadata.price || 'Non défini',
           tags: metadata.tags || [],
           mintContractAddress: associatedAddress,
+          artist: metadata.artist,
+
         };
       })
     );
@@ -237,20 +242,6 @@ const getRandomItems = (array: Collection[], count: number): Collection[] => {
         <Heading as="h1" size="xl" mb={5}>
           Bienvenue sur le premier réseau solidaire expérimental <br /> d'art digital en France
         </Heading>
-        <Box
-          mt={10}
-          textAlign="center"
-          p={4}
-          borderWidth={1}
-          borderRadius="lg"
-          borderColor="gray.300"
-          maxWidth="80%" // Limite la largeur de la box
-          mx="auto"
-        >
-          <Text fontSize="lg" mb={9}>
-            Pour une meilleure expérience sur smartphone, <br /> utilisez le navigateur intégré à votre wallet
-          </Text>
-        </Box>
 
         <Box
           bgSize="cover"
@@ -263,6 +254,20 @@ const getRandomItems = (array: Collection[], count: number): Collection[] => {
         >
           <HeroSection nfts={nfts} haikus={haikus} />
 
+          <Box
+            mt={10}
+            textAlign="center"
+            p={4}
+            borderWidth={1}
+            borderRadius="lg"
+            borderColor="gray.300"
+            maxWidth="80%" // Limite la largeur de la box
+            mx="auto"
+          >
+            <Text fontSize="lg" mb={9}>
+              Pour une meilleure expérience sur smartphone, <br /> utilisez le navigateur intégré à votre wallet
+            </Text>
+          </Box>
 
         </Box>
 

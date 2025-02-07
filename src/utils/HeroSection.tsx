@@ -31,13 +31,12 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
   useEffect(() => {
     const selectedHaikus = haikus.sort(() => 0.5 - Math.random()).slice(0, 5);
     const selectedNfts = nfts.sort(() => 0.5 - Math.random()).slice(0, 5);
-    console.log(selectedNfts);
 
     localStorage.setItem("selectedItems", JSON.stringify({ selectedHaikus, selectedNfts }));
 
     const interval = setInterval(() => {
       setIndex((prevIndex) => (prevIndex + 1) % selectedNfts.length);
-    }, 3600000); // Correction du commentaire pour 3600 secondes
+    }, 3600000); // 1h
 
     return () => clearInterval(interval);
   }, [nfts, haikus]);
@@ -60,10 +59,11 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
       alignItems="center"
       justifyContent="center"
       w="100%"
-      h="400px"
+      h="500px"
       bg="transparent"
       color="white"
-      p={6}
+      p={20}
+      pb={20}
     >
       {nfts.length > 0 && haikus.length > 0 && (
         <>
@@ -98,15 +98,15 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
               alignItems="center"
               zIndex={2}
             >
-              <Text
-                fontStyle="italic"
-                fontSize="lg"
-                textAlign="center"
-                color="white"
-                maxWidth="80%"
-              >
-                {haikus[index]?.poemText || "Pas de poème disponible"}
-              </Text>
+              <VStack textAlign="center" color="white" maxWidth="80%">
+                {haikus[index]?.poemText
+                  ? haikus[index].poemText.split("\n").map((line, i) => (
+                      <Text key={i} fontStyle="italic" fontSize="lg">
+                        {line}
+                      </Text>
+                    ))
+                  : "Pas de poème disponible"}
+              </VStack>
             </Box>
           </Box>
 
@@ -126,9 +126,15 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
               <Text fontWeight="bold" mt={4}>
                 {"Poème : "}{haikus[index]?.poet || "Poète inconnu"}
               </Text>
-              <Text fontStyle="italic">
-                {haikus[index]?.poemText || "Texte du poème"}
-              </Text>
+              <VStack align="start">
+                {haikus[index]?.poemText
+                  ? haikus[index].poemText.split("\n").map((line, i) => (
+                      <Text key={i} fontStyle="italic">
+                        {line}
+                      </Text>
+                    ))
+                  : "Texte du poème"}
+              </VStack>
             </Box>
           </HStack>
         </>
