@@ -257,7 +257,7 @@ const getRandomItems = (array: Collection[], count: number): Collection[] => {
           <Box
             mt={2}
             textAlign="center"
-            p={4}
+            p={2}
             borderWidth={1}
             borderRadius="lg"
             borderColor="gray.300"

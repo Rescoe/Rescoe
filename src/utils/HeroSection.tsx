@@ -59,11 +59,13 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
       alignItems="center"
       justifyContent="center"
       w="100%"
-      h="500px"
+      h="400px"
       bg="transparent"
       color="white"
       px={4} // Moins de padding latéral sur mobile
       py={10}
+      pb={100}
+
     >
       {nfts.length > 0 && haikus.length > 0 && (
         <>
@@ -84,7 +86,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
               w="100%"
               h="100%"
               borderRadius="md"
-              opacity={hovered === "nft" ? 0.7 : 1}
+              opacity={hovered === "nft" ? 1 : 0.95}
             />
 
             <Box
