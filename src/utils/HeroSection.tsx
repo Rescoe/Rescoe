@@ -62,14 +62,15 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
       h="500px"
       bg="transparent"
       color="white"
-      p={20}
-      pb={20}
+      px={4} // Moins de padding latéral sur mobile
+      py={10}
     >
       {nfts.length > 0 && haikus.length > 0 && (
         <>
           <Box
             position="relative"
             w="100%"
+            maxW="600px"
             h="100%"
             borderRadius="md"
             cursor="pointer"
@@ -101,7 +102,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
               <VStack textAlign="center" color="white" maxWidth="80%">
                 {haikus[index]?.poemText
                   ? haikus[index].poemText.split("\n").map((line, i) => (
-                      <Text key={i} fontStyle="italic" fontSize="lg">
+                      <Text key={i} fontStyle="italic" fontSize="sm"> {/* Texte plus petit */}
                         {line}
                       </Text>
                     ))
@@ -110,26 +111,24 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
             </Box>
           </Box>
 
-          <HStack spacing={4} mt={4} align="start">
+          <HStack spacing={4} mt={4} align="start" flexDirection="column"> {/* Colonne pour éviter les sauts de ligne inégaux */}
             <Box>
-              <VStack spacing={2} align="start">
-                <Text fontWeight="bold" mt={4}>
-                  {"Oeuvre : "}{nfts[index]?.artist || "Artiste inconnu"}
-                </Text>
-                <Text fontStyle="italic" mt={2}>
-                  {nfts[index]?.name || "Titre de l'œuvre"}
-                </Text>
-              </VStack>
+              <Text fontWeight="bold" fontSize="md"> {/* Réduction de la taille */}
+                Œuvre : <Text as="span" fontWeight="normal">{nfts[index]?.artist || "Artiste inconnu"}</Text>
+              </Text>
+              <Text fontStyle="italic" fontSize="sm"> {/* Plus petit */}
+                {nfts[index]?.name || "Titre de l'œuvre"}
+              </Text>
             </Box>
 
             <Box>
-              <Text fontWeight="bold" mt={4}>
-                {"Poème : "}{haikus[index]?.poet || "Poète inconnu"}
+              <Text fontWeight="bold" fontSize="md">
+                Poème : <Text as="span" fontWeight="normal">{haikus[index]?.poet || "Poète inconnu"}</Text>
               </Text>
-              <VStack align="start">
+              <VStack align="start" maxW="100%">
                 {haikus[index]?.poemText
                   ? haikus[index].poemText.split("\n").map((line, i) => (
-                      <Text key={i} fontStyle="italic">
+                      <Text key={i} fontStyle="italic" fontSize="sm">
                         {line}
                       </Text>
                     ))
@@ -141,6 +140,8 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
       )}
     </Box>
   );
+
 };
+
 
 export default HeroSection;

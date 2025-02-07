@@ -255,16 +255,16 @@ const getRandomItems = (array: Collection[], count: number): Collection[] => {
           <HeroSection nfts={nfts} haikus={haikus} />
 
           <Box
-            mt={10}
+            mt={2}
             textAlign="center"
             p={4}
             borderWidth={1}
             borderRadius="lg"
             borderColor="gray.300"
-            maxWidth="80%" // Limite la largeur de la box
+            maxWidth="100%" // Limite la largeur de la box
             mx="auto"
           >
-            <Text fontSize="lg" mb={9}>
+            <Text fontSize="lg">
               Pour une meilleure expérience sur smartphone, <br /> utilisez le navigateur intégré à votre wallet
             </Text>
           </Box>
@@ -316,7 +316,7 @@ const getRandomItems = (array: Collection[], count: number): Collection[] => {
             <GridItem>
               <Box textAlign="center">
                 <Icon as={FaBookOpen} boxSize={8} mb={3} />
-                <Heading as="h2" size="lg" mb={2}>La poésie et la technologie</Heading>
+                <Heading as="h2" size="lg" mb={2}>Poétique et technologique</Heading>
                 <Text fontSize="md">
                   RESCOE permet aux artistes et poètes de créer, vendre et protéger leurs droits, en garantissant l'authenticité de leur propriété intellectuelle via la blockchain, tout en explorant les potentialités des technologies et du numérique dans l'art et la poésie.
                 </Text>
