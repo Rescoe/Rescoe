@@ -248,9 +248,9 @@ const MintArt: React.FC = () => {
         throw new Error(`Invalid contract address: ${collectionMintAddress}`);
       }
 
+      //const typeDeCollection = collectionDetails.collectionType;
 
-      // Définition du nombre d'éditions
-      const editions = collectionDetails.collectionType === "Poesie" ? 250 : 1;
+      let editions = 1;
 
       // Contrat de mint
       const mintContract = new web3.eth.Contract(contractABI, collectionMintAddress);
@@ -258,7 +258,7 @@ const MintArt: React.FC = () => {
 
 
       // Appel de la fonction de mint
-      const mintResult: MintEvent = await mintContract.methods.mint(ipfsUrl, editions).send({ from: accounts[0] });
+      const mintResult: MintResult = await mintContract.methods.mint(ipfsUrl, editions).send({ from: accounts[0] });
 
       if (!mintResult.events?.Transfer?.returnValues?.tokenId) {
         throw new Error("Token ID not found in Transfer event.");
@@ -278,6 +278,7 @@ const MintArt: React.FC = () => {
       setIsMinting(false);
     }
   };
+
 
   return (
     <Box p={5} maxWidth="600px" mx="auto" boxShadow="md" borderRadius="md">
