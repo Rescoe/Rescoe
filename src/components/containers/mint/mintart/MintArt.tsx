@@ -38,6 +38,11 @@ interface Collection {
   // Ajoutez d'autres champs nécessaires ici, selon les données que vous attendez
 }
 
+interface CollectionDetails {
+  collectionAddress: string;
+  collectionType: string;
+}
+
 interface MintResult {
   transactionHash: string;
   transactionIndex: bigint;
@@ -205,52 +210,74 @@ const MintArt: React.FC = () => {
 
 
 
-const mintNFT = async (): Promise<void> => {
-  if (!ipfsUrl || selectedCollectionId === null) {
-    alert('Please upload metadata to IPFS and select a collection.');
-    return;
-  }
+  const mintNFT = async (): Promise<void> => {
+    if (!ipfsUrl || selectedCollectionId === null) {
+      alert("Please upload metadata to IPFS and select a collection.");
+      return;
+    }
 
-  if (ipfsUrl && web3) {
+    if (!web3) {
+      console.error("Web3 is not initialized.");
+      return;
+    }
+
     setIsMinting(true);
     try {
-      const contractResCollection = new web3.eth.Contract(ABIRESCOLLECTION, contractRESCOLLECTION);
-      const collectionDetails: Collection = await contractResCollection.methods.getCollection(selectedCollectionId).call();
+      const accounts = await web3.eth.getAccounts();
+      if (!accounts[0]) {
+        throw new Error("No Ethereum account detected.");
+      }
 
-      if (collectionDetails.type !== 'Art') {
-        alert('You cannot mint poetry. Please select an art collection.');
+      // Récupération des détails de la collection
+      const contractResCollection = new web3.eth.Contract(ABIRESCOLLECTION, contractRESCOLLECTION);
+      const collectionDetails: CollectionDetails = await contractResCollection.methods.getCollection(selectedCollectionId).call();
+
+      if (!collectionDetails) {
+        throw new Error("Collection details not found.");
+      }
+
+      // Vérification du type de collection
+      if (collectionDetails.collectionType !== "Art") {
+        alert("You cannot mint poetry. Please select an art collection.");
         return;
       }
 
-      const collectionMintAddress = collectionDetails.address;
-      const typeDeCollection = collectionDetails.address;
+      // Récupération de l'adresse du contrat de mint
+      const collectionMintAddress: string = collectionDetails.collectionAddress;
+      if (!web3.utils.isAddress(collectionMintAddress)) {
+        throw new Error(`Invalid contract address: ${collectionMintAddress}`);
+      }
 
-      let editions = typeDeCollection === 'Poesie' ? 250 : 1;
 
+      // Définition du nombre d'éditions
+      const editions = collectionDetails.collectionType === "Poesie" ? 250 : 1;
+
+      // Contrat de mint
       const mintContract = new web3.eth.Contract(contractABI, collectionMintAddress);
       const salePriceInWei = web3.utils.toWei(salePrice, 'ether');
 
-      const mintResult: MintResult = await mintContract.methods.mint(ipfsUrl, editions).send({ from: accounts[0] });
 
-      if (mintResult.events && mintResult.events.Transfer && mintResult.events.Transfer.returnValues.tokenId) {
-        const tokenId = mintResult.events.Transfer.returnValues.tokenId;
+      // Appel de la fonction de mint
+      const mintResult: MintEvent = await mintContract.methods.mint(ipfsUrl, editions).send({ from: accounts[0] });
 
-              if (isSaleListing && salePrice) {
-                await mintContract.methods.listNFTForSale(tokenId, salePriceInWei).send({ from: accounts[0] });
-              }
-
-      } else {
-        throw new Error('Transfer event or tokenId not found');
+      if (!mintResult.events?.Transfer?.returnValues?.tokenId) {
+        throw new Error("Token ID not found in Transfer event.");
       }
 
-      alert('NFT minted and added to collection successfully!');
+      const tokenId = mintResult.events.Transfer.returnValues.tokenId;
+
+      // Si mise en vente activée, listing automatique
+      if (isSaleListing && salePrice) {
+        await mintContract.methods.listNFTForSale(tokenId, salePriceInWei).send({ from: accounts[0] });
+      }
+
+      alert("Félicitations ! Votre oeuvre est publiée !");
     } catch (error) {
-      console.error('Error minting NFT:', error);
+      console.error("Error minting NFT:", error);
     } finally {
       setIsMinting(false);
     }
-  }
-};
+  };
 
   return (
     <Box p={5} maxWidth="600px" mx="auto" boxShadow="md" borderRadius="md">
@@ -267,7 +294,7 @@ const mintNFT = async (): Promise<void> => {
       <Button mt={4} colorScheme="teal" onClick={uploadFileToIPFS} isLoading={isUploading}>
         Upload to IPFS
       </Button>
-      {ipfsUrl && <Text mt={3} wordBreak="break-word">IPFS URL: {ipfsUrl}</Text>}
+    {/*}  {ipfsUrl && <Text mt={3} wordBreak="break-word">IPFS URL: {ipfsUrl}</Text>} */}
 
       <FormLabel mt={5}>Select Collection</FormLabel>
       <Select onChange={(e) => setSelectedCollectionId(e.target.value)} placeholder="Select a Collection">

@@ -36,7 +36,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
 
     const interval = setInterval(() => {
       setIndex((prevIndex) => (prevIndex + 1) % selectedNfts.length);
-    }, 3600000); // 1h
+    }, 60000); // 1h (3600000)
 
     return () => clearInterval(interval);
   }, [nfts, haikus]);
