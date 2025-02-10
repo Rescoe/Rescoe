@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Image, Heading, VStack, Button, Text, Link, HStack, Grid, Tab, TabList, TabPanel, TabPanels, Tabs, FormLabel, Spinner, Divider, useToast } from '@chakra-ui/react';
+import { Box, Image, Heading, VStack, Button, Text, Link, HStack, Grid, Tab, TabList, TabPanel, TabPanels, Tabs, FormLabel, Spinner, Divider, useToast, useClipboard } from '@chakra-ui/react';
+
 import * as jdenticon from 'jdenticon';
 import { useAuth } from '../../../utils/authContext';
 import { JsonRpcProvider, ethers } from 'ethers';
@@ -130,6 +131,12 @@ const Dashboard = () => {
       setEnsName('Erreur lors de la récupération de l\'ENS');
     }
   };
+
+  // Fonction pour raccourcir l'adresse Ethereum
+const formatAddress = (address: string) => {
+  if (!address) return '';
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+};
 
   const fetchRolesAndImages = async (userAddress: string) => {
     const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
@@ -263,7 +270,7 @@ const Dashboard = () => {
   return (
     <Box p={6} display="flex" flexDirection="column" alignItems="center" justifyContent="center">
       <VStack spacing={8} align="stretch" width="100%" maxW="800px">
-        <Box display="flex" justifyContent="center" alignItems="center">
+      <Box display="flex" justifyContent="center" alignItems="center">
           <HStack spacing={4}>
             <Box
               dangerouslySetInnerHTML={{ __html: avatarSvg }}
@@ -272,13 +279,23 @@ const Dashboard = () => {
               borderRadius="full"
               mb={2}
             />
-            <Box>
+            <Box textAlign="center">
               <Heading mb={2}>{usernames[0]}</Heading>
               <Text fontSize="xl">{roles[0]}</Text>
               <Text fontSize="xl">{biographies[0]}</Text>
               <Divider my={6} borderColor="gray.200" w="80%" mx="auto" />
               <Text fontWeight="bold">Adresse Ethereum:</Text>
-              <Text>{address}</Text>
+              <Text>{formatAddress(address)}</Text> {/* Affichage de l'adresse raccourcie */}
+              <Button
+                onClick={() => {
+                  navigator.clipboard.writeText(address); // Copier l'adresse dans le presse-papiers
+                  alert("Adresse Ethereum copiée !");
+                }}
+                size="sm"
+                mt={2}
+              >
+                Copier
+              </Button>
               {ensName && (
                 <Text fontWeight="bold" mt={2}>ENS: {ensName}</Text>
               )}
@@ -290,14 +307,13 @@ const Dashboard = () => {
           <TabList>
             <Tab>Vos adhésions</Tab>
             <Tab>Gérer vos collections</Tab>
-            <Tab>Gérer vos oeuvres</Tab>
             <Tab>Statistiques</Tab>
           </TabList>
           <TabPanels>
             <TabPanel>
               <VStack spacing={4}>
                 <Text>Voici vos jetons d'adhésion (Insectes) :</Text>
-                <Grid templateColumns="repeat(4, 1fr)" gap={8}>
+                <Grid templateColumns="repeat(auto-fill, minmax(150px, 1fr))" gap={4}>
                   {images.length > 0 && roles.length > 0 ? (
                     images.map((imgUri, index) => (
                       <VStack key={index} spacing={2}>
@@ -308,12 +324,12 @@ const Dashboard = () => {
                             as="a"
                             cursor="pointer"
                             width="100%"
-                            p={4}
+                            p={2}
                           >
                             <img
                               src={imgUri}
                               alt={`Adhesion ${index}`}
-                              style={{ width: '85%', height: '85%', objectFit: 'cover' }}
+                              style={{ width: '100%', height: 'auto', objectFit: 'cover' }}
                             />
                           </Box>
                         </Link>
@@ -334,7 +350,7 @@ const Dashboard = () => {
               {isLoading ? (
                 <Spinner />
               ) : (
-                <Grid templateColumns="repeat(3, 1fr)" gap={6}>
+                <Grid templateColumns="repeat(auto-fill, minmax(200px, 1fr))" gap={6}>
                   {collections.length === 0 ? (
                     <Text>Aucune collection trouvée.</Text>
                   ) : (
@@ -365,16 +381,7 @@ const Dashboard = () => {
                             />
                           </Box>
                         )}
-                        <Box
-                          mt={2}
-                          textAlign="center"
-                          p={4}
-                          borderWidth={1}
-                          borderRadius="lg"
-                          borderColor="gray.300"
-                          maxWidth="80%"
-                          mx="auto"
-                        >
+                        <Box mt={2} textAlign="center">
                           <Text>{collection.name}</Text>
                         </Box>
                       </Box>
@@ -383,8 +390,8 @@ const Dashboard = () => {
                 </Grid>
               )}
 
-              <Divider my={6} borderColor="gray.200" w="80%" mx="auto" />
-              <Box mt={2} textAlign="center" p={4} mx="auto">
+              <Divider my={6} borderColor="gray.200" />
+              <Box mt={2} textAlign="center" p={4}>
                 <Link href="/u/createCollection">
                   <Button colorScheme="teal">
                     Créer une collection
@@ -394,47 +401,17 @@ const Dashboard = () => {
             </TabPanel>
 
             <TabPanel>
-              {isLoading ? (
-                <Spinner />
-              ) : (
-                <Grid templateColumns="repeat(3, 1fr)" gap={6}>
-                  {nfts.length === 0 ? (
-                    <Text>Aucun NFT trouvé.</Text>
-                  ) : (
-                    nfts.map((nft) => (
-                      <Box key={nft.tokenId} borderWidth="1px" borderRadius="lg" p={4}>
-                        <Text>Token ID: {nft.tokenId}</Text>
-                      </Box>
-                    ))
-                  )}
-                </Grid>
-              )}
-            </TabPanel>
-
-            <TabPanel>
               <VStack>
-                {isLoading ? (
-                  <Spinner />
-                ) : (
-                  <Grid templateColumns="repeat(1, 1)" gap={6}>
-                    <Text mt={4}>
-                      Collections créées : {userCollections}.
-                    </Text>
-                    <Text mt={4}>
-                      Collections restantes : {remainingCollections}.
-                    </Text>
-                    <VStack>
-                      <Text mt={4}>
-                        Points d'Adhésion
-                      </Text>
-                      {rewardPoints !== null ? (
-                        <p>Vos points Rescoe : {rewardPoints} 🐝</p>
-                      ) : (
-                        <p>Chargement des points...</p>
-                      )}
-                    </VStack>
-                  </Grid>
-                )}
+                <Text mt={4}>Collections créées : {userCollections}.</Text>
+                <Text mt={4}>Collections restantes : {remainingCollections}.</Text>
+                <VStack>
+                  <Text mt={4}>Points d'Adhésion</Text>
+                  {rewardPoints !== null ? (
+                    <Text>Vos points Rescoe : {rewardPoints} 🐝</Text>
+                  ) : (
+                    <Text>Chargement des points...</Text>
+                  )}
+                </VStack>
               </VStack>
             </TabPanel>
           </TabPanels>
