@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Box, Heading, Spinner, Grid, Tab, TabList, TabPanel, TabPanels, Tabs, Text } from '@chakra-ui/react';
 import { JsonRpcProvider, Contract } from 'ethers';
 import { useRouter } from 'next/router';
+import { useMediaQuery } from '@chakra-ui/react';
+
 import ABIRESCOLLECTION from '../../../ABI/ABI_Collections.json';
 import ABI_MINT_CONTRACT from '../../../ABI/ABI_ART.json';
 
@@ -27,6 +29,7 @@ interface NFT {
 
 
 const UniqueArtGalerie: React.FC = () => {
+  const [isMobile] = useMediaQuery('(max-width: 768px)'); // Ajuster la largeur selon vos besoins
   const [collections, setCollections] = useState<Collection[]>([]);
   const [nfts, setNfts] = useState<NFT[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -39,43 +42,26 @@ const UniqueArtGalerie: React.FC = () => {
   const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
   const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
 
-  // Récupérer les collections
   const fetchCollections = async () => {
-      setIsLoading(true);
-      try {
-        const total: number = await contract.getTotalCollectionsMinted();
-        const collectionsPaginated: any[] = await contract.getCollectionsPaginated(0, total);
+    setIsLoading(true);
+    try {
+      const total: number = await contract.getTotalCollectionsMinted();
+      const collectionsPaginated: any[] = await contract.getCollectionsPaginated(0, total);
 
-        const collectionsData: Collection[] = await Promise.all(
-          collectionsPaginated.map(async (tuple: any) => {
-            const [id, name, , , associatedAddresses, , isFeatured]: [
-              bigint,
-              string,
-              string,
-              string,
-              string,
-              boolean,
-              boolean
-            ] = tuple;
+      // Utiliser Promise.all et filtrer les résultats non nulls
+      const collectionsData = (await Promise.all(
+        collectionsPaginated.map(async (tuple: any) => {
+          const [id, name, collectionType, , associatedAddresses, , isFeatured] = tuple;
 
-            const uri: string = await contract.getCollectionURI(id);
-            const mintContractAddress: string = associatedAddresses;
+          // Vérifier ici si le type de collection est "Art"
+          if (collectionType !== "Art") return null;
 
-            const cachedMetadata = localStorage.getItem(uri);
-            if (cachedMetadata) {
-              const metadata = JSON.parse(cachedMetadata);
-              return {
-                id: id.toString(),
-                name,
-                imageUrl: metadata.image,
-                mintContractAddress,
-                isFeatured,
-              };
-            }
+          const uri: string = await contract.getCollectionURI(id);
+          const mintContractAddress: string = associatedAddresses;
 
-            const response = await fetch(`/api/proxyPinata?ipfsHash=${uri.split('/').pop()}`);
-            const metadata = await response.json();
-            localStorage.setItem(uri, JSON.stringify(metadata));
+          const cachedMetadata = localStorage.getItem(uri);
+          if (cachedMetadata) {
+            const metadata = JSON.parse(cachedMetadata);
             return {
               id: id.toString(),
               name,
@@ -83,16 +69,31 @@ const UniqueArtGalerie: React.FC = () => {
               mintContractAddress,
               isFeatured,
             };
-          })
-        );
+          }
 
-        setCollections(collectionsData.sort((a, b) => Number(b.isFeatured) - Number(a.isFeatured)));
-      } catch (error) {
-        console.error('Erreur lors de la récupération des collections :', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+          const response = await fetch(`/api/proxyPinata?ipfsHash=${uri.split('/').pop()}`);
+          const metadata = await response.json();
+          localStorage.setItem(uri, JSON.stringify(metadata));
+          return {
+            id: id.toString(),
+            name,
+            imageUrl: metadata.image,
+            mintContractAddress,
+            isFeatured,
+          };
+        })
+      )).filter((collection): collection is Collection => collection !== null); // Filtrer les valeurs nulles ici
+
+      // Définir les collections uniquement si le type est Collection
+      setCollections(collectionsData.sort((a, b) => Number(b.isFeatured) - Number(a.isFeatured)));
+    } catch (error) {
+      console.error('Erreur lors de la récupération des collections :', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
 
 
 
@@ -152,60 +153,57 @@ const UniqueArtGalerie: React.FC = () => {
         <TabList>
           <Tab>Collections mise en avant</Tab>
           <Tab>Collections</Tab>
-          <Tab>NFTs</Tab>
+          {selectedCollectionId && <Tab>{collections.find(collection => collection.id === selectedCollectionId)?.name || 'NFTs'}</Tab>}
         </TabList>
 
         <TabPanels>
-          {/* Collections featured */}
+          {/* Collections mises en avant */}
           <TabPanel>
-  {isLoading ? (
-    <Spinner />
-  ) : (
-    <Grid templateColumns="repeat(3, 1fr)" gap={6}>
-      {collections.filter((collection) => collection.isFeatured).length === 0 ? ( // Filtrer les collections "isFeatured"
-        <Text>Aucune collection mise en avant trouvée.</Text>
-      ) : (
-        collections
-          .filter((collection) => collection.isFeatured) // Filtrer les collections "isFeatured"
-          .map((collection) => (
-            <Box
-              key={collection.id}
-              borderWidth="1px"
-              borderRadius="lg"
-              p={4}
-              cursor="pointer"
-              onClick={() =>
-                handleCollectionClick(collection.id, collection.mintContractAddress) // Passe l'adresse du contrat de mint
-              }
-            >
-              {collection.imageUrl && (
-                <Box width="100%" height="150px" overflow="hidden" borderRadius="md">
-                  <img
-                    src={collection.imageUrl}
-                    alt={collection.name}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                    }}
-                  />
-                </Box>
-              )}
-              <Text>{collection.name}</Text>
-            </Box>
-          ))
-      )}
-    </Grid>
-  )}
-</TabPanel>
-
+            {isLoading ? (
+              <Spinner />
+            ) : (
+              <Grid templateColumns={isMobile ? "repeat(2, 1fr)" : "repeat(3, 1fr)"} gap={6}>
+                {collections.filter((collection) => collection.isFeatured).length === 0 ? (
+                  <Text>Aucune collection mise en avant trouvée.</Text>
+                ) : (
+                  collections
+                    .filter((collection) => collection.isFeatured)
+                    .map((collection) => (
+                      <Box
+                        key={collection.id}
+                        borderWidth="1px"
+                        borderRadius="lg"
+                        p={4}
+                        cursor="pointer"
+                        onClick={() => handleCollectionClick(collection.id, collection.mintContractAddress)}
+                      >
+                        {collection.imageUrl && (
+                          <Box width="100%" height="150px" overflow="hidden" borderRadius="md">
+                            <img
+                              src={collection.imageUrl}
+                              alt={collection.name}
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                              }}
+                            />
+                          </Box>
+                        )}
+                        <Text>{collection.name}</Text>
+                      </Box>
+                    ))
+                )}
+              </Grid>
+            )}
+          </TabPanel>
 
           {/* Collections */}
           <TabPanel>
             {isLoading ? (
               <Spinner />
             ) : (
-              <Grid templateColumns="repeat(3, 1fr)" gap={6}>
+              <Grid templateColumns={isMobile ? "repeat(2, 1fr)" : "repeat(3, 1fr)"} gap={6}>
                 {collections.length === 0 ? (
                   <Text>Aucune collection trouvée.</Text>
                 ) : (
@@ -216,7 +214,7 @@ const UniqueArtGalerie: React.FC = () => {
                       borderRadius="lg"
                       p={4}
                       cursor="pointer"
-                      onClick={() => handleCollectionClick(collection.id, collection.mintContractAddress)}  // Passe l'adresse du contrat de mint
+                      onClick={() => handleCollectionClick(collection.id, collection.mintContractAddress)}
                     >
                       {collection.imageUrl && (
                         <Box width="100%" height="150px" overflow="hidden" borderRadius="md">
@@ -240,32 +238,35 @@ const UniqueArtGalerie: React.FC = () => {
           </TabPanel>
 
           {/* NFTs */}
-          <TabPanel>
-            {isLoading ? (
-              <Spinner />
-            ) : (
-              <Grid templateColumns="repeat(auto-fill, minmax(250px, 1fr))" gap={6} justifyItems="center">
-                {nfts.length === 0 ? (
-                  <Text>Aucun NFT trouvé.</Text>
-                ) : (
-                  nfts.map((nft) => (
-                    <Box
-                      key={nft.tokenId}
-                      onClick={() => router.push(`/oeuvresId/${nft.mintContractAddress}/${nft.tokenId}`)}
-                      cursor="pointer"
-                      width="100%"
-                    >
-                      <NFTCard nft={nft} />
-                    </Box>
-                  ))
-                )}
-              </Grid>
-            )}
-          </TabPanel>
+          {selectedCollectionId && ( // Afficher uniquement si une collection a été cliquée
+            <TabPanel>
+              {isLoading ? (
+                <Spinner />
+              ) : (
+                <Grid templateColumns="repeat(auto-fill, minmax(250px, 1fr))" gap={6} justifyItems="center">
+                  {nfts.length === 0 ? (
+                    <Text>Aucun NFT trouvé.</Text>
+                  ) : (
+                    nfts.map((nft) => (
+                      <Box
+                        key={nft.tokenId}
+                        onClick={() => router.push(`/oeuvresId/${nft.mintContractAddress}/${nft.tokenId}`)}
+                        cursor="pointer"
+                        width="100%"
+                      >
+                        <NFTCard nft={nft} />
+                      </Box>
+                    ))
+                  )}
+                </Grid>
+              )}
+            </TabPanel>
+          )}
         </TabPanels>
       </Tabs>
     </Box>
   );
+
 };
 
 export default UniqueArtGalerie;
