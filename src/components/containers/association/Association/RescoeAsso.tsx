@@ -15,10 +15,10 @@ import { motion } from 'framer-motion';
 const MotionBox = motion(Box);
 
 const AssociationPage = () => {
-  const bg = useColorModeValue('gray.50', 'gray.800');
-  const textColor = useColorModeValue('gray.700', 'gray.200');
-  const accentColor = useColorModeValue('white.500', 'white.300');
-  const boxBg = useColorModeValue('white', 'gray.700');
+  const bg = useColorModeValue('Black.50', 'Black.800');
+  const textColor = useColorModeValue('Black.700', 'Black.200');
+  const accentColor = useColorModeValue('white.Black', 'white.300');
+  const boxBg = useColorModeValue('white', 'Black.700');
   const boxShadow = useColorModeValue('md', 'dark-lg');
 
   const sections = [
@@ -76,7 +76,7 @@ const AssociationPage = () => {
         ))}
       </SimpleGrid>
 
-      <Box textAlign="center" py={10} bg={useColorModeValue('gray.100', 'gray.700')} rounded="md" shadow={boxShadow}>
+      <Box textAlign="center" py={10} bg={useColorModeValue('Black.100', 'Black.700')} rounded="md" shadow={boxShadow}>
         <Heading as="h2" size="lg" mb={5} color={textColor}>
           Devenir Adhérent
         </Heading>

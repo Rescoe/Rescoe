@@ -127,15 +127,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
               <Text fontWeight="bold" fontSize="md">
                 Poème : <Text as="span" fontWeight="normal">{haikus[index]?.poet || "Poète inconnu"}</Text>
               </Text>
-              <VStack align="start" maxW="100%">
-                {haikus[index]?.poemText
-                  ? haikus[index].poemText.split("\n").map((line, i) => (
-                      <Text key={i} fontStyle="italic" fontSize="sm">
-                        {line}
-                      </Text>
-                    ))
-                  : "Texte du poème"}
-              </VStack>
+            
             </Box>
           </HStack>
         </>

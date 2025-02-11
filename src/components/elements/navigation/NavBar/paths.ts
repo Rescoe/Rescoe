@@ -31,7 +31,7 @@ const NAV_LINKS: ISubNav[] = [
       {
         label: "Contacts",
         subLabel: 'Qui sommes nous ?',
-        href: '/association/rescoeasso',
+        href: '/association/contact',
         icon: FaRegAddressCard ,  // Icône livre pour l'association
       },
 
