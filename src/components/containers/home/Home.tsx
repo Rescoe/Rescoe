@@ -6,7 +6,7 @@ import NextLink from 'next/link';
 import { JsonRpcProvider, ethers, Contract } from 'ethers';
 import haikuContractABI from '../../ABI/HaikuEditions.json';
 import nftContractABI from '../../ABI/ABI_ART.json';
-//import DynamicCarousel from '../../../utils/DynamicCarousel'; // Assurez-vous d'importer le bon chemin
+import DynamicCarousel from '../../../utils/DynamicCarousel'; // Assurez-vous d'importer le bon chemin
 import HeroSection from '../../../utils/HeroSection'; // Assurez-vous d'importer le bon chemin
 import ABIRESCOLLECTION from '../../ABI/ABI_Collections.json';
 import { useRouter } from 'next/router';
@@ -27,6 +27,7 @@ const [haikus, setHaikus] = useState<Haiku[]>([]); // Typage de l'état
 
 
 interface Nft {
+  id: string;
   image: string;
   name?: string;
   artist?: string;
@@ -68,18 +69,34 @@ const fetchCollections = async () => {
     const collectionsData = await Promise.all(
       collectionsPaginated.map(async (tuple: CollectionTuple) => {
         const [id, name, collectionType, creator, associatedAddresses, isActive, isFeatured] = tuple;
+
+        // 🔹 Vérifier si la collection est mise en avant
+        if (!isFeatured) return null;
+
         const uri = await contract.getCollectionURI(id);
         const mintContractAddress = associatedAddresses;
 
         const cachedMetadata = localStorage.getItem(uri);
+        if (cachedMetadata) {
+          const metadata = JSON.parse(cachedMetadata);
+          return {
+            id: id.toString(),
+            name,
+            collectionType,
+            imageUrl: metadata.image,
+            mintContractAddress,
+            isFeatured,
+            creator,
+          };
+        }
 
         const response = await fetch(`/api/proxyPinata?ipfsHash=${uri.split('/').pop()}`);
         const metadata = await response.json();
-
         localStorage.setItem(uri, JSON.stringify(metadata));
+
         return {
           id: id.toString(),
-          name: name,
+          name,
           collectionType,
           imageUrl: metadata.image,
           mintContractAddress,
@@ -89,20 +106,26 @@ const fetchCollections = async () => {
       })
     );
 
-    const sortedCollections = collectionsData.sort((a, b) => {
-      const featuredA = a.isFeatured ? 1 : 0;
-      const featuredB = b.isFeatured ? 1 : 0;
-      return featuredB - featuredA;
+    // 🔹 Filtrer les valeurs nulles après l'exécution des promesses
+    const filteredCollections = collectionsData.filter(
+      (collection): collection is Collection => collection !== null
+    );
+
+    // 🔹 Trier les collections mises en avant (même si elles le sont déjà)
+    const sortedCollections = filteredCollections.sort((a, b) => {
+      return Number(b.isFeatured) - Number(a.isFeatured);
     });
 
-    setCollections(sortedCollections); // Mise à jour de l'état avec le bon type
+    setCollections(sortedCollections); // Mise à jour de l'état avec les collections filtrées
 
-} catch (error) {
-  console.error('Error fetching collections:' );
-} finally {
-  setIsLoading(false);
-}
+  } catch (error) {
+    console.error('Error fetching collections:', error);
+  } finally {
+    setIsLoading(false);
+  }
 };
+
+
 
 // Récupérer les poèmes (haikus)
 const fetchPoems = async (collectionId: string, associatedAddress: string) => {
@@ -345,7 +368,7 @@ const getRandomItems = (array: Collection[], count: number): Collection[] => {
             Parfois les artistes et poètes collaborent, parfois le hasard les fait se rencontrer !
           </Text>
 
-          {/* }<DynamicCarousel nfts={nfts} haikus={haikus} /> */}
+          <DynamicCarousel nfts={nfts} haikus={haikus} />
         </VStack>
       </Box>
     );
