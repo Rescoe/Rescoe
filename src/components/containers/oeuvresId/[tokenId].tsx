@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Web3 from 'web3';
 import detectEthereumProvider from '@metamask/detect-provider';
 import { useRouter } from 'next/router';
-import { JsonRpcProvider, Contract, ethers } from 'ethers';
+import { JsonRpcProvider, Contract, ethers, formatUnits  } from 'ethers';
 
 import {
   Box,
@@ -119,9 +119,13 @@ const TokenPage: React.FC = () => {
 
 
 //################################################################ Fetch NFT DATA
+
 const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<NFTData> => {
   const cacheKey = `${contractAddress}_${tokenId}`;
   if (nftCache[cacheKey]) return nftCache[cacheKey];
+
+  // Initialisation de web3Instance
+  const web3Instance = new Web3(new Web3.providers.HttpProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!));
 
   try {
     const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
@@ -129,6 +133,11 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
     const owner: string = await contract.ownerOf(tokenId);
     const uri: string = await contract.tokenURI(tokenId);
     const forsale: boolean = await contract.isNFTForSale(tokenId);
+    const PriceNumber: bigint = await contract.getTokenPrice(tokenId);
+
+    const priceInEther: string = formatUnits(PriceNumber, 18); // 18 décimales pour Ether
+    setPrice(priceInEther);
+
 
     if (uri) {
       const res = await fetch(`/api/proxyPinata?ipfsHash=${uri.split('/').pop()}`);
@@ -141,6 +150,7 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
         description: data.description,
         artist: data.artist,
         forsale,
+        price: priceInEther, // Le prix correctement converti en Ether
       };
 
       setNFTCache((prev) => ({ ...prev, [cacheKey]: nftData }));
@@ -189,6 +199,7 @@ const handleListForSale = async () => {
 };
 
     const handlePurchase = async () => {
+
       if (!web3 || !contractAddress || !tokenId || !nftData?.price || accounts.length === 0) {
         console.error("Web3, contractAddress, tokenId, nftData.price ou accounts sont manquants");
         return;
