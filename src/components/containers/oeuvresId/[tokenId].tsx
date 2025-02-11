@@ -47,7 +47,6 @@ const TokenPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [membershipStatus, setMembershipStatus] = useState<string>('');
-  const [remainingTime, setRemainingTime] = useState<number>(0);
   const [name, setName] = useState<string>('');
   const [bio, setBio] = useState<string>('');
   const [price, setPrice] = useState<string>('');
