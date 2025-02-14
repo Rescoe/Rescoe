@@ -108,6 +108,7 @@ const [canvasName, setCanvasName] = useState<string>('');
       }
     };
 
+
     useEffect(() => {
       if (accounts.length > 0) fetchCollections();
     }, [accounts]);
