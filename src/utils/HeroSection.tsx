@@ -4,7 +4,6 @@ import { useRouter } from "next/router";
 
 // Définition des types pour les props
 interface Nft {
-  id: string;
   image: string;
   name?: string;
   artist?: string;
@@ -128,7 +127,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
               <Text fontWeight="bold" fontSize="md">
                 Poème : <Text as="span" fontWeight="normal">{haikus[index]?.poet || "Poète inconnu"}</Text>
               </Text>
-
+            
             </Box>
           </HStack>
         </>

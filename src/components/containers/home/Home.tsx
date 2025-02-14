@@ -169,41 +169,49 @@ const fetchPoems = async (collectionId: string, associatedAddress: string) => {
 
 // Récupérer les NFTs
 const fetchNFTs = async (collectionId: string, associatedAddress: string) => {
-  setIsLoading(true);
-  try {
-    const collectionContract = new Contract(associatedAddress, nftContractABI, provider);
-    const tokenIds = await collectionContract.getTokenPaginated(0, 10);
+    setIsLoading(true);
+    try {
+        const collectionContract = new Contract(associatedAddress, nftContractABI, provider);
+        const tokenIds = await collectionContract.getTokenPaginated(0, 4);
 
-    const nftsData = await Promise.all(
-      tokenIds.map(async (tokenId: string) => {
-        const tokenURI = await collectionContract.tokenURI(tokenId);
-        const cachedMetadata = localStorage.getItem(tokenURI);
-        const metadata = cachedMetadata ? JSON.parse(cachedMetadata) : await (await fetch(`/api/proxyPinata?ipfsHash=${tokenURI.split('/').pop()}`)).json();
+        const nftsData = await Promise.all(
+            tokenIds.map(async (tokenId: string) => {
+                try {
+                  //Pensr a ajouter une fonction exist sur collection contratc ou en tout cas s'assurer que les tokenId de paginated existe bel et bien pour ne pas avoir de probleme si jamais les tokens sont brulés !!! 
+                    const tokenURI = await collectionContract.tokenURI(tokenId);
+                    const cachedMetadata = localStorage.getItem(tokenURI);
+                    const metadata = cachedMetadata ? JSON.parse(cachedMetadata) : await (await fetch(`/api/proxyPinata?ipfsHash=${tokenURI.split('/').pop()}`)).json();
 
-        if (!cachedMetadata) {
-          localStorage.setItem(tokenURI, JSON.stringify(metadata));
-        }
+                    if (!cachedMetadata) {
+                        localStorage.setItem(tokenURI, JSON.stringify(metadata));
+                    }
 
-        return {
-          tokenId: tokenId.toString(),
-          image: metadata.image,
-          name: metadata.name,
-          description: metadata.description,
-          price: metadata.price || 'Non défini',
-          tags: metadata.tags || [],
-          mintContractAddress: associatedAddress,
-          artist: metadata.artist,
+                    return {
+                        tokenId: tokenId.toString(),
+                        image: metadata.image,
+                        name: metadata.name,
+                        description: metadata.description,
+                        price: metadata.price || 'Non défini',
+                        tags: metadata.tags || [],
+                        mintContractAddress: associatedAddress,
+                        artist: metadata.artist,
+                    };
+                } catch (tokenError) {
+                    console.error(`Erreur lors de la récupération des métadonnées pour le tokenId ${tokenId}:`, tokenError);
+                    return null; // Ignorez les tokens dont les métadonnées ne peuvent pas être récupérées
+                }
+            })
+        );
 
-        };
-      })
-    );
-    setNfts(nftsData);
-  } catch (error) {
-    console.error('Erreur lors de la récupération des NFTs :' );
-  } finally {
-    setIsLoading(false);
-  }
+        // Filtrer les résultats null pour éviter d'afficher les NFTs inexistants
+        setNfts(nftsData.filter(nft => nft !== null));
+    } catch (error) {
+        console.error('Erreur lors de la récupération des NFTs :', error);
+    } finally {
+        setIsLoading(false);
+    }
 };
+
 
 // Charger les collections et les NFTs / Poèmes
 useEffect(() => {

@@ -97,43 +97,50 @@ const UniqueArtGalerie: React.FC = () => {
 
 
 
-
   const fetchNFTs = async (collectionId: string, associatedAddress: string) => {
-    setIsLoading(true);
-    try {
-      const collectionContract = new Contract(associatedAddress, ABI_MINT_CONTRACT, provider);
-      const tokenIds: string[] = await collectionContract.getTokenPaginated(0, 10);
+      setIsLoading(true);
+      try {
+          const collectionContract = new Contract(associatedAddress, ABI_MINT_CONTRACT, provider);
+          const tokenIds: string[] = await collectionContract.getTokenPaginated(0, 10);
 
-      const nftsData: NFT[] = await Promise.all(
-        tokenIds.map(async (tokenId: string) => {
-          const tokenURI: string = await collectionContract.tokenURI(tokenId);
-          const cachedMetadata = localStorage.getItem(tokenURI);
-          const metadata = cachedMetadata
-            ? JSON.parse(cachedMetadata)
-            : await (await fetch(`/api/proxyPinata?ipfsHash=${tokenURI.split('/').pop()}`)).json();
+          const nftsData = (await Promise.all(
+              tokenIds.map(async (tokenId: string) => {
+                  try {
+                      const tokenURI: string = await collectionContract.tokenURI(tokenId);
+                      const cachedMetadata = localStorage.getItem(tokenURI);
+                      const metadata = cachedMetadata
+                          ? JSON.parse(cachedMetadata)
+                          : await (await fetch(`/api/proxyPinata?ipfsHash=${tokenURI.split('/').pop()}`)).json();
 
-          if (!cachedMetadata) {
-            localStorage.setItem(tokenURI, JSON.stringify(metadata));
-          }
+                      if (!cachedMetadata) {
+                          localStorage.setItem(tokenURI, JSON.stringify(metadata));
+                      }
 
-          return {
-            tokenId: tokenId.toString(),
-            image: metadata.image,
-            name: metadata.name,
-            description: metadata.description,
-            price: metadata.price || 'Non défini',
-            tags: metadata.tags || [],
-            mintContractAddress: associatedAddress,
-          };
-        })
-      );
-      setNfts(nftsData);
-    } catch (error) {
-      console.error('Erreur lors de la récupération des NFTs :', error);
-    } finally {
-      setIsLoading(false);
-    }
+                      return {
+                          tokenId: tokenId.toString(),
+                          image: metadata.image,
+                          name: metadata.name,
+                          description: metadata.description,
+                          price: metadata.price || 'Non défini',
+                          tags: metadata.tags || [],
+                          mintContractAddress: associatedAddress,
+                      };
+                  } catch (error) {
+                      console.error(`Erreur pour le tokenId ${tokenId}:`, error);
+                      return null; // Renvoie null en cas d'erreur
+                  }
+              })
+          )).filter((nft): nft is NFT => nft !== null); // Filtrage des null
+
+          setNfts(nftsData);
+      } catch (error) {
+          console.error('Erreur lors de la récupération des NFTs :', error);
+      } finally {
+          setIsLoading(false);
+      }
   };
+
+
 
 
   const handleCollectionClick = (collectionId: string, associatedAddress: string) => {
