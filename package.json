@@ -40,6 +40,7 @@
     "gif-frames": "^1.0.1",
     "gif.js": "^0.2.0",
     "gifuct-js": "^2.1.2",
+    "html2canvas": "^1.4.1",
     "jdenticon": "^3.3.0",
     "jszip": "^3.10.1",
     "localtunnel": "^2.0.2",

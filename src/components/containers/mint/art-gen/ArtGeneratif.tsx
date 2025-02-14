@@ -8,6 +8,8 @@ import detectEthereumProvider from "@metamask/detect-provider";
 import contractABI from '../../../ABI/ABI_ART.json';  // Assurez-vous que le chemin est correct.
 import Web3 from "web3";
 import ABIRESCOLLECTION from '../../../ABI/ABI_Collections.json';
+import html2canvas from 'html2canvas';
+
 
 const PINATA_GATEWAY = "https://sapphire-central-catfish-736.mypinata.cloud/ipfs/";
 const PINATA_API_URL = "https://api.pinata.cloud/pinning";
@@ -28,6 +30,7 @@ interface CollectionDetails {
 const GenerativeArtUploader: React.FC = () => {
   const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT as string;
 
+const [canvasName, setCanvasName] = useState<string>('');
   const [zipFiles, setZipFiles] = useState<any>(null);
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [ipfsHash, setIpfsHash] = useState<string | null>(null);
@@ -92,7 +95,7 @@ const GenerativeArtUploader: React.FC = () => {
               owner: collection[3],
               address: collection[4],
             }))
-            .filter((collection) => collection.type === "Art");
+            .filter((collection) => collection.type === "Generative");
           setCollections(filteredCollections);
           console.log(collections);
         } else {
@@ -169,6 +172,70 @@ const GenerativeArtUploader: React.FC = () => {
     }
   }, [zipFiles]);
 
+
+  const captureCanvas = () => {
+    return new Promise<Blob>((resolve, reject) => {
+      const iframe = document.getElementById("generativeArtIframe") as HTMLIFrameElement;
+      if (!iframe) {
+        reject(new Error("Iframe non trouvé"));
+        return;
+      }
+
+      const iframeDocument = iframe.contentDocument || iframe.contentWindow?.document;
+      if (!iframeDocument) {
+        reject(new Error("Impossible d'accéder au document de l'iframe"));
+        return;
+      }
+
+      // Essayer de trouver le canvas avec le nom donné
+      const canvas = iframeDocument.getElementById(canvasName) as HTMLCanvasElement | null;
+      if (canvas) {
+        // Si le canvas existe, le capturer
+        canvas.toBlob((blob) => {
+          if (blob) {
+            setImageBlob(blob); // Stocke le blob capturé
+            resolve(blob);
+          } else {
+            reject(new Error("Échec de la capture du canvas"));
+          }
+        }, "image/png");
+      } else {
+        // Si le canvas n'est pas trouvé, capturer une image du renderPreview
+        console.log(`Canvas "${canvasName}" non trouvé, capture du preview`);
+        capturePreview().then(resolve).catch(reject);
+      }
+    });
+  };
+
+  // Fonction pour capturer le renderPreview (iframe ou autre élément)
+  const capturePreview = () => {
+    return new Promise<Blob>((resolve, reject) => {
+      const iframe = document.getElementById("generativeArtIframe") as HTMLIFrameElement;
+      if (!iframe) {
+        reject(new Error("Iframe non trouvé"));
+        return;
+      }
+
+      const iframeDocument = iframe.contentDocument || iframe.contentWindow?.document;
+      if (!iframeDocument) {
+        reject(new Error("Impossible d'accéder au document de l'iframe"));
+        return;
+      }
+
+      // On prend une capture de la fenêtre d'aperçu (peut être d'un div ou de l'iframe elle-même)
+      html2canvas(iframeDocument.body).then((canvas) => {
+        canvas.toBlob((blob) => {
+          if (blob) {
+            setImageBlob(blob); // Stocke le blob capturé
+            resolve(blob);
+          } else {
+            reject(new Error("Échec de la capture du preview"));
+          }
+        }, "image/png");
+      }).catch(reject);
+    });
+  };
+
   const renderPreview = () => {
     if (previewUrl) {
       return (
@@ -184,37 +251,6 @@ const GenerativeArtUploader: React.FC = () => {
     }
     return <Text>Pas de fichier index.html trouvé dans le ZIP.</Text>;
   };
-
-  const captureCanvas = () => {
-    return new Promise<Blob>((resolve, reject) => {
-        const iframe = document.getElementById("generativeArtIframe") as HTMLIFrameElement;
-        if (!iframe) {
-            reject(new Error("Iframe non trouvé"));
-            return;
-        }
-
-        const iframeDocument = iframe.contentDocument || iframe.contentWindow?.document;
-        if (!iframeDocument) {
-            reject(new Error("Impossible d'accéder au document de l'iframe"));
-            return;
-        }
-
-        const canvas = iframeDocument.getElementById("myCanvas") as HTMLCanvasElement | null;
-        if (!canvas) {
-            reject(new Error("Canvas non trouvé dans l'iframe"));
-            return;
-        }
-
-        canvas.toBlob((blob) => {
-            if (blob) {
-                setImageBlob(blob); // Stocke le blob capturé
-                resolve(blob);
-            } else {
-                reject(new Error("Échec de la capture du canvas"));
-            }
-        }, "image/png");
-    });
-};
 
   const uploadToIPFS = async () => {
     if (!imageBlob) {
@@ -352,16 +388,36 @@ const GenerativeArtUploader: React.FC = () => {
 
   return (
     <VStack spacing={4} p={5}>
+      {/* Champ pour uploader le fichier ZIP */}
       <Input
         type="file"
         accept=".zip"
         onChange={handleFileChange}
         mb={4}
       />
+
+      {/* Affichage de l'aperçu du contenu génératif */}
       {renderPreview()}
 
-      <Image src={imageBlob ? URL.createObjectURL(imageBlob) : ''} alt="Captured Preview" mb={3} boxSize="200px" objectFit="cover" />
+      {/* Affichage de l'image capturée */}
+      <Image
+        src={imageBlob ? URL.createObjectURL(imageBlob) : ''}
+        alt="Captured Preview"
+        mb={3}
+        boxSize="200px"
+        objectFit="cover"
+      />
 
+      {/* Champ de texte pour entrer le nom du canvas */}
+      <Input
+        type="text"
+        placeholder="Entrez le nom du canvas"
+        value={canvasName}
+        onChange={(e) => setCanvasName(e.target.value)}
+        mb={4}
+      />
+
+      {/* Formulaire pour entrer les metadata */}
       <VStack spacing={3} align="stretch">
         <Input placeholder="Artist" name="artist" value={metadata.artist} onChange={handleMetadataChange} />
         <Input placeholder="Name" name="name" value={metadata.name} onChange={handleMetadataChange} />
@@ -369,13 +425,17 @@ const GenerativeArtUploader: React.FC = () => {
         <Input placeholder="Tags (comma-separated)" name="tags" value={metadata.tags} onChange={handleMetadataChange} />
       </VStack>
 
+      {/* Bouton pour capturer l'image du canvas */}
       <Button mt={4} colorScheme="teal" onClick={() => { captureCanvas(); }}>
-        Captur
+        Capture
       </Button>
+
+      {/* Bouton pour télécharger sur IPFS */}
       <Button mt={4} colorScheme="teal" onClick={() => { uploadToIPFS(); }}>
         Upload
       </Button>
 
+      {/* Sélection de la collection */}
       <Select onChange={(e) => setSelectedCollectionId(e.target.value)} placeholder="Sélectionnez une Collection">
         {collections.map((collection) => (
           <option key={collection.id} value={collection.id.toString()}>
@@ -384,6 +444,7 @@ const GenerativeArtUploader: React.FC = () => {
         ))}
       </Select>
 
+      {/* Input pour le nombre d'éditions */}
       <Input
         type="number"
         placeholder="Nombre d'éditions"
@@ -392,6 +453,7 @@ const GenerativeArtUploader: React.FC = () => {
         mt={4}
       />
 
+      {/* Bouton pour mint l'art */}
       <Button
         onClick={mintArt}
         colorScheme="green"
@@ -401,6 +463,7 @@ const GenerativeArtUploader: React.FC = () => {
         Mint l'art
       </Button>
     </VStack>
+
   );
 };
 

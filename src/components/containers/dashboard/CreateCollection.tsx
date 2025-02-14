@@ -337,6 +337,7 @@ const [account, setAccount] = useState<string | null>(null);
                   <option value="">Sélectionner un type</option>
                   <option value="Art">Art</option>
                   <option value="Poesie">Poésie</option>
+                  <option value="Generative">Art Génératif</option>
                 </Select>
               </FormControl>
 
