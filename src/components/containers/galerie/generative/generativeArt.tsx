@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Heading, Spinner, Grid, Tab, TabList, TabPanel, TabPanels, Tabs, Text } from '@chakra-ui/react';
-import { JsonRpcProvider, Contract } from 'ethers';
+import { JsonRpcProvider, Contract, ethers } from 'ethers';
 import { useRouter } from 'next/router';
 import { useMediaQuery } from '@chakra-ui/react';
-
 import ABIRESCOLLECTION from '../../../ABI/ABI_Collections.json';
-import ABI_MINT_CONTRACT from '../../../ABI/ABI_ART.json';
-
+import ABI_MINT_CONTRACT from '../../../ABI/ABI_GENERATIVE_ART.json';
 import NFTCard from '../NFTCard';
 
 interface Collection {
@@ -19,17 +17,18 @@ interface Collection {
 
 interface NFT {
   tokenId: string;
-  image: string;
+  owner: string; // Définir le type exact du propriétaire, par ex. string
   name: string;
   description: string;
-  price: number;
+  price: number | null; // Peut être null si non défini
   tags: string[];
   mintContractAddress: string;
+  tokenURI: string; // Ajout de l'URI manquant
 }
 
 
 const UniqueArtGalerie: React.FC = () => {
-  const [isMobile] = useMediaQuery('(max-width: 768px)'); // Ajuster la largeur selon vos besoins
+  const [isMobile] = useMediaQuery('(max-width: 768px)');
   const [collections, setCollections] = useState<Collection[]>([]);
   const [nfts, setNfts] = useState<NFT[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -38,7 +37,6 @@ const UniqueArtGalerie: React.FC = () => {
   const router = useRouter();
 
   const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!;
-
   const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
   const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
 
@@ -46,102 +44,91 @@ const UniqueArtGalerie: React.FC = () => {
     setIsLoading(true);
     try {
       const total: number = await contract.getTotalCollectionsMinted();
-      const collectionsPaginated: any[] = await contract.getCollectionsPaginated(0, total);
+      const collectionsPaginated: any[] = await contract.getCollectionsPaginated(27, total);
 
-      // Utiliser Promise.all et filtrer les résultats non nulls
       const collectionsData = (await Promise.all(
         collectionsPaginated.map(async (tuple: any) => {
           const [id, name, collectionType, , associatedAddresses, , isFeatured] = tuple;
 
-          // Vérifier ici si le type de collection est "Art"
-          if (collectionType !== "Generative") return null;
+          if (collectionType !== "Generative") return null; // On ne traite que les collections génératives
 
-          const uri: string = await contract.getCollectionURI(id);
-          const mintContractAddress: string = associatedAddresses;
+          try {
+            const collectionContract = new ethers.Contract(
+              associatedAddresses,
+              ["function getCID() view returns (string)"],
+              provider
+            );
 
-          const cachedMetadata = localStorage.getItem(uri);
-          if (cachedMetadata) {
-            const metadata = JSON.parse(cachedMetadata);
+            const cid = await collectionContract.getCID();
+            const imageUrl = `https://ipfs.io/ipfs/${cid}`;
+
             return {
               id: id.toString(),
               name,
-              imageUrl: metadata.image,
-              mintContractAddress,
+              imageUrl,
+              mintContractAddress: associatedAddresses,
               isFeatured,
             };
+          } catch (error) {
+            console.error(`Erreur lors de la récupération du CID pour la collection ${id}:`, error);
+            return null;
           }
-
-          const response = await fetch(`/api/proxyPinata?ipfsHash=${uri.split('/').pop()}`);
-          const metadata = await response.json();
-          localStorage.setItem(uri, JSON.stringify(metadata));
-          return {
-            id: id.toString(),
-            name,
-            imageUrl: metadata.image,
-            mintContractAddress,
-            isFeatured,
-          };
         })
-      )).filter((collection): collection is Collection => collection !== null); // Filtrer les valeurs nulles ici
+      )).filter((collection): collection is Collection => collection !== null);
 
-      // Définir les collections uniquement si le type est Collection
       setCollections(collectionsData.sort((a, b) => Number(b.isFeatured) - Number(a.isFeatured)));
     } catch (error) {
-      console.error('Erreur lors de la récupération des collections :', error);
+      console.error("Erreur lors de la récupération des collections :", error);
     } finally {
       setIsLoading(false);
     }
   };
 
-
-
-
-
   const fetchNFTs = async (collectionId: string, associatedAddress: string) => {
-      setIsLoading(true);
-      try {
-          const collectionContract = new Contract(associatedAddress, ABI_MINT_CONTRACT, provider);
-          const tokenIds: string[] = await collectionContract.getTokenPaginated(0, 10);
+    setIsLoading(true);
+    try {
+      const collectionContract = new Contract(associatedAddress, ABI_MINT_CONTRACT, provider);
+      const tokenIds: string[] = await collectionContract.getTokenPaginated(0, 10);
 
-          const nftsData = (await Promise.all(
-              tokenIds.map(async (tokenId: string) => {
-                  try {
-                      const tokenURI: string = await collectionContract.tokenURI(tokenId);
-                      const cachedMetadata = localStorage.getItem(tokenURI);
-                      const metadata = cachedMetadata
-                          ? JSON.parse(cachedMetadata)
-                          : await (await fetch(`/api/proxyPinata?ipfsHash=${tokenURI.split('/').pop()}`)).json();
+      const nftsData = (await Promise.all(
+        tokenIds.map(async (tokenId: string) => {
+          try {
+            const fullDetails = await collectionContract.getFullDetails(tokenId);
+            const [owner, mintDate, currentPrice, forSale, priceHistory, collectionId, tokenURI] = fullDetails;
 
-                      if (!cachedMetadata) {
-                          localStorage.setItem(tokenURI, JSON.stringify(metadata));
-                      }
+            const cachedMetadata = localStorage.getItem(tokenURI);
+            const metadata = cachedMetadata
+              ? JSON.parse(cachedMetadata)
+              : await (await fetch(`/api/proxyPinata?ipfsHash=${tokenURI.split('/').pop()}`)).json();
 
-                      return {
-                          tokenId: tokenId.toString(),
-                          image: metadata.image,
-                          name: metadata.name,
-                          description: metadata.description,
-                          price: metadata.price || 'Non défini',
-                          tags: metadata.tags || [],
-                          mintContractAddress: associatedAddress,
-                      };
-                  } catch (error) {
-                      console.error(`Erreur pour le tokenId ${tokenId}:`, error);
-                      return null; // Renvoie null en cas d'erreur
-                  }
-              })
-          )).filter((nft): nft is NFT => nft !== null); // Filtrage des null
+            if (!cachedMetadata) {
+              localStorage.setItem(tokenURI, JSON.stringify(metadata));
+            }
 
-          setNfts(nftsData);
-      } catch (error) {
-          console.error('Erreur lors de la récupération des NFTs :', error);
-      } finally {
-          setIsLoading(false);
-      }
+            return {
+              tokenId: tokenId.toString(),
+              owner: metadata.owner || owner, // Utiliser les données de fallback si propriétaire non trouvé
+              name: metadata.name,
+              description: metadata.description,
+              price: metadata.price || null, // Définir le prix à null s'il n'est pas défini
+              tags: metadata.tags || [],
+              mintContractAddress: associatedAddress,
+              tokenURI: tokenURI,
+            };
+          } catch (error) {
+            console.error(`Erreur pour le tokenId ${tokenId}:`, error);
+            return null;
+          }
+        })
+      )).filter((nft): nft is NFT => nft !== null);
+
+      setNfts(nftsData);
+    } catch (error) {
+      console.error('Erreur lors de la récupération des NFTs :', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
-
-
-
 
   const handleCollectionClick = (collectionId: string, associatedAddress: string) => {
     setSelectedCollectionId(collectionId);
@@ -164,7 +151,6 @@ const UniqueArtGalerie: React.FC = () => {
         </TabList>
 
         <TabPanels>
-          {/* Collections mises en avant */}
           <TabPanel>
             {isLoading ? (
               <Spinner />
@@ -186,14 +172,12 @@ const UniqueArtGalerie: React.FC = () => {
                       >
                         {collection.imageUrl && (
                           <Box width="100%" height="150px" overflow="hidden" borderRadius="md">
-                            <img
+                            <iframe
                               src={collection.imageUrl}
-                              alt={collection.name}
-                              style={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover',
-                              }}
+                              width="100%"
+                              height="100%"
+                              style={{ border: "none" }}
+                              sandbox="allow-scripts"
                             />
                           </Box>
                         )}
@@ -205,7 +189,6 @@ const UniqueArtGalerie: React.FC = () => {
             )}
           </TabPanel>
 
-          {/* Collections */}
           <TabPanel>
             {isLoading ? (
               <Spinner />
@@ -225,14 +208,12 @@ const UniqueArtGalerie: React.FC = () => {
                     >
                       {collection.imageUrl && (
                         <Box width="100%" height="150px" overflow="hidden" borderRadius="md">
-                          <img
+                          <iframe
                             src={collection.imageUrl}
-                            alt={collection.name}
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'cover',
-                            }}
+                            width="100%"
+                            height="100%"
+                            style={{ border: "none" }}
+                            sandbox="allow-scripts"
                           />
                         </Box>
                       )}
@@ -244,8 +225,7 @@ const UniqueArtGalerie: React.FC = () => {
             )}
           </TabPanel>
 
-          {/* NFTs */}
-          {selectedCollectionId && ( // Afficher uniquement si une collection a été cliquée
+          {selectedCollectionId && (
             <TabPanel>
               {isLoading ? (
                 <Spinner />
@@ -257,11 +237,27 @@ const UniqueArtGalerie: React.FC = () => {
                     nfts.map((nft) => (
                       <Box
                         key={nft.tokenId}
-                        onClick={() => router.push(`/oeuvresId/${nft.mintContractAddress}/${nft.tokenId}`)}
+                        borderWidth="1px"
+                        borderRadius="lg"
+                        p={4}
                         cursor="pointer"
-                        width="100%"
+                        onClick={() => router.push(`/oeuvresId/${nft.mintContractAddress}/${nft.tokenId}`)}
                       >
-                        <NFTCard nft={nft} />
+                        {nft.tokenURI ? (
+                          <Box width="100%" height="300px" overflow="hidden" borderRadius="md">
+                            <iframe
+                              src={nft.tokenURI}
+                              width="100%"
+                              height="100%"
+                              style={{ border: "none", backgroundColor: "#f9f9f9" }}
+                              sandbox="allow-scripts allow-same-origin"
+                            />
+                          </Box>
+                        ) : (
+                          <Text>Pas d'aperçu disponible</Text>
+                        )}
+                        <Text>Token ID: {nft.tokenId}</Text>
+                        <Text>Owner: {nft.owner}</Text>
                       </Box>
                     ))
                   )}
@@ -273,7 +269,6 @@ const UniqueArtGalerie: React.FC = () => {
       </Tabs>
     </Box>
   );
-
 };
 
 export default UniqueArtGalerie;

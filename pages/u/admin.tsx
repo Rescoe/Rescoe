@@ -1,42 +1,58 @@
 import { Default } from 'components/layouts/Default';
 import React, { useEffect, useState } from 'react';
 import AdminPage from '../../src/components/containers/dashboard/Admin';
-import { JsonRpcProvider, Contract } from 'ethers';
+import Web3 from 'web3';
 import ABIRESCOLLECTION from '../../src/components/ABI/ABI_Collections.json';
 
-const CONTRACT_ADDRESS = '0x3cd67A92A99f8e1086A5A8B5e6f72D470471796e'; // Assurez-vous que cette variable est dans .env.local
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT;
 
 const Admin = () => {
-    const [account, setAccount] = useState('');
-    const [isAdmin, setIsAdmin] = useState(false);
+    const [account, setAccount] = useState<string>('');
+    const [isAdmin, setIsAdmin] = useState<boolean>(false);
+    const [web3, setWeb3] = useState<Web3 | null>(null);
 
     useEffect(() => {
-        const loadAccount = async () => {
-            if (!CONTRACT_ADDRESS) {
-                console.error("Contract address is not defined.");
-                return;
-            }
+        const initWeb3 = async () => {
+            if (typeof window !== 'undefined' && window.ethereum) {
+                try {
+                    // Vérification que window.ethereum est bien présent
+                    const provider = window.ethereum as any; // On cast en 'any' pour éviter l'erreur de typage
+                    await provider.request({ method: 'eth_requestAccounts' });
 
-            // Utilisation du JsonRpcProvider pour se connecter via RPC
-            const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS); // Utiliser l'URL RPC de Moralis
+                    const web3Instance = new Web3(provider);
+                    setWeb3(web3Instance);
 
-            // Interroger le contrat pour obtenir l'owner
-            const contract = new Contract(CONTRACT_ADDRESS, ABIRESCOLLECTION, provider);
-            const contractOwner = await contract.admin(); // Remplacez 'admin' par la méthode de votre contrat pour obtenir l'owner
+                    const accounts = await web3Instance.eth.getAccounts();
+                    if (accounts.length > 0) {
+                        setAccount(accounts[0]);
 
-            // Vérifier si l'utilisateur actuel est l'owner du contrat
-            const signer = await provider.getSigner(); // Résolution de la promesse avant d'obtenir l'adresse
-            const currentAccount = await signer.getAddress(); // Obtenir l'adresse une fois que le signer est résolu
+                        // Vérification de l'existence du contrat
+                        if (!CONTRACT_ADDRESS) {
+                            console.error("L'adresse du contrat n'est pas définie dans les variables d'environnement.");
+                            return;
+                        }
 
-            setAccount(currentAccount);
+                        // Connexion au contrat
+                        const contract = new web3Instance.eth.Contract(ABIRESCOLLECTION, CONTRACT_ADDRESS);
+                        const contractOwner: string = await contract.methods.admin().call();
 
-            // Vérifier si l'utilisateur actuel est l'admin
-            if (currentAccount.toLowerCase() === contractOwner.toLowerCase()) {
-                setIsAdmin(true);
+                          if (contractOwner && contractOwner.length > 0) {
+                              setIsAdmin(accounts[0].toLowerCase() === contractOwner.toLowerCase());
+                          } else {
+                              console.error("Impossible de récupérer l'admin du contrat.");
+                          }
+
+
+                    }
+                } catch (error) {
+                    console.error('Erreur de connexion à MetaMask:');
+                }
+            } else {
+                console.error('MetaMask non détecté.');
             }
         };
 
-        loadAccount();
+        initWeb3();
     }, []);
 
     if (!isAdmin) {

@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import Web3 from 'web3';
 import getRandomInsectGif from '../../../utils/GenInsect24';
 import ABI from '../../ABI/ABIAdhesion.json';
+import { useAuth } from '../../../utils/authContext';
+
 import axios from 'axios';
 import {
     Box,
@@ -31,6 +33,7 @@ interface Detail {
 
 
 const AdminPage: React.FC = () => {
+    const { address: authAddress } = useAuth();
     const [account, setAccount] = useState<string>('');
     const [recipients, setRecipients] = useState<string>('');
     const [details, setDetails] = useState<Array<{ uri: string; role: string; name?: string; bio?: string }>>([]);
