@@ -241,7 +241,7 @@ const UniqueArtGalerie: React.FC = () => {
                         borderRadius="lg"
                         p={4}
                         cursor="pointer"
-                        onClick={() => router.push(`/oeuvresId/${nft.mintContractAddress}/${nft.tokenId}`)}
+                        onClick={() => router.push(`/generativeId/${nft.mintContractAddress}/${nft.tokenId}`)}
                       >
                         {nft.tokenURI ? (
                           <Box width="100%" height="300px" overflow="hidden" borderRadius="md">
