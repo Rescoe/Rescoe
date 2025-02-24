@@ -102,9 +102,18 @@ const ConnectBouton: React.FC = () => {
         {({ account, chain, openConnectModal, mounted }) => {
           if (!mounted || !account || !chain) {
             return (
-              <Button size="sm" onClick={openConnectModal} colorScheme="blue">
+              <Button
+                size="sm"
+                onClick={async () => {
+                  await openConnectModal(); // Ouvre le wallet
+                  if(account && chain){
+                  handleAuth(account.address, chain.id); // Passe directement à la vérification d'adhésion
+                }
+                }}
+                colorScheme="blue">
                 Connect Wallet
               </Button>
+
             );
           }
 
