@@ -1,4 +1,4 @@
-import { Box, Container, Button, Menu, MenuButton, MenuList, MenuItem, Drawer, DrawerBody, DrawerCloseButton, DrawerContent, DrawerHeader, DrawerOverlay, useDisclosure, HStack, VStack, Flex } from '@chakra-ui/react';
+import { Box, Tooltip, Container, Button, Menu, MenuButton, MenuList, MenuItem, Drawer, DrawerBody, DrawerCloseButton, DrawerContent, DrawerHeader, DrawerOverlay, useDisclosure, HStack, VStack, Flex } from '@chakra-ui/react';
 import { FaBug, FaEye, FaEyeSlash, FaBars } from 'react-icons/fa';
 import { ChevronDownIcon } from '@chakra-ui/icons';
 import React, { useRef, useState, useEffect } from 'react';
@@ -14,10 +14,16 @@ import SelectInsect from '../InsectSelector';
 
 import { Insect } from '../InsectSelector';
 
-
+interface AuthContextType {
+  isAuthenticated: boolean;
+  setAuthenticated: (authStatus: boolean) => void;
+  // Ajoutez d'autres propriétés si nécessaire
+}
 
 const Header = () => {
   const headerRef = useRef<HTMLDivElement>(null);
+  const { isAuthenticated } = useAuth();
+
   const { isAdmin, isArtist, isPoet, isTrainee, isContributor, address, isMember } = useAuth();
   const [isInsectVisible, setIsInsectVisible] = useState(true);
   const [selectedInsect, setSelectedInsect] = useState<Insect | null>(null);
@@ -166,19 +172,29 @@ const Header = () => {
 
             {isMember ? (
               <Box mt={4} display="flex" justifyContent="center">
-              {isInsectVisible && selectedInsect && (
-                <Insecte
-                  headerRef={headerRef}
-                  selectedInsect={selectedInsect.image}
-                />
-              )}
-
+                {isInsectVisible && selectedInsect && (
+                  <Insecte
+                    headerRef={headerRef}
+                    selectedInsect={selectedInsect.image}
+                  />
+                )}
               </Box>
             ) : (
-              <NextLink href="/adhesion" passHref>
-                <Button colorScheme="yellow">Adhérer</Button>
-              </NextLink>
+              <Tooltip label="Veuillez d'abord connecter votre wallet pour adhérer" aria-label="Aide Adhésion">
+                <span>
+                  <NextLink href="/adhesion" passHref>
+                    <Button
+                      colorScheme="yellow"
+                      size="sm"
+                      isDisabled={!isAuthenticated}
+                    >
+                      Adhérer
+                    </Button>
+                  </NextLink>
+                </span>
+              </Tooltip>
             )}
+
             <ColorModeButton />
           </HStack>
         </Flex>

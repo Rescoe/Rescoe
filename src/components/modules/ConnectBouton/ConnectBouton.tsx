@@ -15,7 +15,7 @@ const ConnectBouton: React.FC = () => {
   const { requestChallengeAsync } = useAuthRequestChallengeEvm();
   const { role, setAddress } = useAuth();
   const [isConnecting, setIsConnecting] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { isAuthenticated, setIsAuthenticated } = useAuth();
 
   const handleAuth = async (account: string, chainId: number) => {
     setIsConnecting(true);
@@ -103,14 +103,16 @@ const ConnectBouton: React.FC = () => {
           if (!mounted || !account || !chain) {
             return (
               <Button
-                size="sm"
                 onClick={async () => {
                   await openConnectModal(); // Ouvre le wallet
                   if(account && chain){
                   handleAuth(account.address, chain.id); // Passe directement à la vérification d'adhésion
                 }
                 }}
-                colorScheme="blue">
+                colorScheme="blue"
+                size="sm"
+                >
+
                 Connect Wallet
               </Button>
 
@@ -120,9 +122,9 @@ const ConnectBouton: React.FC = () => {
           if (isConnected && !isAuthenticated) {
             return (
               <Button
-                size="sm"
                 onClick={() => handleAuth(account.address, chain.id)}
                 colorScheme="green"
+                size="sm"
                 isLoading={isConnecting}
                 loadingText="Vérification de l'adhésion..."
               >

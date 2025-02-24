@@ -14,7 +14,9 @@ type AuthContextType = {
   isPoet: boolean;
   isTrainee: boolean;
   isContributor: boolean;
+  isAuthenticated: boolean; // Ajout de la propriété isAuthenticated
   setAddress: (address: string | null) => void;
+  setIsAuthenticated: (status: boolean) => void; // Ajout de la fonction setIsAuthenticated
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -26,8 +28,11 @@ const AuthContext = createContext<AuthContextType>({
   isPoet: false,
   isTrainee: false,
   isContributor: false,
+  isAuthenticated: false, // Valeur initiale de isAuthenticated
   setAddress: () => {},
+  setIsAuthenticated: () => {}, // Fonction vide par défaut
 });
+
 
 export const useAuth = () => useContext(AuthContext);
 
@@ -49,6 +54,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [web3, setWeb3] = useState<Web3 | null>(null);
   const [userAddress, setUserAddress] = useState<string | null>(null);
 
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
     const initWeb3 = async () => {
@@ -58,6 +64,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setWeb3(web3Instance);
         const accounts = await web3Instance.eth.getAccounts();
         setAddress(accounts[0]); // Définir l'adresse connectée
+
+        const setAuthentication = (authenticated: boolean) => {
+          setIsAuthenticated(authenticated);
+        }
+
       }
     };
     initWeb3();
@@ -123,6 +134,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       isTrainee: role === 'trainee',
       isContributor: role === 'contributor',
       isMember,
+      isAuthenticated,
+      setIsAuthenticated,
     }}>
       {loading ? <div>Loading...</div> : children}
     </AuthContext.Provider>
