@@ -112,6 +112,9 @@ useEffect(() => {
         setName(data.name);
         setBio(data.bio);
         setPrice(data.price);
+        console.log(name);
+        console.log(bio);
+        console.log(price);
       } catch (error) {
         console.error('Erreur lors de la récupération du NFT:', error);
         setError('Erreur lors de la récupération des données.');
@@ -123,60 +126,62 @@ useEffect(() => {
     fetchNFT();
   }, [router.isReady, contractAddress, tokenId]);
 
-  const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<NFTData> => {
-    const cacheKey = `${contractAddress}_${tokenId}`;
+  const fetchNFTData = async (contractAddress: string, tokenId: number) => {
+  const cacheKey = `${contractAddress}_${tokenId}`;
 
-    // Si le cache existe, on retourne les données du cache
-    if (nftCache[cacheKey]) {
-      return nftCache[cacheKey];
-    }
+  if (nftCache[cacheKey]) {
+    return nftCache[cacheKey];
+  }
 
-    try {
-      const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
-      const contract = new ethers.Contract(contractAddress, ABI, provider);
+  try {
+    const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+    const contract = new ethers.Contract(contractAddress, ABI, provider);
 
-      const [
-        owner,
-        role,
-        mintTimestamp,
-        price,
-        name,
-        bio,
-        remainingTime,
-        forSale,
-      ] = await contract.getTokenDetails(tokenId);
+    const [
+      owner,
+      role,
+      mintTimestamp,
+      price,
+      name,
+      bio,
+      remainingTime,
+      forSale
+    ] = await contract.getTokenDetails(tokenId);
 
-      const uri = await contract.tokenURI(tokenId);
-      const res = await fetch(`/api/proxyPinata?ipfsHash=${uri.split('/').pop()}`);
-      const data = await res.json();
+    const [
+      membership,
+      realName,
+      realBio
+    ] = await contract.getUserInfo(owner);
 
-      // S'assurer que web3 est initialisé avant de l'utiliser
-      if (!web3) {
-          throw new Error('Web3 not initialized');
-      }
-      const priceInEther: string = web3.utils.fromWei(price.toString(), 'ether'); // Convertir le prix en Ether
-      const nftData: NFTData = {
-        owner,
-        role,
-        mintTimestamp: formatTimestamp(Number(mintTimestamp)),
-        price: priceInEther, // Utilisation de la valeur convertie
-        name,
-        bio,
-        remainingTime: formatSeconds(Number(remainingTime)),
-        forSale,
-        membership: '', // Initialisez si besoin
-        image: data.image, // Ajoutez l'image si nécessaire
-      };
 
-      setNFTCache((prev) => ({ ...prev, [cacheKey]: nftData }));
 
-      return nftData;
-    } catch (error) {
-      console.error('Erreur lors de la récupération des données NFT:', error);
-      throw new Error('Erreur lors de la récupération des données NFT.');
-    }
+    const uri = await contract.tokenURI(tokenId);
+    const res = await fetch(`/api/proxyPinata?ipfsHash=${uri.split('/').pop()}`);
+    const data = await res.json();
+
+    const nftData = {
+      ...data,
+      owner,
+      role,
+      mintTimestamp: formatTimestamp(Number(mintTimestamp)), // Conversion et formatage
+      price: ethers.formatUnits(price, 'ether'),
+      name : realName,
+      bio : realBio,
+      remainingTime :formatSeconds(Number(remainingTime)), //: formatSeconds(Number(remainingTime)), // Conversion et formatage
+      forSale,
+      membership
+    };
+
+
+    setNFTCache((prev) => ({ ...prev, [cacheKey]: nftData }));
+
+    return nftData;
+  } catch (error) {
+    console.error('Erreur lors de la récupération des données NFT:' );
+    throw new Error('Erreur lors de la récupération des données NFT.');
+  }
   };
-
 
   const handleRenewMembership = async () => {
       // Vérifier que contractAddress est défini et est une chaîne
