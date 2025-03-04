@@ -85,8 +85,10 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
 
   const handleClick = (item: AlternatingItem) => {
     if (item?.type === "nft") {
-      const nftId = (item.content as Nft).id;
-      router.push(`/tokenId/${nftId}`);
+      const nftId = (item.content as Nft).content.tokenId;
+      const Contrat = (item.content as Nft).content.mintContractAddress;
+
+      router.push(`/oeuvresId/${Contrat}/${nftId}`);
     }
   };
 
@@ -96,6 +98,9 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
 
   const renderContent = (item: AlternatingItem) => {
     if (item.type === "haiku") {
+
+      const haikuContent = item.content as Haiku; // Assertion de type
+
       return (
         <Box
           position="relative"
@@ -117,22 +122,9 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
             height="100%"
           >
 
-          {/*          <Text fontStyle="italic" textAlign="center">
-                      {typeof item.content === "string" ? item.content : "Contenu du haiku introuvable"}
-                    </Text>
-
-                    {hoveredItem?.type === "haiku" && Array.isArray(hoveredItem.content) && (
-                      hoveredItem.content.map((line, index) => ( // Utilisation de `map` ici
-                        <Text key={index} fontStyle="italic" fontSize="sm">
-                          {line}
-                        </Text>
-                      ))
-                    )}
-          */}
-
 
             <Text fontStyle="italic" textAlign="center">
-              {typeof item.content === "string" ? item.content : "Contenu du haiku introuvable"}
+            {typeof haikuContent.poemText ? haikuContent.poemText : "Contenu du haiku introuvable"}
             </Text>
           </Box>
           {hoveredItem?.type === "haiku" && hoveredItem.content === item.content && (

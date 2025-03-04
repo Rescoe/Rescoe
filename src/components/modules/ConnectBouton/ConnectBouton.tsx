@@ -165,6 +165,23 @@ const ConnectBouton: React.FC = () => {
                         );
                     }
 
+
+
+          if (isConnected && !isAuthenticated && account && chain) {
+            return (
+              <Button
+                onClick={() => handleAuth(account.address, chain.id)}
+                colorScheme="green"
+                size="sm"
+                isLoading={isConnecting}
+                loadingText="Vérification de l'adhésion..."
+              >
+                Espace Adhérents
+              </Button>
+            );
+          }
+
+
                     return (
                         <Box>
                             <Tooltip label={`Connecté : ${getUserRole()}`} aria-label="User Role Tooltip" hasArrow placement="bottom">

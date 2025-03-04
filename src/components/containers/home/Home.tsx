@@ -177,7 +177,7 @@ const fetchNFTs = async (collectionId: string, associatedAddress: string) => {
         const nftsData = await Promise.all(
             tokenIds.map(async (tokenId: string) => {
                 try {
-                  //Pensr a ajouter une fonction exist sur collection contratc ou en tout cas s'assurer que les tokenId de paginated existe bel et bien pour ne pas avoir de probleme si jamais les tokens sont brulés !!! 
+                  //Pensr a ajouter une fonction exist sur collection contratc ou en tout cas s'assurer que les tokenId de paginated existe bel et bien pour ne pas avoir de probleme si jamais les tokens sont brulés !!!
                     const tokenURI = await collectionContract.tokenURI(tokenId);
                     const cachedMetadata = localStorage.getItem(tokenURI);
                     const metadata = cachedMetadata ? JSON.parse(cachedMetadata) : await (await fetch(`/api/proxyPinata?ipfsHash=${tokenURI.split('/').pop()}`)).json();
@@ -368,7 +368,7 @@ const getRandomItems = (array: Collection[], count: number): Collection[] => {
             En savoir plus sur l'association
           </Button>
 
-          <Divider my={6} borderColor="gray.200" w="80%" mx="auto" />
+          <Divider my={6} borderColor="gray.200" w="100%" mx="auto" />
           <Heading as="h2" size="lg" mb={5}>
             Quelques créations et poèmes associés aléatoirement :
           </Heading>
