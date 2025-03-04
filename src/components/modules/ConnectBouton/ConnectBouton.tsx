@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { signIn, signOut } from 'next-auth/react';
 import Web3 from "web3";
 import detectEthereumProvider from '@metamask/detect-provider';
-
 import { useAccount, useDisconnect, useSignMessage } from 'wagmi';
 import { Button, Text, HStack, useToast, Tooltip, Box, Menu, MenuButton, MenuList, MenuItem } from '@chakra-ui/react';
 import { getEllipsisTxt } from '../../../utils/format';
@@ -19,12 +18,9 @@ const ConnectBouton: React.FC = () => {
     const { role, setAddress } = useAuth();
     const [isConnecting, setIsConnecting] = useState(false);
     const { isAuthenticated, setIsAuthenticated } = useAuth();
-    const [walletConnected, setWalletConnected] = useState(false);
-    const [selectedChainId, setSelectedChainId] = useState(11155111); // Chaîne par défaut
-    const [chainName, setChainName] = useState("Sepolia"); // Chaîne par défaut
+    const [selectedChainId, setSelectedChainId] = useState(11155111);
+    const [chainName, setChainName] = useState("Sepolia");
     const [web3, setWeb3] = useState<Web3 | null>(null);
-    //const [error, setError] = useState<number>();
-
 
     useEffect(() => {
         const initWeb3 = async () => {
@@ -39,63 +35,54 @@ const ConnectBouton: React.FC = () => {
 
     const handleChainSelect = async (chainId: number) => {
         setSelectedChainId(chainId);
-
-        if (web3 && web3.currentProvider) { // Vérifiez également que currentProvider est défini
+        if (web3 && web3.currentProvider) {
             try {
                 await web3.currentProvider.request({
-                method: 'wallet_switchEthereumChain',
-                params: [{ chainId: `0x${chainId.toString(16)}` }],
-            });
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: `0x${chainId.toString(16)}` }],
+                });
 
-            const chainMap: { [key: number]: string } = {
-                1: "Ethereum",
-                11155111: "Sepolia",
-                42161: "Arbitrum",
-                10: "Optimism",
-                84531: "Base",
-            };
+                const chainMap: { [key: number]: string } = {
+                    1: "Ethereum",
+                    11155111: "Sepolia",
+                    42161: "Arbitrum",
+                    10: "Optimism",
+                    84531: "Base",
+                };
 
-            setChainName(chainMap[chainId] || "Réseau inconnu");
-        } catch (error) {
-    if (error instanceof Error) {
-        if ((error as any).code === 4902) { // Utilisation de 'as any' ou 'unknown' pour accéder à 'code'
-            console.error("Le réseau n'est pas disponible, veuillez l'ajouter.");
-        } else {
-            console.error(error.message);
+                setChainName(chainMap[chainId] || "Réseau inconnu");
+            } catch (error) {
+                console.error("Erreur lors du changement de chaîne:", error);
+            }
         }
-    } else {
-        console.error("Une erreur inconnue est survenue.");
-    }
-}
-}
     };
 
     useEffect(() => {
-        if (walletConnected && address && isConnected) {
+        const storedAddress = localStorage.getItem('connectedAddress');
+        const storedAuth = localStorage.getItem('isAuthenticated') === 'true';
+
+        if (storedAddress && isConnected) {
+            setAddress(storedAddress);
+            setIsAuthenticated(storedAuth);
+        } else if (isConnected && address) {
             handleAuth(address, selectedChainId);
-            setWalletConnected(false);
+        } else {
+            setIsAuthenticated(false);
         }
-    }, [walletConnected, address, isConnected, selectedChainId]);
+    }, [isConnected, address, setAddress, selectedChainId, setIsAuthenticated]);
 
     const handleAuth = async (account: string, chainId: number) => {
         setIsConnecting(true);
         try {
             const challenge = await requestChallengeAsync({ address: account, chainId });
-
-            if (!challenge || !challenge.message) {
+            if (!challenge?.message) {
                 throw new Error("Challenge non valide.");
             }
 
             const signature = await signMessageAsync({ message: challenge.message });
+            const result = await signIn('moralis-auth', { message: challenge.message, signature, network: 'Evm', redirect: false });
 
-            const result = await signIn('moralis-auth', {
-                message: challenge.message,
-                signature,
-                network: 'Evm',
-                redirect: false,
-            });
-
-            if (result && result.error) {
+            if (result?.error) {
                 throw new Error(result.error);
             }
 
@@ -126,19 +113,7 @@ const ConnectBouton: React.FC = () => {
         localStorage.removeItem('isAuthenticated');
     };
 
-    useEffect(() => {
-        const storedAddress = localStorage.getItem('connectedAddress');
-        const storedAuth = localStorage.getItem('isAuthenticated') === 'true';
-        if (storedAddress && isConnected) {
-            setAddress(storedAddress);
-            setIsAuthenticated(storedAuth);
-        } else {
-            setIsAuthenticated(false);
-        }
-    }, [isConnected, setAddress]);
-
     const getUserRole = () => {
-        if (!address) return 'User';
         return role ? role.charAt(0).toUpperCase() + role.slice(1) : 'User';
     };
 
@@ -153,7 +128,6 @@ const ConnectBouton: React.FC = () => {
                             <Button
                                 onClick={async () => {
                                     await openConnectModal();
-                                    setWalletConnected(true);
                                 }}
                                 colorScheme="blue"
                                 size="sm"
@@ -165,42 +139,25 @@ const ConnectBouton: React.FC = () => {
                         );
                     }
 
-
-
-          if (isConnected && !isAuthenticated && account && chain) {
-            return (
-              <Button
-                onClick={() => handleAuth(account.address, chain.id)}
-                colorScheme="green"
-                size="sm"
-                isLoading={isConnecting}
-                loadingText="Vérification de l'adhésion..."
-              >
-                Espace Adhérents
-              </Button>
-            );
-          }
-
-
                     return (
                         <Box>
                             <Tooltip label={`Connecté : ${getUserRole()}`} aria-label="User Role Tooltip" hasArrow placement="bottom">
                                 <Menu>
-                                    <MenuButton as={HStack} onClick={() => {}} cursor="pointer" gap={'20px'} spacing={{ base: 2, md: 4 }} direction={{ base: 'column', md: 'row' }}>
-                                        <Text fontWeight="medium">
-                                            {account ? getEllipsisTxt(account.address) : "Non connecté"}
-                                        </Text>
-                                        <Text fontSize="sm" color="gray.500">
-                                            {chainName}
-                                        </Text>
+                                    <MenuButton as={HStack} cursor="pointer" gap={'20px'} spacing={{ base: 2, md: 4 }} direction={{ base: 'column', md: 'row' }}>
+                                    <Text fontWeight="medium">
+                                      {account ? getEllipsisTxt(account.address) : "Non connecté"}
+                                    </Text>
+                                    <Text fontSize="sm" color="gray.500">
+                                      {chain ? chain.name : "Réseau inconnu"}
+                                    </Text>
                                     </MenuButton>
                                     <MenuList>
                                         <MenuItem onClick={() => handleChainSelect(1)}>Ethereum</MenuItem>
                                         <MenuItem onClick={() => handleChainSelect(11155111)}>Sepolia</MenuItem>
                                         <MenuItem onClick={() => handleChainSelect(84531)}>Base</MenuItem>
-                                        <MenuItem onClick={() => handleDisconnect()}>Se déconnecter</MenuItem>
-                                        { account && chain && (
-                                          <MenuItem onClick={() => handleAuth(account.address, chain.id)}>Réessayer l'adhésion</MenuItem>
+                                        <MenuItem onClick={handleDisconnect}>Se déconnecter</MenuItem>
+                                        {account && chain && !isAuthenticated && (
+                                            <MenuItem onClick={() => handleAuth(account.address, chain.id)}>Réessayer l'adhésion</MenuItem>
                                         )}
                                     </MenuList>
                                 </Menu>

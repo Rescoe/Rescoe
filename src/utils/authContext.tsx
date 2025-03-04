@@ -87,7 +87,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             return;
           }
 
-          const memberInfo = (await contract.methods.members(userAddress).call()) as MemberInfo;
+          const memberInfo: MemberInfo = await contract.methods.members(userAddress).call();
           setRole(roleMapping[memberInfo.role] || null);
         }
       } catch (error) {
