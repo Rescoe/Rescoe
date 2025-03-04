@@ -32,6 +32,8 @@ const RoleBasedNFTPage = () => {
     const [showBananas, setShowBananas] = useState(false);  // Add state to control when to show Bananas
     const [name, setName] = useState(''); // Ajouter état pour le nom
     const [bio, setBio] = useState(''); // Ajouter état pour la biographie
+    const [isOnSepolia, setIsOnSepolia] = useState<boolean>(false); // État pour vérifier si sur Sepolia
+    const [wantsCryptoAdhesion, setWantsCryptoAdhesion] = useState<boolean>(false); // État pour savoir si l'utilisateur veut adhérer en crypto
 
     const Bananas = dynamic(() => import('../../modules/Bananas'), { ssr: false });
 
@@ -61,7 +63,15 @@ const RoleBasedNFTPage = () => {
                 setWeb3(web3Instance);
                 const accounts = await web3Instance.eth.getAccounts();
                 setAccount(accounts[0]);
-                await fetchMintPrice(web3Instance); // Récupérer le prix lors de l'initialisation
+                await fetchMintPrice(web3Instance);
+
+                const chainId = await web3Instance.eth.getChainId();
+                setIsOnSepolia(Number(chainId) === 11155111); // Vérifier si sur Sepolia
+
+                const storedChoice = localStorage.getItem('wantsCryptoAdhesion');
+                if (storedChoice) {
+                    setWantsCryptoAdhesion(JSON.parse(storedChoice)); // Charge le choix sauvegardé
+                }
             }
         };
         initWeb3();
@@ -181,82 +191,142 @@ const RoleBasedNFTPage = () => {
     };
 
 
+    const switchToSepolia = async () => {
+        if (web3 && web3.currentProvider) { // Vérifiez également que currentProvider est défini
+            try {
+                await web3.currentProvider.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: '0xaa36a7' }],
+                });
+                window.location.reload(); // Rafraîchir la page
+            } catch (error) {
+                console.error(error);
+                alert("Erreur lors du changement de réseau. Assurez-vous que Sepolia est ajouté à Metamask.");
+            }
+        } else {
+            console.error("Web3 n'est pas initialisé ou currentProvider est non défini.");
+            alert("Web3 n'est pas disponible. Veuillez vous assurer que vous avez une extension Ethereum installée.");
+        }
+    };
 
-    return (
+
+        const handleCryptoAdhesion = async () => {
+            setWantsCryptoAdhesion(true); // L'utilisateur veut adhérer en crypto
+
+            const provider = await detectEthereumProvider();
+            if (provider) {
+                const web3Instance = new Web3(provider);
+                const chainId = await web3Instance.eth.getChainId(); // Vérifiez le chain ID ici
+                // Utilisez directement chainId pour la condition
+                if (Number(chainId) !== 11155111) {
+                    await switchToSepolia(); // Change le réseau uniquement si nécessaire
+                } else {
+                    // Si déjà sur Sepolia, continuez à afficher les champs
+                    console.log("Champs de données pour l'adhésion en crypto affichés.");
+                    // Si vous voulez prouver que vous êtes sur le bon réseau ici, vous pouvez
+                    // mettre à jour l'état directement également
+                    setIsOnSepolia(true);
+                }
+            }
+            console.log(isOnSepolia);
+            localStorage.setItem('wantsCryptoAdhesion', String(true)); // Sauvegarde le choix en tant que chaîne
+        };
+
+
+        const handleRegularAdhesion = async () => {
+            setWantsCryptoAdhesion(false); // L'utilisateur veut adhérer en crypto
+            localStorage.setItem('wantsCryptoAdhesion', String(false)); // Sauvegarde le choix
+        };
+
+        return (
         <Box p={5} textAlign="center">
             <Center>
                 <Heading mb={5}>Mint votre NFT basé sur un rôle</Heading>
             </Center>
-            <Select
-                placeholder="Choisissez un rôle"
-                onChange={(e) => {
-                    setSelectedRole(e.target.value);
-                    generateImage(); // Générez l'image lorsque l'utilisateur choisit un rôle
-                    setRoleConfirmed(false); // Réinitialiser le statut de confirmation
-                }}
-            >
-                {roles.map(role => (
-                    <option key={role.value} value={role.value}>{role.label}</option>
-                ))}
-            </Select>
 
-            {/* Ajout de champs pour le nom et la biographie */}
-<FormControl mt={4}>
-    <FormLabel htmlFor="name">Nom</FormLabel>
-    <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Entrez votre nom" />
-</FormControl>
-<FormControl mt={4}>
-    <FormLabel htmlFor="bio">Biographie</FormLabel>
-    <Input id="bio" value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Entrez votre biographie" />
-</FormControl>
-
-
-            <Button
-                onClick={handleConfirmRole}
-                colorScheme="blue"
-                isDisabled={!selectedRole || roleConfirmed}
-                mt={2}
-            >
-                Choisir ce rôle
+            <Button colorScheme="blue" onClick={handleCryptoAdhesion} mb={4}>
+                Adhérer en Crypto (Sepolia)
             </Button>
-            {generatedImageUrl && (
-                <Box mt={5}>
-                    <Text fontSize="lg">Aperçu de l'image générée pour le rôle sélectionné :</Text>
-                    <Image src={generatedImageUrl} alt="Aperçu du rôle" boxSize="128px" />
-                </Box>
+
+            {/* Ajoutez un bouton pour l'adhésion par CB */}
+            <Button colorScheme="green" onClick={handleRegularAdhesion} mb={4}>
+                Adhérer par Carte Bancaire
+            </Button>
+
+            {/* Afficher les champs si l'utilisateur a choisi d'adhérer en crypto */}
+            {wantsCryptoAdhesion && isOnSepolia && (
+                <>
+                    <Select
+                        placeholder="Choisissez un rôle"
+                        onChange={(e) => {
+                            setSelectedRole(e.target.value);
+                            generateImage(); // Générez l'image lorsque l'utilisateur choisit un rôle
+                        }}
+                    >
+                        {roles.map(role => (
+                            <option key={role.value} value={role.value}>{role.label}</option>
+                        ))}
+                    </Select>
+
+                    <FormControl mt={4}>
+                        <FormLabel htmlFor="name">Nom</FormLabel>
+                        <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Entrez votre nom" />
+                    </FormControl>
+                    <FormControl mt={4}>
+                        <FormLabel htmlFor="bio">Biographie</FormLabel>
+                        <Input id="bio" value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Entrez votre biographie" />
+                    </FormControl>
+
+                    <Button
+                        onClick={handleConfirmRole}
+                        colorScheme="blue"
+                        isDisabled={!selectedRole || roleConfirmed}
+                        mt={2}
+                    >
+                        Choisir ce rôle
+                    </Button>
+
+                    {generatedImageUrl && (
+                        <Box mt={5}>
+                            <Text fontSize="lg">Aperçu de l'image générée pour le rôle sélectionné :</Text>
+                            <Image src={generatedImageUrl} alt="Aperçu du rôle" boxSize="128px" />
+                        </Box>
+                    )}
+
+                    <Text mt={4}>Prix de mint : {mintPrice} ETH</Text>
+                    <Button
+                        onClick={mintNFT}
+                        colorScheme="teal"
+                        isLoading={isMinting || isUploading}
+                        loadingText="Minting..."
+                        mb={5}
+                        isDisabled={!ipfsUrl || !roleConfirmed} // Désactiver le bouton mint tant que l'upload n'est pas terminé
+                    >
+                        Mint NFT
+                    </Button>
+                </>
             )}
-            <Text mt={4}>Prix de mint: {mintPrice} ETH</Text> {/* Afficher le prix de mint */}
-            <Button
-                onClick={mintNFT}
-                colorScheme="teal"
-                isLoading={isMinting || isUploading}
-                loadingText="Minting..."
-                mb={5}
-                isDisabled={!ipfsUrl || !roleConfirmed} // Désactiver le bouton mint tant que l'upload n'est pas terminé
-            >
-                Mint NFT
-            </Button>
+
             {showBananas && (
-              <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
-                <Canvas
-                  camera={{ near: 0.1, far: 100 }}
-                  style={{
-                              backgroundColor: 'transparent',
-                              position: 'fixed', // Cela rend le Canvas fixé à l'écran
-                              top: 0,
-                              left: 0,
-                              width: '100%',
-                              height: '100%',
-                              zIndex: -1, // Mise en arrière-plan
-                            }}
-                >
-                  <Bananas />
-                </Canvas>
-              </div>
+                <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
+                    <Canvas
+                        camera={{ near: 0.1, far: 100 }}
+                        style={{
+                            backgroundColor: 'transparent',
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                            zIndex: -1,
+                        }}
+                    >
+                        <Bananas />
+                    </Canvas>
+                </div>
             )}
-
         </Box>
     );
-};
+    };
 
-export default RoleBasedNFTPage;
+    export default RoleBasedNFTPage;
