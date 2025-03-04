@@ -116,7 +116,7 @@ const ConnectBouton: React.FC = () => {
     const getUserRole = () => {
         return role ? role.charAt(0).toUpperCase() + role.slice(1) : 'User';
     };
-
+/*
     return (
       <Box>
         <RainbowConnectButton.Custom>
@@ -164,7 +164,7 @@ const ConnectBouton: React.FC = () => {
     };
 
     export default ConnectBouton;
-/*
+*/
 
     return (
         <Box>
@@ -220,4 +220,3 @@ const ConnectBouton: React.FC = () => {
 };
 
 export default ConnectBouton;
-*/

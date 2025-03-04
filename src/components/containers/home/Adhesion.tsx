@@ -4,6 +4,8 @@ import detectEthereumProvider from '@metamask/detect-provider';
 import axios from 'axios';
 import ABI from '../../ABI/ABIAdhesion.json'; // Votre ABI de contrat ici.
 import getRandomInsectGif from '../../../utils/GenInsect24'; // Importer la fonction
+import { useRouter } from "next/router";
+
 import {
     Box,
     Button,
@@ -14,10 +16,13 @@ import {
     Image,
     FormControl,
     FormLabel,
-    Input // Ajout de Input pour le prix si nécessaire
+    Input,
+    Progress
 } from "@chakra-ui/react";
 import dynamic from 'next/dynamic';
 import { Canvas } from '@react-three/fiber';
+import { useAuth } from '../../../utils/authContext';
+
 
 const RoleBasedNFTPage = () => {
     const [web3, setWeb3] = useState<Web3 | null>(null);
@@ -34,6 +39,16 @@ const RoleBasedNFTPage = () => {
     const [bio, setBio] = useState(''); // Ajouter état pour la biographie
     const [isOnSepolia, setIsOnSepolia] = useState<boolean>(false); // État pour vérifier si sur Sepolia
     const [wantsCryptoAdhesion, setWantsCryptoAdhesion] = useState<boolean>(false); // État pour savoir si l'utilisateur veut adhérer en crypto
+    const { isAuthenticated } = useAuth();
+    const [isMinted, setIsMinted] = useState<boolean>(false);
+    const [nftId, setNftId] = useState<string>('');
+
+    const [progress, setProgress] = useState(0);
+const [countdown, setCountdown] = useState(5); // 5 secondes avant redirection
+
+
+    const router = useRouter();
+
 
     const Bananas = dynamic(() => import('../../modules/Bananas'), { ssr: false });
 
@@ -72,10 +87,18 @@ const RoleBasedNFTPage = () => {
                 if (storedChoice) {
                     setWantsCryptoAdhesion(JSON.parse(storedChoice)); // Charge le choix sauvegardé
                 }
+
+                const contract = new web3Instance.eth.Contract(ABI, contractAddress);
+                const totalMinted: number = await contract.methods.getTotalMinted().call();
+                console.log("totalminted : ", totalMinted.toString());
+
+                setNftId(Number(totalMinted).toString()); // Convertit BigNumber en nombre normal
             }
         };
         initWeb3();
     }, []);
+
+
 
 
     const fetchMintPrice = async (web3Instance: Web3) => {
@@ -166,7 +189,6 @@ const RoleBasedNFTPage = () => {
 
     const mintNFT = async () => {
         if (ipfsUrl && web3) {
-            setIsMinting(true);
             try {
 
                 const contract = new web3.eth.Contract(ABI, contractAddress);
@@ -176,6 +198,8 @@ const RoleBasedNFTPage = () => {
                 if (roleMapping.hasOwnProperty(selectedRole)) {
                     await contract.methods.safeMint(ipfsUrl, roleMapping[selectedRole as RoleKey], name, bio).send({ from: account, value: priceInWei });
                     setShowBananas(true);
+                    setIsMinting(true);
+
                 } else {
                     console.error(`Rôle sélectionné "${selectedRole}" non trouvé dans le mapping`);
                 }
@@ -184,10 +208,40 @@ const RoleBasedNFTPage = () => {
                 alert('Error minting NFT:');
             } finally {
                 setIsMinting(false);
+                startLoadingAndRedirect();
             }
         } else {
             alert("Assurez vous d'être connecté, si vous êtes déjà connecté, essayez depuis le navigateur intégré à votre wallet. ");
         }
+    };
+
+
+    const startLoadingAndRedirect = () => {
+        let progress = 0;
+        let countdown = 5; // Temps avant redirection
+        setProgress(progress);
+        setCountdown(countdown);
+
+        const progressInterval = setInterval(() => {
+            setProgress((oldProgress) => {
+                if (oldProgress >= 100) {
+                    clearInterval(progressInterval);
+                    return 100;
+                }
+                return oldProgress + 2; // Augmente par paliers de 20%
+            });
+        }, 1000);
+
+        const countdownInterval = setInterval(() => {
+            setCountdown((oldCount) => {
+                if (oldCount <= 1) {
+                    clearInterval(countdownInterval);
+                    setIsMinted(true);
+                    router.push(`/AdhesionId/${contractAddress}/${nftId}`);
+                }
+                return oldCount - 1;
+            });
+        }, 1000);
     };
 
 
@@ -239,94 +293,95 @@ const RoleBasedNFTPage = () => {
         };
 
         return (
-        <Box p={5} textAlign="center">
-            <Center>
-                <Heading mb={5}>Mint votre NFT basé sur un rôle</Heading>
-            </Center>
+              <Box p={5} textAlign="center">
+                  <Center>
+                      <Heading mb={5}>Mint votre NFT basé sur un rôle</Heading>
+                  </Center>
 
-            <Button colorScheme="blue" onClick={handleCryptoAdhesion} mb={4}>
-                Adhérer en Crypto (Sepolia)
-            </Button>
+                  <Button colorScheme="blue" onClick={handleCryptoAdhesion} mb={4}>
+                      Adhérer en Crypto (Sepolia)
+                  </Button>
 
-            {/* Ajoutez un bouton pour l'adhésion par CB */}
-            <Button colorScheme="green" onClick={handleRegularAdhesion} mb={4}>
-                Adhérer par Carte Bancaire
-            </Button>
+                  <Button colorScheme="green" onClick={handleRegularAdhesion} mb={4}>
+                      Adhérer par Carte Bancaire
+                  </Button>
 
-            {/* Afficher les champs si l'utilisateur a choisi d'adhérer en crypto */}
-            {wantsCryptoAdhesion && isOnSepolia && (
-                <>
-                    <Select
-                        placeholder="Choisissez un rôle"
-                        onChange={(e) => {
-                            setSelectedRole(e.target.value);
-                            generateImage(); // Générez l'image lorsque l'utilisateur choisit un rôle
-                        }}
-                    >
-                        {roles.map(role => (
-                            <option key={role.value} value={role.value}>{role.label}</option>
-                        ))}
-                    </Select>
+                  {(isAuthenticated || (wantsCryptoAdhesion && isOnSepolia)) && (
+                      <>
+                          <Select
+                              placeholder="Choisissez un rôle"
+                              onChange={(e) => {
+                                  setSelectedRole(e.target.value);
+                                  generateImage(); // Générez l'image lorsque l'utilisateur choisit un rôle
+                              }}
+                          >
+                              {roles.map(role => (
+                                  <option key={role.value} value={role.value}>{role.label}</option>
+                              ))}
+                          </Select>
 
-                    <FormControl mt={4}>
-                        <FormLabel htmlFor="name">Nom</FormLabel>
-                        <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Entrez votre nom" />
-                    </FormControl>
-                    <FormControl mt={4}>
-                        <FormLabel htmlFor="bio">Biographie</FormLabel>
-                        <Input id="bio" value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Entrez votre biographie" />
-                    </FormControl>
+                          <FormControl mt={4}>
+                              <FormLabel htmlFor="name">Nom</FormLabel>
+                              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Entrez votre nom" />
+                          </FormControl>
+                          <FormControl mt={4}>
+                              <FormLabel htmlFor="bio">Biographie</FormLabel>
+                              <Input id="bio" value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Entrez votre biographie" />
+                          </FormControl>
 
-                    <Button
-                        onClick={handleConfirmRole}
-                        colorScheme="blue"
-                        isDisabled={!selectedRole || roleConfirmed}
-                        mt={2}
-                    >
-                        Choisir ce rôle
-                    </Button>
+                          <Button
+                              onClick={handleConfirmRole}
+                              colorScheme="blue"
+                              isDisabled={!selectedRole || roleConfirmed}
+                              mt={2}
+                          >
+                              Confirmer le rôle
+                          </Button>
 
-                    {generatedImageUrl && (
-                        <Box mt={5}>
-                            <Text fontSize="lg">Aperçu de l'image générée pour le rôle sélectionné :</Text>
-                            <Image src={generatedImageUrl} alt="Aperçu du rôle" boxSize="128px" />
-                        </Box>
-                    )}
+                          {generatedImageUrl && (
+                              <Box mt={5}>
+                                  <Text fontSize="lg">Vous serez rediriger vers votre insecte après l'adhesion</Text>
+                              </Box>
+                          )}
 
-                    <Text mt={4}>Prix de mint : {mintPrice} ETH</Text>
-                    <Button
-                        onClick={mintNFT}
-                        colorScheme="teal"
-                        isLoading={isMinting || isUploading}
-                        loadingText="Minting..."
-                        mb={5}
-                        isDisabled={!ipfsUrl || !roleConfirmed} // Désactiver le bouton mint tant que l'upload n'est pas terminé
-                    >
-                        Mint NFT
-                    </Button>
-                </>
-            )}
+                          <Text mt={4}>Prix de mint : {mintPrice} ETH</Text>
+                          <Button
+                              onClick={mintNFT}
+                              colorScheme="teal"
+                              isLoading={isMinting || isUploading}
+                              loadingText="Minting..."
+                              mb={5}
+                              isDisabled={!ipfsUrl || !roleConfirmed} // Désactiver le bouton mint tant que l'upload n'est pas terminé
+                          >
+                              Adhérer
+                          </Button>
+                      </>
 
-            {showBananas && (
-                <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
-                    <Canvas
-                        camera={{ near: 0.1, far: 100 }}
-                        style={{
-                            backgroundColor: 'transparent',
-                            position: 'fixed',
-                            top: 0,
-                            left: 0,
-                            width: '100%',
-                            height: '100%',
-                            zIndex: -1,
-                        }}
-                    >
-                        <Bananas />
-                    </Canvas>
-                </div>
-            )}
-        </Box>
-    );
-    };
+                  )}
 
-    export default RoleBasedNFTPage;
+
+
+                  {showBananas && (
+
+                      <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
+                          <Canvas
+                              camera={{ near: 0.1, far: 100 }}
+                              style={{
+                                  backgroundColor: 'transparent',
+                                  position: 'fixed',
+                                  top: 0,
+                                  left: 0,
+                                  width: '100%',
+                                  height: '100%',
+                                  zIndex: -1,
+                              }}
+                          >
+                              <Bananas />
+                          </Canvas>
+                      </div>
+                  )}
+              </Box>
+          );
+      };
+
+      export default RoleBasedNFTPage;
