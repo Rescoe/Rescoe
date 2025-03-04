@@ -118,6 +118,55 @@ const ConnectBouton: React.FC = () => {
     };
 
     return (
+      <Box>
+        <RainbowConnectButton.Custom>
+          {({ account, chain, openConnectModal, mounted }) => {
+            if (!mounted || !account || !chain) {
+              return (
+                <Button size="sm" onClick={openConnectModal} colorScheme="blue">
+                  Connect Wallet
+                </Button>
+              );
+            }
+
+            if (isConnected && !isAuthenticated) {
+              return (
+                <Button
+                  size="sm"
+                  onClick={() => handleAuth(account.address, chain.id)}
+                  colorScheme="green"
+                  isLoading={isConnecting}
+                  loadingText="Vérification de l'adhésion..."
+                >
+                  Espace Adhérents
+                </Button>
+              );
+            }
+
+            if (isAuthenticated) {
+              return (
+                <Box>
+                  <Tooltip label={`Connecté : ${getUserRole()}`} aria-label="User Role Tooltip" hasArrow placement="bottom">
+                    <HStack onClick={handleDisconnect} cursor="pointer" gap={'20px'} spacing={{ base: 2, md: 4 }} direction={{ base: 'column', md: 'row' }}>
+                      <Text fontWeight="medium">{getEllipsisTxt(account.address)}</Text>
+                      <Text fontSize="sm" color="gray.500">{chain.name}</Text>
+                    </HStack>
+                  </Tooltip>
+                </Box>
+              );
+            }
+
+            return null; // Ne devrait pas atteindre ici dans un flux correct
+          }}
+        </RainbowConnectButton.Custom>
+      </Box>
+    );
+    };
+
+    export default ConnectBouton;
+/*
+
+    return (
         <Box>
             <RainbowConnectButton.Custom>
                 {({ account, chain, openConnectModal, mounted }) => {
@@ -171,3 +220,4 @@ const ConnectBouton: React.FC = () => {
 };
 
 export default ConnectBouton;
+*/
