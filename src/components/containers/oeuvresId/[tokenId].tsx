@@ -22,19 +22,46 @@ import {
   Tab,
   TabPanels,
   TabPanel,
+  Table,
+  Thead,
+  Tr,
+  Th,
+  Td,
+  Tbody,
 } from '@chakra-ui/react';
 import ABI from '../../../components/ABI/ABI_ART.json';
 import { useAuth } from '../../../utils/authContext';
 
-type NFTData = {
-  owner: string;
-  image: string;
-  name: string;
-  description: string;
-  artist: string;
-  forsale: boolean;
-  price?: string;
-};
+interface Transaction {
+    seller: string;
+    buyer: string;
+    timestamp: bigint;
+    price: bigint;
+}
+
+interface NFTData {
+    owner: string;
+    mintDate: bigint;
+    priceHistory: number[];
+    transactions: {
+        oldOwner: string;
+        newOwner: string;
+        date: string;
+        price: string;
+    }[];
+    image: string;
+    name: string;
+    description: string;
+    artist: string;
+    forsale: boolean;
+    price: string;
+}
+
+interface HistoryData {
+    priceHistory: bigint[];
+    transactionHistory: Transaction[];
+}
+
 
 type NFTCache = Record<string, NFTData>;
 
@@ -55,6 +82,9 @@ const TokenPage: React.FC = () => {
   const [accounts, setAccounts] = useState<string[]>([]);
   const [isForSale, setIsForSale] = useState<boolean>(false);
   const [nftCache, setNFTCache] = useState<NFTCache>({});
+  const [formattedTransactions, setFormattedTransactions] = useState<
+    { oldOwner: string; newOwner: string; date: string; price: string }[]
+  >([]);
 
   function formatSeconds(seconds: number): string {
     const days = Math.floor(seconds / (24 * 60 * 60));
@@ -65,10 +95,11 @@ const TokenPage: React.FC = () => {
     return `${days}j ${hours}h ${minutes}m ${remainingSeconds}s`;
   }
 
-  function formatTimestamp(timestamp: number): string {
-    const date = new Date(timestamp * 1000);
-    return date.toLocaleString();
+  function formatTimestamp(timestamp: number | BigInt): string {
+      const date = new Date(Number(timestamp) * 1000); // Convertir BigInt à Number
+      return date.toLocaleString();
   }
+
 
   useEffect(() => {
     const setupWeb3 = async () => {
@@ -105,6 +136,8 @@ const TokenPage: React.FC = () => {
         setMembershipStatus(data.forsale ? 'actif' : 'expiré');
         setName(data.name);
         setBio(data.description);
+        setFormattedTransactions(data.transactions); // Mettre à jour ici
+
       } catch (error) {
         console.error('Erreur lors de la récupération du NFT');
         setError('Erreur lors de la récupération des données.');
@@ -120,48 +153,80 @@ const TokenPage: React.FC = () => {
 //################################################################ Fetch NFT DATA
 
 const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<NFTData> => {
-  const cacheKey = `${contractAddress}_${tokenId}`;
-  if (nftCache[cacheKey]) return nftCache[cacheKey];
+    const cacheKey = `${contractAddress}_${tokenId}`;
+    if (nftCache[cacheKey]) return nftCache[cacheKey];
 
-  // Initialisation de web3Instance
-  const web3Instance = new Web3(new Web3.providers.HttpProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!));
+    const web3Instance = new Web3(new Web3.providers.HttpProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!));
 
-  try {
-    const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
-    const contract = new Contract(contractAddress, ABI, provider);
-    const owner: string = await contract.ownerOf(tokenId);
-    const uri: string = await contract.tokenURI(tokenId);
-    const forsale: boolean = await contract.isNFTForSale(tokenId);
-    const PriceNumber: bigint = await contract.getTokenPrice(tokenId);
+    try {
+        const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+        const contract = new Contract(contractAddress, ABI, provider);
 
-    const priceInEther: string = formatUnits(PriceNumber, 18); // 18 décimales pour Ether
-    setPrice(priceInEther);
+        const fullDetails = await contract.getTokenFullDetails(tokenId);
 
+        const owner: string = fullDetails.owner;
+        const mintDate: bigint = fullDetails.mintDate;
+        const currentPrice: bigint = fullDetails.currentPrice;
+        const forsale: boolean = fullDetails.forSale;
+        const priceHistory: bigint[] = fullDetails.priceHistory;
+        const transactions: Transaction[] = fullDetails.transactions;
 
-    if (uri) {
-      const res = await fetch(`/api/proxyPinata?ipfsHash=${uri.split('/').pop()}`);
-      const data = await res.json();
+        // Formatter les transactions
+        const formattedTransactions = transactions.map((transaction: Transaction) => ({
+            oldOwner: transaction.seller,
+            newOwner: transaction.buyer,
+            date: formatTimestamp(transaction.timestamp), // Conversion en string pour éviter les erreurs
+            price: formatUnits(transaction.price, 18),
+        }));
 
-      const nftData: NFTData = {
-        owner,
-        image: data.image,
-        name: data.name,
-        description: data.description,
-        artist: data.artist,
-        forsale,
-        price: priceInEther, // Le prix correctement converti en Ether
-      };
+        const priceInEther = formatUnits(currentPrice, 18);
+        setPrice(priceInEther);
 
-      setNFTCache((prev) => ({ ...prev, [cacheKey]: nftData }));
-      return nftData;
-    } else {
-      throw new Error('URI invalide.');
+        const uri = await contract.tokenURI(tokenId);
+        if (!uri) throw new Error("URI invalide.");
+
+        const res = await fetch(`/api/proxyPinata?ipfsHash=${uri.split("/").pop()}`);
+        if (!res.ok) throw new Error("Erreur lors de la récupération des données d'image.");
+
+        const data = await res.json();
+
+        const nftData: NFTData = {
+            owner,
+            mintDate,
+            priceHistory: priceHistory.map((price) => Number(price)), // Convertir les BigInts en nombres
+            transactions: formattedTransactions,
+            image: data.image,
+            name: data.name,
+            description: data.description,
+            artist: data.artist,
+            forsale,
+            price: priceInEther,
+        };
+
+        nftCache[cacheKey] = nftData;
+        return nftData;
+    } catch (error: any) {
+        console.error("Erreur lors de la récupération des données NFT:", error);
+        throw new Error(`Erreur lors de la récupération des données NFT: ${error.message}`);
     }
-  } catch (error) {
-    throw new Error('Erreur lors de la récupération des données NFT.');
-  }
 };
 
+const fetchHistory = async (contractAddress: string, tokenId: number): Promise<HistoryData> => {
+    const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+    const contract = new Contract(contractAddress, ABI, provider);
+
+    try {
+        const priceHistory: bigint[] = await contract.getPriceHistory(tokenId);
+        const transactionHistory: Transaction[] = await contract.getTransactionHistory(tokenId);
+
+        return {
+            priceHistory,
+            transactionHistory,
+        };
+    } catch (error) {
+        throw new Error("Erreur lors de la récupération de l'historique.");
+    }
+};
 
 
 
@@ -274,15 +339,45 @@ const handleListForSale = async () => {
 
 
         <TabPanels>
-          <TabPanel>
-          <VStack spacing={4} alignItems="start" mb={6}>
-            <Text fontSize="lg"><strong>Nom :</strong> {nftData.name}</Text>
-            <Text fontSize="lg"><strong>Description :</strong> {nftData.description}</Text>
-            <Text fontSize="lg"><strong>Artiste :</strong> {nftData.artist}</Text>
-            <img src={nftData.image} alt={nftData.name} style={{ maxWidth: '100%', borderRadius: '8px' }} />
-          </VStack>
 
-          </TabPanel>
+        <TabPanel>
+            <VStack spacing={4} alignItems="start" mb={6}>
+                <Text fontSize="lg"><strong>Nom :</strong> {nftData.name}</Text>
+                <Text fontSize="lg"><strong>Description :</strong> {nftData.description}</Text>
+                <Text fontSize="lg"><strong>Artiste :</strong> {nftData.artist}</Text>
+                <Text fontSize="lg"><strong>Propriétaire :</strong> {nftData.owner}</Text>
+                <Text fontSize="lg"><strong>Date de mint :</strong> {formatTimestamp(Number(nftData.mintDate))}</Text>
+                <Text fontSize="lg"><strong>Prix actuel :</strong> {nftData.price} ETH</Text>
+                <Text fontSize="lg"><strong>En vente :</strong> {nftData.forsale ? 'Oui' : 'Non'}</Text>
+                <Text fontSize="lg"><strong>Historique des prix :</strong> {nftData.priceHistory.join(', ')}</Text>
+
+                <img src={nftData.image} alt={nftData.name} style={{ maxWidth: '100%', borderRadius: '8px' }} />
+
+                <Text fontSize="lg" mb={2}><strong>Historique des transactions :</strong></Text>
+                <Table>
+                    <Thead>
+                        <Tr>
+                            <Th>Ancien propriétaire</Th>
+                            <Th>Nouveau propriétaire</Th>
+                            <Th>Date</Th>
+                            <Th>Prix</Th>
+                        </Tr>
+                    </Thead>
+                    <Tbody>
+                        {formattedTransactions.map((transaction, index) => (
+                            <Tr key={index}>
+                                <Td>{transaction.oldOwner}</Td>
+                                <Td>{transaction.newOwner}</Td>
+                                <Td>{transaction.date}</Td>
+                                <Td>{transaction.price} ETH</Td>
+                            </Tr>
+                        ))}
+                    </Tbody>
+                </Table>
+            </VStack>
+        </TabPanel>
+
+
 
 
                     <TabPanel>

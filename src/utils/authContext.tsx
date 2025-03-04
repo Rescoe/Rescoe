@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import Web3 from 'web3';
 import detectEthereumProvider from '@metamask/detect-provider';
-import ABI from '../components/ABI/ABIAdhesion.json'; // Votre ABI de contrat ici.
+import ABI from '../components/ABI/ABIAdhesion.json';
 
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS!; // Mettez à jour avec votre adresse de contrat.
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS!;
 
 type AuthContextType = {
   address: string | null;
@@ -14,9 +14,9 @@ type AuthContextType = {
   isPoet: boolean;
   isTrainee: boolean;
   isContributor: boolean;
-  isAuthenticated: boolean; // Ajout de la propriété isAuthenticated
+  isAuthenticated: boolean;
   setAddress: (address: string | null) => void;
-  setIsAuthenticated: (status: boolean) => void; // Ajout de la fonction setIsAuthenticated
+  setIsAuthenticated: (status: boolean) => void;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -28,11 +28,10 @@ const AuthContext = createContext<AuthContextType>({
   isPoet: false,
   isTrainee: false,
   isContributor: false,
-  isAuthenticated: false, // Valeur initiale de isAuthenticated
+  isAuthenticated: false,
   setAddress: () => {},
-  setIsAuthenticated: () => {}, // Fonction vide par défaut
+  setIsAuthenticated: () => {},
 });
-
 
 export const useAuth = () => useContext(AuthContext);
 
@@ -44,84 +43,63 @@ const roleMapping: { [key: number]: 'admin' | 'artist' | 'poet' | 'trainee' | 'c
 };
 
 interface MemberInfo {
-  role: number; // ou string si `role` est un string
+  role: number;
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [address, setAddress] = useState<string | null>(null);
   const [role, setRole] = useState<'admin' | 'artist' | 'poet' | 'trainee' | 'contributor' | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
   const [web3, setWeb3] = useState<Web3 | null>(null);
-  const [userAddress, setUserAddress] = useState<string | null>(null);
-
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Chargement initial uniquement
 
   useEffect(() => {
     const initWeb3 = async () => {
-      const provider = await detectEthereumProvider();
-      if (provider) {
-        const web3Instance = new Web3(provider);
-        setWeb3(web3Instance);
-        const accounts = await web3Instance.eth.getAccounts();
-        setAddress(accounts[0]); // Définir l'adresse connectée
-
-        const setAuthentication = (authenticated: boolean) => {
-          setIsAuthenticated(authenticated);
+      try {
+        const provider = await detectEthereumProvider();
+        if (provider) {
+          const web3Instance = new Web3(provider);
+          setWeb3(web3Instance);
+          const accounts = await web3Instance.eth.getAccounts();
+          if (accounts.length > 0) {
+            setAddress(accounts[0]);
+            setIsAuthenticated(true);
+          }
         }
-
+      } catch (error) {
+        console.error("Erreur lors de l'initialisation de Web3 :", error);
+      } finally {
+        setIsLoading(false); // Fin du chargement initial
       }
     };
     initWeb3();
   }, []);
 
-
   useEffect(() => {
     const fetchRole = async (userAddress: string) => {
-  setLoading(true);
-  try {
-    if (web3 && address) {
-      const contract = new web3.eth.Contract(ABI, CONTRACT_ADDRESS);
+      try {
+        if (web3 && userAddress) {
+          const contract = new web3.eth.Contract(ABI, CONTRACT_ADDRESS);
+          const owner = (await contract.methods.owner().call()) as string;
 
-      // Vérifier si l'utilisateur est le propriétaire du contrat (admin)
-      const owner = (await contract.methods.owner().call()) as string;
-      if (typeof userAddress === 'string' && userAddress.trim() !== '' && typeof owner === 'string' && owner.trim() !== '') {
-        if (userAddress.toLowerCase() === owner.toLowerCase()) {
-          setRole('admin');
-          return;
+          if (userAddress.toLowerCase() === owner.toLowerCase()) {
+            setRole('admin');
+            return;
+          }
+
+          const memberInfo = (await contract.methods.members(userAddress).call()) as MemberInfo;
+          setRole(roleMapping[memberInfo.role] || null);
         }
+      } catch (error) {
+        console.error("Erreur lors de la récupération du rôle:", error);
       }
+    };
 
-
-      // Récupérer les informations du membre
-      const memberInfo = (await contract.methods.members(userAddress).call()) as MemberInfo;
-      const userRoleIndex = memberInfo.role;
-
-      // Déterminer le rôle basé sur l'index
-      const mappedRole = roleMapping[userRoleIndex as keyof typeof roleMapping];
-      if (mappedRole) {
-        setRole(mappedRole);
-      } else {
-        setRole(null);
-      }
-    }
-  } catch (error) {
-    console.error("Erreur lors de la récupération du rôle:", error);
-  } finally {
-    setLoading(false);
-  }
-};
-
-
-    if (address) {
-      fetchRole(address.toLowerCase());
-    } else {
-      // Reset values if no address
-      setRole(null);
-    }
+    if (address) fetchRole(address.toLowerCase());
+    else setRole(null);
   }, [address, web3]);
 
-  // Définir isMember si l'utilisateur a l'un des rôles spécifiques
-  const isMember = role !== null; // Vrai si le rôle est défini, donc l'utilisateur est membre.
+  const isMember = role !== null;
 
   return (
     <AuthContext.Provider value={{
@@ -137,7 +115,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       isAuthenticated,
       setIsAuthenticated,
     }}>
-      {loading ? <div>Loading...</div> : children}
+      {isLoading ? <div>Chargement...</div> : children}
     </AuthContext.Provider>
   );
 };

@@ -16,24 +16,27 @@ const ConnectBouton: React.FC = () => {
   const { role, setAddress } = useAuth();
   const [isConnecting, setIsConnecting] = useState(false);
   const { isAuthenticated, setIsAuthenticated } = useAuth();
+  const [walletConnected, setWalletConnected] = useState(false); // Suivi de la connexion
+
+  // 🔹 Fonction d'authentification appelée APRÈS connexion
+  useEffect(() => {
+    if (walletConnected && address && isConnected) {
+      handleAuth(address, 11155111); // Appelle handleAuth une seule fois après connexion
+      setWalletConnected(false); // Reset après appel
+    }
+  }, [walletConnected, address, isConnected]);
 
   const handleAuth = async (account: string, chainId: number) => {
     setIsConnecting(true);
     try {
-      // Étape 1: Demander le challenge à Moralis
       const challenge = await requestChallengeAsync({ address: account, chainId: 11155111 });
 
-      // Vérifier la validité du challenge
       if (!challenge || !challenge.message) {
         throw new Error("Challenge non valide.");
       }
 
-      // Étape 2: Signer le message du challenge
       const signature = await signMessageAsync({ message: challenge.message });
 
-      // Vérifier la signature
-
-      // Étape 3: Authentification avec Moralis
       const result = await signIn('moralis-auth', {
         message: challenge.message,
         signature,
@@ -41,21 +44,15 @@ const ConnectBouton: React.FC = () => {
         redirect: false,
       });
 
-
-      // Vérification d'erreur dans la réponse de signIn
       if (result && result.error) {
         throw new Error(result.error);
       }
 
-      // Étape 4: Mise à jour de l'adresse et de l'état d'authentification
       setAddress(account.toLowerCase());
-
       setIsAuthenticated(true);
 
-      // Sauvegarde dans localStorage
       localStorage.setItem('connectedAddress', account.toLowerCase());
       localStorage.setItem('isAuthenticated', 'true');
-
     } catch (e) {
       console.error("Erreur lors de l'authentification:", e);
       toast({
@@ -98,58 +95,49 @@ const ConnectBouton: React.FC = () => {
 
   return (
     <Box>
-      <RainbowConnectButton.Custom>
-        {({ account, chain, openConnectModal, mounted }) => {
-          if (!mounted || !account || !chain) {
-            return (
-              <Button
-                onClick={async () => {
-                  await openConnectModal(); // Ouvre le wallet
-                  if(account && chain){
-                  handleAuth(account.address, chain.id); // Passe directement à la vérification d'adhésion
-                }
-                }}
-                colorScheme="blue"
-                size="sm"
-                >
+     <RainbowConnectButton.Custom>
+       {({ account, chain, openConnectModal, mounted }) => {
+         if (!mounted) return null;
 
-                Connect Wallet
-              </Button>
+         if (!isAuthenticated) {
+           // Afficher "Connect Wallet" si l'utilisateur n'est pas authentifié
+           return (
+             <Button
+               onClick={async () => {
+                 await openConnectModal(); // 🔹 Ouvre Metamask
+                 setWalletConnected(true); // 🔹 Déclenche useEffect pour appeler handleAuth() après connexion
+               }}
+               colorScheme="blue"
+               size="sm"
+               isLoading={isConnecting}
+               loadingText="Vérification..."
+             >
+               Connect Wallet
+             </Button>
+           );
+         }
 
-            );
-          }
+         // Afficher les informations de l'utilisateur connecté (adresse et rôle)
+         return (
+           <Box>
+             <Tooltip label={`Connecté : ${getUserRole()}`} aria-label="User Role Tooltip" hasArrow placement="bottom">
+               <HStack onClick={handleDisconnect} cursor="pointer" gap={'20px'} spacing={{ base: 2, md: 4 }} direction={{ base: 'column', md: 'row' }}>
 
-          if (isConnected && !isAuthenticated) {
-            return (
-              <Button
-                onClick={() => handleAuth(account.address, chain.id)}
-                colorScheme="green"
-                size="sm"
-                isLoading={isConnecting}
-                loadingText="Vérification de l'adhésion..."
-              >
-                Espace Adhérents
-              </Button>
-            );
-          }
+               <Text fontWeight="medium">
+                 {account ? getEllipsisTxt(account.address) : "Non connecté"}
+               </Text>
 
-          if (isAuthenticated) {
-            return (
-              <Box>
-                <Tooltip label={`Connecté : ${getUserRole()}`} aria-label="User Role Tooltip" hasArrow placement="bottom">
-                  <HStack onClick={handleDisconnect} cursor="pointer" gap={'20px'} spacing={{ base: 2, md: 4 }} direction={{ base: 'column', md: 'row' }}>
-                    <Text fontWeight="medium">{getEllipsisTxt(account.address)}</Text>
-                    <Text fontSize="sm" color="gray.500">{chain.name}</Text>
-                  </HStack>
-                </Tooltip>
-              </Box>
-            );
-          }
+               <Text fontSize="sm" color="gray.500">
+                 {chain ? chain.name : "Réseau inconnu"}
+               </Text>
 
-          return null; // Ne devrait pas atteindre ici dans un flux correct
-        }}
-      </RainbowConnectButton.Custom>
-    </Box>
+               </HStack>
+             </Tooltip>
+           </Box>
+         );
+       }}
+     </RainbowConnectButton.Custom>
+   </Box>
   );
 };
 
