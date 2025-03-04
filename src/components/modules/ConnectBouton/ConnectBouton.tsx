@@ -199,6 +199,9 @@ const ConnectBouton: React.FC = () => {
                                         <MenuItem onClick={() => handleChainSelect(11155111)}>Sepolia</MenuItem>
                                         <MenuItem onClick={() => handleChainSelect(84531)}>Base</MenuItem>
                                         <MenuItem onClick={() => handleDisconnect()}>Se déconnecter</MenuItem>
+                                        { account && chain && (
+                                          <MenuItem onClick={() => handleAuth(account.address, chain.id)}>Réessayer l'adhésion</MenuItem>
+                                        )}
                                     </MenuList>
                                 </Menu>
                             </Tooltip>
