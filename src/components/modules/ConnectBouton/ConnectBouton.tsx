@@ -15,7 +15,7 @@ const ConnectBouton: React.FC = () => {
     const { signMessageAsync } = useSignMessage();
     const toast = useToast();
     const { requestChallengeAsync } = useAuthRequestChallengeEvm();
-    const { role, setAddress } = useAuth();
+    const { role, setAddress, isMember } = useAuth();
     const [isConnecting, setIsConnecting] = useState(false);
     const { isAuthenticated, setIsAuthenticated } = useAuth();
     const [selectedChainId, setSelectedChainId] = useState(11155111);
@@ -125,7 +125,7 @@ const ConnectBouton: React.FC = () => {
 
                     return (
                         <Box>
-                            {!isAuthenticated && (
+                            {!isMember && (
                                 <Button
                                     onClick={async () => {
                                         await openConnectModal(); // Ouvre le wallet
@@ -142,7 +142,7 @@ const ConnectBouton: React.FC = () => {
                                 </Button>
                             )}
 
-                            {isAuthenticated && (
+                            {isMember && (
                                 <Tooltip label={`Connecté : ${getUserRole()}`} aria-label="User Role Tooltip" hasArrow placement="bottom">
                                     <Menu>
                                         <MenuButton as={HStack} cursor="pointer" gap={'20px'} spacing={{ base: 2, md: 4 }} direction={{ base: 'column', md: 'row' }}>
