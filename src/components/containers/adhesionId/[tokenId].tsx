@@ -25,6 +25,10 @@ import { useRouter } from 'next/router';
 import ABI from '../../../components/ABI/ABIAdhesion.json';
 import { useAuth } from '../../../utils/authContext';
 
+import ABI_Management from '../../../components/ABI/ABI_ADHESION_MANAGEMENT.json';
+
+
+
 interface NFTData {
   owner: string;
   role: number;
@@ -37,6 +41,8 @@ interface NFTData {
   membership: string;
   image?: string;  // Ajouter une image optionnelle
 }
+
+const contractAddressmanagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGER;
 
 const TokenPage = () => {
   const router = useRouter();
@@ -136,6 +142,8 @@ useEffect(() => {
   try {
     const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
     const contract = new ethers.Contract(contractAddress, ABI, provider);
+    const contractmanagement = new ethers.Contract(contractAddressmanagement, ABI_Management, provider);
+
 
     const [
       owner,
@@ -152,7 +160,7 @@ useEffect(() => {
       membership,
       realName,
       realBio
-    ] = await contract.getUserInfo(owner);
+    ] = await contractmanagement.getUserInfo(owner);
 
 
 
@@ -173,6 +181,7 @@ useEffect(() => {
       membership
     };
 
+    console.log(nftData);
 
     setNFTCache((prev) => ({ ...prev, [cacheKey]: nftData }));
 

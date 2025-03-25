@@ -17,10 +17,11 @@ const ConnectBouton: React.FC = () => {
     const { requestChallengeAsync } = useAuthRequestChallengeEvm();
     const { role, setAddress } = useAuth();
     const [isConnecting, setIsConnecting] = useState(false);
-    const { isAuthenticated, setIsAuthenticated } = useAuth();
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [selectedChainId, setSelectedChainId] = useState(11155111);
     const [chainName, setChainName] = useState("Sepolia");
     const [web3, setWeb3] = useState<Web3 | null>(null);
+    const [isMobile, setIsMobile] = useState(false);
 
     useEffect(() => {
         const initWeb3 = async () => {
@@ -31,6 +32,7 @@ const ConnectBouton: React.FC = () => {
             }
         };
         initWeb3();
+        setIsMobile(/Mobi|Android/i.test(navigator.userAgent));
     }, []);
 
     const handleChainSelect = async (chainId: number) => {
@@ -64,23 +66,22 @@ const ConnectBouton: React.FC = () => {
         if (storedAddress && isConnected) {
             setAddress(storedAddress);
             setIsAuthenticated(storedAuth);
-        } else if (isConnected && address) {
-            handleAuth(address, selectedChainId);
         } else {
             setIsAuthenticated(false);
         }
-    }, [isConnected, address, setAddress, selectedChainId, setIsAuthenticated]);
+    }, [isConnected, setAddress]);
 
     const handleAuth = async (account: string, chainId: number) => {
         setIsConnecting(true);
         try {
             const challenge = await requestChallengeAsync({ address: account, chainId });
-            if (!challenge?.message) {
+
+            if (!challenge || !challenge.message) {
                 throw new Error("Challenge non valide.");
             }
 
             const signature = await signMessageAsync({ message: challenge.message });
-            const result = await signIn('moralis-auth', { message: challenge.message, signature, network: 'Evm', redirect: false });
+            const result = await signIn('moralis-auth', { message: challenge.message, signature });
 
             if (result?.error) {
                 throw new Error(result.error);
@@ -94,7 +95,7 @@ const ConnectBouton: React.FC = () => {
             console.error("Erreur lors de l'authentification:", e);
             toast({
                 title: 'Oops, quelque chose s\'est mal passé...',
-                description: 'Essayez depuis le navigateur de votre wallet',
+                description: 'Petite erreur, revenez plus tard',
                 status: 'error',
                 position: 'top-right',
                 isClosable: true,
@@ -116,55 +117,6 @@ const ConnectBouton: React.FC = () => {
     const getUserRole = () => {
         return role ? role.charAt(0).toUpperCase() + role.slice(1) : 'User';
     };
-/*
-    return (
-      <Box>
-        <RainbowConnectButton.Custom>
-          {({ account, chain, openConnectModal, mounted }) => {
-            if (!mounted || !account || !chain) {
-              return (
-                <Button size="sm" onClick={openConnectModal} colorScheme="blue">
-                  Connect Wallet
-                </Button>
-              );
-            }
-
-            if (isConnected && !isAuthenticated) {
-              return (
-                <Button
-                  size="sm"
-                  onClick={() => handleAuth(account.address, chain.id)}
-                  colorScheme="green"
-                  isLoading={isConnecting}
-                  loadingText="Vérification de l'adhésion..."
-                >
-                  Espace Adhérents
-                </Button>
-              );
-            }
-
-            if (isAuthenticated) {
-              return (
-                <Box>
-                  <Tooltip label={`Connecté : ${getUserRole()}`} aria-label="User Role Tooltip" hasArrow placement="bottom">
-                    <HStack onClick={handleDisconnect} cursor="pointer" gap={'20px'} spacing={{ base: 2, md: 4 }} direction={{ base: 'column', md: 'row' }}>
-                      <Text fontWeight="medium">{getEllipsisTxt(account.address)}</Text>
-                      <Text fontSize="sm" color="gray.500">{chain.name}</Text>
-                    </HStack>
-                  </Tooltip>
-                </Box>
-              );
-            }
-
-            return null; // Ne devrait pas atteindre ici dans un flux correct
-          }}
-        </RainbowConnectButton.Custom>
-      </Box>
-    );
-    };
-
-    export default ConnectBouton;
-*/
 
     return (
         <Box>
@@ -193,12 +145,12 @@ const ConnectBouton: React.FC = () => {
                             <Tooltip label={`Connecté : ${getUserRole()}`} aria-label="User Role Tooltip" hasArrow placement="bottom">
                                 <Menu>
                                     <MenuButton as={HStack} cursor="pointer" gap={'20px'} spacing={{ base: 2, md: 4 }} direction={{ base: 'column', md: 'row' }}>
-                                    <Text fontWeight="medium">
-                                      {account ? getEllipsisTxt(account.address) : "Non connecté"}
-                                    </Text>
-                                    <Text fontSize="sm" color="gray.500">
-                                      {chain ? chain.name : "Réseau inconnu"}
-                                    </Text>
+                                        <Text fontWeight="medium">
+                                            {account ? getEllipsisTxt(account.address) : "Non connecté"}
+                                        </Text>
+                                        <Text fontSize="sm" color="gray.500">
+                                            {chain ? chain.name : "Réseau inconnu"}
+                                        </Text>
                                     </MenuButton>
                                     <MenuList>
                                         <MenuItem onClick={() => handleChainSelect(1)}>Ethereum</MenuItem>
@@ -206,7 +158,7 @@ const ConnectBouton: React.FC = () => {
                                         <MenuItem onClick={() => handleChainSelect(84531)}>Base</MenuItem>
                                         <MenuItem onClick={handleDisconnect}>Se déconnecter</MenuItem>
                                         {account && chain && !isAuthenticated && (
-                                            <MenuItem onClick={() => handleAuth(account.address, chain.id)}>Réessayer l'adhésion</MenuItem>
+                                            <MenuItem onClick={() => handleAuth(account.address, chain.id)}>Vérifier l'adhésion</MenuItem>
                                         )}
                                     </MenuList>
                                 </Menu>
