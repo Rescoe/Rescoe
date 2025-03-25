@@ -7,6 +7,8 @@ import { JsonRpcProvider, ethers } from 'ethers';
 import { Contract } from 'ethers';
 import ABI from '../../ABI/ABIAdhesion.json';
 import ABIRESCOLLECTION from '../../ABI/ABI_Collections.json';
+import ABI_ADHESION_MANAGEMENT from '../../ABI/ABI_ADHESION_MANAGEMENT.json';
+
 import axios from "axios";
 import detectEthereumProvider from '@metamask/detect-provider';
 import Web3 from "web3";
@@ -14,6 +16,7 @@ import Web3 from "web3";
 
 const contractAddressAdhesion = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS as string;
 const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT as string;
+const contractAddressmanagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGER as string;
 
 
 // Interfaces pour le typage
@@ -140,10 +143,12 @@ const formatAddress = (address: string) => {
 
   const fetchRolesAndImages = async (userAddress: string) => {
     const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
-    const contract = new Contract(contractAddressAdhesion, ABI, provider);
+    const contract = new Contract(contractAddressmanagement, ABI_ADHESION_MANAGEMENT, provider);
+    const contractadhesion = new Contract(contractAddressAdhesion, ABI, provider);
+
 
     try {
-      const tokenIds = await contract.getTokensByOwner(userAddress);
+      const tokenIds = await contract.getTokensByOwnerPaginated(userAddress, 0, 1);
       const userInfos = await contract.getUserInfo(userAddress);
 
       const username = userInfos.name;
@@ -151,7 +156,7 @@ const formatAddress = (address: string) => {
 
       const fetchedRolesAndImages: RoleImageData[] = await Promise.all(
         tokenIds.map(async (tokenId: number) => {
-          const tokenURI = await contract.tokenURI(tokenId);
+          const tokenURI = await contractadhesion.tokenURI(tokenId);
           const response = await fetch(tokenURI);
           const metadata = await response.json();
 

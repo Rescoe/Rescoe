@@ -17,11 +17,10 @@ const ConnectBouton: React.FC = () => {
     const { requestChallengeAsync } = useAuthRequestChallengeEvm();
     const { role, setAddress } = useAuth();
     const [isConnecting, setIsConnecting] = useState(false);
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const { isAuthenticated, setIsAuthenticated } = useAuth();
     const [selectedChainId, setSelectedChainId] = useState(11155111);
     const [chainName, setChainName] = useState("Sepolia");
     const [web3, setWeb3] = useState<Web3 | null>(null);
-    const [isMobile, setIsMobile] = useState(false);
 
     useEffect(() => {
         const initWeb3 = async () => {
@@ -32,7 +31,6 @@ const ConnectBouton: React.FC = () => {
             }
         };
         initWeb3();
-        setIsMobile(/Mobi|Android/i.test(navigator.userAgent));
     }, []);
 
     const handleChainSelect = async (chainId: number) => {
@@ -66,22 +64,23 @@ const ConnectBouton: React.FC = () => {
         if (storedAddress && isConnected) {
             setAddress(storedAddress);
             setIsAuthenticated(storedAuth);
+        } else if (isConnected && address) {
+            handleAuth(address, selectedChainId);
         } else {
             setIsAuthenticated(false);
         }
-    }, [isConnected, setAddress]);
+    }, [isConnected, address, setAddress, selectedChainId, setIsAuthenticated]);
 
     const handleAuth = async (account: string, chainId: number) => {
         setIsConnecting(true);
         try {
             const challenge = await requestChallengeAsync({ address: account, chainId });
-
-            if (!challenge || !challenge.message) {
+            if (!challenge?.message) {
                 throw new Error("Challenge non valide.");
             }
 
             const signature = await signMessageAsync({ message: challenge.message });
-            const result = await signIn('moralis-auth', { message: challenge.message, signature });
+            const result = await signIn('moralis-auth', { message: challenge.message, signature, network: 'Evm', redirect: false });
 
             if (result?.error) {
                 throw new Error(result.error);
@@ -95,7 +94,7 @@ const ConnectBouton: React.FC = () => {
             console.error("Erreur lors de l'authentification:", e);
             toast({
                 title: 'Oops, quelque chose s\'est mal passé...',
-                description: 'Petite erreur, revenez plus tard',
+                description: 'Essayez de vous reconnecter.',
                 status: 'error',
                 position: 'top-right',
                 isClosable: true,
@@ -124,45 +123,49 @@ const ConnectBouton: React.FC = () => {
                 {({ account, chain, openConnectModal, mounted }) => {
                     if (!mounted) return null;
 
-                    if (!isAuthenticated) {
-                        return (
-                            <Button
-                                onClick={async () => {
-                                    await openConnectModal();
-                                }}
-                                colorScheme="blue"
-                                size="sm"
-                                isLoading={isConnecting}
-                                loadingText="Vérification..."
-                            >
-                                Connect Wallet
-                            </Button>
-                        );
-                    }
-
                     return (
                         <Box>
-                            <Tooltip label={`Connecté : ${getUserRole()}`} aria-label="User Role Tooltip" hasArrow placement="bottom">
-                                <Menu>
-                                    <MenuButton as={HStack} cursor="pointer" gap={'20px'} spacing={{ base: 2, md: 4 }} direction={{ base: 'column', md: 'row' }}>
-                                        <Text fontWeight="medium">
-                                            {account ? getEllipsisTxt(account.address) : "Non connecté"}
-                                        </Text>
-                                        <Text fontSize="sm" color="gray.500">
-                                            {chain ? chain.name : "Réseau inconnu"}
-                                        </Text>
-                                    </MenuButton>
-                                    <MenuList>
-                                        <MenuItem onClick={() => handleChainSelect(1)}>Ethereum</MenuItem>
-                                        <MenuItem onClick={() => handleChainSelect(11155111)}>Sepolia</MenuItem>
-                                        <MenuItem onClick={() => handleChainSelect(84531)}>Base</MenuItem>
-                                        <MenuItem onClick={handleDisconnect}>Se déconnecter</MenuItem>
-                                        {account && chain && !isAuthenticated && (
-                                            <MenuItem onClick={() => handleAuth(account.address, chain.id)}>Vérifier l'adhésion</MenuItem>
-                                        )}
-                                    </MenuList>
-                                </Menu>
-                            </Tooltip>
+                            {!isAuthenticated && (
+                                <Button
+                                    onClick={async () => {
+                                        await openConnectModal(); // Ouvre le wallet
+                                        if (isConnected && account) {
+                                            handleAuth(account.address, selectedChainId); // Tenter la vérification automatiquement
+                                        }
+                                    }}
+                                    colorScheme="blue"
+                                    size="sm"
+                                    isLoading={isConnecting}
+                                    loadingText="Vérification..."
+                                >
+                                    Connect Wallet
+                                </Button>
+                            )}
+
+                            {isAuthenticated && (
+                                <Tooltip label={`Connecté : ${getUserRole()}`} aria-label="User Role Tooltip" hasArrow placement="bottom">
+                                    <Menu>
+                                        <MenuButton as={HStack} cursor="pointer" gap={'20px'} spacing={{ base: 2, md: 4 }} direction={{ base: 'column', md: 'row' }}>
+                                            <Text fontWeight="medium">
+                                                {account ? getEllipsisTxt(account.address) : "Non connecté"}
+                                            </Text>
+                                            <Text fontSize="sm" color="gray.500">
+                                                {chain ? chain.name : "Réseau inconnu"}
+                                            </Text>
+                                        </MenuButton>
+                                        <MenuList>
+                                            <MenuItem onClick={() => handleChainSelect(1)}>Ethereum</MenuItem>
+                                            <MenuItem onClick={() => handleChainSelect(11155111)}>Sepolia</MenuItem>
+                                            <MenuItem onClick={() => handleChainSelect(84531)}>Base</MenuItem>
+                                            <MenuItem onClick={handleDisconnect}>Se déconnecter</MenuItem>
+                                            {/* Ajouter l'option de vérification d'adhésion dans le menu */}
+                                            {account && chain && (
+                                                <MenuItem onClick={() => handleAuth(account.address, selectedChainId)}>Vérifier l'adhésion</MenuItem>
+                                            )}
+                                        </MenuList>
+                                    </Menu>
+                                </Tooltip>
+                            )}
                         </Box>
                     );
                 }}

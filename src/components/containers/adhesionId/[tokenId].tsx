@@ -42,7 +42,7 @@ interface NFTData {
   image?: string;  // Ajouter une image optionnelle
 }
 
-const contractAddressmanagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGER;
+const contractAddressmanagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGER as string;
 
 const TokenPage = () => {
   const router = useRouter();
