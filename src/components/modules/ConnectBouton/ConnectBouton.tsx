@@ -125,7 +125,7 @@ const ConnectBouton: React.FC = () => {
 
                     return (
                         <Box>
-                            {!isMember && (
+                            {!isAuthenticated && (
                                 <Button
                                     onClick={async () => {
                                         await openConnectModal(); // Ouvre le wallet
@@ -142,7 +142,7 @@ const ConnectBouton: React.FC = () => {
                                 </Button>
                             )}
 
-                            {isMember && (
+                            {isAuthenticated && (
                                 <Tooltip label={`Connecté : ${getUserRole()}`} aria-label="User Role Tooltip" hasArrow placement="bottom">
                                     <Menu>
                                         <MenuButton as={HStack} cursor="pointer" gap={'20px'} spacing={{ base: 2, md: 4 }} direction={{ base: 'column', md: 'row' }}>
