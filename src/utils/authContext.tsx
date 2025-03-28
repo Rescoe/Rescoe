@@ -16,7 +16,7 @@ interface AuthContextType {
   isContributor: boolean;
   isAuthenticated: boolean;
   setAddress: (address: string | null) => void;
-  setIsAuthenticated: (status: boolean) => void; // Ensure this matches what's provided
+  setIsAuthenticated: (status: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -45,12 +45,14 @@ const roleMapping: { [key: number]: 'admin' | 'artist' | 'poet' | 'trainee' | 'c
 interface MemberInfo {
   role: number;
 }
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [address, setAddress] = useState<string | null>(null);
   const [role, setRole] = useState<'admin' | 'artist' | 'poet' | 'trainee' | 'contributor' | null>(null);
   const [web3, setWeb3] = useState<Web3 | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMember, setIsMember] = useState(false);
 
   useEffect(() => {
     const initWeb3 = async () => {
@@ -67,6 +69,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (accounts.length > 0) {
         setAddress(accounts[0]);
         setIsAuthenticated(true);
+        fetchRole(accounts[0]); // Appel de fetchRole après avoir défini l'adresse
       } else {
         setIsAuthenticated(false);
       }
@@ -80,42 +83,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (web3 && userAddress) {
         const contract = new web3.eth.Contract(ABI, CONTRACT_ADDRESS);
         const owner = (await contract.methods.owner().call()) as string;
-
         const memberInfo: MemberInfo = await contract.methods.members(userAddress).call();
-        setRole(roleMapping[memberInfo.role] || null);
+
+        console.log("Member Info:", memberInfo);
 
         if (userAddress.toLowerCase() === owner.toLowerCase()) {
           setRole('admin');
+          setIsMember(true);
           return;
         }
 
-        return roleMapping[memberInfo.role]; // Return role for conditional checking
+        setRole(roleMapping[memberInfo.role] || null);
+        setIsMember(true);
       }
     } catch (error) {
       console.error("Error fetching role:", error);
+      setIsMember(false);
     }
   };
 
   useEffect(() => {
-    const fetchUserRole = async () => {
-      if (address) {
-        try {
-          const fetchedRole = await fetchRole(address);
-          if (fetchedRole) {
-            setRole(fetchedRole);
-          } else {
-            setIsAuthenticated(false);
-          }
-        } catch (error) {
-          console.error("Error while fetching user role:", error);
-          setIsAuthenticated(false);
-        }
-      }
-    };
-    fetchUserRole();
+    if (address) {
+      fetchRole(address);
+    }
   }, [address, web3]);
-
-  const isMember = role !== null;
 
   return (
     <AuthContext.Provider value={{
