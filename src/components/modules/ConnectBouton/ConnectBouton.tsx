@@ -158,10 +158,13 @@ const ConnectBouton: React.FC = () => {
                                             <MenuItem onClick={() => handleChainSelect(11155111)}>Sepolia</MenuItem>
                                             <MenuItem onClick={() => handleChainSelect(84531)}>Base</MenuItem>
                                             <MenuItem onClick={handleDisconnect}>Se déconnecter</MenuItem>
+
+                                            <MenuItem onClick={() => window.location.href = '/u/dashboard'}> Aller au Dashboard</MenuItem>
                                             {/* Ajouter l'option de vérification d'adhésion dans le menu */}
                                             {account && chain && (
                                                 <MenuItem onClick={() => handleAuth(account.address, selectedChainId)}>Vérifier l'adhésion</MenuItem>
                                             )}
+
                                         </MenuList>
                                     </Menu>
                                 </Tooltip>
