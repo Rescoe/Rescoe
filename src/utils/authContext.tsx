@@ -5,7 +5,7 @@ import ABI from '../components/ABI/ABIAdhesion.json';
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS!;
 
-type AuthContextType = {
+interface AuthContextType {
   address: string | null;
   role: 'admin' | 'artist' | 'poet' | 'trainee' | 'contributor' | null;
   isMember: boolean;
@@ -16,8 +16,8 @@ type AuthContextType = {
   isContributor: boolean;
   isAuthenticated: boolean;
   setAddress: (address: string | null) => void;
-  setIsAuthenticated: (status: boolean) => void;
-};
+  setIsAuthenticated: (status: boolean) => void; // Ensure this matches what's provided
+}
 
 const AuthContext = createContext<AuthContextType>({
   address: null,
@@ -45,13 +45,12 @@ const roleMapping: { [key: number]: 'admin' | 'artist' | 'poet' | 'trainee' | 'c
 interface MemberInfo {
   role: number;
 }
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [address, setAddress] = useState<string | null>(null);
   const [role, setRole] = useState<'admin' | 'artist' | 'poet' | 'trainee' | 'contributor' | null>(null);
   const [web3, setWeb3] = useState<Web3 | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true); // Chargement initial uniquement
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const initWeb3 = async () => {
@@ -69,35 +68,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } catch (error) {
         console.error("Erreur lors de l'initialisation de Web3 :", error);
       } finally {
-        setIsLoading(false); // Fin du chargement initial
+        setIsLoading(false);
       }
     };
     initWeb3();
   }, []);
 
-  useEffect(() => {
-    const fetchRole = async (userAddress: string) => {
-      try {
-        if (web3 && userAddress) {
-          const contract = new web3.eth.Contract(ABI, CONTRACT_ADDRESS);
-          const owner = (await contract.methods.owner().call()) as string;
+  const fetchRole = async (userAddress: string) => {
+    try {
+      if (web3 && userAddress) {
+        const contract = new web3.eth.Contract(ABI, CONTRACT_ADDRESS);
+        const owner = (await contract.methods.owner().call()) as string;
 
-          if (userAddress.toLowerCase() === owner.toLowerCase()) {
-            setRole('admin');
-            return;
-          }
-
-          const memberInfo: MemberInfo = await contract.methods.members(userAddress).call();
-          setRole(roleMapping[memberInfo.role] || null);
+        if (userAddress.toLowerCase() === owner.toLowerCase()) {
+          setRole('admin');
+          return;
         }
-      } catch (error) {
-        console.error("Erreur lors de la récupération du rôle:", error);
+
+        const memberInfo: MemberInfo = await contract.methods.members(userAddress).call();
+        setRole(roleMapping[memberInfo.role] || null);
+      }
+    } catch (error) {
+      console.error("Erreur lors de la récupération du rôle:", error);
+    }
+  };
+
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      if (address) {
+        setIsAuthenticated(true);
+        try {
+          await fetchRole(address.toLowerCase()); // Now it can access fetchRole
+        } catch (error) {
+          console.error("Error fetching user role:", error);
+        }
+      } else {
+        setIsAuthenticated(false);
       }
     };
 
-    if (address) fetchRole(address.toLowerCase());
-    else setRole(null);
-  }, [address, web3]);
+    fetchUserRole();
+  }, [address]);
 
   const isMember = role !== null;
 

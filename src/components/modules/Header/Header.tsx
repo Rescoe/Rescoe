@@ -15,10 +15,19 @@ import SelectInsect from '../InsectSelector';
 import { Insect } from '../InsectSelector';
 
 interface AuthContextType {
+  address: string | null;
+  role: 'admin' | 'artist' | 'poet' | 'trainee' | 'contributor' | null;
+  isMember: boolean;
+  isAdmin: boolean;
+  isArtist: boolean;
+  isPoet: boolean;
+  isTrainee: boolean;
+  isContributor: boolean;
   isAuthenticated: boolean;
-  setAuthenticated: (authStatus: boolean) => void;
-  // Ajoutez d'autres propriétés si nécessaire
+  setAddress: (address: string | null) => void;
+  setIsAuthenticated: (status: boolean) => void; // Ensure this matches what's provided
 }
+
 
 const Header = () => {
   const headerRef = useRef<HTMLDivElement>(null);
