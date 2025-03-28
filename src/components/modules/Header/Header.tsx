@@ -147,7 +147,7 @@ const Header = () => {
               </NextLink>
             )}
 
-            {isMember && (
+            {isAuthenticated && (
               <HStack spacing={4} cursor="pointer">
                 <Menu>
                   <MenuButton as="div">
@@ -179,7 +179,7 @@ const Header = () => {
               </HStack>
             )}
 
-            {isMember ? (
+            {isAuthenticated ? (
               <Box mt={4} display="flex" justifyContent="center">
                 {isInsectVisible && selectedInsect && (
                   <Insecte
