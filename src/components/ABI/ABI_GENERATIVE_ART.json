@@ -25,6 +25,11 @@
 				"internalType": "string",
 				"name": "_collectionType",
 				"type": "string"
+			},
+			{
+				"internalType": "address",
+				"name": "_adhesionContractAddress",
+				"type": "address"
 			}
 		],
 		"stateMutability": "nonpayable",
@@ -324,6 +329,19 @@
 		],
 		"name": "Transfer",
 		"type": "event"
+	},
+	{
+		"inputs": [],
+		"name": "adhesionContractAddress",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
 	},
 	{
 		"inputs": [
