@@ -3,6 +3,9 @@ import React, { useState, useEffect } from 'react';
 import Web3 from 'web3';
 import getRandomInsectGif from '../../../utils/GenInsect24';
 import ABI from '../../ABI/ABIAdhesion.json';
+import ABICollection from '../../ABI/ABI_Collections.json';
+import ABIManagementAdhesion from '../../ABI/ABI_ADHESION_MANAGEMENT.json';
+
 import { useAuth } from '../../../utils/authContext';
 
 import axios from 'axios';
@@ -31,6 +34,13 @@ interface Detail {
     bio?: string;
 }
 
+interface Adhesion {
+    address: string;
+    role: string;
+    name: string;
+    bio: string;
+}
+
 
 const AdminPage: React.FC = () => {
     const { address: authAddress } = useAuth();
@@ -42,13 +52,19 @@ const AdminPage: React.FC = () => {
     const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
     const [isUploading, setIsUploading] = useState<boolean>(false);
     const [ipfsUrl, setIpfsUrl] = useState<string | null>(null);
-    const [mintPrice, setMintPrice] = useState<number>(0);
     const [nftId, setNftId] = useState<number>(0);
     const [salePrice, setSalePrice] = useState<number>(0);
     const [activeTab, setActiveTab] = useState<string>('Roles');
     const [name, setName] = useState<string>('');
     const [bio, setBio] = useState<string>('');
     const [web3, setWeb3] = useState<Web3 | null>(null);
+    const [activeSettingsTab, setActiveSettingsTab] = useState<string>('MintPrice');
+
+    const [mintPrice, setMintPrice] = useState<number>(0);
+
+    const [newPointPrice, setNewPointPrice] = useState<number>(0);
+    const [numberOfAdhesions, setNumberOfAdhesions] = useState<number>(1); // Nombre par défaut
+    const [adhesionData, setAdhesionData] = useState<{ address: string; role: string; name: string; bio: string }[]>([{ address: '', role: '', name: '', bio: 'Biographie (modifiable)' }]);
 
 
     const roleMapping: Record<string, number> = {
@@ -59,6 +75,10 @@ const AdminPage: React.FC = () => {
     };
 
     const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS as string;
+    const contratRescollection = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT as string;
+    const contratAdhesionManagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGER as string;
+
+
 
 
     // Assure-toi que Web3 est bien importé et disponible
@@ -83,108 +103,176 @@ const AdminPage: React.FC = () => {
         initWeb3();
     }, []); // Cette dépendance vide assure que ce code ne s'exécute qu'une seule fois au montage du composant
 
+    const handleTabChange = (tab: string) => {
+        setActiveTab(tab);
+    };
 
-        const generateImage = () => {
-            loadGifFromFile();
-        };
+//########################################################################### Systeme de generation des badge d'adheion (images insectes) et upload IPFS
+const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const count = parseInt(e.target.value);
+    if (!isNaN(count) && count >= 1) {
+        setNumberOfAdhesions(count);
+        const updatedAdhesionData: Adhesion[] = Array.from({ length: count }, (_, index) => ({
+            address: '',
+            role: '',
+            name: '',
+            bio: index === 0 ? 'Biographie (modifiable)' : '',
+        }));
+        setAdhesionData(updatedAdhesionData);
+    } else {
+        setNumberOfAdhesions(1);
+        setAdhesionData([{ address: '', role: '', name: '', bio: 'Biographie (modifiable)' }]);
+    }
+};
 
-        const loadGifFromFile = async () => {
-            const response = await fetch('/gifs/Scarabe.gif');
-            const blob = await response.blob();
-            const gifURL = URL.createObjectURL(blob);
-            setGeneratedImageUrl(gifURL);
-        };
+const handleAdhesionChange = (index: number, field: 'address' | 'role' | 'name' | 'bio', value: string) => {
+  const updatedData = [...adhesionData];
+  updatedData[index][field] = value;
+  setAdhesionData(updatedData);
+};
 
-        const handleTabChange = (tab: string) => {
-            setActiveTab(tab);
-        };
+const generateImage = () => {
+  loadGifFromFile();
+};
 
-        const handleConfirmRole = async () => {
-            if (generatedImageUrl) {
-                await uploadFileToIPFS(generatedImageUrl);
+const loadGifFromFile = async () => {
+  const response = await fetch('/gifs/Scarabe.gif');
+  const blob = await response.blob();
+  const gifURL = URL.createObjectURL(blob);
+  setGeneratedImageUrl(gifURL);
+};
+
+const handleConfirmRole = async () => {
+    const generatedImageUrls = await Promise.all(
+        adhesionData.map(async (adhesion) => {
+            await generateImageForAdhesion(adhesion); // Ajoutez cette ligne pour générer et stocker chaque image
+            return generatedImageUrl; // Retourne l'URL générée
+        })
+    );
+
+    // Ensuite, téléversez les images et les données pour chaque adhérent
+    for (let index = 0; index < adhesionData.length; index++) {
+        if (generatedImageUrls[index]) {
+            const imageUrl = generatedImageUrls[index];
+            if (imageUrl) {
+                await uploadFileToIPFS(imageUrl, adhesionData[index]);
             } else {
-                alert("Veuillez vous assurer que l'image est générée.");
+                alert("Erreur: l'URL de l'image générée est nulle.");
             }
+        } else {
+            alert("Veuillez vous assurer que les images sont générées.");
+        }
+    }
+
+};
+
+// Nouvelle fonction pour générer des images par adhésion
+const generateImageForAdhesion = async (adhesion: Adhesion) => {
+    const response = await fetch('/gifs/Scarabe.gif'); // Ou le chemin de votre image
+    const blob = await response.blob();
+    const gifURL = URL.createObjectURL(blob);
+    setGeneratedImageUrl(gifURL); // Met à jour l'URL de l'image générée
+    return gifURL; // Retourne l'URL pour l'utiliser dans le téléversement
+};
+
+
+const uploadFileToIPFS = async (imageUrl: string, adhesion: Adhesion) => {
+    setIsUploading(true);
+    try {
+        const response = await fetch(imageUrl);
+        const blob = await response.blob();
+        const formData = new FormData();
+        formData.append('file', blob, 'insect.gif');
+
+        const imageResponse = await axios.post('https://api.pinata.cloud/pinning/pinFileToIPFS', formData, {
+            headers: {
+                'Authorization': `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT}`,
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+
+        const imageIpfsUrl = `https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${imageResponse.data.IpfsHash}`;
+        setIpfsUrl(imageIpfsUrl);
+
+        const metadataJson = {
+            name: adhesion.name,
+            bio: adhesion.bio,
+            description: `Rescoe vous a attribué le rôle suivant : ${adhesion.role}`,
+            image: imageIpfsUrl,
+            role: adhesion.role,
+            tags: ["Adhesion", "Minted by Rescoe", adhesion.role],
         };
 
-        const uploadFileToIPFS = async (imageUrl: string) => {
-            setIsUploading(true);
-            try {
-                const response = await fetch(imageUrl);
-                const blob = await response.blob();
-                const formData = new FormData();
-                formData.append('file', blob, 'insect.gif');
+        const metadataResponse = await axios.post('https://api.pinata.cloud/pinning/pinJSONToIPFS', metadataJson, {
+            headers: {
+                'Authorization': `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT}`,
+                'Content-Type': 'application/json',
+            },
+        });
 
-                const imageResponse = await axios.post('https://api.pinata.cloud/pinning/pinFileToIPFS', formData, {
-                    headers: {
-                        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT}`,
-                        'Content-Type': 'multipart/form-data',
-                    },
-                });
+        const metadataIpfsUrl = `https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`;
+        // Stocke les détails des métadonnées pour chaque adhérent
+        setDetails((prevDetails) => [...prevDetails, { uri: metadataIpfsUrl, role: adhesion.role, name: adhesion.name, bio: adhesion.bio }]);
+    } catch (error) {
+        console.error('Error uploading to IPFS:', error);
+    } finally {
+        setIsUploading(false);
+    }
+};
 
-                const imageIpfsUrl = `https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${imageResponse.data.IpfsHash}`;
-                setIpfsUrl(imageIpfsUrl);
 
-                const metadataJson = {
-                    name,
-                    bio,
-                    description: `Rescoe vous a attribué le rôle suivant : ${selectedRole}`,
-                    image: imageIpfsUrl,
-                    role: selectedRole,
-                    tags: ["Adhesion", "Minted by Rescoe", selectedRole],
-                };
+const handleMintMultiple = async (): Promise<void> => {
+    if (window.ethereum) {
+        const web3 = new Web3(window.ethereum as any);
+        const contract = new web3.eth.Contract(ABI, contractAddress);
 
-                const metadataResponse = await axios.post('https://api.pinata.cloud/pinning/pinJSONToIPFS', metadataJson, {
+        // Récupérer les détails au moment de l'appel de mint
+        const details = adhesionData.map(adhesion => ({
+            address: adhesion.address.trim(),
+            role: roleMapping[adhesion.role],
+            name: adhesion.name || "",
+            bio: adhesion.bio || "",
+        }));
+
+        try {
+            const accounts: string[] = await web3.eth.getAccounts();
+            const recipientsArray: string[] = details.map(adhesion => adhesion.address);
+            const rolesArray: number[] = details.map(adhesion => adhesion.role);
+            const nameArray: string[] = details.map(adhesion => adhesion.name);
+            const bioArray: string[] = details.map(adhesion => adhesion.bio);
+
+            // Créer un tableau d'URIs basé sur ce qui a été préalablement généré
+            const urisArray: string[] = await Promise.all(adhesionData.map(async (adhesion, index) => {
+                const metadataResponse = await axios.post('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
+                    name: adhesion.name,
+                    bio: adhesion.bio,
+                    description: `Rescoe vous a attribué le rôle suivant : ${adhesion.role}`,
+                    image: ipfsUrl, // Assurez-vous que cette URL est déjà définie
+                    role: adhesion.role,
+                    tags: ["Adhesion", "Minted by Rescoe", adhesion.role],
+                }, {
                     headers: {
                         'Authorization': `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT}`,
                         'Content-Type': 'application/json',
                     },
                 });
 
-                const metadataIpfsUrl = `https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`;
-                setDetails((prevDetails) => [...prevDetails, { uri: metadataIpfsUrl, role: selectedRole, name, bio }]);
-            } catch (error) {
-                console.error('Error uploading to IPFS:', error);
-            } finally {
-                setIsUploading(false);
-            }
-        };
+                return `https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`;
+            }));
 
-
-// Vérification si window.ethereum est défini
-const handleMintMultiple = async (): Promise<void> => {
-    if (window.ethereum) {
-        const web3 = new Web3(window.ethereum as any);  // Casting de window.ethereum
-
-        const contract = new web3.eth.Contract(ABI, contractAddress);
-
-        try {
-            const accounts: string[] = await web3.eth.getAccounts();
-            const recipientsArray: string[] = recipients.split(',').map(addr => addr.trim());
-
-            const urisArray: string[] = details.map((detail: Detail) => detail.uri);
-
-            const rolesArray: number[] = details.map((detail: Detail) => {
-              const role = roleMapping[detail.role];
-              return typeof role === 'number' ? role : parseInt(role, 10);  // On vérifie si c'est déjà un nombre
-          });
-
-
-            const nameArray: string[] = details.map((detail: Detail) => detail.name || "");
-            const bioArray: string[] = details.map((detail: Detail) => detail.bio || "");
-
+            // Vérifier que tous les tableaux ont la même longueur
             if (recipientsArray.length !== rolesArray.length ||
                 recipientsArray.length !== urisArray.length ||
                 recipientsArray.length !== nameArray.length ||
                 recipientsArray.length !== bioArray.length) {
-                alert('Le nombre d\'adresses, de rôles, d\'URIs, de noms et de bios doit être le même.');
+                alert('Le nombre d\'adresses, d\'URIs, de rôles, de noms et de bios doit être le même.');
                 return;
             }
 
             await contract.methods.mintMultiple(recipientsArray, urisArray, rolesArray, nameArray, bioArray).send({ from: accounts[0] });
             alert('NFTs mintés avec succès !');
         } catch (error) {
-            console.error("Minting failed:");
+            console.error("Minting failed:", error);
             alert('Minting failed: ');
         }
     } else {
@@ -192,6 +280,79 @@ const handleMintMultiple = async (): Promise<void> => {
     }
 };
 
+/*
+//############################################################################# => Systeme de mint multiple accessible uniquement a l'admin
+// Vérification si window.ethereum est défini
+const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const count = parseInt(e.target.value);
+        if (!isNaN(count) && count >= 1) {
+            setNumberOfAdhesions(count);
+            const updatedAdhesionData = Array.from({ length: count }, (_, index) => ({
+                address: '',
+                role: '',
+                name: '',
+                bio: index === 0 ? 'Biographie (modifiable)' : '',
+            }));
+            setAdhesionData(updatedAdhesionData);
+        } else {
+            setNumberOfAdhesions(1);
+            setAdhesionData([{ address: '', role: '', name: '', bio: 'Biographie (modifiable)' }]);
+        }
+    };
+
+    const handleAdhesionChange = (index: number, field: 'address' | 'role' | 'name' | 'bio', value: string) => {
+        const updatedData = [...adhesionData];
+        updatedData[index][field] = value;
+        setAdhesionData(updatedData);
+    };
+
+    const handleMintMultiple = async (): Promise<void> => {
+        if (window.ethereum) {
+            const web3 = new Web3(window.ethereum as any);
+            const contract = new web3.eth.Contract(ABI, contractAddress);
+
+            try {
+                const accounts: string[] = await web3.eth.getAccounts();
+
+                const recipientsArray: string[] = adhesionData.map(adhesion => adhesion.address.trim());
+                const rolesArray: number[] = adhesionData.map(adhesion => roleMapping[adhesion.role]); // Assurez-vous que le rôle est correctement décodé
+                const nameArray: string[] = adhesionData.map(adhesion => adhesion.name || "");
+                const bioArray: string[] = adhesionData.map(adhesion => adhesion.bio || "");
+
+                // Vérifier que chaque tableau a la même longueur
+                if (recipientsArray.length !== rolesArray.length || recipientsArray.length !== nameArray.length || recipientsArray.length !== bioArray.length) {
+                    alert('Le nombre d\'adresses, de rôles, de noms et de bios doit être le même.');
+                    return;
+                }
+
+                await contract.methods.mintMultiple(recipientsArray, rolesArray, nameArray, bioArray).send({ from: accounts[0] });
+                alert('NFTs mintés avec succès !');
+            } catch (error) {
+                console.error("Minting failed:");
+                alert('Minting failed: ');
+            }
+        } else {
+            alert('MetaMask ou un autre fournisseur Web3 n\'est pas installé.');
+        }
+    };
+
+*/
+//############################################################# => Gestion du prix des adhesion et des points de récompense
+const setPointPrice = async (newPrice: number) => {
+    if (window.ethereum && web3 && account) {
+        const contract = new web3.eth.Contract(ABIManagementAdhesion, contratAdhesionManagement);
+        try {
+            // Appel de la fonction Solidity pour modifier le prix des points
+            await contract.methods.setPointPrice(newPrice).send({ from: account });
+            alert('Prix des points mis à jour avec succès !');
+        } catch (error) {
+            console.error("Erreur lors de la mise à jour du prix des points:", error);
+            alert("La mise à jour a échoué !");
+        }
+    } else {
+        alert("Assurez-vous d'être connecté et d'avoir une instance Web3 disponible.");
+    }
+};
 
 
 
@@ -211,6 +372,8 @@ const handleSetMintPrice = async (): Promise<void> => {
     }
 };
 
+
+//############################################################# => Gestion du retrait de l'argent des adhesions
 const handleWithdraw = async (): Promise<void> => {
     if (window.ethereum && web3 && account) {
         const contract = new web3.eth.Contract(ABI, contractAddress);
@@ -257,131 +420,270 @@ const handleBurnNFT = async (): Promise<void> => {
     }
 };
 
+const ManageFeaturedCollections = () => {
+    const [collectionId, setCollectionId] = useState<string>('');
+
+    const handleFeature = async (isFeatured: boolean) => {
+        if (!collectionId) return alert('Veuillez renseigner un ID de collection.');
+
+        if (window.ethereum && web3 && account) {
+            try {
+                const contract = new web3.eth.Contract(ABICollection, contratRescollection);
+                await contract.methods.featureCollection(parseInt(collectionId), isFeatured).send({ from: account });
+                alert(`La collection ${collectionId} a été ${isFeatured ? 'mise en avant' : 'retirée des mises en avant'}.`);
+            } catch (error) {
+                console.error('Erreur lors de la mise à jour de la mise en avant :', error);
+                alert('Erreur lors de la mise à jour de la collection.');
+            }
+        } else {
+            alert("Assurez-vous d'être connecté et d'avoir une instance Web3 disponible.");
+        }
+    };
+
+    return (
+        <VStack spacing={4} align="start">
+            <Heading size="md">Mettre une collection en avant</Heading>
+            <Input
+                placeholder="ID de la collection"
+                value={collectionId}
+                onChange={(e) => setCollectionId(e.target.value)}
+            />
+            <HStack>
+                <Button colorScheme="green" onClick={() => handleFeature(true)}>Mettre en avant</Button>
+                <Button colorScheme="red" onClick={() => handleFeature(false)}>Retirer</Button>
+            </HStack>
+        </VStack>
+    );
+};
+
+
+
 
     const ManageRoles = () => (
-        <VStack>
-            <Heading size="md">Gérer les Rôles</Heading>
-            <Input
-                placeholder="Adresse du destinataire (séparez par des virgules)"
-                value={recipients}
-                onChange={(e) => setRecipients(e.target.value)}
-            />
-            <Select
-                placeholder="Choisissez un rôle"
-                onChange={(e) => {
-                    const index = parseInt(e.target.value, 10); // Conversion en nombre
+      <VStack>
+            <Heading size="md">Générer des adhésions</Heading>
+            <FormControl mt={4}>
+                <FormLabel htmlFor="adhesion-count">Nombre d'adhésions :</FormLabel>
+                <Input
+                    id="adhesion-count"
+                    type="number"
+                    value={numberOfAdhesions}
+                    onChange={handleNumberChange}
+                    min={1}
+                />
+            </FormControl>
 
-                    if (!isNaN(index)) {
-                        setSelectedRole(Object.keys(roleMapping)[index]);
-                        generateImage();
-                    }
-                }}
-                value={selectedRole}
-            >
-                {Object.keys(roleMapping).map((role) => (
-                    <option key={role} value={roleMapping[role]}>
-                        {role}
-                    </option>
-                ))}
-            </Select>
+            {adhesionData.map((adhesion, index) => (
+                <VStack key={index} spacing={2} mt={4}>
+                    <FormControl>
+                        <FormLabel htmlFor={`address-${index}`}>Adresse</FormLabel>
+                        <Input
+                            id={`address-${index}`}
+                            value={adhesion.address}
+                            onChange={(e) => handleAdhesionChange(index, 'address', e.target.value)}
+                            placeholder="Entrez l'adresse du destinataire"
+                        />
+                    </FormControl>
+                    <FormControl>
+                        <FormLabel htmlFor={`role-${index}`}>Rôle</FormLabel>
+                        <Select
+                            id={`role-${index}`}
+                            value={adhesion.role}
+                            onChange={(e) => handleAdhesionChange(index, 'role', e.target.value)}
+                            placeholder="Choisir un rôle"
+                        >
+                            {Object.keys(roleMapping).map(role => (
+                                <option key={role} value={role}>
+                                    {role}
+                                </option>
+                            ))}
+                        </Select>
+                    </FormControl>
+                    <FormControl>
+                        <FormLabel htmlFor={`name-${index}`}>Nom</FormLabel>
+                        <Input
+                            id={`name-${index}`}
+                            value={adhesion.name}
+                            onChange={(e) => handleAdhesionChange(index, 'name', e.target.value)}
+                            placeholder="Entrez votre nom"
+                        />
+                    </FormControl>
+                    <FormControl>
+                        <FormLabel htmlFor={`bio-${index}`}>Biographie</FormLabel>
+                        <Input
+                            id={`bio-${index}`}
+                            value={adhesion.bio}
+                            onChange={(e) => handleAdhesionChange(index, 'bio', e.target.value)}
+                            placeholder="Entrez votre biographie"
+                        />
+                    </FormControl>
+                </VStack>
+            ))}
+
             <Center>
                 {generatedImageUrl && <Image src={generatedImageUrl} alt="Generated Insect" boxSize="150px" />}
             </Center>
 
-            {/* Ajout de champs pour le nom et la biographie */}
-<FormControl mt={4}>
-    <FormLabel htmlFor="name">Nom</FormLabel>
-    <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Entrez votre nom" />
-</FormControl>
-<FormControl mt={4}>
-    <FormLabel htmlFor="bio">Biographie</FormLabel>
-    <Input id="bio" value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Entrez votre biographie" />
-</FormControl>
-
-
             <Button onClick={handleConfirmRole} isLoading={isUploading} colorScheme="teal">
-                Confirmer le rôle et téléverser sur IPFS
+                Confirmer les adhésions et téléverser sur IPFS
             </Button>
-            {ipfsUrl && <Text>IPFS URL: {ipfsUrl}</Text>}
-            {details.map((detail, index) => (
-                <Text key={index}>URI: {detail.uri} | Rôle: {detail.role}</Text>
-            ))}
             <Button onClick={handleMintMultiple} isLoading={loading} colorScheme="teal">
                 Mint Multiple adhérents addresses
             </Button>
         </VStack>
     );
 
-    const ManageNFT = () => (
-        <VStack>
-            <Heading size="md">Gérer les NFTs</Heading>
-            <Input
-                placeholder="ID du NFT à mettre en vente"
-                value={nftId}
-                onChange={(e) => setNftId(Number(e.target.value))}
-                type="number"
-            />
+    const ManageNFT = () => {
+        const [activeNFTTab, setActiveNFTTab] = useState<string>('ManageNFT');
 
-            <Input
-                placeholder="Prix de vente (ETH)"
-                value={salePrice}
-                onChange={(e) => setSalePrice(Number(e.target.value))}
-                type="number"
-            />
+        return (
+            <VStack>
+                <HStack spacing={4}>
+                    <Button
+                        onClick={() => setActiveNFTTab('ManageNFT')}
+                        variant={activeNFTTab === 'ManageNFT' ? 'solid' : 'outline'}
+                    >
+                        Gérer les NFTs
+                    </Button>
+                    <Button
+                        onClick={() => setActiveNFTTab('ManageFeatured')}
+                        variant={activeNFTTab === 'ManageFeatured' ? 'solid' : 'outline'}
+                    >
+                        Collections mises en avant
+                    </Button>
+                </HStack>
+                {activeNFTTab === 'ManageNFT' && (
+                    <>
+                        <Heading size="md">Gérer les NFTs</Heading>
+                        <Input
+                            placeholder="ID du NFT à mettre en vente"
+                            value={nftId}
+                            onChange={(e) => setNftId(Number(e.target.value))}
+                            type="number"
+                        />
+                        <Input
+                            placeholder="Prix de vente (ETH)"
+                            value={salePrice}
+                            onChange={(e) => setSalePrice(Number(e.target.value))}
+                            type="number"
+                        />
+                        <Button onClick={handlePutNFTForSale} colorScheme="green" mb={3}>
+                            Mettre NFT en vente
+                        </Button>
+                        <Button onClick={handleBurnNFT} colorScheme="red" mb={3}>
+                            Brûler un NFT
+                        </Button>
+                    </>
+                )}
+                {activeNFTTab === 'ManageFeatured' && <ManageFeaturedCollections />}
+            </VStack>
+        );
+    };
 
-            <Button onClick={handlePutNFTForSale} colorScheme="green" mb={3}>
-                Mettre NFT en vente
-            </Button>
-            <Button onClick={handleBurnNFT} colorScheme="red" mb={3}>
-                Brûler un NFT
-            </Button>
-        </VStack>
-    );
 
     const Settings = () => (
-        <VStack>
-            <Heading size="md">Paramètres</Heading>
-            <Input
-                placeholder="Nouveau prix de mint (ETH)"
-                value={mintPrice}
-                onChange={(e) => setMintPrice(Number(e.target.value))}
-                type="number"
-            />
-            <Button onClick={handleSetMintPrice} colorScheme="blue" mb={3}>Changer le prix de mint</Button>
-            <Button onClick={handleWithdraw} colorScheme="red" mb={3}>Retirer les fonds</Button>
-        </VStack>
+
+      <VStack>
+                  <HStack spacing={4}>
+                      <Button
+                          onClick={() => setActiveSettingsTab('MintPrice')}
+                          variant={activeSettingsTab === 'MintPrice' ? 'solid' : 'outline'}
+                      >
+                          Changer le prix de mint
+                      </Button>
+                      <Button
+                          onClick={() => setActiveSettingsTab('PointPrice')}
+                          variant={activeSettingsTab === 'PointPrice' ? 'solid' : 'outline'}
+                      >
+                          Changer le prix des points
+                      </Button>
+                      <Button
+                          onClick={() => setActiveSettingsTab('Withdraw')}
+                          variant={activeSettingsTab === 'Withdraw' ? 'solid' : 'outline'}
+                      >
+                          Retirer des fonds
+                      </Button>
+                  </HStack>
+
+                  <Divider />
+
+                  {activeSettingsTab === 'MintPrice' && (
+                      <VStack>
+                          <Heading size="md">Changer le prix de mint</Heading>
+                          <Text>Saisissez le nouveau prix de mint (ETH):</Text>
+                          <Input
+                              placeholder="Nouveau prix de mint (ETH)"
+                              value={mintPrice}
+                              onChange={(e) => setMintPrice(Number(e.target.value))}
+                              type="number"
+                          />
+                          <Button onClick={() => setMintPrice(mintPrice)} colorScheme="blue" mb={3}>
+                              Changer le prix de mint
+                          </Button>
+                      </VStack>
+                  )}
+
+                  {activeSettingsTab === 'PointPrice' && (
+                      <VStack>
+                          <Heading size="md">Changer le prix des points</Heading>
+                          <Text>Saisissez le nouveau prix des points:</Text>
+                          <Input
+                              placeholder="Nouveau prix des points"
+                              value={newPointPrice}
+                              onChange={(e) => setNewPointPrice(Number(e.target.value))}
+                              type="number"
+                          />
+                          <Button onClick={() => setPointPrice(newPointPrice)} colorScheme="blue" mb={3}>
+                              Changer le prix des points
+                          </Button>
+                      </VStack>
+                  )}
+
+                  {activeSettingsTab === 'Withdraw' && (
+                      <VStack>
+                          <Heading size="md">Retirer des fonds</Heading>
+                          <Text>Appuyez sur le bouton ci-dessous pour retirer les fonds disponibles.</Text>
+                          <Button onClick={handleWithdraw} colorScheme="red" mb={3}>
+                              Retirer les fonds
+                          </Button>
+                      </VStack>
+                  )}
+              </VStack>
     );
 
     return (
         <Box p={6} display="flex" justifyContent="center" alignItems="center">
+
             <VStack spacing={4}>
+            <Heading size="md">Gestion Administrative</Heading>
+
                 <HStack spacing={4} mb={6}>
                     <Button
                         onClick={() => handleTabChange('Roles')}
                         variant={activeTab === 'Roles' ? 'solid' : 'outline'}
                     >
-                        Gérer les Rôles
+                        Adhérents
                     </Button>
                     <Button
                         onClick={() => handleTabChange('NFT')}
                         variant={activeTab === 'NFT' ? 'solid' : 'outline'}
                     >
-                        Gérer les NFT
+                        Collections & Oeuvres
                     </Button>
                     <Button
                         onClick={() => handleTabChange('Settings')}
                         variant={activeTab === 'Settings' ? 'solid' : 'outline'}
                     >
-                        Paramètres
+                        Economie
                     </Button>
                 </HStack>
 
                 <Divider />
 
                 <Box mt={6}>
-                    {activeTab === 'Roles' && <ManageRoles />}
-                    {activeTab === 'NFT' && <ManageNFT />}
-                    {activeTab === 'Settings' && <Settings />}
+                {activeTab === 'Roles' && <ManageRoles />}
+                {activeTab === 'NFT' && <ManageNFT />}
+                {activeTab === 'Settings' && <Settings />}
                 </Box>
             </VStack>
         </Box>
