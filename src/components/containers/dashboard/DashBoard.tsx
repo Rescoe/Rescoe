@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Image, Heading, VStack, Button, Text, Link, HStack, Grid, Tab, TabList, TabPanel, TabPanels, Tabs, FormLabel, Spinner, Divider, useToast, useClipboard } from '@chakra-ui/react';
-
 import * as jdenticon from 'jdenticon';
 import { useAuth } from '../../../utils/authContext';
-import { JsonRpcProvider, ethers } from 'ethers';
+import { JsonRpcProvider } from 'ethers';
+import { ethers } from "ethers";
 import { Contract } from 'ethers';
 import ABI from '../../ABI/ABIAdhesion.json';
 import ABIRESCOLLECTION from '../../ABI/ABI_Collections.json';
 import ABI_ADHESION_MANAGEMENT from '../../ABI/ABI_ADHESION_MANAGEMENT.json';
+
+import { BrowserProvider, Eip1193Provider } from "ethers";
 
 import axios from "axios";
 import detectEthereumProvider from '@metamask/detect-provider';
@@ -68,6 +70,8 @@ const Dashboard = () => {
   const [tokensIdsAdherent, setTokenIdAdherent] = useState<number[]>([]); // Changement ici pour accepter plusieurs IDs
   const [error, setError] = useState<string | null>(null);
   const [web3, setWeb3] = useState<Web3 | null>(null);
+  const [pointsToBuy, setPointsToBuy] = useState(0);
+
 
 
   const toast = useToast();
@@ -272,6 +276,74 @@ const formatAddress = (address: string) => {
     }
   };
 
+
+  const fetchPointPrice = async () => {
+      const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
+      const contract = new Contract(contractAddressmanagement, ABI_ADHESION_MANAGEMENT, provider); // Pas besoin de signer pour lire le prix
+
+      try {
+          // Appel pour récupérer le prix des points
+          const prixPoints = await contract.pointPrice(); // Ceci devrait fonctionner si pointPrice est public
+          console.log(`Le prix par point est : ${prixPoints.toString()} Wei`); // Afficher le prix en Wei
+          return prixPoints; // Retourner en Ether
+      } catch (error) {
+          console.error("Erreur lors de la récupération du prix des points:", error);
+      }
+  };
+
+  // Ensuite, appellez cette fonction dans l'effet useEffect pour l'initialisation si nécessaire
+  useEffect(() => {
+      const getPointPrice = async () => {
+          const price = await fetchPointPrice();
+          // Enregistrer ou utiliser ce prix comme besoin
+      };
+
+      getPointPrice();
+  }, [contractAddressmanagement]);
+
+
+  const buyAdhesionPoints = async (userAddress: string) => {
+    if (!window.ethereum) {
+      throw new Error("Wallet non détecté.");
+    }
+
+    const ethereum = window.ethereum as Eip1193Provider;
+
+    await ethereum.request({ method: "eth_requestAccounts" });
+
+    const provider = new BrowserProvider(ethereum);
+    const signer = await provider.getSigner();
+
+
+    const contract = new ethers.Contract(contractAddressmanagement, ABI_ADHESION_MANAGEMENT, signer);
+
+    try {
+      const prixParPoint = await fetchPointPrice(); // exemple : "100000000000000"
+
+      if (!prixParPoint || isNaN(Number(prixParPoint))) {
+        throw new Error("Le prix par point est invalide.");
+      }
+
+      const totalPrice = BigInt(prixParPoint) * BigInt(pointsToBuy);
+
+      const tx = await contract.buyRewardPoints(userAddress, pointsToBuy, {
+        value: totalPrice,
+      });
+
+      await tx.wait();
+      console.log(`Achat réussi: ${pointsToBuy} points achetés !`);
+      fetchAdhesionPoints(userAddress);
+    } catch (error) {
+      console.error("Erreur lors de l'achat des points:", error);
+    }
+  };
+
+
+
+
+
+
+
   return (
     <Box p={6} display="flex" flexDirection="column" alignItems="center" justifyContent="center">
       <VStack spacing={8} align="stretch" width="100%" maxW="800px">
@@ -410,6 +482,20 @@ const formatAddress = (address: string) => {
                 <Text mt={4}>Collections créées : {userCollections}.</Text>
                 <Text mt={4}>Collections restantes : {remainingCollections}.</Text>
                 <VStack>
+
+                <div>
+                  <h1>Points d'Adhésion</h1>
+                  <p>Points actuels: {rewardPoints}</p>
+                  <input
+                    type="number"
+                    value={pointsToBuy}
+                    onChange={(e) => setPointsToBuy(parseInt(e.target.value))}
+                    placeholder="Nombre de points à acheter"
+                  />
+                  <button onClick={() => buyAdhesionPoints(address)} >Acheter des Points</button>
+                </div>
+
+
                   <Text mt={4}>Points d'Adhésion</Text>
                   {rewardPoints !== null ? (
                     <Text>Vos points Rescoe : {rewardPoints} 🐝</Text>
