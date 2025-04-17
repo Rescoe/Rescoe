@@ -44,7 +44,7 @@ const UniqueArtGalerie: React.FC = () => {
     setIsLoading(true);
     try {
       const total: number = await contract.getTotalCollectionsMinted();
-      const collectionsPaginated: any[] = await contract.getCollectionsPaginated(27, total);
+      const collectionsPaginated: any[] = await contract.getCollectionsPaginated(0, total);
 
       const collectionsData = (await Promise.all(
         collectionsPaginated.map(async (tuple: any) => {

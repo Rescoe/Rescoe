@@ -42,11 +42,13 @@ interface NFTData {
   image?: string;  // Ajouter une image optionnelle
 }
 
-const contractAddressmanagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGER as string;
+const contractAdhesionManagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGER as string;
+const contractAdhesion = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS as string;
+
 
 const TokenPage = () => {
   const router = useRouter();
-  const { contractAddress, tokenId } = router.query;
+  const { contractAdhesion, tokenId } = router.query;
   const { address: authAddress } = useAuth();
 
   const [nftData, setNftData] = useState<NFTData | null>(null);
@@ -101,14 +103,14 @@ useEffect(() => {
 
 
 useEffect(() => {
-    if (!router.isReady || !contractAddress || !tokenId) return;
+    if (!router.isReady || !contractAdhesion || !tokenId) return;
 
     setIsLoading(true);
 
     const fetchNFT = async () => {
       try {
         // Assurez-vous que tokenId est bien un nombre
-        const data = await fetchNFTData(contractAddress as string, Number(tokenId));
+        const data = await fetchNFTData(contractAdhesion as string, Number(tokenId));
         setNftData(data);
         setIsForSale(data.forSale); // Utilisez forSale au lieu de forsale
 
@@ -130,10 +132,10 @@ useEffect(() => {
     };
 
     fetchNFT();
-  }, [router.isReady, contractAddress, tokenId]);
+  }, [router.isReady, contractAdhesion, tokenId]);
 
-  const fetchNFTData = async (contractAddress: string, tokenId: number) => {
-  const cacheKey = `${contractAddress}_${tokenId}`;
+  const fetchNFTData = async (contractAdhesion: string, tokenId: number) => {
+  const cacheKey = `${contractAdhesion}_${tokenId}`;
 
   if (nftCache[cacheKey]) {
     return nftCache[cacheKey];
@@ -141,8 +143,8 @@ useEffect(() => {
 
   try {
     const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
-    const contract = new ethers.Contract(contractAddress, ABI, provider);
-    const contractmanagement = new ethers.Contract(contractAddressmanagement, ABI_Management, provider);
+    const contract = new ethers.Contract(contractAdhesion, ABI, provider);
+    const contractmanagement = new ethers.Contract(contractAdhesionManagement, ABI_Management, provider);
 
 
     const [
@@ -193,15 +195,18 @@ useEffect(() => {
   };
 
   const handleRenewMembership = async () => {
-      // Vérifier que contractAddress est défini et est une chaîne
-      if (!contractAddress || Array.isArray(contractAddress)) {
+      // Vérifier que contractAdhesion est défini et est une chaîne
+      if (!contractAdhesion || Array.isArray(contractAdhesion)) {
           console.error("Contract address is invalid");
           return;
       }
 
+      const contract = new ethers.Contract(contractAdhesion, ABI, provider); // Affirme que c'est un string
+      const price = await contract.mintPrice();
+      console.log(price);
       // L'utilisateur peut renouveler son adhésion même si elle a expiré
       try {
-          const contract = new ethers.Contract(contractAddress as string, ABI, provider); // Affirme que c'est un string
+
           const tx = await contract.renewMembership(tokenId, { value: ethers.parseEther("0.005") });
           await tx.wait();
 
@@ -214,7 +219,7 @@ useEffect(() => {
 
   const handleUpdateInfo = async () => {
     try {
-      const contract = new ethers.Contract(contractAddress as string, ABI, provider); // Affirme que c'est un string
+      const contract = new ethers.Contract(contractAdhesion as string, ABI, provider); // Affirme que c'est un string
       await contract.setNameAndBio(tokenId, name, bio); // Ajout du tokenId
       alert("Informations mises à jour avec succès.");
     } catch (error) {
@@ -224,7 +229,7 @@ useEffect(() => {
 
   const handleListForSale = async () => {
     try {
-      const contract = new ethers.Contract(contractAddress as string, ABI, provider); // Affirme que c'est un string
+      const contract = new ethers.Contract(contractAdhesion as string, ABI, provider); // Affirme que c'est un string
       await contract.listTokenForSale(tokenId, ethers.parseEther(price));
       setIsForSale(true); // Ajoutez une variable locale si vous gérez l'état côté frontend
 
@@ -246,7 +251,7 @@ useEffect(() => {
     }
 
     try {
-      const contract = new ethers.Contract(contractAddress as string, ABI, provider);
+      const contract = new ethers.Contract(contractAdhesion as string, ABI, provider);
 
       const priceInEther: string = web3.utils.fromWei(nftData.price, 'ether')
 

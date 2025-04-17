@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 import Web3 from "web3";
+import { JsonRpcProvider, Contract } from 'ethers';
+import { BigNumberish } from 'ethers';
+
 import detectEthereumProvider from '@metamask/detect-provider';
 import axios from 'axios';
 import ABI from '../../ABI/ABIAdhesion.json'; // Votre ABI de contrat ici.
@@ -33,7 +36,7 @@ const RoleBasedNFTPage = () => {
     const [isUploading, setIsUploading] = useState<boolean>(false);
     const [isMinting, setIsMinting] = useState<boolean>(false);
     const [roleConfirmed, setRoleConfirmed] = useState<boolean>(false);
-    const [mintPrice, setMintPrice] = useState<string>(''); // État pour le prix du mint
+    const [mintPrice, setMintPrice] = useState(0); // État pour le prix du mint
     const [showBananas, setShowBananas] = useState(false);  // Add state to control when to show Bananas
     const [name, setName] = useState(''); // Ajouter état pour le nom
     const [bio, setBio] = useState(''); // Ajouter état pour la biographie
@@ -43,8 +46,10 @@ const RoleBasedNFTPage = () => {
     const [isMinted, setIsMinted] = useState<boolean>(false);
     const [nftId, setNftId] = useState<string>('');
 
+    const { address } = useAuth();
+
     const [progress, setProgress] = useState(0);
-const [countdown, setCountdown] = useState(5); // 5 secondes avant redirection
+    const [countdown, setCountdown] = useState(5); // 5 secondes avant redirection
 
 
     const router = useRouter();
@@ -102,12 +107,28 @@ const [countdown, setCountdown] = useState(5); // 5 secondes avant redirection
 
 
     const fetchMintPrice = async (web3Instance: Web3) => {
-        const contract = new web3Instance.eth.Contract(ABI, contractAddress);
+        const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
 
+        if (!contractAddress) {
+          console.error("L'adresse du contrat n'est pas définie.");
+          return;
+        }
+
+        const contract = new Contract(contractAddress, ABI, provider);
+        // sinon cf "      const priceInEth = web3.utils.fromWei(actualPointPrice.toString(), "ether"); " dans admin.tsx
+        //const contract = new web3Instance.eth.Contract(ABI, contractAddress);
+
+        /*      const priceInEth = web3.utils.fromWei(actualPointPrice, "ether");
+              console.log("Prix en ETH:", priceInEth);
+
+              setprixPoints(priceInEth);
+              */
+              
         try {
-            const price: string = await contract.methods.mintPrice().call(); // Le prix est renvoyé en wei sous forme de string
+            const price: BigNumberish = await contract.mintPrice(); // Le prix est renvoyé en wei sous forme de string
+            console.log(price);
             const ethPrice: string = web3Instance.utils.fromWei(price, 'ether'); // Converti en ethers sous forme de string
-            setMintPrice(ethPrice); // Stocke le prix dans l'état local
+            setMintPrice(Number(price));//Number(price)/1000000000000000000); // Stocke le prix dans l'état local
         } catch (error) {
             console.error("Erreur lors de la récupération du prix du mint :", error);
         }
@@ -344,7 +365,7 @@ const [countdown, setCountdown] = useState(5); // 5 secondes avant redirection
                               </Box>
                           )}
 
-                          <Text mt={4}>Prix de mint : {mintPrice} ETH</Text>
+                          <Text mt={4}>Prix de mint : {mintPrice} WEI</Text>
                           <Button
                               onClick={mintNFT}
                               colorScheme="teal"

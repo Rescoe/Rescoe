@@ -16,9 +16,9 @@ import detectEthereumProvider from '@metamask/detect-provider';
 import Web3 from "web3";
 
 
-const contractAddressAdhesion = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS as string;
+const contractAdhesion = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS as string;
 const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT as string;
-const contractAddressmanagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGER as string;
+const contratAdhesionManagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGER as string;
 
 
 // Interfaces pour le typage
@@ -71,7 +71,7 @@ const Dashboard = () => {
   const [error, setError] = useState<string | null>(null);
   const [web3, setWeb3] = useState<Web3 | null>(null);
   const [pointsToBuy, setPointsToBuy] = useState(0);
-
+  const [nombreTotalMint, setNombreTotalMint] = useState<number | null>(null);
 
 
   const toast = useToast();
@@ -116,6 +116,7 @@ const Dashboard = () => {
       setAvatarSvg(svgString);
 
       // Appels aux différentes fonctions pour récupérer les données
+      fetchNFTs();
       fetchRolesAndImages(address);
       fetchENS(address);
       fetchStatsCollection(address);
@@ -147,12 +148,14 @@ const formatAddress = (address: string) => {
 
   const fetchRolesAndImages = async (userAddress: string) => {
     const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
-    const contract = new Contract(contractAddressmanagement, ABI_ADHESION_MANAGEMENT, provider);
-    const contractadhesion = new Contract(contractAddressAdhesion, ABI, provider);
-
+    const contract = new Contract(contratAdhesionManagement, ABI_ADHESION_MANAGEMENT, provider);
+    const contractadhesion = new Contract(contractAdhesion, ABI, provider);
+    console.log(userAddress);
 
     try {
-      const tokenIds = await contract.getTokensByOwnerPaginated(userAddress, 0, 1);
+
+      const tokenIds = await contract.getTokensByOwnerPaginated(userAddress, 0, nombreTotalMint);
+      console.log('test');
       const userInfos = await contract.getUserInfo(userAddress);
 
       const username = userInfos.name;
@@ -249,10 +252,13 @@ const formatAddress = (address: string) => {
   const fetchNFTs = async () => {
     const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
     const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
+    const contractadhesionManagementVar = new Contract(contratAdhesionManagement, ABI_ADHESION_MANAGEMENT, provider);
+    const contractadhesionVar = new Contract(contractAdhesion, ABI, provider);
 
     try {
-      const totalMinted = await contract.getTotalMinted();
-      const tokenIds = await contract.getAllTokensPaginated(0, 12);
+      const totalMinted = await contractadhesionVar.getTotalMinted();
+      setNombreTotalMint(totalMinted);
+      const tokenIds = await contractadhesionManagementVar.getTokensPaginated(0, totalMinted);
       const nftsData = tokenIds.map((id: string) => ({ tokenId: id.toString() }));
       setNfts(nftsData);
     } catch (error) {
@@ -267,7 +273,7 @@ const formatAddress = (address: string) => {
 
   const fetchAdhesionPoints = async (userAddress: string) => {
     const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
-    const contract = new Contract(contractAddressAdhesion, ABI, provider);
+    const contract = new Contract(contractAdhesion, ABI, provider);
     try {
       const points = await contract.rewardPoints(userAddress);
       setRewardPoints(parseInt(points.toString()));
@@ -279,7 +285,7 @@ const formatAddress = (address: string) => {
 
   const fetchPointPrice = async () => {
       const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
-      const contract = new Contract(contractAddressmanagement, ABI_ADHESION_MANAGEMENT, provider); // Pas besoin de signer pour lire le prix
+      const contract = new Contract(contratAdhesionManagement, ABI_ADHESION_MANAGEMENT, provider); // Pas besoin de signer pour lire le prix
 
       try {
           // Appel pour récupérer le prix des points
@@ -299,7 +305,7 @@ const formatAddress = (address: string) => {
       };
 
       getPointPrice();
-  }, [contractAddressmanagement]);
+  }, [contratAdhesionManagement]);
 
 
   const buyAdhesionPoints = async (userAddress: string) => {
@@ -315,7 +321,7 @@ const formatAddress = (address: string) => {
     const signer = await provider.getSigner();
 
 
-    const contract = new ethers.Contract(contractAddressmanagement, ABI_ADHESION_MANAGEMENT, signer);
+    const contract = new ethers.Contract(contratAdhesionManagement, ABI_ADHESION_MANAGEMENT, signer);
 
     try {
       const prixParPoint = await fetchPointPrice(); // exemple : "100000000000000"
@@ -395,7 +401,7 @@ const formatAddress = (address: string) => {
                     images.map((imgUri, index) => (
                       <VStack key={index} spacing={2}>
                         <Link
-                          href={`/AdhesionId/${contractAddressAdhesion}/${tokensIdsAdherent[index]}`}
+                          href={`/AdhesionId/${contractAdhesion}/${tokensIdsAdherent[index]}`}
                         >
                           <Box
                             as="a"

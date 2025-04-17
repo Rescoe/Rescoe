@@ -16,7 +16,7 @@ interface AuthContextType {
   isContributor: boolean;
   isAuthenticated: boolean;
   setAddress: (address: string | null) => void;
-  setIsAuthenticated: (status: boolean) => void;
+  setIsAuthenticated: (status: boolean) => void; // Ensure this matches what's provided
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -45,35 +45,31 @@ const roleMapping: { [key: number]: 'admin' | 'artist' | 'poet' | 'trainee' | 'c
 interface MemberInfo {
   role: number;
 }
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [address, setAddress] = useState<string | null>(null);
   const [role, setRole] = useState<'admin' | 'artist' | 'poet' | 'trainee' | 'contributor' | null>(null);
   const [web3, setWeb3] = useState<Web3 | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isMember, setIsMember] = useState(false);
 
   useEffect(() => {
     const initWeb3 = async () => {
-      const provider = await detectEthereumProvider();
-      if (!provider) {
-        console.error("Please install MetaMask!");
+      try {
+        const provider = await detectEthereumProvider();
+        if (provider) {
+          const web3Instance = new Web3(provider);
+          setWeb3(web3Instance);
+          const accounts = await web3Instance.eth.getAccounts();
+          if (accounts.length > 0) {
+            setAddress(accounts[0]);
+            setIsAuthenticated(true);
+          }
+        }
+      } catch (error) {
+        console.error("Erreur lors de l'initialisation de Web3 :", error);
+      } finally {
         setIsLoading(false);
-        return;
       }
-
-      const web3Instance = new Web3(provider);
-      setWeb3(web3Instance);
-      const accounts = await web3Instance.eth.getAccounts();
-      if (accounts.length > 0) {
-        setAddress(accounts[0]);
-        setIsAuthenticated(true);
-        fetchRole(accounts[0]); // Appel de fetchRole après avoir défini l'adresse
-      } else {
-        setIsAuthenticated(false);
-      }
-      setIsLoading(false);
     };
     initWeb3();
   }, []);
@@ -83,30 +79,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (web3 && userAddress) {
         const contract = new web3.eth.Contract(ABI, CONTRACT_ADDRESS);
         const owner = (await contract.methods.owner().call()) as string;
-        const memberInfo: MemberInfo = await contract.methods.members(userAddress).call();
-
-        console.log("Member Info:", memberInfo);
 
         if (userAddress.toLowerCase() === owner.toLowerCase()) {
           setRole('admin');
-          setIsMember(true);
           return;
         }
-        setIsAuthenticated(true);
+
+        const memberInfo: MemberInfo = await contract.methods.members(userAddress).call();
         setRole(roleMapping[memberInfo.role] || null);
-        setIsMember(true);
       }
     } catch (error) {
-      console.error("Error fetching role:", error);
-      setIsMember(false);
+      console.error("Erreur lors de la récupération du rôle:", error);
     }
   };
 
   useEffect(() => {
-    if (address) {
-      fetchRole(address);
-    }
-  }, [address, web3]);
+    const fetchUserRole = async () => {
+      if (address) {
+        setIsAuthenticated(true);
+        try {
+          await fetchRole(address.toLowerCase()); // Now it can access fetchRole
+        } catch (error) {
+          console.error("Error fetching user role:", error);
+        }
+      } else {
+        setIsAuthenticated(false);
+      }
+    };
+
+    fetchUserRole();
+  }, [address]);
+
+  const isMember = role !== null;
 
   return (
     <AuthContext.Provider value={{

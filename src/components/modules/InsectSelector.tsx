@@ -10,7 +10,7 @@ import { BigNumberish } from 'ethers';
 const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS!;
 
 
-
+//Ce code fonctionne sur mobile chrome
 
 const SelectInsect = ({ onSelect }: { onSelect: (insect: Insect) => void }) => {
   const { address } = useAuth();

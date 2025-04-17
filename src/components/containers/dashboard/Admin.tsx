@@ -60,6 +60,7 @@ const AdminPage: React.FC = () => {
     const [web3, setWeb3] = useState<Web3 | null>(null);
     const [activeSettingsTab, setActiveSettingsTab] = useState<string>('MintPrice');
 
+    const[prixPoints, setprixPoints] = useState<string>('');
     const [mintPrice, setMintPrice] = useState<number>(0);
 
     const [newPointPrice, setNewPointPrice] = useState<number>(0);
@@ -93,7 +94,7 @@ const AdminPage: React.FC = () => {
                 // Récupérer les comptes après avoir initialisé Web3
                 const accounts = await web3Instance.eth.getAccounts();
                 setAccount(accounts[0] || ''); // Si aucun compte n'est trouvé, le compte est vide
-
+                fetchPointPrice();
                 // Optionnel: récupérer d'autres informations comme le prix de mint
             } else {
                 alert('Veuillez installer MetaMask!');
@@ -342,8 +343,10 @@ const setPointPrice = async (newPrice: number) => {
     if (window.ethereum && web3 && account) {
         const contract = new web3.eth.Contract(ABIManagementAdhesion, contratAdhesionManagement);
         try {
+
+          const priceInWei = web3.utils.toWei(newPrice.toString(), 'ether'); // Convertir le prix en wei
+          await contract.methods.setPointPrice(priceInWei).send({ from: account });
             // Appel de la fonction Solidity pour modifier le prix des points
-            await contract.methods.setPointPrice(newPrice).send({ from: account });
             alert('Prix des points mis à jour avec succès !');
         } catch (error) {
             console.error("Erreur lors de la mise à jour du prix des points:", error);
@@ -352,6 +355,26 @@ const setPointPrice = async (newPrice: number) => {
     } else {
         alert("Assurez-vous d'être connecté et d'avoir une instance Web3 disponible.");
     }
+};
+
+const fetchPointPrice = async () => {
+  if (window.ethereum && web3 && account) {
+    const contract = new web3.eth.Contract(ABIManagementAdhesion, contratAdhesionManagement);
+
+    try {
+      const actualPointPrice = await contract.methods.pointPrice().call() as string; // ✅ cast en string
+      console.log("Prix en wei:", actualPointPrice);
+
+      const priceInEth = web3.utils.fromWei(actualPointPrice, "ether");
+      console.log("Prix en ETH:", priceInEth);
+
+      setprixPoints(priceInEth);
+
+    } catch (err) {
+      alert("Erreur lors de la recuperation du prix des points ");
+
+    }
+  }
 };
 
 
@@ -374,11 +397,30 @@ const handleSetMintPrice = async (): Promise<void> => {
 
 
 //############################################################# => Gestion du retrait de l'argent des adhesions
-const handleWithdraw = async (): Promise<void> => {
+const handleWithdrawAdhesion = async (): Promise<void> => {
     if (window.ethereum && web3 && account) {
         const contract = new web3.eth.Contract(ABI, contractAddress);
+
         try {
             await contract.methods.withdraw().send({ from: account });
+
+            alert('Retrait réussi!');
+        } catch (error) {
+            console.error("Erreur lors du retrait:", error);
+            alert("Retrait échoué!");
+        }
+    } else {
+        alert("Assurez-vous d'être connecté et d'avoir une instance Web3 disponible.");
+    }
+};
+
+const handleWithdrawPoints = async (): Promise<void> => {
+    if (window.ethereum && web3 && account) {
+        const contract = new web3.eth.Contract(ABIManagementAdhesion, contratAdhesionManagement);
+
+        try {
+            await contract.methods.withdraw().send({ from: account });
+
             alert('Retrait réussi!');
         } catch (error) {
             console.error("Erreur lors du retrait:", error);
@@ -589,13 +631,13 @@ const ManageFeaturedCollections = () => {
                           onClick={() => setActiveSettingsTab('MintPrice')}
                           variant={activeSettingsTab === 'MintPrice' ? 'solid' : 'outline'}
                       >
-                          Changer le prix de mint
+                          Changer le prix de l'adhésion
                       </Button>
                       <Button
                           onClick={() => setActiveSettingsTab('PointPrice')}
                           variant={activeSettingsTab === 'PointPrice' ? 'solid' : 'outline'}
                       >
-                          Changer le prix des points
+                          Changer le prix des points de récompense
                       </Button>
                       <Button
                           onClick={() => setActiveSettingsTab('Withdraw')}
@@ -626,6 +668,8 @@ const ManageFeaturedCollections = () => {
                   {activeSettingsTab === 'PointPrice' && (
                       <VStack>
                           <Heading size="md">Changer le prix des points</Heading>
+                          <Text mt={4}>prix actuel d'un point: {prixPoints}ETH .</Text>
+
                           <Text>Saisissez le nouveau prix des points:</Text>
                           <Input
                               placeholder="Nouveau prix des points"
@@ -643,9 +687,14 @@ const ManageFeaturedCollections = () => {
                       <VStack>
                           <Heading size="md">Retirer des fonds</Heading>
                           <Text>Appuyez sur le bouton ci-dessous pour retirer les fonds disponibles.</Text>
-                          <Button onClick={handleWithdraw} colorScheme="red" mb={3}>
-                              Retirer les fonds
+                          <HStack>
+                          <Button onClick={handleWithdrawAdhesion} colorScheme="red" mb={3}>
+                              Retirer les fonds d'adhesion
                           </Button>
+                          <Button onClick={handleWithdrawPoints} colorScheme="red" mb={3}>
+                              Retirer les fonds d'achat de points
+                          </Button>
+                          </HStack>
                       </VStack>
                   )}
               </VStack>
