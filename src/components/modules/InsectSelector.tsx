@@ -7,7 +7,7 @@ import ABI from '../ABI/ABIAdhesion.json';
 import { BigNumberish } from 'ethers';
 
 
-const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS!;
+const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS as string;
 
 
 //Ce code fonctionne sur mobile chrome

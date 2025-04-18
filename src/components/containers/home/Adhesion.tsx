@@ -73,12 +73,12 @@ const RoleBasedNFTPage = () => {
         Contributeur: 3,
     };
 
-    const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS!; // Mettez à jour avec votre adresse de contrat
+    const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS  as string; // Mettez à jour avec votre adresse de contrat
 
     useEffect(() => {
         const initWeb3 = async () => {
-            const provider = await detectEthereumProvider();
-            if (provider) {
+            const provider = (await detectEthereumProvider()) as any;
+            if (address) {
                 const web3Instance = new Web3(provider);
                 setWeb3(web3Instance);
                 const accounts = await web3Instance.eth.getAccounts();
@@ -123,12 +123,12 @@ const RoleBasedNFTPage = () => {
 
               setprixPoints(priceInEth);
               */
-              
+
         try {
             const price: BigNumberish = await contract.mintPrice(); // Le prix est renvoyé en wei sous forme de string
             console.log(price);
             const ethPrice: string = web3Instance.utils.fromWei(price, 'ether'); // Converti en ethers sous forme de string
-            setMintPrice(Number(price));//Number(price)/1000000000000000000); // Stocke le prix dans l'état local
+            setMintPrice(Number(ethPrice));//Number(price)/1000000000000000000); // Stocke le prix dans l'état local
         } catch (error) {
             console.error("Erreur lors de la récupération du prix du mint :", error);
         }
@@ -286,6 +286,7 @@ const RoleBasedNFTPage = () => {
 
 
         const handleCryptoAdhesion = async () => {
+          if(address){
             setWantsCryptoAdhesion(true); // L'utilisateur veut adhérer en crypto
 
             const provider = await detectEthereumProvider();
@@ -304,7 +305,11 @@ const RoleBasedNFTPage = () => {
                 }
             }
             console.log(isOnSepolia);
-            localStorage.setItem('wantsCryptoAdhesion', String(true)); // Sauvegarde le choix en tant que chaîne
+            localStorage.setItem('wantsCryptoAdhesion', String(true));
+          }
+          else{
+            alert("Vous devez vous connecter avec votre wallet pour adhérer par crypto")
+          } // Sauvegarde le choix en tant que chaîne
         };
 
 
@@ -365,7 +370,7 @@ const RoleBasedNFTPage = () => {
                               </Box>
                           )}
 
-                          <Text mt={4}>Prix de mint : {mintPrice} WEI</Text>
+                          <Text mt={4}>Prix de mint : {mintPrice} ETH</Text>
                           <Button
                               onClick={mintNFT}
                               colorScheme="teal"
