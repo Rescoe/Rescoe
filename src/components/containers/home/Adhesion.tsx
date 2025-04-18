@@ -240,6 +240,8 @@ const fetchMintPrice = async () => {
             alert("Erreur lors de l'upload sur IPFS.");
         } finally {
             setIsUploading(false);
+            setIsReadyToMint(true);
+
         }
     };
 
