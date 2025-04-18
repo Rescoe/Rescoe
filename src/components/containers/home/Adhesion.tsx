@@ -423,7 +423,7 @@ const handleMint = async () => {
 
                           <Text mt={4}>Prix de mint : {mintPrice} ETH</Text>
                           <Button
-                              onClick={mintNFT}
+                              onClick={handleMint}
                               colorScheme="teal"
                               isLoading={isMinting || isUploading}
                               loadingText="Minting..."
