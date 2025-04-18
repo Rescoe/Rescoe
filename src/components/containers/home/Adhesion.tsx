@@ -85,7 +85,6 @@ const RoleBasedNFTPage = () => {
                 setWeb3(web3Instance);
                 const accounts = await web3Instance.eth.getAccounts();
                 setAccount(accounts[0]);
-                await fetchMintPrice();
 
                 const chainId = await web3Instance.eth.getChainId();
                 setIsOnSepolia(Number(chainId) === 11155111); // Vérifier si sur Sepolia
@@ -105,7 +104,11 @@ const RoleBasedNFTPage = () => {
         initWeb3();
     }, []);
 
-
+    useEffect(() => {
+      if (address) {
+          fetchMintPrice();
+              }
+    }, [address]);
 
 /*
     const fetchMintPrice = async (web3Instance: Web3) => {
