@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import Web3 from "web3";
 import { JsonRpcProvider, Contract } from 'ethers';
+import { ethers } from 'ethers';
+
 import { BigNumberish } from 'ethers';
 
 import detectEthereumProvider from '@metamask/detect-provider';
@@ -83,7 +85,7 @@ const RoleBasedNFTPage = () => {
                 setWeb3(web3Instance);
                 const accounts = await web3Instance.eth.getAccounts();
                 setAccount(accounts[0]);
-                await fetchMintPrice(web3Instance);
+                await fetchMintPrice();
 
                 const chainId = await web3Instance.eth.getChainId();
                 setIsOnSepolia(Number(chainId) === 11155111); // Vérifier si sur Sepolia
@@ -105,35 +107,64 @@ const RoleBasedNFTPage = () => {
 
 
 
-
-    const fetchMintPrice = async () => {
+/*
+    const fetchMintPrice = async (web3Instance: Web3) => {
         const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
-        const contract = new web3.eth.Contract(ABI, contractAddress);
-        //const contract = new Contract(contractAddress, ABI, provider);
 
         if (!contractAddress) {
           console.error("L'adresse du contrat n'est pas définie.");
           return;
         }
 
+        const contract = new Contract(contractAddress, ABI, provider);
         // sinon cf "      const priceInEth = web3.utils.fromWei(actualPointPrice.toString(), "ether"); " dans admin.tsx
         //const contract = new web3Instance.eth.Contract(ABI, contractAddress);
 
-        /*      const priceInEth = web3.utils.fromWei(actualPointPrice, "ether");
-              console.log("Prix en ETH:", priceInEth);
+      //      const priceInEth = web3.utils.fromWei(actualPointPrice, "ether");
+              //console.log("Prix en ETH:", priceInEth);
 
-              setprixPoints(priceInEth);
-              */
+            //  setprixPoints(priceInEth);
+          //
 
         try {
-            const price: BigNumberish = await contract.methods.mintPrice().call(); // Le prix est renvoyé en wei sous forme de string
+            const price: BigNumberish = await contract.mintPrice(); // Le prix est renvoyé en wei sous forme de string
             console.log(price);
-            const ethPrice: string = web3.utils.fromWei(price, "ether"); // Converti en ethers sous forme de string
+            const ethPrice: string = web3Instance.utils.fromWei(price, 'ether'); // Converti en ethers sous forme de string
             setMintPrice(Number(ethPrice));//Number(price)/1000000000000000000); // Stocke le prix dans l'état local
         } catch (error) {
             console.error("Erreur lors de la récupération du prix du mint :", error);
         }
     };
+
+*/
+
+const fetchMintPrice = async () => {
+    const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+
+    if (!contractAddress) {
+        console.error("L'adresse du contrat n'est pas définie.");
+        return;
+    }
+
+    const contract = new Contract(contractAddress, ABI, provider);
+
+    try {
+        // Récupération du prix de mint en Wei depuis le contrat
+        const price: BigNumberish = await contract.mintPrice(); // Le prix est en Wei
+        console.log("Prix de mint en Wei:", price);
+
+        // Conversion manuelle du prix de Wei en Ether
+        const ethPrice = Number(price) / 1e18; // Division par 10^18 pour convertir de Wei vers Ether
+
+        // Stocker le prix dans l'état local
+        setMintPrice(ethPrice);
+        console.log(`Prix de mint récupéré: ${ethPrice} ETH`);
+    } catch (error) {
+        console.error("Erreur lors de la récupération du prix du mint :", error);
+    }
+};
+
+
 
 
 
@@ -210,32 +241,35 @@ const RoleBasedNFTPage = () => {
 
 
     const mintNFT = async () => {
-        if (ipfsUrl && web3) {
-            try {
+    if (!ipfsUrl || !selectedRole || !web3) {
+        alert("Assurez-vous d'être connecté et d'avoir généré une URL IPFS.");
+        return;
+    }
 
-                const contract = new web3.eth.Contract(ABI, contractAddress);
-                const priceInWei = web3.utils.toWei(mintPrice.toString(), 'ether'); // Convertir le prix en wei
+    try {
+        const contract = new web3.eth.Contract(ABI, contractAddress);
+        const priceInWei = web3.utils.toWei(mintPrice.toString(), 'ether'); // Conversion correcte
 
-                // Envoyer le prix lors de la méthode mint
-                if (roleMapping.hasOwnProperty(selectedRole)) {
-                    await contract.methods.safeMint(ipfsUrl, roleMapping[selectedRole as RoleKey], name, bio).send({ from: account, value: priceInWei });
-                    setShowBananas(true);
-                    setIsMinting(true);
+        if (roleMapping.hasOwnProperty(selectedRole)) {
+            const roleValue = roleMapping[selectedRole as RoleKey];
+            // Minting NFT
+            const transaction = await contract.methods.safeMint(ipfsUrl, roleValue, name, bio).send({ from: account, value: priceInWei });
 
-                } else {
-                    console.error(`Rôle sélectionné "${selectedRole}" non trouvé dans le mapping`);
-                }
-            } catch (error) {
-                console.error('Error minting NFT:', error);
-                alert('Error minting NFT:');
-            } finally {
-                setIsMinting(false);
-                startLoadingAndRedirect();
-            }
+            console.log('Transaction réussie:', transaction);
+            setShowBananas(true);
+            setIsMinting(true);
+            startLoadingAndRedirect();
         } else {
-            alert("Assurez vous d'être connecté, si vous êtes déjà connecté, essayez depuis le navigateur intégré à votre wallet. ");
+            console.error(`Rôle sélectionné "${selectedRole}" non trouvé dans le mapping`);
         }
-    };
+    } catch (error) {
+        console.error('Erreur lors du minting NFT:', error);
+        alert('Erreur lors du minting NFT. Vérifiez la console pour plus de détails.');
+    } finally {
+        setIsMinting(false);
+    }
+};
+
 
 
     const startLoadingAndRedirect = () => {
@@ -253,6 +287,7 @@ const RoleBasedNFTPage = () => {
                 return oldProgress + 2; // Augmente par paliers de 20%
             });
         }, 1000);
+
 
         const countdownInterval = setInterval(() => {
             setCountdown((oldCount) => {

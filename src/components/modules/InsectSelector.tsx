@@ -1,3 +1,4 @@
+//Code Insect Selector
 import React, { useEffect, useState } from 'react';
 import { Box, Button, Image, VStack } from '@chakra-ui/react';
 import { useAuth } from '../../utils/authContext';
