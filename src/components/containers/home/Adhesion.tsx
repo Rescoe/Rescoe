@@ -53,6 +53,7 @@ const RoleBasedNFTPage = () => {
     const [progress, setProgress] = useState(0);
     const [countdown, setCountdown] = useState(5); // 5 secondes avant redirection
 
+    const [isReadyToMint, setIsReadyToMint] = useState(false);
 
     const router = useRouter();
 
@@ -244,32 +245,43 @@ const fetchMintPrice = async () => {
 
 
     const mintNFT = async () => {
-    if (!ipfsUrl || !selectedRole || !web3) {
-        alert("Assurez-vous d'être connecté et d'avoir généré une URL IPFS.");
-        return;
-    }
-
-    try {
-        const contract = new web3.eth.Contract(ABI, contractAddress);
-        const priceInWei = web3.utils.toWei(mintPrice.toString(), 'ether'); // Conversion correcte
-
-        if (roleMapping.hasOwnProperty(selectedRole)) {
-            const roleValue = roleMapping[selectedRole as RoleKey];
-            // Minting NFT
-            const transaction = await contract.methods.safeMint(ipfsUrl, roleValue, name, bio).send({ from: account, value: priceInWei });
-
-            console.log('Transaction réussie:', transaction);
-            setShowBananas(true);
-            setIsMinting(true);
-            startLoadingAndRedirect();
-        } else {
-            console.error(`Rôle sélectionné "${selectedRole}" non trouvé dans le mapping`);
+        if (!ipfsUrl || !selectedRole || !web3 || !account) {
+            alert("Assurez-vous d'être connecté, d'avoir généré une URL IPFS et que le rôle est sélectionné.");
+            return;
         }
-    } catch (error) {
-        console.error('Erreur lors du minting NFT:', error);
-        alert('Erreur lors du minting NFT. Vérifiez la console pour plus de détails.');
-    } finally {
-        setIsMinting(false);
+
+        try {
+            const contract = new web3.eth.Contract(ABI, contractAddress);
+            const priceInWei = web3.utils.toWei(mintPrice.toString(), 'ether');
+
+            if (roleMapping.hasOwnProperty(selectedRole)) {
+                const roleValue = roleMapping[selectedRole as RoleKey];
+
+                // Minting NFT
+                const transaction = await contract.methods.safeMint(ipfsUrl, roleValue, name, bio).send({ from: account, value: priceInWei });
+
+                console.log('Transaction réussie:', transaction);
+                setShowBananas(true);
+                setIsMinting(true);
+                startLoadingAndRedirect();
+            } else {
+                console.error(`Rôle sélectionné "${selectedRole}" non trouvé dans le mapping`);
+            }
+        } catch (error) {
+            console.error('Erreur lors du minting NFT:', error);
+            alert('Erreur lors du minting NFT. Vérifiez la console pour plus de détails.');
+        } finally {
+            setIsMinting(false);
+        }
+    };
+
+
+
+const handleMint = async () => {
+    if (isReadyToMint) {
+        await mintNFT(); // Appelez mintNFT lorsque nous savons que tout est prêt
+    } else {
+        alert("Les conditions ne sont pas remplies pour mint");
     }
 };
 
