@@ -64,6 +64,7 @@ const ConnectBouton: React.FC = () => {
         if (storedAddress && isConnected) {
             setAddress(storedAddress);
             setIsAuthenticated(storedAuth);
+            getUserRole();
         } else if (isConnected && address) {
             handleAuth(address, selectedChainId);
         } else {
