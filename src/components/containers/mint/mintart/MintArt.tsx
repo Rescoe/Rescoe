@@ -4,6 +4,7 @@ import detectEthereumProvider from "@metamask/detect-provider";
 import axios from "axios";
 import contractABI from '../../../ABI/ABI_ART.json';
 import ABIRESCOLLECTION from '../../../ABI/ABI_Collections.json';
+import { useAuth } from '../../../../utils/authContext';
 
 import dynamic from 'next/dynamic';
 import { Canvas } from '@react-three/fiber';
@@ -89,6 +90,9 @@ const MintArt: React.FC = () => {
   const [isSaleListing, setIsSaleListing] = useState<boolean>(false);
   const [showBananas, setShowBananas] = useState<boolean>(false);
 
+  const { address } = useAuth();
+
+
   useEffect(() => {
     const setupWeb3 = async () => {
       try {
@@ -109,6 +113,13 @@ const MintArt: React.FC = () => {
     setupWeb3();
   }, []);
 
+  useEffect(() => {
+    if (address) {
+        fetchUserCollections();
+            }
+  }, [address]);
+
+
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
@@ -127,7 +138,7 @@ const MintArt: React.FC = () => {
     try {
       setLoading(true);
       const accounts = await web3.eth.getAccounts();
-      const userAddress = accounts[0];
+      const userAddress = address;
       const contract = new web3.eth.Contract(ABIRESCOLLECTION, contractRESCOLLECTION);
       const result = await contract.methods.getCollectionsByUser(userAddress).call();
       if (Array.isArray(result)) {
@@ -152,10 +163,6 @@ const MintArt: React.FC = () => {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (accounts.length > 0) fetchUserCollections();
-  }, [accounts]);
 
 
   const uploadFileToIPFS = async (): Promise<void> => {

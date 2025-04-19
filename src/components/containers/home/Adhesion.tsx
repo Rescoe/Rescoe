@@ -111,36 +111,6 @@ const RoleBasedNFTPage = () => {
               }
     }, [address]);
 
-/*
-    const fetchMintPrice = async (web3Instance: Web3) => {
-        const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
-
-        if (!contractAddress) {
-          console.error("L'adresse du contrat n'est pas définie.");
-          return;
-        }
-
-        const contract = new Contract(contractAddress, ABI, provider);
-        // sinon cf "      const priceInEth = web3.utils.fromWei(actualPointPrice.toString(), "ether"); " dans admin.tsx
-        //const contract = new web3Instance.eth.Contract(ABI, contractAddress);
-
-      //      const priceInEth = web3.utils.fromWei(actualPointPrice, "ether");
-              //console.log("Prix en ETH:", priceInEth);
-
-            //  setprixPoints(priceInEth);
-          //
-
-        try {
-            const price: BigNumberish = await contract.mintPrice(); // Le prix est renvoyé en wei sous forme de string
-            console.log(price);
-            const ethPrice: string = web3Instance.utils.fromWei(price, 'ether'); // Converti en ethers sous forme de string
-            setMintPrice(Number(ethPrice));//Number(price)/1000000000000000000); // Stocke le prix dans l'état local
-        } catch (error) {
-            console.error("Erreur lors de la récupération du prix du mint :", error);
-        }
-    };
-
-*/
 
 const fetchMintPrice = async () => {
     const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
