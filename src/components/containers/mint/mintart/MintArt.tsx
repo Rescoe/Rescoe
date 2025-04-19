@@ -95,23 +95,17 @@ const MintArt: React.FC = () => {
 
 
   useEffect(() => {
-          const setupWeb3 = async () => {
-              try {
-                  const provider = await detectEthereumProvider(); // Détection du provider
-                  if (provider) {
-                      const web3Instance = new Web3(provider);
-                      setWeb3(web3Instance); // Met à jour l'état Web3
-
-                      // Si vous avez une chaîne spécifique à sélectionner, gérez cela ici.
-                  } else {
-                      console.error("MetaMask non détecté.");
-                  }
-              } catch (error) {
-                  console.error("Erreur lors de la configuration de Web3 :", error);
-              }
-          };
-          setupWeb3();
-      }, []); // Exécutez une fois lorsque le composant est monté
+      const initWeb3 = async () => {
+          const provider = await detectEthereumProvider();
+          if (provider) {
+              const web3Instance = new Web3(provider);
+              setWeb3(web3Instance);
+          } else {
+              alert("MetaMask non détecté.");
+          }
+      };
+      initWeb3();
+  }, []);
 
 
 
@@ -122,27 +116,33 @@ const MintArt: React.FC = () => {
   }, [address]);
 
   const handleInitializeWeb3 = async (): Promise<Web3 | null> => {
-    const provider: any = await detectEthereumProvider();
-    if (provider) {
+      const provider: any = await detectEthereumProvider();
+      if (!provider) {
+          alert("MetaMask non détecté. Veuillez installer MetaMask.");
+          return null;
+      }
+
       try {
-        await provider.request({ method: 'eth_requestAccounts' });
-        const web3Instance = new Web3(provider);
-        setWeb3(web3Instance); // on peut garder ça si tu veux persister dans le state
-        return web3Instance;
+          // Cette ligne ouvre MetaMask et demande les comptes
+          const accounts = await provider.request({ method: 'eth_requestAccounts' });
+
+          if (accounts && accounts.length > 0) {
+              const web3Instance = new Web3(provider);
+              return web3Instance;
+          } else {
+              alert("Aucun compte trouvé. Veuillez vous connecter à MetaMask.");
+              return null;
+          }
       } catch (error) {
-        console.error("Accès au wallet refusé :", error);
-        alert("Autorisez l'accès à votre wallet pour continuer.");
-        return null;
+          console.error("Erreur lors de la demande d'accès au wallet :", error);
+          alert("Erreur lors de l'accès à votre wallet : ");
+          return null;
       }
-    } else {
-      if (typeof window !== "undefined" && /Mobi|Android/i.test(navigator.userAgent)) {
-        window.location.href = "https://metamask.app.link/dapp/" + window.location.href.replace(/^https?:\/\//, "");
-        return null;
-      }
-      alert("MetaMask non détecté.");
-      return null;
-    }
   };
+
+
+  // Ajoutez un bouton pour initialiser Web3
+
 
 
 
@@ -253,70 +253,72 @@ const MintArt: React.FC = () => {
 
 
   const mintNFT = async (): Promise<void> => {
-      if (!ipfsUrl || selectedCollectionId === null) {
-          alert("Veuillez télécharger les métadonnées sur IPFS et sélectionner une collection.");
-          return;
-      }
-
-      let currentWeb3 = web3;
-      if (!currentWeb3) {
-        currentWeb3 = await handleInitializeWeb3();
-        if (!currentWeb3) {
-          alert("Web3 toujours non initialisé");
-          return;
-        }
-      }
-
-
-      if(currentWeb3){
-      setIsMinting(true); // Indique que le mint commence
-      try {
-          // Utilisez directement l'adresse depuis l'authContext
-          const userAddress = address;
-
-          // Récupération des détails de la collection
-          const contractResCollection = new currentWeb3.eth.Contract(ABIRESCOLLECTION, contractRESCOLLECTION);
-          const collectionDetails: CollectionDetails = await contractResCollection.methods.getCollection(selectedCollectionId).call();
-
-          if (!collectionDetails) {
-              throw new Error("Détails de la collection introuvables.");
-          }
-
-          // Vérification du type de collection
-          if (collectionDetails.collectionType !== "Art") {
-              alert("Vous ne pouvez pas mint une poésie. Veuillez sélectionner une collection d'art.");
-              return;
-          }
-
-          // Récupération de l'adresse du contrat de mint
-          const collectionMintAddress: string = collectionDetails.collectionAddress;
-          if (!currentWeb3.utils.isAddress(collectionMintAddress)) {
-              throw new Error(`Adresse de contrat invalide : ${collectionMintAddress}`);
-          }
-
-          const editions = 1; // Nombre d'éditions à mint
-          const mintContract = new currentWeb3.eth.Contract(contractABI, collectionMintAddress);
-
-          if (!userAddress) {
-            throw new Error("L'adresse utilisateur est invalide ou non connectée.");
-          }
-          // Appel de la fonction de mint
-          const mintResult: MintResult = await mintContract.methods.mint(ipfsUrl, editions).send({ from: userAddress });
-
-          if (!mintResult.events?.Transfer?.returnValues?.tokenId) {
-              throw new Error("Token ID introuvable dans l'événement Transfer.");
-          }
-
-          alert("Félicitations ! Votre œuvre est publiée !");
-      } catch (error) {
-          console.error("Erreur lors du minting NFT :", error);
-          alert('Erreur lors de la publication de l\'œuvre. Vérifiez la console pour plus de détails.');
-      } finally {
-          setIsMinting(false); // Termine l'état de minting
-      }
+    if (!ipfsUrl || selectedCollectionId === null) {
+        alert("Veuillez télécharger les métadonnées sur IPFS et sélectionner une collection.");
+        return;
     }
-  };
 
+    // Vérifier que Web3 est initialisé
+    if (!web3) {
+        const initializedWeb3 = await handleInitializeWeb3();  // Appel à la méthode
+        if (!initializedWeb3) {
+            alert("Web3 toujours non initialisé mémorts");
+            return;
+        }
+        setWeb3(initializedWeb3);  // Utiliser le setter d'état pour mettre à jour web3
+    }
+
+    if(web3){
+    // Continuez avec le processus de minting
+    setIsMinting(true); // Indique que le mint commence
+    try {
+        const userAddress = address; // Utiliser l'adresse depuis l'authContext
+
+        // Récupération des détails de la collection
+        const contractResCollection = new web3.eth.Contract(ABIRESCOLLECTION, contractRESCOLLECTION);
+        const collectionDetails: CollectionDetails = await contractResCollection.methods.getCollection(selectedCollectionId).call();
+
+        // Vérifier l'existence des détails de la collection
+        if (!collectionDetails) {
+            throw new Error("Détails de la collection introuvables.");
+        }
+
+        // Vérification du type de collection
+        if (collectionDetails.collectionType !== "Art") {
+            alert("Vous ne pouvez pas mint une poésie. Veuillez sélectionner une collection d'art.");
+            return;
+        }
+
+        // Récupération de l'adresse du contrat de mint
+        const collectionMintAddress: string = collectionDetails.collectionAddress;
+        if (!web3.utils.isAddress(collectionMintAddress)) {
+            throw new Error(`Adresse de contrat invalide : ${collectionMintAddress}`);
+        }
+
+        const editions = 1; // Nombre d'éditions à mint
+        const mintContract = new web3.eth.Contract(contractABI, collectionMintAddress);
+
+        // Vérifiez que l'utilisateur est connecté
+        if (!userAddress) {
+            throw new Error("L'adresse utilisateur est invalide ou non connectée.");
+        }
+
+        // Appel de la fonction de mint
+        const mintResult: MintResult = await mintContract.methods.mint(ipfsUrl, editions).send({ from: userAddress });
+
+        if (!mintResult.events?.Transfer?.returnValues?.tokenId) {
+            throw new Error("Token ID introuvable dans l'événement Transfer.");
+        }
+
+        alert("Félicitations ! Votre œuvre est publiée !");
+    } catch (error) {
+        console.error("Erreur lors du minting NFT :", error);
+        alert('Erreur lors de la publication de l\'œuvre. Vérifiez la console pour plus de détails.');
+    } finally {
+        setIsMinting(false); // Terminez l'état de minting
+    }
+  }
+};
 
 
 
@@ -370,6 +372,8 @@ const MintArt: React.FC = () => {
         Mint NFT
       </Button>
       <Text mt={2}>Wallet connecté : {address}</Text>
+      <Button onClick={handleInitializeWeb3}>Initialiser Web3</Button>
+
     </Box>
   );
 };
