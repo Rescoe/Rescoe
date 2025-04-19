@@ -1,5 +1,7 @@
 import React, { useState, useEffect, ChangeEvent } from "react";
 import Web3 from "web3";
+import { JsonRpcProvider, Contract } from 'ethers';
+
 import detectEthereumProvider from "@metamask/detect-provider";
 import axios from "axios";
 import contractABI from '../../../ABI/ABI_ART.json';
@@ -64,7 +66,6 @@ interface MintResult {
     };
   };
 }
-
 
 
 const Bananas = dynamic(() => import('../../../modules/Bananas'), { ssr: false });
@@ -133,36 +134,77 @@ const MintArt: React.FC = () => {
     setMetadata((prev) => ({ ...prev, [name]: value }));
   };
 
-  const fetchUserCollections = async () => {
-    if (!web3) return;
-    try {
-      setLoading(true);
-      const accounts = await web3.eth.getAccounts();
-      const userAddress = address;
-      const contract = new web3.eth.Contract(ABIRESCOLLECTION, contractRESCOLLECTION);
-      const result = await contract.methods.getCollectionsByUser(userAddress).call();
-      if (Array.isArray(result)) {
-        const filteredCollections = result
-          .map((collection: any) => ({
-            id: collection[0].toString(),
-            name: collection[1],
-            type: collection[2],
-            owner: collection[3],
-            address: collection[4],
-          }))
-          .filter((collection) => collection.type === "Art");
-        setCollections(filteredCollections);
-      } else {
-        console.error('Unexpected result format:', result);
-        setError('Unexpected result format');
-      }
-    } catch (err) {
-      console.error("Error fetching collections:", err);
-      setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setLoading(false);
+
+/*
+const fetchUserCollections = async () => {
+  if (!web3) return;
+  try {
+    setLoading(true);
+    const accounts = await web3.eth.getAccounts();
+    const userAddress = address;
+    const contract = new web3.eth.Contract(ABIRESCOLLECTION, contractRESCOLLECTION);
+    const result = await contract.methods.getCollectionsByUser(userAddress).call();
+    if (Array.isArray(result)) {
+      const filteredCollections = result
+        .map((collection: any) => ({
+          id: collection[0].toString(),
+          name: collection[1],
+          type: collection[2],
+          owner: collection[3],
+          address: collection[4],
+        }))
+        .filter((collection) => collection.type === "Art");
+      setCollections(filteredCollections);
+    } else {
+      console.error('Unexpected result format:', result);
+      setError('Unexpected result format');
     }
+  } catch (err) {
+    console.error("Error fetching collections:", err);
+    setError(err instanceof Error ? err.message : 'Unknown error');
+  } finally {
+    setLoading(false);
+  }
+};*/
+
+
+  const fetchUserCollections = async () => {
+      const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS); // Utilisation du fournisseur JSON-RPC
+
+      if (!contractRESCOLLECTION) {
+          console.error("L'adresse du contrat de collection n'est pas définie.");
+          return;
+      }
+
+      const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
+
+      try {
+          // Récupération des collections de l'utilisateur
+
+          const result = await contract.getCollectionsByUser(address); // Appel de la méthode pour obtenir les collections
+
+          if (Array.isArray(result)) {
+              const filteredCollections = result
+                  .map((collection: any) => ({
+                      id: collection[0].toString(),
+                      name: collection[1],
+                      type: collection[2],
+                      owner: collection[3],
+                      address: collection[4],
+                  }))
+                  .filter((collection) => collection.type === "Art"); // Filtrer uniquement les collections d'art
+
+              setCollections(filteredCollections); // Mettre à jour l'état avec les collections filtrées
+          } else {
+              console.error('Format de résultat inattendu:', result);
+              setError('Format de résultat inattendu');
+          }
+      } catch (err) {
+          console.error("Erreur lors de la récupération des collections :", err);
+          setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      }
   };
+
 
 
   const uploadFileToIPFS = async (): Promise<void> => {
