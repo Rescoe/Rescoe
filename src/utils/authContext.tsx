@@ -16,7 +16,11 @@ interface AuthContextType {
   isContributor: boolean;
   isAuthenticated: boolean;
   setAddress: (address: string | null) => void;
-  setIsAuthenticated: (status: boolean) => void; // Ensure this matches what's provided
+  setIsAuthenticated: (status: boolean) => void;
+
+  // Ajouts :
+  web3: Web3 | null;
+  provider: any;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -31,6 +35,10 @@ const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   setAddress: () => {},
   setIsAuthenticated: () => {},
+
+  // Ajouts :
+  web3: null,
+  provider: null,
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -45,19 +53,22 @@ const roleMapping: { [key: number]: 'admin' | 'artist' | 'poet' | 'trainee' | 'c
 interface MemberInfo {
   role: number;
 }
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [address, setAddress] = useState<string | null>(null);
   const [role, setRole] = useState<'admin' | 'artist' | 'poet' | 'trainee' | 'contributor' | null>(null);
   const [web3, setWeb3] = useState<Web3 | null>(null);
+  const [provider, setProvider] = useState<any>(null); // Ajouté pour exposer le provider
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const initWeb3 = async () => {
       try {
-        const provider = await detectEthereumProvider();
-        if (provider) {
-          const web3Instance = new Web3(provider);
+        const detectedProvider = await detectEthereumProvider();
+        if (detectedProvider) {
+          const web3Instance = new Web3(detectedProvider);
+          setProvider(detectedProvider); // Stocker le provider
           setWeb3(web3Instance);
           const accounts = await web3Instance.eth.getAccounts();
           if (accounts.length > 0) {
@@ -98,7 +109,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (address) {
         setIsAuthenticated(true);
         try {
-          await fetchRole(address.toLowerCase()); // Now it can access fetchRole
+          await fetchRole(address.toLowerCase());
         } catch (error) {
           console.error("Error fetching user role:", error);
         }
@@ -125,6 +136,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       isMember,
       isAuthenticated,
       setIsAuthenticated,
+
+      // Ajouts :
+      web3,
+      provider,
     }}>
       {isLoading ? <div>Chargement...</div> : children}
     </AuthContext.Provider>

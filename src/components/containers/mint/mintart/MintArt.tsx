@@ -76,8 +76,6 @@ const MintArt: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<Metadata>({ name: "", description: "", tags: "" });
-  const [provider, setProvider] = useState<any>(null);
-  const [web3, setWeb3] = useState<Web3 | null>(null);
   const [accounts, setAccounts] = useState<string[]>([]);
   const [ipfsUrl, setIpfsUrl] = useState<string | null>(null);
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -91,61 +89,15 @@ const MintArt: React.FC = () => {
   const [isSaleListing, setIsSaleListing] = useState<boolean>(false);
   const [showBananas, setShowBananas] = useState<boolean>(false);
 
-  const { address } = useAuth();
-
-
-  useEffect(() => {
-      const initWeb3 = async () => {
-          const provider = await detectEthereumProvider();
-          if (provider) {
-              const web3Instance = new Web3(provider);
-              setWeb3(web3Instance);
-          } else {
-              alert("MetaMask non détecté.");
-          }
-      };
-      initWeb3();
-  }, []);
+  const { address, web3, provider } = useAuth();
 
 
 
   useEffect(() => {
     if (address) {
         fetchUserCollections();
-        handleInitializeWeb3();
             }
   }, [address]);
-
-  useEffect(() => {
-    const init = async () => {
-        if (!web3) {
-            const web3Instance = await handleInitializeWeb3();
-            if (web3Instance) {
-                const accounts = await web3Instance.eth.getAccounts();
-                if (accounts.length > 0) {
-                    console.log("Compte connecté:", accounts[0]);
-                } else {
-                    console.error("Aucun compte connecté.");
-                }
-            }
-        }
-    };
-    init();
-}, [web3]);
-
-  const handleInitializeWeb3 = async () => {
-      // Identique à la logique dans ConnectBouton
-      const provider: any = await detectEthereumProvider();
-      if (provider) {
-          const web3Instance = new Web3(provider);
-          setWeb3(web3Instance);
-          return web3Instance;
-      } else {
-          alert("MetaMask non détecté. Veuillez installer MetaMask.");
-          return null;
-      }
-  };
-
 
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -420,7 +372,6 @@ try {
         Mint NFT
       </Button>
       <Text mt={2}>Wallet connecté : {address}</Text>
-      <Button onClick={handleInitializeWeb3}>Initialiser Web3</Button>
 
     </Box>
   );
