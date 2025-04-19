@@ -121,26 +121,29 @@ const MintArt: React.FC = () => {
             }
   }, [address]);
 
-  const handleInitializeWeb3 = async (): Promise<void> => {
+  const handleInitializeWeb3 = async (): Promise<Web3 | null> => {
     const provider: any = await detectEthereumProvider();
     if (provider) {
       try {
-        await provider.request({ method: 'eth_requestAccounts' }); // Connecter le wallet si pas encore fait
+        await provider.request({ method: 'eth_requestAccounts' });
         const web3Instance = new Web3(provider);
-        setWeb3(web3Instance);
+        setWeb3(web3Instance); // on peut garder ça si tu veux persister dans le state
+        return web3Instance;
       } catch (error) {
         console.error("Accès au wallet refusé :", error);
         alert("Autorisez l'accès à votre wallet pour continuer.");
+        return null;
       }
     } else {
-      if (!provider && typeof window !== "undefined" && /Mobi|Android/i.test(navigator.userAgent)) {
+      if (typeof window !== "undefined" && /Mobi|Android/i.test(navigator.userAgent)) {
         window.location.href = "https://metamask.app.link/dapp/" + window.location.href.replace(/^https?:\/\//, "");
-        return;
+        return null;
       }
-
       alert("MetaMask non détecté.");
+      return null;
     }
   };
+
 
 
 
@@ -255,22 +258,24 @@ const MintArt: React.FC = () => {
           return;
       }
 
-      if (!web3) {
-        await handleInitializeWeb3();
-        if (!web3) {
+      let currentWeb3 = web3;
+      if (!currentWeb3) {
+        currentWeb3 = await handleInitializeWeb3();
+        if (!currentWeb3) {
           alert("Web3 toujours non initialisé");
           return;
         }
       }
 
-      if(web3){
+
+      if(currentWeb3){
       setIsMinting(true); // Indique que le mint commence
       try {
           // Utilisez directement l'adresse depuis l'authContext
           const userAddress = address;
 
           // Récupération des détails de la collection
-          const contractResCollection = new web3.eth.Contract(ABIRESCOLLECTION, contractRESCOLLECTION);
+          const contractResCollection = new currentWeb3.eth.Contract(ABIRESCOLLECTION, contractRESCOLLECTION);
           const collectionDetails: CollectionDetails = await contractResCollection.methods.getCollection(selectedCollectionId).call();
 
           if (!collectionDetails) {
@@ -285,12 +290,12 @@ const MintArt: React.FC = () => {
 
           // Récupération de l'adresse du contrat de mint
           const collectionMintAddress: string = collectionDetails.collectionAddress;
-          if (!web3.utils.isAddress(collectionMintAddress)) {
+          if (!currentWeb3.utils.isAddress(collectionMintAddress)) {
               throw new Error(`Adresse de contrat invalide : ${collectionMintAddress}`);
           }
 
           const editions = 1; // Nombre d'éditions à mint
-          const mintContract = new web3.eth.Contract(contractABI, collectionMintAddress);
+          const mintContract = new currentWeb3.eth.Contract(contractABI, collectionMintAddress);
 
           if (!userAddress) {
             throw new Error("L'adresse utilisateur est invalide ou non connectée.");
