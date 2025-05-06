@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Heading, Spinner, Grid, Tab, TabList, TabPanel, TabPanels, Tabs, Text } from '@chakra-ui/react';
+import { Box, Heading, Spinner, Grid, Tab, TabList, TabPanel, TabPanels, Tabs, Text, Input } from '@chakra-ui/react';
 import { JsonRpcProvider, Contract, BigNumberish } from "ethers";
 
 import { useAuth } from '../../../../utils/authContext'; // Importez votre AuthContext
@@ -19,7 +19,11 @@ interface Collection {
   imageUrl: string;
   mintContractAddress: string;
   isFeatured: boolean;
+  creator: string;        // Ajouté
+  collectionType: string; // Ajouté
 }
+
+
 
 interface NFT {
   owner: string;
@@ -42,6 +46,11 @@ const UniqueArtGalerie: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [currentTabIndex, setCurrentTabIndex] = useState<number>(0);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
+
+  const [searchResults, setSearchResults] = useState<Collection[]>([]); // État pour stocker les résultats de la recherche
+  const [showSearchResults, setShowSearchResults] = useState(false); // État pour contrôler l'affichage des résultats de recherche
+  const [searchTerm, setSearchTerm] = useState<string>(''); // État pour stocker le terme de recherche
+
   const router = useRouter();
   const { web3, address } = useAuth();
 
@@ -59,13 +68,13 @@ const UniqueArtGalerie: React.FC = () => {
       // Utiliser Promise.all et filtrer les résultats non nulls
       const collectionsData = (await Promise.all(
         collectionsPaginated.map(async (tuple: any) => {
-          const [id, name, collectionType, , associatedAddresses, , isFeatured] = tuple;
+          const [id, name, collectionType, creator, collectionAddress, isActive, isFeatured] = tuple;
 
           // Vérifier ici si le type de collection est "Art"
           if (collectionType !== "Art") return null;
 
           const uri: string = await contract.getCollectionURI(id);
-          const mintContractAddress: string = associatedAddresses;
+          const mintContractAddress: string = collectionAddress;
 
           const cachedMetadata = localStorage.getItem(uri);
           if (cachedMetadata) {
@@ -73,6 +82,8 @@ const UniqueArtGalerie: React.FC = () => {
             return {
               id: id.toString(),
               name,
+              collectionType,
+              creator,
               imageUrl: metadata.image,
               mintContractAddress,
               isFeatured,
@@ -190,6 +201,21 @@ const UniqueArtGalerie: React.FC = () => {
   };
 
 
+  const handleSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      if (searchTerm) {
+          const results = collections.filter(collection =>
+              collection.name.toLowerCase().includes(searchTerm.toLowerCase()) || // Filtre par nom de la collection
+              collection.creator.toLowerCase().includes(searchTerm.toLowerCase()) || // Filtre par créateur
+              collection.collectionType.toLowerCase().includes(searchTerm.toLowerCase()) // Filtre par type de collection
+              // Vous pouvez ajouter d'autres filtres ici
+          );
+
+          setSearchResults(results); // Met à jour l'état avec les résultats de recherche
+          setShowSearchResults(true); // Affiche les résultats
+      }
+  };
+
 
 
 
@@ -207,12 +233,21 @@ const UniqueArtGalerie: React.FC = () => {
   return (
     <Box p={6}>
       <Heading mb={4}>Galerie</Heading>
-      <Tabs index={currentTabIndex} onChange={(index) => setCurrentTabIndex(index)}>
-        <TabList>
-          <Tab>Collections mise en avant</Tab>
-          <Tab>Collections</Tab>
-          {selectedCollectionId && <Tab>{collections.find(collection => collection.id === selectedCollectionId)?.name || 'NFTs'}</Tab>}
-        </TabList>
+      <form onSubmit={handleSearchSubmit}>
+                  <Input
+                      placeholder="Rechercher une collection..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      mb={4}
+                  />
+              </form>
+              <Tabs index={currentTabIndex} onChange={(index) => setCurrentTabIndex(index)}>
+                  <TabList>
+                      <Tab>Collections mise en avant</Tab>
+                      <Tab>Collections</Tab>
+                      {selectedCollectionId && <Tab>{collections.find(collection => collection.id === selectedCollectionId)?.name || 'NFTs'}</Tab>}
+                      {showSearchResults && <Tab>Résultats de recherche</Tab>} {/* Nouvel onglet pour les résultats */}
+                  </TabList>
 
         <TabPanels>
           {/* Collections mises en avant */}
@@ -325,6 +360,32 @@ const UniqueArtGalerie: React.FC = () => {
               )}
             </TabPanel>
           )}
+
+          {/* Résultats de recherche */}
+          {showSearchResults && (
+              <TabPanel>
+                  {searchResults.length === 0 ? (
+                      <Text>Aucune collection trouvée.</Text>
+                  ) : (
+                      <Grid templateColumns="repeat(auto-fill, minmax(250px, 1fr))" gap={6}>
+                          {searchResults.map((collection) => (
+                            <Box
+                              key={collection.id}
+                              borderWidth="1px"
+                              borderRadius="lg"
+                              p={4}
+                              cursor="pointer"
+                              onClick={() => handleCollectionClick(collection.id, collection.mintContractAddress)}
+                            >
+                                  <Text>{collection.name}</Text>
+                                  <img src={collection.imageUrl} alt={collection.name} style={{ width: '100%', height: 'auto' }} />
+                              </Box>
+                          ))}
+                      </Grid>
+                  )}
+              </TabPanel>
+          )}
+
         </TabPanels>
       </Tabs>
     </Box>
