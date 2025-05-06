@@ -42,6 +42,7 @@ const NAV_LINKS: ISubNav[] = [
     label: 'Minter',
     href: '/mintart',
     icon: FaEthereum ,  // Icône palette ajoutée
+    requiresAuth: true, // Ajout de la propriété
     children: [
       {
         label: "Art 1/1",

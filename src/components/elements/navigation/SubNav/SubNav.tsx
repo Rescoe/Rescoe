@@ -9,6 +9,8 @@ export interface ISubNav {
   icon?: IconType;  // Remplacement de `logo` par `icon`
   href?: string;
   children?: Array<ISubNav>;
+  requiresAuth?: boolean; // Ajout de requiresAuth comme propriété facultative
+
 }
 
 const SubNav = ({ label, href, subLabel, icon }: ISubNav) => {

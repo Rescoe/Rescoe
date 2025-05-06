@@ -1,10 +1,15 @@
 import React from "react";
 
+import { useAuth } from '../../../utils/authContext';
+
+
 interface NFT {
+  owner: string;
   tokenId: string;
   image: string;
   name: string;
   description: string;
+  forSale:boolean;
   price: number;
   tags: string[];
   mintContractAddress: string;
@@ -13,10 +18,18 @@ interface NFT {
 interface NFTCardProps {
   nft: NFT;
   buyNFT?: (nft: NFT) => void; // Fonction optionnelle pour acheter un NFT
+  isForSale: boolean; // Ajouter isForSale
+  proprietaire: string;
 }
 
 const NFTCard: React.FC<NFTCardProps> = ({ nft, buyNFT }) => {
-  const isForSale = nft.price > 0;
+  const { address: authAddress } = useAuth();
+
+  const isForSale = nft.forSale;
+
+  const isOwner = authAddress && authAddress.toLowerCase() === nft.owner.toLowerCase();
+  const canPurchase = !isOwner && isForSale; // L'utilisateur ne doit pas être le propriétaire et le NFT doit être en vente
+
 
   return (
     <div
@@ -30,7 +43,6 @@ const NFTCard: React.FC<NFTCardProps> = ({ nft, buyNFT }) => {
         boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
       }}
     >
-      {/* Image avec objectFit pour garantir un bon redimensionnement */}
       <div style={{ flex: 1, width: "100%", overflow: "hidden" }}>
         <img
           src={nft.image}
@@ -38,7 +50,7 @@ const NFTCard: React.FC<NFTCardProps> = ({ nft, buyNFT }) => {
           style={{
             width: "100%",
             height: "100%",
-            objectFit: "cover", // Recadrage pour s'assurer que l'image couvre l'espace
+            objectFit: "cover",
           }}
         />
       </div>
@@ -53,14 +65,14 @@ const NFTCard: React.FC<NFTCardProps> = ({ nft, buyNFT }) => {
         </p>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          {isForSale ? (
+          {canPurchase ? (
             <>
               <span style={{ fontSize: "1rem", fontWeight: "bold" }}>
                 {nft.price} ETH
               </span>
               {buyNFT && (
                 <button
-                  onClick={() => buyNFT(nft)}
+                  onClick={() => buyNFT(nft)} // Appel de la fonction buyNFT avec le NFT
                   style={{
                     backgroundColor: "#008CBA",
                     color: "white",
@@ -74,12 +86,17 @@ const NFTCard: React.FC<NFTCardProps> = ({ nft, buyNFT }) => {
                 </button>
               )}
             </>
+          ) : isOwner ? ( // Vérifiez si l'utilisateur est le propriétaire
+            <span style={{ fontSize: "1rem", color: "#999" }}>
+              Vous êtes propriétaire de cette œuvre
+            </span>
           ) : (
             <span style={{ fontSize: "1rem", color: "#999" }}>
               Non disponible à la vente
             </span>
           )}
         </div>
+
       </div>
     </div>
   );
