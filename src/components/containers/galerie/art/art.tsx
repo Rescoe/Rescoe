@@ -212,7 +212,9 @@ const UniqueArtGalerie: React.FC = () => {
           const results = collections.filter(collection =>
               collection.name.toLowerCase().includes(searchTerm.toLowerCase()) || // Filtre par nom de la collection
               collection.creator.toLowerCase().includes(searchTerm.toLowerCase()) || // Filtre par créateur
-              collection.collectionType.toLowerCase().includes(searchTerm.toLowerCase()) // Filtre par type de collection
+              collection.collectionType.toLowerCase().includes(searchTerm.toLowerCase()) ||// Filtre par type de collection
+              collection.id.toLowerCase().includes(searchTerm.toLowerCase()) // Filtre par type de collection
+
               // Vous pouvez ajouter d'autres filtres ici
           );
 
@@ -222,6 +224,15 @@ const UniqueArtGalerie: React.FC = () => {
   };
 
 
+  useEffect(() => {
+    const { collectionId, contractAddress } = router.query;
+
+    if (typeof collectionId === 'string' && typeof contractAddress === 'string') {
+      setSelectedCollectionId(collectionId);
+      fetchNFTs(collectionId, contractAddress);
+      setCurrentTabIndex(2); // Pour ouvrir l'onglet avec la collection
+    }
+  }, [router.query]);
 
 
 

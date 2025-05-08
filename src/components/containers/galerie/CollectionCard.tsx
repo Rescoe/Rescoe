@@ -31,7 +31,17 @@ const CollectionCard: React.FC<CollectionCardProps> = ({ collection, type }) => 
     };
 
     return (
-        <Box borderWidth="1px" borderRadius="lg" overflow="hidden" p={4} margin="0 10px" width="200px">
+      <Box
+        borderWidth="1px"
+        borderRadius="lg"
+        overflow="hidden"
+        p={3}
+        m="0 5px"
+        w="150px"
+        cursor="pointer"
+        _hover={{ boxShadow: 'md',transition: '0.2s' }}
+      >
+
             <Box height="150px" overflow="hidden">
                 <Image
                     src={collection.imageUrl}

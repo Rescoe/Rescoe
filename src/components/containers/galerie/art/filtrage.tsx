@@ -4,6 +4,9 @@ import { JsonRpcProvider, Contract } from "ethers";
 import ABIRESCOLLECTION from '../../../ABI/ABI_Collections.json';
 import CollectionCard from '../CollectionCard'; // Importez votre CollectionCard
 
+import Link from 'next/link'; // assure-toi que c'est en haut du fichier
+
+
 interface Collection {
     id: string;
     name: string;
@@ -21,6 +24,7 @@ interface FilteredCollectionsCarouselProps {
 const FilteredCollectionsCarousel: React.FC<FilteredCollectionsCarouselProps> = ({ creator, selectedCollectionId, type }) => {
     const [collections, setCollections] = useState<Collection[]>([]);
     const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [typeRedirection, setTypeRedirection] = useState<string>('');
 
     const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
     const contract = new Contract(process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!, ABIRESCOLLECTION, provider);
@@ -37,6 +41,16 @@ const FilteredCollectionsCarousel: React.FC<FilteredCollectionsCarouselProps> = 
 
                         // Vérifiez si le type de collection correspond à celui demandé
                         if (type && collectionType !== type) return null;
+
+                        if (type == 'Art'){
+                          setTypeRedirection("art");
+                        }
+                        else if (type == "Poesie"){
+                          setTypeRedirection("recueil");
+                        }
+                        else {
+                          setTypeRedirection("generative");
+                        }
 
                         const uri: string = await contract.getCollectionURI(id);
                         const response = await fetch(`/api/proxyPinata?ipfsHash=${uri.split('/').pop()}`);
@@ -87,11 +101,14 @@ const FilteredCollectionsCarousel: React.FC<FilteredCollectionsCarouselProps> = 
             ) : (
                 <Box display="flex" overflowX="auto">
                     {collections.length === 0 ? (
-                        <Text>Aucune collection trouvée pour cet artiste.</Text>
+                        <Text>Aucune collection de {type} trouvée pour cet artiste.</Text>
                     ) : (
 
                         collections.map((collection) => (
-                          <CollectionCard key={collection.id} collection={collection} type={type} />
+                          <Link key={collection.id} href={`/galerie/${typeRedirection}`} passHref>
+                            <CollectionCard key={collection.id} collection={collection} type={type} />
+                          </Link>
+
                         ))
                     )}
                 </Box>

@@ -31,6 +31,7 @@ import {
   Th,
   Td,
   Tbody,
+  Stack,
 } from '@chakra-ui/react';
 import ABI from '../../../components/ABI/ABI_ART.json';
 import { useAuth } from '../../../utils/authContext';
@@ -334,160 +335,119 @@ const handleListForSale = async () => {
 
   return (
     <Box textAlign="center" mt={10} p={6} display="flex" flexDirection="column" alignItems="center">
-    <HStack align="center" spacing={2}  mt={10} p={6}>
-    <Image
-      src={nftData.image || '/fallback-image.png'}
-      alt={nftData.name}
-      maxWidth="20px"
-    />
 
+      {/* Titre + Image */}
+      <Stack direction={{ base: "column", md: "row" }} spacing={4} align="center" mt={4}>
+        <Image
+          src={nftData.image || '/fallback-image.png'}
+          alt={nftData.name}
+          maxW="80px"
+          borderRadius="md"
+        />
+        <Heading as="h1" fontSize={{ base: "xl", md: "3xl" }}>
+          {nftData.name} - {nftData.artist}
+        </Heading>
+      </Stack>
 
-      <Heading as="h1" fontSize="3xl">
-        {nftData.name} - {nftData.artist}
-      </Heading>
-
-    </HStack>
-
-      <Tabs variant="enclosed" colorScheme="teal">
-
-        <TabList>
+      <Tabs variant="enclosed" colorScheme="teal" mt={6} w="full" maxW="container.lg">
+        <TabList flexWrap="wrap">
           <Tab>Détails</Tab>
-          {isOwner && <Tab>Mise en vente</Tab>} {/* Afficher si propriétaire */}
-          {isOwner && <Tab>Mise à jour</Tab>} {/* Afficher si propriétaire */}
-          {/* Optionnel : Historique */}
-          {isOwner && <Tab>Actions</Tab>}
-          {!isOwner && <Tab>A venir (peut etre)</Tab>} {/* Afficher si pas propriétaire */}
+          {isOwner && <Tab>Paramètres</Tab>}
+          {canPurchase && <Tab>Acheter</Tab>}
         </TabList>
 
         <TabPanels>
+          <TabPanel>
+            <Stack direction={{ base: "column", md: "row" }} spacing={6} mb={6} align="start">
 
-        <TabPanel>
-            <VStack spacing={4} alignItems="start" mb={6}>
-              <HStack spacing={40}>
+              {/* Image NFT */}
+              <Box
+                borderWidth="1px"
+                borderRadius="lg"
+                overflow="hidden"
+                p={4}
+                w={{ base: "100%", md: "300px" }}
+              >
+                <Box h="300px" overflow="hidden">
+                  <Image
+                    src={nftData.image}
+                    alt={nftData.name}
+                    objectFit="cover"
+                    w="100%"
+                    h="100%"
+                  />
+                </Box>
+              </Box>
 
-                  <Box borderWidth="1px" borderRadius="lg" overflow="hidden" p={4} margin="0 10px" width="300px"> {/* Ajustez la largeur comme nécessaire */}
-                      <Box height="300px" overflow="hidden">
-                          <Image
-                              src={nftData.image}
-                              alt={nftData.name}
-                              objectFit="cover" // Cela permet de conserver les proportions
-                              width="100%" // L'image prendra la largeur du conteneur
-                              height="100%" // L'image prendra la hauteur du conteneur
-                          />
-                      </Box>
-                      {/* Affichez d'autres infos sur la collection si nécessaire */}
-                  </Box>
+              {/* Infos Texte */}
+              <VStack spacing={4} alignItems="start" mb={6}>
+                  <Text fontSize="lg"><strong>Nom :</strong> {nftData.name}</Text>
+                  <Text fontSize="lg"><strong>Description :</strong> {nftData.description}</Text>
+                  <Text fontSize="lg"><strong>Artiste :</strong> {nftData.artist}</Text>
+                  <Text fontSize="lg"><strong>Propriétaire :</strong> {formatAddress(nftData.owner)}</Text>
+                  <Text fontSize="lg"><strong>Date de mint :</strong> {formatTimestamp(Number(nftData.mintDate))}</Text>
+                  <Text fontSize="lg"><strong>Prix actuel :</strong> {nftData.price} ETH</Text>
+                  <Text fontSize="lg"><strong>En vente :</strong> {nftData.forsale ? 'Oui' : 'Non'}</Text>
+                  <Text fontSize="lg"><strong>Historique des prix :</strong> {nftData.priceHistory.join(', ')} ETH</Text>
+                  <Text fontSize="lg"><strong>Collection ID :</strong> {nftData.collectionId ? nftData.collectionId.toString() : 'Aucune collection'}</Text>
+                  <Text fontSize="lg">  <strong>Adresse de contrat :</strong>{' '}{contractAddress ? formatAddress(contractAddress) : 'Adresse inconnue'}</Text>
+              </VStack>
+            </Stack>
 
+            {/* Tableau transactions */}
+            <Box overflowX="auto" w="full">
+              <Table variant="simple" size="sm" minW="600px">
+                <Thead>
+                  <Tr>
+                    <Th>Ancien</Th>
+                    <Th>Nouveau</Th>
+                    <Th>Date</Th>
+                    <Th>Prix</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {formattedTransactions.map((tx, i) => (
+                    <Tr key={i}>
+                      <Td>{formatAddress(tx.oldOwner)}</Td>
+                      <Td>{formatAddress(tx.newOwner)}</Td>
+                      <Td>{tx.date}</Td>
+                      <Td>{tx.price} ETH</Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+            </Box>
 
-                    <VStack spacing={4} alignItems="start" mb={6}>
-                        <Text fontSize="lg"><strong>Nom :</strong> {nftData.name}</Text>
-                        <Text fontSize="lg"><strong>Description :</strong> {nftData.description}</Text>
-                        <Text fontSize="lg"><strong>Artiste :</strong> {nftData.artist}</Text>
-                        <Text fontSize="lg"><strong>Propriétaire :</strong> {formatAddress(nftData.owner)}</Text>
-                        <Text fontSize="lg"><strong>Date de mint :</strong> {formatTimestamp(Number(nftData.mintDate))}</Text>
-                        <Text fontSize="lg"><strong>Prix actuel :</strong> {nftData.price} ETH</Text>
-                        <Text fontSize="lg"><strong>En vente :</strong> {nftData.forsale ? 'Oui' : 'Non'}</Text>
-                        <Text fontSize="lg"><strong>Historique des prix :</strong> {nftData.priceHistory.join(', ')} ETH</Text>
-                        <Text fontSize="lg"><strong>Collection ID :</strong> {nftData.collectionId ? nftData.collectionId.toString() : 'Aucune collection'}</Text>
-                        <Text fontSize="lg"><strong>Addresse de contrat :</strong> {contractAddress}</Text>
-                    </VStack>
-                </HStack>
-
-                <Text fontSize="lg" mb={2}><strong>Historique des transactions :</strong></Text>
-                <Table>
-                    <Thead>
-                        <Tr>
-                            <Th>Ancien propriétaire</Th>
-                            <Th>Nouveau propriétaire</Th>
-                            <Th>Date</Th>
-                            <Th>Prix</Th>
-                        </Tr>
-                    </Thead>
-                    <Tbody>
-                        {formattedTransactions.map((transaction, index) => (
-                            <Tr key={index}>
-                                <Td>{formatAddress(transaction.oldOwner)}</Td>
-                                <Td>{formatAddress(transaction.newOwner)}</Td>
-                                <Td>{transaction.date}</Td>
-                                <Td>{transaction.price} ETH</Td>
-                            </Tr>
-                        ))}
-                    </Tbody>
-                </Table>
-
-                <Box textAlign="center" mt={10} p={6} display="flex" flexDirection="column" alignItems="center">
-
-            <Heading size="xl" mb={6} mt={12}>
-                Découvrez les autres collections de {nftData.artist} !
-            </Heading>
-
-            <Divider my={4} /> {/* Ligne de séparation */}
-
-            <HStack>
-                {nftData?.collectionId && nftData?.artist && (
-                    <FilteredCollectionsCarousel
-                        creator={nftData.owner}
-                        selectedCollectionId={nftData.collectionId.toString()}
-                        type={'Art'}
-                    />
-                )}
-
-
-                {nftData?.collectionId && nftData?.artist && (
-                    <FilteredCollectionsCarousel
-                        creator={nftData.owner}
-                        selectedCollectionId={nftData.collectionId.toString()}
-                        type={'Poesie'}
-                    />
-                )}
-
-                {nftData?.collectionId && nftData?.artist && (
-                    <FilteredCollectionsCarousel
-                        creator={nftData.owner}
-                        selectedCollectionId={nftData.collectionId.toString()}
-                        type={'Generative'}
-                    />
-                )}
-            </HStack>
-
-        </Box>
-
-            </VStack>
-        </TabPanel>
-
-
-
-
-                    <TabPanel>
-                    {isOwner && (
-                      <FormControl mt={4}>
-                        <FormLabel htmlFor="price">Prix pour mise en vente</FormLabel>
-                        <Input
-                          id="price"
-                          type="text"
-                          value={price}
-                          onChange={(e) => setPrice(e.target.value)}
-                          placeholder="Ex: 0.01"
-                        />
-                        <Button colorScheme="teal" mt={4} onClick={handleListForSale}>Mettre en vente</Button>
-                      </FormControl>
-                    )}
-
-                    {canPurchase ? (
-                            <Button colorScheme="green" mt={4} onClick={handlePurchase}>
-                              Acheter ce NFT
-                            </Button>
-                          ) : (
-                            <Text mt={4} color="red">
-                              Ce NFT n'est pas à vendre
-                            </Text>
-                          )}
-                    </TabPanel>
+            {/* Carrousels */}
+            <Box mt={5} w="full">
+              <Heading size="md" mb={3}>
+                Découvrez les autres collections de {nftData.artist}
+              </Heading>
+              <Stack direction={{ base: "column", md: "row" }} spacing={2}>
+                <FilteredCollectionsCarousel
+                  creator={nftData.owner}
+                  selectedCollectionId={nftData.collectionId.toString()}
+                  type="Art"
+                />
+                <FilteredCollectionsCarousel
+                  creator={nftData.owner}
+                  selectedCollectionId={nftData.collectionId.toString()}
+                  type="Poesie"
+                />
+                <FilteredCollectionsCarousel
+                  creator={nftData.owner}
+                  selectedCollectionId={nftData.collectionId.toString()}
+                  type="Generative"
+                />
+              </Stack>
+            </Box>
+          </TabPanel>
 
           <TabPanel>
-          <Text mt={4} color="red">
-            Cette partie devra servir a mettre a jour l'uri de l'oeuvre
+          <Text mt={4}>
+            Données :
           </Text>
+          {isOwner && (
             <FormControl mt={4}>
               <FormLabel htmlFor="name">Nom</FormLabel>
               <Input
@@ -498,7 +458,7 @@ const handleListForSale = async () => {
                 placeholder="Entrez votre nom"
               />
 
-              <FormLabel htmlFor="bio">Biographie</FormLabel>
+              <FormLabel htmlFor="bio">Description :</FormLabel>
               <Input
                 id="bio"
                 type="text"
@@ -507,11 +467,35 @@ const handleListForSale = async () => {
                 placeholder="Entrez votre biographie"
               />
               <Button colorScheme="blue" mt={4} onClick={handleUpdateInfo}>Mettre à jour</Button>
+
+              <Text mt={10}>
+              Mettre en vente :
+              </Text>
+
+              <FormLabel htmlFor="price">Mettre a jour le prix de vente :</FormLabel>
+              <Input
+                id="price"
+                type="text"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder="Ex: 0.01"
+              />
+              <Button colorScheme="teal" mt={4} onClick={handleListForSale}>Mettre en vente</Button>
             </FormControl>
+          )}
+
+          {(canPurchase  && isForSale) ? (
+                  <Button colorScheme="green" mt={4} onClick={handlePurchase}>
+                    Acheter ce NFT
+                  </Button>
+                ) : (
+                  <Text mt={4}>
+                    Ce NFT n'est pas à vendre
+                  </Text>
+          )}
+
+
           </TabPanel>
-
-
-
         </TabPanels>
       </Tabs>
     </Box>
