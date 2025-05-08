@@ -1,63 +1,68 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Spinner, Text } from '@chakra-ui/react';
+import { Box, Spinner, Text, Heading} from '@chakra-ui/react';
 import { JsonRpcProvider, Contract } from "ethers";
 import ABIRESCOLLECTION from '../../../ABI/ABI_Collections.json';
-import NFTCard from '../NFTCard';
+import CollectionCard from '../CollectionCard'; // Importez votre CollectionCard
 
 interface Collection {
     id: string;
     name: string;
     imageUrl: string;
     mintContractAddress: string;
-    creator: string; // Ajouté
+    creator: string; // Adresse du créateur
 }
-
-
 
 interface FilteredCollectionsCarouselProps {
-    creator: string; // Le créateur par lequel vous allez filtrer
-    selectedCollectionId: string; // Si vous avez besoin de l'ID de la collection
+    creator: string; // L'adresse du créateur
+    selectedCollectionId: string;
+    type: string; // Nouveau paramètre pour spécifier le type de collection
 }
 
-const FilteredCollectionsCarousel: React.FC<FilteredCollectionsCarouselProps> = ({ creator, selectedCollectionId }) => {
+const FilteredCollectionsCarousel: React.FC<FilteredCollectionsCarouselProps> = ({ creator, selectedCollectionId, type }) => {
     const [collections, setCollections] = useState<Collection[]>([]);
     const [isLoading, setIsLoading] = useState<boolean>(false);
 
-    // Connexion à la blockchain
     const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
     const contract = new Contract(process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!, ABIRESCOLLECTION, provider);
 
-    const fetchCollections = async (creator: string) => {
+    const fetchCollections = async () => {
         setIsLoading(true);
         try {
-            const total: number = await contract.getTotalCollectionsMinted();
-            const collectionsPaginated: any[] = await contract.getCollectionsPaginated(0, total);
-
+            const total: bigint = await contract.getTotalCollectionsMinted();
             const collectionsData = await Promise.all(
-                collectionsPaginated.map(async (tuple: any) => {
-                    const [id, name, collectionType, collectionCreator, collectionAddress, isActive, isFeatured] = tuple;
+                Array.from({ length: Number(total) }, async (_, index) => {
+                    try {
+                        const collectionDetails = await contract.getCollection(index);
+                        const [id, name, collectionType, collectionCreator, collectionAddress, isActive, isFeatured] = collectionDetails;
 
-                    // Vérifiez que la collection type est "Art"
-                    if (collectionType !== "Art") return null;
+                        // Vérifiez si le type de collection correspond à celui demandé
+                        if (type && collectionType !== type) return null;
 
-                    const uri: string = await contract.getCollectionURI(id);
-                    const response = await fetch(`/api/proxyPinata?ipfsHash=${uri.split('/').pop()}`);
-                    const metadata = await response.json();
+                        const uri: string = await contract.getCollectionURI(id);
+                        const response = await fetch(`/api/proxyPinata?ipfsHash=${uri.split('/').pop()}`);
+                        const metadata = await response.json();
 
-                    return {
-                        id: id.toString(),
-                        name,
-                        imageUrl: metadata.image,
-                        mintContractAddress: collectionAddress,
-                        creator: collectionCreator, // Enregistrez le créateur
-                    };
+                        return {
+                            id: id.toString(),
+                            name,
+                            imageUrl: metadata.image,
+                            mintContractAddress: collectionAddress,
+                            creator: collectionCreator,
+                        };
+                    } catch (innerError) {
+                        console.error(`Erreur lors de la récupération de la collection ${index}:`, innerError);
+                        return null;
+                    }
                 })
             );
 
-            // Filtrer les collections par créateur
-            const filteredCollections = collectionsData.filter(collection => collection?.creator.toLowerCase() === creator.toLowerCase());
+            // Filtrer uniquement celles qui ne sont pas nulles
+            const filteredCollections = collectionsData.filter((collection) => collection !== null);
+            const userCollections = filteredCollections.filter(collection =>
+                collection.creator.toLowerCase() === creator.toLowerCase()
+            );
 
-            setCollections(filteredCollections.filter((collection) => collection !== null)); // Mise à jour des collections
+            setCollections(userCollections);
         } catch (error) {
             console.error('Erreur lors de la récupération des collections :', error);
         } finally {
@@ -65,39 +70,33 @@ const FilteredCollectionsCarousel: React.FC<FilteredCollectionsCarouselProps> = 
         }
     };
 
+
     useEffect(() => {
-      console.log(creator);
-
-        if (creator) { // Utilisez directement le créateur passé en tant que prop
-            fetchCollections(creator); // Appelez la fonction avec l'adresse du créateur
+        if (creator) {
+            fetchCollections();
         }
-    }, [creator]); // Dépendance pour appeler à chaque changement de créateur
+    }, [creator]);
 
 
-/*
-  <Box p={6}>
-      {isLoading ? (
-          <Spinner />
-      ) : (
-          <Box display="flex" overflowX="auto">
-              {collections.length === 0 ? (
-                  <Text>Aucune collection trouvée pour ce créateur.</Text>
-              ) : (
-                  collections.map((collection) => (
-                      <NFTCard key={collection.id} /> // Affichez chaque collection  {/*collection={collection}/*}
-                  ))
-              )}
-          </Box>
-      )}
-  </Box>
-  */
 
     return (
-      <Box p={6}>
-      <Text>Aucune collection trouvée pour ce créateur.</Text>
-      </Box>
+        <Box p={6}>
 
+            {isLoading ? (
+                <Spinner />
+            ) : (
+                <Box display="flex" overflowX="auto">
+                    {collections.length === 0 ? (
+                        <Text>Aucune collection trouvée pour cet artiste.</Text>
+                    ) : (
 
+                        collections.map((collection) => (
+                          <CollectionCard key={collection.id} collection={collection} type={type} />
+                        ))
+                    )}
+                </Box>
+            )}
+        </Box>
     );
 };
 

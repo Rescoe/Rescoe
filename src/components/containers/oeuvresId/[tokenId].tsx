@@ -5,6 +5,8 @@ import { useRouter } from 'next/router';
 import { JsonRpcProvider, Contract, ethers, formatUnits  } from 'ethers';
 import {FilteredCollectionsCarousel} from '../galerie/art'; // Mettez à jour le chemin
 
+
+
 import {
   Box,
   Button,
@@ -156,6 +158,12 @@ const TokenPage: React.FC = () => {
 
 
 //################################################################ Fetch NFT DATA
+// Fonction pour raccourcir l'adresse Ethereum
+const formatAddress = (address: string) => {
+if (!address) return '';
+return `${address.slice(0, 6)}...${address.slice(-4)}`;
+};
+
 
 const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<NFTData> => {
     const cacheKey = `${contractAddress}_${tokenId}`;
@@ -325,7 +333,7 @@ const handleListForSale = async () => {
 
 
   return (
-    <Box textAlign="center" mt={10} p={6}>
+    <Box textAlign="center" mt={10} p={6} display="flex" flexDirection="column" alignItems="center">
     <HStack align="center" spacing={2}  mt={10} p={6}>
     <Image
       src={nftData.image || '/fallback-image.png'}
@@ -333,12 +341,15 @@ const handleListForSale = async () => {
       maxWidth="20px"
     />
 
+
       <Heading as="h1" fontSize="3xl">
         {nftData.name} - {nftData.artist}
       </Heading>
 
     </HStack>
+
       <Tabs variant="enclosed" colorScheme="teal">
+
         <TabList>
           <Tab>Détails</Tab>
           {isOwner && <Tab>Mise en vente</Tab>} {/* Afficher si propriétaire */}
@@ -348,25 +359,39 @@ const handleListForSale = async () => {
           {!isOwner && <Tab>A venir (peut etre)</Tab>} {/* Afficher si pas propriétaire */}
         </TabList>
 
-
         <TabPanels>
 
         <TabPanel>
             <VStack spacing={4} alignItems="start" mb={6}>
-                <Text fontSize="lg"><strong>Nom :</strong> {nftData.name}</Text>
-                <Text fontSize="lg"><strong>Description :</strong> {nftData.description}</Text>
-                <Text fontSize="lg"><strong>Artiste :</strong> {nftData.artist}</Text>
-                <Text fontSize="lg"><strong>Propriétaire :</strong> {nftData.owner}</Text>
-                <Text fontSize="lg"><strong>Date de mint :</strong> {formatTimestamp(Number(nftData.mintDate))}</Text>
-                <Text fontSize="lg"><strong>Prix actuel :</strong> {nftData.price} ETH</Text>
-                <Text fontSize="lg"><strong>En vente :</strong> {nftData.forsale ? 'Oui' : 'Non'}</Text>
-                <Text fontSize="lg"><strong>Historique des prix :</strong> {nftData.priceHistory.join(', ')} ETH</Text>
-                <Text fontSize="lg"><strong>Collection ID :</strong> {nftData.collectionId ? nftData.collectionId.toString() : 'Aucune collection'}</Text>
-                <Text fontSize="lg"><strong>Addresse de contrat :</strong> {contractAddress}</Text>
+              <HStack spacing={40}>
+
+                  <Box borderWidth="1px" borderRadius="lg" overflow="hidden" p={4} margin="0 10px" width="300px"> {/* Ajustez la largeur comme nécessaire */}
+                      <Box height="300px" overflow="hidden">
+                          <Image
+                              src={nftData.image}
+                              alt={nftData.name}
+                              objectFit="cover" // Cela permet de conserver les proportions
+                              width="100%" // L'image prendra la largeur du conteneur
+                              height="100%" // L'image prendra la hauteur du conteneur
+                          />
+                      </Box>
+                      {/* Affichez d'autres infos sur la collection si nécessaire */}
+                  </Box>
 
 
-
-                <img src={nftData.image} alt={nftData.name} style={{ maxWidth: '100%', borderRadius: '8px' }} />
+                    <VStack spacing={4} alignItems="start" mb={6}>
+                        <Text fontSize="lg"><strong>Nom :</strong> {nftData.name}</Text>
+                        <Text fontSize="lg"><strong>Description :</strong> {nftData.description}</Text>
+                        <Text fontSize="lg"><strong>Artiste :</strong> {nftData.artist}</Text>
+                        <Text fontSize="lg"><strong>Propriétaire :</strong> {formatAddress(nftData.owner)}</Text>
+                        <Text fontSize="lg"><strong>Date de mint :</strong> {formatTimestamp(Number(nftData.mintDate))}</Text>
+                        <Text fontSize="lg"><strong>Prix actuel :</strong> {nftData.price} ETH</Text>
+                        <Text fontSize="lg"><strong>En vente :</strong> {nftData.forsale ? 'Oui' : 'Non'}</Text>
+                        <Text fontSize="lg"><strong>Historique des prix :</strong> {nftData.priceHistory.join(', ')} ETH</Text>
+                        <Text fontSize="lg"><strong>Collection ID :</strong> {nftData.collectionId ? nftData.collectionId.toString() : 'Aucune collection'}</Text>
+                        <Text fontSize="lg"><strong>Addresse de contrat :</strong> {contractAddress}</Text>
+                    </VStack>
+                </HStack>
 
                 <Text fontSize="lg" mb={2}><strong>Historique des transactions :</strong></Text>
                 <Table>
@@ -381,8 +406,8 @@ const handleListForSale = async () => {
                     <Tbody>
                         {formattedTransactions.map((transaction, index) => (
                             <Tr key={index}>
-                                <Td>{transaction.oldOwner}</Td>
-                                <Td>{transaction.newOwner}</Td>
+                                <Td>{formatAddress(transaction.oldOwner)}</Td>
+                                <Td>{formatAddress(transaction.newOwner)}</Td>
                                 <Td>{transaction.date}</Td>
                                 <Td>{transaction.price} ETH</Td>
                             </Tr>
@@ -390,17 +415,42 @@ const handleListForSale = async () => {
                     </Tbody>
                 </Table>
 
-                <Box textAlign="center" mt={10} p={6}>
-                    {nftData?.collectionId && nftData?.artist && (
-                        <FilteredCollectionsCarousel
-                            creator={nftData.artist}
-                            selectedCollectionId={nftData.collectionId.toString()}
-                        />
-                    )}
-                </Box>
+                <Box textAlign="center" mt={10} p={6} display="flex" flexDirection="column" alignItems="center">
+
+            <Heading size="xl" mb={6} mt={12}>
+                Découvrez les autres collections de {nftData.artist} !
+            </Heading>
+
+            <Divider my={4} /> {/* Ligne de séparation */}
+
+            <HStack>
+                {nftData?.collectionId && nftData?.artist && (
+                    <FilteredCollectionsCarousel
+                        creator={nftData.owner}
+                        selectedCollectionId={nftData.collectionId.toString()}
+                        type={'Art'}
+                    />
+                )}
 
 
+                {nftData?.collectionId && nftData?.artist && (
+                    <FilteredCollectionsCarousel
+                        creator={nftData.owner}
+                        selectedCollectionId={nftData.collectionId.toString()}
+                        type={'Poesie'}
+                    />
+                )}
 
+                {nftData?.collectionId && nftData?.artist && (
+                    <FilteredCollectionsCarousel
+                        creator={nftData.owner}
+                        selectedCollectionId={nftData.collectionId.toString()}
+                        type={'Generative'}
+                    />
+                )}
+            </HStack>
+
+        </Box>
 
             </VStack>
         </TabPanel>
@@ -436,7 +486,7 @@ const handleListForSale = async () => {
 
           <TabPanel>
           <Text mt={4} color="red">
-Cette partie devra servir a mettre a jour l'uri de l'oeuvre
+            Cette partie devra servir a mettre a jour l'uri de l'oeuvre
           </Text>
             <FormControl mt={4}>
               <FormLabel htmlFor="name">Nom</FormLabel>
