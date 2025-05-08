@@ -38,6 +38,11 @@ interface NFT {
   mintContractAddress: string;
 }
 
+interface UniqueArtGalerieProps {
+    selectedCollectionId: string;
+    creator: string; // Ajoutez ceci
+}
+
 
 const UniqueArtGalerie: React.FC = () => {
   const [isMobile] = useMediaQuery('(max-width: 768px)'); // Ajuster la largeur selon vos besoins

@@ -152,9 +152,11 @@ const formatAddress = (address: string) => {
     const contractadhesion = new Contract(contractAdhesion, ABI, provider);
     console.log(userAddress);
 
+    console.log(Number(nombreTotalMint));
+
     try {
 
-      const tokenIds = await contract.getTokensByOwnerPaginated(userAddress, 0, nombreTotalMint);
+      const tokenIds = await contract.getTokensByOwnerPaginated(userAddress, 0, Number(nombreTotalMint));
       console.log('test');
       const userInfos = await contract.getUserInfo(userAddress);
 
@@ -290,7 +292,7 @@ const formatAddress = (address: string) => {
       try {
           // Appel pour récupérer le prix des points
           const prixPoints = await contract.pointPrice(); // Ceci devrait fonctionner si pointPrice est public
-          console.log(`Le prix par point est : ${prixPoints.toString()} Wei`); // Afficher le prix en Wei
+          //console.log(`Le prix par point est : ${prixPoints.toString()} Wei`); // Afficher le prix en Wei
           return prixPoints; // Retourner en Ether
       } catch (error) {
           console.error("Erreur lors de la récupération du prix des points:", error);

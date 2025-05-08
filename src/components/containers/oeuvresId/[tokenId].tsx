@@ -3,6 +3,7 @@ import Web3 from 'web3';
 import detectEthereumProvider from '@metamask/detect-provider';
 import { useRouter } from 'next/router';
 import { JsonRpcProvider, Contract, ethers, formatUnits  } from 'ethers';
+import {FilteredCollectionsCarousel} from '../galerie/art'; // Mettez à jour le chemin
 
 import {
   Box,
@@ -55,6 +56,7 @@ interface NFTData {
     artist: string;
     forsale: boolean;
     price: string;
+    collectionId: number;  // Vérifiez ceci
 }
 
 interface HistoryData {
@@ -82,6 +84,8 @@ const TokenPage: React.FC = () => {
   const [accounts, setAccounts] = useState<string[]>([]);
   const [isForSale, setIsForSale] = useState<boolean>(false);
   const [nftCache, setNFTCache] = useState<NFTCache>({});
+  //const [collectionId, setCollectionId] = useState<bigint>({});
+
   const [formattedTransactions, setFormattedTransactions] = useState<
     { oldOwner: string; newOwner: string; date: string; price: string }[]
   >([]);
@@ -137,6 +141,7 @@ const TokenPage: React.FC = () => {
         setName(data.name);
         setBio(data.description);
         setFormattedTransactions(data.transactions); // Mettre à jour ici
+        //setCollectionId(data.collectionId);
 
       } catch (error) {
         console.error('Erreur lors de la récupération du NFT');
@@ -163,6 +168,7 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
         const contract = new Contract(contractAddress, ABI, provider);
 
         const fullDetails = await contract.getTokenFullDetails(tokenId);
+        console.log(fullDetails);
 
         const owner: string = fullDetails.owner;
         const mintDate: bigint = fullDetails.mintDate;
@@ -170,6 +176,7 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
         const forsale: boolean = fullDetails.forSale;
         const priceHistory: bigint[] = fullDetails.priceHistory;
         const transactions: Transaction[] = fullDetails.transactions;
+        const collectionId: bigint = fullDetails[6];
 
         // Formatter les transactions
         const formattedTransactions = transactions.map((transaction: Transaction) => ({
@@ -193,7 +200,7 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
         const nftData: NFTData = {
             owner,
             mintDate,
-            priceHistory: priceHistory.map((price) => Number(price)), // Convertir les BigInts en nombres
+            priceHistory: priceHistory.map((price) => (Number(price) / 1e18)),
             transactions: formattedTransactions,
             image: data.image,
             name: data.name,
@@ -201,7 +208,11 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
             artist: data.artist,
             forsale,
             price: priceInEther,
+            collectionId: Number(collectionId), // Assurez-vous qu'il soit un nombre
         };
+
+        console.log("nftData:", nftData); // Débogage
+
 
         nftCache[cacheKey] = nftData;
         return nftData;
@@ -349,7 +360,11 @@ const handleListForSale = async () => {
                 <Text fontSize="lg"><strong>Date de mint :</strong> {formatTimestamp(Number(nftData.mintDate))}</Text>
                 <Text fontSize="lg"><strong>Prix actuel :</strong> {nftData.price} ETH</Text>
                 <Text fontSize="lg"><strong>En vente :</strong> {nftData.forsale ? 'Oui' : 'Non'}</Text>
-                <Text fontSize="lg"><strong>Historique des prix :</strong> {nftData.priceHistory.join(', ')}</Text>
+                <Text fontSize="lg"><strong>Historique des prix :</strong> {nftData.priceHistory.join(', ')} ETH</Text>
+                <Text fontSize="lg"><strong>Collection ID :</strong> {nftData.collectionId ? nftData.collectionId.toString() : 'Aucune collection'}</Text>
+                <Text fontSize="lg"><strong>Addresse de contrat :</strong> {contractAddress}</Text>
+
+
 
                 <img src={nftData.image} alt={nftData.name} style={{ maxWidth: '100%', borderRadius: '8px' }} />
 
@@ -374,6 +389,19 @@ const handleListForSale = async () => {
                         ))}
                     </Tbody>
                 </Table>
+
+                <Box textAlign="center" mt={10} p={6}>
+                    {nftData?.collectionId && nftData?.artist && (
+                        <FilteredCollectionsCarousel
+                            creator={nftData.artist}
+                            selectedCollectionId={nftData.collectionId.toString()}
+                        />
+                    )}
+                </Box>
+
+
+
+
             </VStack>
         </TabPanel>
 

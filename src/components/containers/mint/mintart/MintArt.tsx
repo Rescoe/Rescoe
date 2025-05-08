@@ -173,7 +173,7 @@ const MintArt: React.FC = () => {
 
         const imageUrl = `https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${imageResponse.data.IpfsHash}`;
         const metadataJson = {
-          artist: metadata.artist,
+          artist: address,
           name: metadata.name,
           description: metadata.description,
           image: imageUrl,
@@ -330,9 +330,9 @@ try {
       <Input type="file" onChange={handleFileChange} mb={3} />
       {previewUrl && <Image src={previewUrl} alt="Preview" mb={3} boxSize="200px" objectFit="cover" />}
       <VStack spacing={3} align="stretch">
-        <Input placeholder="Artist" name="artist" value={metadata.artist} onChange={handleMetadataChange} />
+        {/*}<Input placeholder="Artist" name="artist" value={metadata.artist} onChange={handleMetadataChange} />*/}
         <Input placeholder="Name" name="name" value={metadata.name} onChange={handleMetadataChange} />
-        <Input placeholder="Description" name="description" value={metadata.description} onChange={handleMetadataChange} />
+        <Input placeholder="Description (pensez à ajouter votre nom d'artiste)" name="description" value={metadata.description} onChange={handleMetadataChange} />
         <Input placeholder="Tags (comma-separated)" name="tags" value={metadata.tags} onChange={handleMetadataChange} />
       </VStack>
       <Button mt={4} colorScheme="teal" onClick={uploadFileToIPFS} isLoading={isUploading}>

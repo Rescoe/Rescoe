@@ -22,8 +22,11 @@ interface NFTCardProps {
   proprietaire: string;
 }
 
+
+
 const NFTCard: React.FC<NFTCardProps> = ({ nft, buyNFT }) => {
-  const { address: authAddress } = useAuth();
+  const { address: authAddress, connectWallet } = useAuth(); // ajoute connectWallet
+
 
   const isForSale = nft.forSale;
 
@@ -71,20 +74,29 @@ const NFTCard: React.FC<NFTCardProps> = ({ nft, buyNFT }) => {
                 {nft.price} ETH
               </span>
               {buyNFT && (
-                <button
-                  onClick={() => buyNFT(nft)} // Appel de la fonction buyNFT avec le NFT
-                  style={{
-                    backgroundColor: "#008CBA",
-                    color: "white",
-                    padding: "5px 10px",
-                    border: "none",
-                    borderRadius: "5px",
-                    cursor: "pointer",
-                  }}
-                >
-                  Acheter
-                </button>
-              )}
+          <button
+            onClick={async (e) => {
+              e.stopPropagation();
+              if (!authAddress) {
+                await connectWallet(); // déclenche la connexion si pas connecté
+              }
+              if (authAddress) {
+                buyNFT(nft); // exécute l’achat seulement si connecté
+              }
+            }}
+            style={{
+              backgroundColor: "#008CBA",
+              color: "white",
+              padding: "5px 10px",
+              border: "none",
+              borderRadius: "5px",
+              cursor: "pointer",
+            }}
+          >
+            Acheter
+          </button>
+        )}
+
             </>
           ) : isOwner ? ( // Vérifiez si l'utilisateur est le propriétaire
             <span style={{ fontSize: "1rem", color: "#999" }}>

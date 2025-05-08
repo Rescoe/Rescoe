@@ -3,6 +3,9 @@ import Web3 from 'web3';
 import detectEthereumProvider from '@metamask/detect-provider';
 import ABI from '../components/ABI/ABIAdhesion.json';
 
+import { useToast } from '@chakra-ui/react';
+
+
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS!;
 
 interface AuthContextType {
@@ -18,10 +21,12 @@ interface AuthContextType {
   setAddress: (address: string | null) => void;
   setIsAuthenticated: (status: boolean) => void;
 
-  // Ajouts :
   web3: Web3 | null;
   provider: any;
+
+  connectWallet: () => Promise<void>;
 }
+
 
 const AuthContext = createContext<AuthContextType>({
   address: null,
@@ -39,6 +44,9 @@ const AuthContext = createContext<AuthContextType>({
   // Ajouts :
   web3: null,
   provider: null,
+
+  connectWallet: async () => {}, // Ajout de la fonction par défaut
+
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -61,6 +69,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [provider, setProvider] = useState<any>(null); // Ajouté pour exposer le provider
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const toast = useToast();
+
 
   useEffect(() => {
     const initWeb3 = async () => {
@@ -104,6 +114,64 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const connectWallet = async () => {
+    try {
+        // Vérifier si l'objet ethereum est disponible
+        const provider = await detectEthereumProvider();
+
+        if (!provider) {
+            // Si aucun provider n'est détecté, afficher un message d'erreur
+            toast({
+                title: 'Wallet non connecté',
+                description: 'Veuillez connecter votre wallet pour effectuer un achat.',
+                status: 'error',
+                duration: 5000,
+                isClosable: true,
+            });
+            return; // Sortir de la fonction si aucun provider n'est trouvé
+        }
+
+        // Création d'une instance Web3
+        const web3Instance = new Web3(provider);
+        setProvider(provider); // Stocker le provider
+        setWeb3(web3Instance);
+
+        // Récupérer les comptes disponibles
+        const accounts = await web3Instance.eth.getAccounts();
+
+        if (accounts.length > 0) {
+            const selectedAddress = accounts[0];
+
+            setAddress(selectedAddress); // Stocker l'adresse sélectionnée
+            setIsAuthenticated(true); // Mettre à jour l'état d'authentification
+
+            // Récupérer le rôle si web3 est disponible
+            if (web3Instance) {
+                await fetchRole(selectedAddress.toLowerCase());
+            }
+        } else {
+            // Si aucun compte n'est trouvé, afficher un message d'erreur
+            toast({
+                title: 'Aucun compte connecté',
+                description: 'Veuillez vous connecter à votre wallet et réessayer.',
+                status: 'warning',
+                duration: 5000,
+                isClosable: true,
+            });
+        }
+    } catch (error) {
+        console.error("Erreur lors de la connexion au wallet :", error);
+        toast({
+            title: 'Erreur de connexion',
+            description: 'Une erreur s’est produite lors de la connexion au wallet.',
+            status: 'error',
+            duration: 5000,
+            isClosable: true,
+        });
+    }
+};
+
+
   useEffect(() => {
     const fetchUserRole = async () => {
       if (address) {
@@ -137,10 +205,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       isAuthenticated,
       setIsAuthenticated,
 
-      // Ajouts :
       web3,
       provider,
+
+      connectWallet,
     }}>
+
       {isLoading ? <div>Chargement...</div> : children}
     </AuthContext.Provider>
   );
