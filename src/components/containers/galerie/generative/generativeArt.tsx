@@ -17,17 +17,16 @@ interface Collection {
 
 interface NFT {
   tokenId: string;
-  owner: string; // Définir le type exact du propriétaire, par ex. string
+  owner: string;
   name: string;
   description: string;
-  price: number | null; // Peut être null si non défini
+  price: number | null;
   tags: string[];
   mintContractAddress: string;
-  tokenURI: string; // Ajout de l'URI manquant
+  tokenURI: string;
 }
 
-
-const UniqueArtGalerie: React.FC = () => {
+const UniqueGenerativeArtGallery: React.FC = () => {
   const [isMobile] = useMediaQuery('(max-width: 768px)');
   const [collections, setCollections] = useState<Collection[]>([]);
   const [nfts, setNfts] = useState<NFT[]>([]);
@@ -50,7 +49,7 @@ const UniqueArtGalerie: React.FC = () => {
         collectionsPaginated.map(async (tuple: any) => {
           const [id, name, collectionType, , associatedAddresses, , isFeatured] = tuple;
 
-          if (collectionType !== "Generative") return null; // On ne traite que les collections génératives
+          if (collectionType !== "Generative") return null;
 
           try {
             const collectionContract = new ethers.Contract(
@@ -107,10 +106,10 @@ const UniqueArtGalerie: React.FC = () => {
 
             return {
               tokenId: tokenId.toString(),
-              owner: metadata.owner || owner, // Utiliser les données de fallback si propriétaire non trouvé
+              owner: metadata.owner || owner,
               name: metadata.name,
               description: metadata.description,
-              price: metadata.price || null, // Définir le prix à null s'il n'est pas défini
+              price: metadata.price || null,
               tags: metadata.tags || [],
               mintContractAddress: associatedAddress,
               tokenURI: tokenURI,
@@ -142,10 +141,10 @@ const UniqueArtGalerie: React.FC = () => {
 
   return (
     <Box p={6}>
-      <Heading mb={4}>Galerie</Heading>
+      <Heading mb={4}>Galerie d'Art Génératif</Heading>
       <Tabs index={currentTabIndex} onChange={(index) => setCurrentTabIndex(index)}>
         <TabList>
-          <Tab>Collections mise en avant</Tab>
+          <Tab>Collections mises en avant</Tab>
           <Tab>Collections</Tab>
           {selectedCollectionId && <Tab>{collections.find(collection => collection.id === selectedCollectionId)?.name || 'NFTs'}</Tab>}
         </TabList>
@@ -271,4 +270,4 @@ const UniqueArtGalerie: React.FC = () => {
   );
 };
 
-export default UniqueArtGalerie;
+export default UniqueGenerativeArtGallery;

@@ -64,7 +64,7 @@ const FilteredCollectionsCarousel: React.FC<FilteredCollectionsCarouselProps> = 
                             creator: collectionCreator,
                         };
                     } catch (innerError) {
-                        console.error(`Erreur lors de la récupération de la collection ${index}:`, innerError);
+                        console.error(`Erreur lors de la récupération de la collection ${index}:`);
                         return null;
                     }
                 })
@@ -78,7 +78,7 @@ const FilteredCollectionsCarousel: React.FC<FilteredCollectionsCarouselProps> = 
 
             setCollections(userCollections);
         } catch (error) {
-            console.error('Erreur lors de la récupération des collections :', error);
+            console.error('Erreur lors de la récupération des collections :');
         } finally {
             setIsLoading(false);
         }

@@ -88,6 +88,8 @@ const TokenPage: React.FC = () => {
   const [isForSale, setIsForSale] = useState<boolean>(false);
   const [nftCache, setNFTCache] = useState<NFTCache>({});
   //const [collectionId, setCollectionId] = useState<bigint>({});
+  const [transacActivity, setTransacActivity] = useState<boolean>(false);
+
 
   const [formattedTransactions, setFormattedTransactions] = useState<
     { oldOwner: string; newOwner: string; date: string; price: string }[]
@@ -177,7 +179,6 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
         const contract = new Contract(contractAddress, ABI, provider);
 
         const fullDetails = await contract.getTokenFullDetails(tokenId);
-        console.log(fullDetails);
 
         const owner: string = fullDetails.owner;
         const mintDate: bigint = fullDetails.mintDate;
@@ -194,6 +195,13 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
             date: formatTimestamp(transaction.timestamp), // Conversion en string pour éviter les erreurs
             price: formatUnits(transaction.price, 18),
         }));
+
+
+        if(formattedTransactions.length != 0){
+          setTransacActivity(true);
+        }
+
+
 
         const priceInEther = formatUnits(currentPrice, 18);
         setPrice(priceInEther);
@@ -220,7 +228,6 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
             collectionId: Number(collectionId), // Assurez-vous qu'il soit un nombre
         };
 
-        console.log("nftData:", nftData); // Débogage
 
 
         nftCache[cacheKey] = nftData;
@@ -395,6 +402,9 @@ const handleListForSale = async () => {
             </Stack>
 
             {/* Tableau transactions */}
+
+            {transacActivity === true &&
+
             <Box overflowX="auto" w="full">
               <Table variant="simple" size="sm" minW="600px">
                 <Thead>
@@ -405,6 +415,7 @@ const handleListForSale = async () => {
                     <Th>Prix</Th>
                   </Tr>
                 </Thead>
+
                 <Tbody>
                   {formattedTransactions.map((tx, i) => (
                     <Tr key={i}>
@@ -416,32 +427,12 @@ const handleListForSale = async () => {
                   ))}
                 </Tbody>
               </Table>
-            </Box>
 
-            {/* Carrousels */}
-            <Box mt={5} w="full">
-              <Heading size="md" mb={3}>
-                Découvrez les autres collections de {nftData.artist}
-              </Heading>
-              <Stack direction={{ base: "column", md: "row" }} spacing={2}>
-                <FilteredCollectionsCarousel
-                  creator={nftData.owner}
-                  selectedCollectionId={nftData.collectionId.toString()}
-                  type="Art"
-                />
-                <FilteredCollectionsCarousel
-                  creator={nftData.owner}
-                  selectedCollectionId={nftData.collectionId.toString()}
-                  type="Poesie"
-                />
-                <FilteredCollectionsCarousel
-                  creator={nftData.owner}
-                  selectedCollectionId={nftData.collectionId.toString()}
-                  type="Generative"
-                />
-              </Stack>
             </Box>
+          }
           </TabPanel>
+
+          <Divider my={6} />
 
           <TabPanel>
           <Text mt={4}>
@@ -498,6 +489,31 @@ const handleListForSale = async () => {
           </TabPanel>
         </TabPanels>
       </Tabs>
+
+      {/* Carrousels */}
+      <Box mt={5} w="full">
+        <Heading size="md" mb={3}>
+          Découvrez les autres collections de {nftData.artist}
+        </Heading>
+        <Stack direction={{ base: "column", md: "row" }} spacing={2}>
+          <FilteredCollectionsCarousel
+            creator={nftData.owner}
+            selectedCollectionId={nftData.collectionId.toString()}
+            type="Art"
+          />
+          <FilteredCollectionsCarousel
+            creator={nftData.owner}
+            selectedCollectionId={nftData.collectionId.toString()}
+            type="Poesie"
+          />
+          <FilteredCollectionsCarousel
+            creator={nftData.owner}
+            selectedCollectionId={nftData.collectionId.toString()}
+            type="Generative"
+          />
+        </Stack>
+      </Box>
+
     </Box>
   );
 };
