@@ -264,6 +264,15 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
             collectionId: Number(collectionId),
         };
 
+
+        const ownerCheck = Boolean(authAddress && nftData?.owner && authAddress.toLowerCase() === nftData.owner.toLowerCase());
+        setIsOwner(ownerCheck);
+        setCanPurchase(!ownerCheck && nftData.forsale);
+
+        console.log(isOwner);
+        console.log(canPurchase);
+
+
         nftCache[cacheKey] = nftData;
         return nftData;
 
