@@ -239,6 +239,10 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
             price: formatUnits(transaction.price, 18),
         }));
 
+        if(formattedTransactions.length != 0){
+          setTransacActivity(true);
+        }
+        
         const priceInEther = formatUnits(currentPrice, 18);
         setPrice(priceInEther);
 
