@@ -119,7 +119,6 @@ const UniqueArtGalerie: React.FC = () => {
 
   const fetchNFTs = async (collectionId: string, associatedAddress: string) => {
       setIsLoading(true);
-
       try {
           const collectionContract = new Contract(associatedAddress, ABI_MINT_CONTRACT, provider);
           const tokenIds: string[] = await collectionContract.getTokenPaginated(0, 10);
@@ -127,28 +126,31 @@ const UniqueArtGalerie: React.FC = () => {
           const nftsData = await Promise.all(
               tokenIds.map(async (tokenId: string) => {
                   try {
-                      // Récupérez le tokenURI pour le NFT
-                      const tokenURI: string = await collectionContract.tokenURI(tokenId);
-                      const cachedMetadata = localStorage.getItem(tokenURI);
+                      let tokenURI: string;
 
-                      // Vérifier si le cache est éligible
-                      if (cachedMetadata) {
-                          return JSON.parse(cachedMetadata);
+                      try {
+                          // Essayez d'accéder au tokenURI
+                          tokenURI = await collectionContract.tokenURI(tokenId);
+                      } catch (error) {
+                          // Si on ne trouve pas le token, loguer et passer au suivant
+                          console.warn(`Le token avec le tokenId ${tokenId} n'existe pas.`);
+                          return null; // Retourne null pour cet NFT
                       }
 
-                      // Si le cachedMetadata n'est pas disponible, essayer de le récupérer à partir de l'API
-                      const metadata = await (await fetch(`/api/proxyPinata?ipfsHash=${tokenURI.split('/').pop()}`)).json();
+                      // Si le tokenURI est correctement récupéré, continuez avec le reste de la logique
+                      const cachedMetadata = localStorage.getItem(tokenURI);
+                      const metadata = cachedMetadata
+                          ? JSON.parse(cachedMetadata)
+                          : await (await fetch(`/api/proxyPinata?ipfsHash=${tokenURI.split('/').pop()}`)).json();
 
-                      // Enregistrez le tokenURI dans localStorage
-                      localStorage.setItem(tokenURI, JSON.stringify(metadata));
-
-                      // Récupération du prix à l'aide de la fonction getTokenPrice
                       const priceInWei: BigNumberish = await collectionContract.getTokenPrice(tokenId);
-
-                      // Vérifiez si le NFT est en vente à l'aide de la fonction isNFTForSale
                       const isForSale: boolean = await collectionContract.isNFTForSale(tokenId);
-
+                      const priceInEthers = Number(priceInWei) / 1e18;
                       const proprietaire = await collectionContract.ownerOf(tokenId);
+
+                      if (!cachedMetadata) {
+                          localStorage.setItem(tokenURI, JSON.stringify(metadata));
+                      }
 
                       return {
                           owner: proprietaire,
@@ -157,35 +159,26 @@ const UniqueArtGalerie: React.FC = () => {
                           name: metadata.name,
                           description: metadata.description,
                           priceInWei: priceInWei.toString(),
-                          price: Number(priceInWei) / 1e18 || 0,
+                          price: priceInEthers || 0,
                           forSale: isForSale,
                           tags: metadata.tags || [],
                           mintContractAddress: associatedAddress,
                       };
-
                   } catch (error) {
                       console.error(`Erreur pour le tokenId ${tokenId}:`, error);
-                      return null; // Retourner null pour filtrer les NFTs invalides
+                      return null; // En cas d'autres erreurs, retourner null
                   }
               })
           );
 
           const filteredNFTsData = nftsData.filter((nft): nft is NFT => nft !== null);
           setNfts(filteredNFTsData);
-
-          // Stocker dans localStorage avec le temps de sauvegarde
-          const settingsToStore = {
-              nfts: filteredNFTsData,
-          };
-          localStorage.setItem("nftsData", JSON.stringify(settingsToStore));
-
       } catch (error) {
           console.error('Erreur lors de la récupération des NFTs :', error);
       } finally {
           setIsLoading(false);
       }
   };
-
 
 
 

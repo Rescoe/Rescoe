@@ -177,8 +177,16 @@ const fetchNFTs = async (collectionId: string, associatedAddress: string) => {
         const nftsData = await Promise.all(
             tokenIds.map(async (tokenId: string) => {
                 try {
-                  //Pensr a ajouter une fonction exist sur collection contratc ou en tout cas s'assurer que les tokenId de paginated existe bel et bien pour ne pas avoir de probleme si jamais les tokens sont brulés !!!
-                    const tokenURI = await collectionContract.tokenURI(tokenId);
+                    // Essayer d'accéder à tokenURI tout en gérant l'erreur si le token a été brûlé
+                    let tokenURI: string;
+                    try {
+                        tokenURI = await collectionContract.tokenURI(tokenId);
+                    } catch (tokenError) {
+                        // Si le token n'existe pas, loguer un avertissement et passer au suivant
+                        console.warn(`Le token avec le tokenId ${tokenId} n'existe pas.`);
+                        return null; // Retourner null pour cet NFT
+                    }
+
                     const cachedMetadata = localStorage.getItem(tokenURI);
                     const metadata = cachedMetadata ? JSON.parse(cachedMetadata) : await (await fetch(`/api/proxyPinata?ipfsHash=${tokenURI.split('/').pop()}`)).json();
 
@@ -196,8 +204,8 @@ const fetchNFTs = async (collectionId: string, associatedAddress: string) => {
                         mintContractAddress: associatedAddress,
                         artist: metadata.artist,
                     };
-                } catch (tokenError) {
-                    console.error(`Erreur lors de la récupération des métadonnées pour le tokenId ${tokenId}:`, tokenError);
+                } catch (error) {
+                    console.error(`Erreur lors de la récupération des métadonnées pour le tokenId ${tokenId}:`, error);
                     return null; // Ignorez les tokens dont les métadonnées ne peuvent pas être récupérées
                 }
             })
