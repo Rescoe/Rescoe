@@ -79,6 +79,12 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
     }, delay * 1000);
   }, [nfts, haikus, delay, maxNfts, maxHaikus]);
 
+  // Fonction pour raccourcir l'adresse Ethereum
+  const formatAddress = (address: string) => {
+  if (!address) return '';
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  };
+
   const moveToIndex = (newIndex: number) => {
     setIndex(newIndex % items.length);
   };
@@ -211,7 +217,7 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
       <Box position="relative" p={4} w="100%" h="600px">
         <Box
           display="grid"
-          gridTemplateColumns={isMobile ? 'repeat(3, 1fr)' : 'repeat(4, 1fr)'}
+          gridTemplateColumns={isMobile ? 'repeat(3, 1fr)' : 'repeat(3, 1fr)'}
           gridTemplateRows="repeat(3, 1fr)"
           gap={4}
           h="100%"
@@ -294,9 +300,11 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
                 {typeof items[index].content !== "string" && (
                   <>
                     <Text fontWeight="bold" mb={2}>
-                      {"Artiste inconnu"}
+                      {((items[index].content as Nft).name) || "Oeuvre sans nom"}
                     </Text>
-                    <Text>{"Nom de l'œuvre"}</Text>
+                    <Text>
+                      {formatAddress((items[index].content as Nft).artist) || "Artiste inconnu"}
+                    </Text>
                   </>
                 )}
               </>

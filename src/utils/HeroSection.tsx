@@ -60,6 +60,13 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
     return () => clearInterval(interval);
   }, [nfts, haikus]);
 
+  // Fonction pour raccourcir l'adresse Ethereum
+  const formatAddress = (address: string) => {
+  if (!address) return '';
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  };
+
+
   const handleClick = (item: Nft | Haiku) => {
     if ("content" in item) {
       const nftId = item.content.tokenId;
@@ -141,10 +148,10 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
           <HStack spacing={4} mt={4} align="start" flexDirection="column">
             <Box>
               <Text fontWeight="bold" fontSize="md">
-                Œuvre : <Text as="span" fontWeight="normal">{currentNft.artist || "Artiste inconnu"}</Text>
+                Œuvre : <Text as="span" fontWeight="normal">{currentNft.name || "Artiste"}</Text>
               </Text>
               <Text fontStyle="italic" fontSize="sm">
-                {currentNft.name || "Titre de l'œuvre"}
+                {formatAddress(currentNft.artist) || "Oeuvre sans nom"}
               </Text>
             </Box>
 
