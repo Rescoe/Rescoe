@@ -504,16 +504,6 @@ const handleTabChange = (index: number) => {
               </Box>
             }
 
-            {transacActivity === false &&
-
-            <Box overflowX="auto" w="full">
-            <Text>
-              Aucune transaction enregistrée pour le moment
-            </Text>
-            </Box>
-          }
-
-
           <Divider my={6} />
 
 
