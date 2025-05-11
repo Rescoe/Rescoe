@@ -71,7 +71,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
   };
 
   // Récupération sécurisée des NFT et Haikus locaux ou par défaut, pour le rendu
-  const { selectedNfts = [], selectedHaikus = [] } = JSON.parse(localStorage.getItem("selectedItems") || '{"Rien a afficher"}') || {};
+  const { selectedNfts = [], selectedHaikus = [] } = JSON.parse(localStorage.getItem("selectedItems") || '{}') || {};
 
   // Vérification que selectedNfts et selectedHaikus sont valides avant de les utiliser
   const currentNft = selectedNfts.length > 0 ? selectedNfts[index % selectedNfts.length] : null;

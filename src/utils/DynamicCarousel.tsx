@@ -3,6 +3,7 @@ import { Box, Image, Text } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useMediaQuery } from '@chakra-ui/react';
 
+
 interface Nft {
   id: string;
   image: string;
@@ -34,7 +35,8 @@ interface GridLayoutProps {
 }
 
 const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNfts = 5, maxHaikus = 5 }) => {
-  const [isMobile] = useMediaQuery('(max-width: 768px)');
+  const [isMobile] = useMediaQuery('(max-width: 768px)'); // Ajuster la largeur selon vos besoins
+
   const [index, setIndex] = useState<number>(0);
   const [items, setItems] = useState<AlternatingItem[]>([]);
   const [hoveredItem, setHoveredItem] = useState<AlternatingItem | null>(null);
@@ -43,66 +45,39 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
 
   useEffect(() => {
     setLoading(true);
+    setTimeout(() => {
+      const selectedNfts = nfts.slice(0, maxNfts);
+      const selectedHaikus = haikus.slice(0, maxHaikus);
 
-    const cachedSettings = localStorage.getItem("gridLayoutSettings");
-    const currentTime = new Date().getTime();
 
-    // Rafraîchir le localStorage toutes les 12 heures (43200000 ms)
-    const twelveHours = 43200000;
+      const alternateItems: AlternatingItem[] = [];
+      const maxLength = Math.max(selectedNfts.length, selectedHaikus.length);
 
-    if (cachedSettings) {
-      const { nfts: cachedNfts, haikus: cachedHaikus, savedTime } = JSON.parse(cachedSettings);
-
-      // Vérifie si les données sont encore valides
-      if (currentTime - savedTime < twelveHours) {
-        const selectedNfts = cachedNfts || nfts.slice(0, maxNfts);
-        const selectedHaikus = cachedHaikus || haikus.slice(0, maxHaikus);
-        constructItems(selectedNfts, selectedHaikus);
-        setLoading(false);
-        return;
+      for (let i = 0; i < maxLength; i++) {
+        if (i < selectedHaikus.length) {
+          alternateItems.push({
+            type: "haiku",
+            content: {
+              poemText: selectedHaikus[i].poemText.split("\n").map(line => line.trim()).join("\n"), // Créer un objet Haiku
+            } as Haiku, // S'assurer que c'est bien de type Haiku
+            associatedNft: selectedNfts[i % selectedNfts.length],
+          });
+        }
+        if (i < selectedNfts.length) {
+          alternateItems.push({
+            type: "nft",
+            content: selectedNfts[i],
+            associatedHaiku: selectedHaikus[i % selectedHaikus.length]?.poemText.split("\n").map(line => line.trim()).join("\n"), // Vous pourrez faire la même vérification ici si nécessaire
+          });
+        }
       }
-    }
 
-    // Si rien n'est en cache ou si les données sont obsolètes, sauvegardez les nouvelles
-    const selectedNfts = nfts.slice(0, maxNfts);
-    const selectedHaikus = haikus.slice(0, maxHaikus);
-    constructItems(selectedNfts, selectedHaikus);
 
-    const settingsToStore = {
-      nfts: selectedNfts,
-      haikus: selectedHaikus,
-      savedTime: currentTime, // Sauvegarder le temps actuel
-    };
-    localStorage.setItem("gridLayoutSettings", JSON.stringify(settingsToStore));
 
-    setLoading(false);
+      setItems(alternateItems);
+      setLoading(false);
+    }, delay * 1000);
   }, [nfts, haikus, delay, maxNfts, maxHaikus]);
-
-  const constructItems = (selectedNfts: Nft[], selectedHaikus: Haiku[]) => {
-    const alternateItems: AlternatingItem[] = [];
-    const maxLength = Math.max(selectedNfts.length, selectedHaikus.length);
-
-    for (let i = 0; i < maxLength; i++) {
-      if (i < selectedHaikus.length) {
-        alternateItems.push({
-          type: "haiku",
-          content: {
-            poemText: selectedHaikus[i].poemText.split("\n").map(line => line.trim()).join("\n"),
-          } as Haiku,
-          associatedNft: selectedNfts[i % selectedNfts.length],
-        });
-      }
-      if (i < selectedNfts.length) {
-        alternateItems.push({
-          type: "nft",
-          content: selectedNfts[i],
-          associatedHaiku: selectedHaikus[i % selectedHaikus.length]?.poemText.split("\n").map(line => line.trim()).join("\n"),
-        });
-      }
-    }
-
-    setItems(alternateItems);
-  };
 
   const moveToIndex = (newIndex: number) => {
     setIndex(newIndex % items.length);
@@ -123,7 +98,8 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
 
   const renderContent = (item: AlternatingItem) => {
     if (item.type === "haiku") {
-      const haikuContent = item.content as Haiku;
+
+      const haikuContent = item.content as Haiku; // Assertion de type
 
       return (
         <Box
@@ -145,8 +121,10 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
             alignItems="center"
             height="100%"
           >
+
+
             <Text fontStyle="italic" textAlign="center">
-              {typeof haikuContent.poemText ? haikuContent.poemText : "Contenu du haiku introuvable"}
+            {typeof haikuContent.poemText ? haikuContent.poemText : "Contenu du haiku introuvable"}
             </Text>
           </Box>
           {hoveredItem?.type === "haiku" && hoveredItem.content === item.content && (
@@ -175,7 +153,8 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
         </Box>
       );
     } else if (item.type === "nft") {
-      const nftContent = item.content as Nft;
+      // Vérification que item.content est un NFT avant d'accéder à ses propriétés
+      const nftContent = item.content as Nft; // Assertion de type
 
       return (
         <Box
@@ -188,7 +167,7 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
           onMouseLeave={() => setHoveredItem(null)}
         >
           <Image
-            src={nftContent.image}
+            src={nftContent.image} // Accède directement à l'image du NFT
             alt={nftContent.name || "NFT"}
             objectFit="cover"
             w="100%"
@@ -223,8 +202,10 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
         </Box>
       );
     }
-    return null;
+    return null; // Retourner null si aucun type ne correspond
   };
+
+
 
   return (
       <Box position="relative" p={4} w="100%" h="600px">
@@ -250,7 +231,10 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
           {
             column: "2 / span 3", row: "3", offset: 2
           }].map(({ column, row, offset }, i) => {
+            // Si mobile, enlever la dernière colonne
             if (isMobile && column === "4 / span 1") return null;
+
+            // Enlever le rendu pour la colonne 2 ligne 2
             if (isMobile && column === "2 / span 2" && row === "2") return null;
 
             return (
@@ -300,7 +284,7 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
                       {"Poète inconnu"}
                     </Text>
                     <Text fontStyle="italic">
-                      {"Titre du haiku"}
+                      {"Titre du haiku"} {/* Ici, on accède à poemText uniquement pour un haiku */}
                     </Text>
                   </>
                 )}
@@ -319,6 +303,7 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
             ) : (
               <Text>{"Un poème, une œuvre."}</Text>
             )}
+
             </Box>
           )}
         </Box>
