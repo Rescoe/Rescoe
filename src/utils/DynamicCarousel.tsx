@@ -303,8 +303,9 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
                       {((items[index].content as Nft).name) || "Oeuvre sans nom"}
                     </Text>
                     <Text>
-                      {formatAddress((items[index].content as Nft).artist) || "Artiste inconnu"}
+                      {formatAddress((items[index].content as Nft).artist ?? "") || "Artiste inconnu"}
                     </Text>
+
                   </>
                 )}
               </>
