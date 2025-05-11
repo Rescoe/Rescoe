@@ -29,7 +29,7 @@ const Loading = ({ onFinish }: { onFinish?: () => void }) => {
         display: visible ? 'flex' : 'none',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'black',
+        backgroundColor: 'rgba(0, 0, 0, 0.2)', // Fond légèrement transparent
         overflow: 'hidden',
         zIndex: 9999,
     };
@@ -83,7 +83,7 @@ const Loading = ({ onFinish }: { onFinish?: () => void }) => {
     return (
         <div style={containerStyle}>
             <p style={{ position: 'absolute', bottom: '10%', fontSize: '1.2rem', color: '#FFF', textShadow: '1px 1px 5px rgba(0, 0, 0, 0.7)' }}>
-                Les lucioles s'activent...
+                Les insectes s'activent...
             </p>
         </div>
     );

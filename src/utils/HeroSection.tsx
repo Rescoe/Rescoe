@@ -37,9 +37,13 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
 
     // Si le localStorage contient des éléments, les utiliser
     if (cachedItems) {
-      const parsedItems = JSON.parse(cachedItems);
-      selectedNfts = parsedItems.selectedNfts || [];
-      selectedHaikus = parsedItems.selectedHaikus || [];
+      try {
+        const parsedItems = JSON.parse(cachedItems);
+        selectedNfts = Array.isArray(parsedItems.selectedNfts) ? parsedItems.selectedNfts : [];
+        selectedHaikus = Array.isArray(parsedItems.selectedHaikus) ? parsedItems.selectedHaikus : [];
+      } catch (error) {
+        console.error("Erreur de parsing des éléments du localStorage:", error);
+      }
     } else {
       // Sinon, en sélectionner des nouveaux
       selectedNfts = nfts.sort(() => 0.5 - Math.random()).slice(0, 5);
@@ -66,8 +70,12 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
     }
   };
 
-  // Récupération des NFT et Haikus locaux ou par défaut, pour le rendu
-  const { selectedNfts, selectedHaikus } = JSON.parse(localStorage.getItem("selectedItems") || '{}') || { selectedNfts: [], selectedHaikus: [] };
+  // Récupération sécurisée des NFT et Haikus locaux ou par défaut, pour le rendu
+  const { selectedNfts = [], selectedHaikus = [] } = JSON.parse(localStorage.getItem("selectedItems") || '{"Rien a afficher"}') || {};
+
+  // Vérification que selectedNfts et selectedHaikus sont valides avant de les utiliser
+  const currentNft = selectedNfts.length > 0 ? selectedNfts[index % selectedNfts.length] : null;
+  const currentHaiku = selectedHaikus.length > 0 ? selectedHaikus[index % selectedHaikus.length] : null;
 
   return (
     <Box
@@ -84,7 +92,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
       py={10}
       pb={100}
     >
-      {selectedNfts.length > 0 && selectedHaikus.length > 0 && (
+      {currentNft && currentHaiku && (
         <>
           <Box
             position="relative"
@@ -97,8 +105,8 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
             onMouseLeave={() => setHovered(null)}
           >
             <Image
-              src={selectedNfts[index].image}
-              alt={selectedNfts[index].name || "NFT"}
+              src={currentNft.image}
+              alt={currentNft.name || "NFT"}
               objectFit="cover"
               w="100%"
               h="100%"
@@ -119,9 +127,8 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
               zIndex={2}
             >
               <VStack textAlign="center" color="white" maxWidth="80%">
-                {selectedHaikus[index]?.poemText
-                  ? selectedHaikus[index].poemText.split("\n").map((line: string, i: number) => (
-
+                {currentHaiku.poemText
+                  ? currentHaiku.poemText.split("\n").map((line: string, i: number) => (
                       <Text key={i} fontStyle="italic" fontSize="sm">
                         {line}
                       </Text>
@@ -134,16 +141,16 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
           <HStack spacing={4} mt={4} align="start" flexDirection="column">
             <Box>
               <Text fontWeight="bold" fontSize="md">
-                Œuvre : <Text as="span" fontWeight="normal">{selectedNfts[index]?.artist || "Artiste inconnu"}</Text>
+                Œuvre : <Text as="span" fontWeight="normal">{currentNft.artist || "Artiste inconnu"}</Text>
               </Text>
               <Text fontStyle="italic" fontSize="sm">
-                {selectedNfts[index]?.name || "Titre de l'œuvre"}
+                {currentNft.name || "Titre de l'œuvre"}
               </Text>
             </Box>
 
             <Box>
               <Text fontWeight="bold" fontSize="md">
-                Poème : <Text as="span" fontWeight="normal">{selectedHaikus[index]?.poet || "Poète inconnu"}</Text>
+                Poème : <Text as="span" fontWeight="normal">{currentHaiku.poet || "Poète inconnu"}</Text>
               </Text>
             </Box>
           </HStack>

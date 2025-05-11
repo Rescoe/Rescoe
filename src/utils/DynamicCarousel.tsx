@@ -42,30 +42,40 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
   const router = useRouter();
 
   useEffect(() => {
+    setLoading(true);
+
     const cachedSettings = localStorage.getItem("gridLayoutSettings");
+    const currentTime = new Date().getTime();
+
+    // Rafraîchir le localStorage toutes les 12 heures (43200000 ms)
+    const twelveHours = 43200000;
 
     if (cachedSettings) {
-      // Si des données sont présentes, utilisez-les
-      const {
-        nfts: cachedNfts,
-        haikus: cachedHaikus,
-        delay: cachedDelay,
-        maxNfts: cachedMaxNfts,
-        maxHaikus: cachedMaxHaikus,
-      } = JSON.parse(cachedSettings);
+      const { nfts: cachedNfts, haikus: cachedHaikus, savedTime } = JSON.parse(cachedSettings);
 
-      // Mettez à jour l'état avec les données récupérées
-      const selectedNfts = cachedNfts || nfts.slice(0, maxNfts);
-      const selectedHaikus = cachedHaikus || haikus.slice(0, maxHaikus);
-
-      constructItems(selectedNfts, selectedHaikus);
-      setLoading(false);
-    } else {
-      // Créez un nouvel état et stockez-le
-      constructItems(nfts.slice(0, maxNfts), haikus.slice(0, maxHaikus));
-      const settingsToStore = { nfts, haikus, delay, maxNfts, maxHaikus };
-      localStorage.setItem("gridLayoutSettings", JSON.stringify(settingsToStore));
+      // Vérifie si les données sont encore valides
+      if (currentTime - savedTime < twelveHours) {
+        const selectedNfts = cachedNfts || nfts.slice(0, maxNfts);
+        const selectedHaikus = cachedHaikus || haikus.slice(0, maxHaikus);
+        constructItems(selectedNfts, selectedHaikus);
+        setLoading(false);
+        return;
+      }
     }
+
+    // Si rien n'est en cache ou si les données sont obsolètes, sauvegardez les nouvelles
+    const selectedNfts = nfts.slice(0, maxNfts);
+    const selectedHaikus = haikus.slice(0, maxHaikus);
+    constructItems(selectedNfts, selectedHaikus);
+
+    const settingsToStore = {
+      nfts: selectedNfts,
+      haikus: selectedHaikus,
+      savedTime: currentTime, // Sauvegarder le temps actuel
+    };
+    localStorage.setItem("gridLayoutSettings", JSON.stringify(settingsToStore));
+
+    setLoading(false);
   }, [nfts, haikus, delay, maxNfts, maxHaikus]);
 
   const constructItems = (selectedNfts: Nft[], selectedHaikus: Haiku[]) => {
@@ -217,103 +227,103 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
   };
 
   return (
-    <Box position="relative" p={4} w="100%" h="600px">
-      <Box
-        display="grid"
-        gridTemplateColumns={isMobile ? 'repeat(3, 1fr)' : 'repeat(4, 1fr)'}
-        gridTemplateRows="repeat(3, 1fr)"
-        gap={4}
-        h="100%"
-      >
-        {[{
-          column: "1 / span 3", row: "1", offset: -1
-        },
-        {
-          column: "4 / span 1", row: "1", offset: 1
-        },
-        {
-          column: "1 / span 1", row: "2 / span 2", offset: -2
-        },
-        {
-          column: "2 / span 2", row: "2", offset: 0
-        },
-        {
-          column: "2 / span 3", row: "3", offset: 2
-        }].map(({ column, row, offset }, i) => {
-          if (isMobile && column === "4 / span 1") return null;
-          if (isMobile && column === "2 / span 2" && row === "2") return null;
+      <Box position="relative" p={4} w="100%" h="600px">
+        <Box
+          display="grid"
+          gridTemplateColumns={isMobile ? 'repeat(3, 1fr)' : 'repeat(4, 1fr)'}
+          gridTemplateRows="repeat(3, 1fr)"
+          gap={4}
+          h="100%"
+        >
+          {[{
+            column: "1 / span 3", row: "1", offset: -1
+          },
+          {
+            column: "4 / span 1", row: "1", offset: 1
+          },
+          {
+            column: "1 / span 1", row: "2 / span 2", offset: -2
+          },
+          {
+            column: "2 / span 2", row: "2", offset: 0
+          },
+          {
+            column: "2 / span 3", row: "3", offset: 2
+          }].map(({ column, row, offset }, i) => {
+            if (isMobile && column === "4 / span 1") return null;
+            if (isMobile && column === "2 / span 2" && row === "2") return null;
 
-          return (
+            return (
+              <Box
+                key={i}
+                gridColumn={column}
+                gridRow={row}
+                p={2}
+                alignItems="left"
+                cursor="pointer"
+                minWidth="150px"
+                minHeight="150px"
+                width="100%"
+                height="100%"
+                position="relative"
+                onClick={() => {
+                  moveToIndex((index + offset + items.length) % items.length);
+                  if (column === "2 / span 2" && row === "2") {
+                    handleClick(items[(index + offset + items.length) % items.length]);
+                  }
+                }}
+              >
+                {items.length > 0 && renderContent(items[(index + offset + items.length) % items.length])}
+              </Box>
+            );
+          })}
+
+          {items.length > 0 && (
             <Box
-              key={i}
-              gridColumn={column}
-              gridRow={row}
+              gridColumn={isMobile ? "2 / span 2" : "4 / span 1"} // Ajustement de la colonne pour le cartel
+              gridRow="2"
+              display="flex"
+              flexDirection="column"
+              alignItems="center"
+              justifyContent="center"
               p={2}
-              alignItems="left"
-              cursor="pointer"
-              minWidth="150px"
-              minHeight="150px"
-              width="100%"
-              height="100%"
-              position="relative"
-              onClick={() => {
-                moveToIndex((index + offset + items.length) % items.length);
-                if (column === "2 / span 2" && row === "2") {
-                  handleClick(items[(index + offset + items.length) % items.length]);
-                }
-              }}
+              borderRadius="md"
+              boxShadow="md"
+              bg="rgba(0, 0, 0, 0.7)"
+              color="white"
             >
-              {items.length > 0 && renderContent(items[(index + offset + items.length) % items.length])}
+            {items[index].type === "haiku" ? (
+              <>
+                {typeof items[index].content !== "string" && (
+                  <>
+                    <Text fontWeight="bold" mb={2}>
+                      {"Poète inconnu"}
+                    </Text>
+                    <Text fontStyle="italic">
+                      {"Titre du haiku"}
+                    </Text>
+                  </>
+                )}
+              </>
+            ) : items[index].type === "nft" ? (
+              <>
+                {typeof items[index].content !== "string" && (
+                  <>
+                    <Text fontWeight="bold" mb={2}>
+                      {"Artiste inconnu"}
+                    </Text>
+                    <Text>{"Nom de l'œuvre"}</Text>
+                  </>
+                )}
+              </>
+            ) : (
+              <Text>{"Un poème, une œuvre."}</Text>
+            )}
             </Box>
-          );
-        })}
-
-        {items.length > 0 && (
-          <Box
-            gridColumn={isMobile ? "2 / span 2" : "4 / span 1"}
-            gridRow="2"
-            display="flex"
-            flexDirection="column"
-            alignItems="center"
-            justifyContent="center"
-            p={2}
-            borderRadius="md"
-            boxShadow="md"
-            bg="rgba(0, 0, 0, 0.7)"
-            color="white"
-          >
-          {items[index].type === "haiku" ? (
-            <>
-              {typeof items[index].content !== "string" && (
-                <>
-                  <Text fontWeight="bold" mb={2}>
-                    {"Poète inconnu"}
-                  </Text>
-                  <Text fontStyle="italic">
-                    {"Titre du haiku"}
-                  </Text>
-                </>
-              )}
-            </>
-          ) : items[index].type === "nft" ? (
-            <>
-              {typeof items[index].content !== "string" && (
-                <>
-                  <Text fontWeight="bold" mb={2}>
-                    {"Artiste inconnu"}
-                  </Text>
-                  <Text>{"Nom de l'œuvre"}</Text>
-                </>
-              )}
-            </>
-          ) : (
-            <Text>{"Un poème, une œuvre."}</Text>
           )}
-          </Box>
-        )}
+        </Box>
       </Box>
-    </Box>
-  );
+    );
 };
 
 export default GridLayout;
