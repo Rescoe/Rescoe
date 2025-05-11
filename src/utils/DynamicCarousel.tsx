@@ -3,7 +3,6 @@ import { Box, Image, Text } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useMediaQuery } from '@chakra-ui/react';
 
-
 interface Nft {
   id: string;
   image: string;
@@ -35,8 +34,7 @@ interface GridLayoutProps {
 }
 
 const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNfts = 5, maxHaikus = 5 }) => {
-  const [isMobile] = useMediaQuery('(max-width: 768px)'); // Ajuster la largeur selon vos besoins
-
+  const [isMobile] = useMediaQuery('(max-width: 768px)');
   const [index, setIndex] = useState<number>(0);
   const [items, setItems] = useState<AlternatingItem[]>([]);
   const [hoveredItem, setHoveredItem] = useState<AlternatingItem | null>(null);
@@ -44,40 +42,57 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
   const router = useRouter();
 
   useEffect(() => {
-    setLoading(true);
-    setTimeout(() => {
-      const selectedNfts = nfts.slice(0, maxNfts);
-      const selectedHaikus = haikus.slice(0, maxHaikus);
+    const cachedSettings = localStorage.getItem("gridLayoutSettings");
 
+    if (cachedSettings) {
+      // Si des données sont présentes, utilisez-les
+      const {
+        nfts: cachedNfts,
+        haikus: cachedHaikus,
+        delay: cachedDelay,
+        maxNfts: cachedMaxNfts,
+        maxHaikus: cachedMaxHaikus,
+      } = JSON.parse(cachedSettings);
 
-      const alternateItems: AlternatingItem[] = [];
-      const maxLength = Math.max(selectedNfts.length, selectedHaikus.length);
+      // Mettez à jour l'état avec les données récupérées
+      const selectedNfts = cachedNfts || nfts.slice(0, maxNfts);
+      const selectedHaikus = cachedHaikus || haikus.slice(0, maxHaikus);
 
-      for (let i = 0; i < maxLength; i++) {
-        if (i < selectedHaikus.length) {
-          alternateItems.push({
-            type: "haiku",
-            content: {
-              poemText: selectedHaikus[i].poemText.split("\n").map(line => line.trim()).join("\n"), // Créer un objet Haiku
-            } as Haiku, // S'assurer que c'est bien de type Haiku
-            associatedNft: selectedNfts[i % selectedNfts.length],
-          });
-        }
-        if (i < selectedNfts.length) {
-          alternateItems.push({
-            type: "nft",
-            content: selectedNfts[i],
-            associatedHaiku: selectedHaikus[i % selectedHaikus.length]?.poemText.split("\n").map(line => line.trim()).join("\n"), // Vous pourrez faire la même vérification ici si nécessaire
-          });
-        }
-      }
-
-
-
-      setItems(alternateItems);
+      constructItems(selectedNfts, selectedHaikus);
       setLoading(false);
-    }, delay * 1000);
+    } else {
+      // Créez un nouvel état et stockez-le
+      constructItems(nfts.slice(0, maxNfts), haikus.slice(0, maxHaikus));
+      const settingsToStore = { nfts, haikus, delay, maxNfts, maxHaikus };
+      localStorage.setItem("gridLayoutSettings", JSON.stringify(settingsToStore));
+    }
   }, [nfts, haikus, delay, maxNfts, maxHaikus]);
+
+  const constructItems = (selectedNfts: Nft[], selectedHaikus: Haiku[]) => {
+    const alternateItems: AlternatingItem[] = [];
+    const maxLength = Math.max(selectedNfts.length, selectedHaikus.length);
+
+    for (let i = 0; i < maxLength; i++) {
+      if (i < selectedHaikus.length) {
+        alternateItems.push({
+          type: "haiku",
+          content: {
+            poemText: selectedHaikus[i].poemText.split("\n").map(line => line.trim()).join("\n"),
+          } as Haiku,
+          associatedNft: selectedNfts[i % selectedNfts.length],
+        });
+      }
+      if (i < selectedNfts.length) {
+        alternateItems.push({
+          type: "nft",
+          content: selectedNfts[i],
+          associatedHaiku: selectedHaikus[i % selectedHaikus.length]?.poemText.split("\n").map(line => line.trim()).join("\n"),
+        });
+      }
+    }
+
+    setItems(alternateItems);
+  };
 
   const moveToIndex = (newIndex: number) => {
     setIndex(newIndex % items.length);
@@ -98,8 +113,7 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
 
   const renderContent = (item: AlternatingItem) => {
     if (item.type === "haiku") {
-
-      const haikuContent = item.content as Haiku; // Assertion de type
+      const haikuContent = item.content as Haiku;
 
       return (
         <Box
@@ -121,10 +135,8 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
             alignItems="center"
             height="100%"
           >
-
-
             <Text fontStyle="italic" textAlign="center">
-            {typeof haikuContent.poemText ? haikuContent.poemText : "Contenu du haiku introuvable"}
+              {typeof haikuContent.poemText ? haikuContent.poemText : "Contenu du haiku introuvable"}
             </Text>
           </Box>
           {hoveredItem?.type === "haiku" && hoveredItem.content === item.content && (
@@ -153,8 +165,7 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
         </Box>
       );
     } else if (item.type === "nft") {
-      // Vérification que item.content est un NFT avant d'accéder à ses propriétés
-      const nftContent = item.content as Nft; // Assertion de type
+      const nftContent = item.content as Nft;
 
       return (
         <Box
@@ -167,7 +178,7 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
           onMouseLeave={() => setHoveredItem(null)}
         >
           <Image
-            src={nftContent.image} // Accède directement à l'image du NFT
+            src={nftContent.image}
             alt={nftContent.name || "NFT"}
             objectFit="cover"
             w="100%"
@@ -202,113 +213,107 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
         </Box>
       );
     }
-    return null; // Retourner null si aucun type ne correspond
+    return null;
   };
 
-
-
   return (
-      <Box position="relative" p={4} w="100%" h="600px">
-        <Box
-          display="grid"
-          gridTemplateColumns={isMobile ? 'repeat(3, 1fr)' : 'repeat(4, 1fr)'}
-          gridTemplateRows="repeat(3, 1fr)"
-          gap={4}
-          h="100%"
-        >
-          {[{
-            column: "1 / span 3", row: "1", offset: -1
-          },
-          {
-            column: "4 / span 1", row: "1", offset: 1
-          },
-          {
-            column: "1 / span 1", row: "2 / span 2", offset: -2
-          },
-          {
-            column: "2 / span 2", row: "2", offset: 0
-          },
-          {
-            column: "2 / span 3", row: "3", offset: 2
-          }].map(({ column, row, offset }, i) => {
-            // Si mobile, enlever la dernière colonne
-            if (isMobile && column === "4 / span 1") return null;
+    <Box position="relative" p={4} w="100%" h="600px">
+      <Box
+        display="grid"
+        gridTemplateColumns={isMobile ? 'repeat(3, 1fr)' : 'repeat(4, 1fr)'}
+        gridTemplateRows="repeat(3, 1fr)"
+        gap={4}
+        h="100%"
+      >
+        {[{
+          column: "1 / span 3", row: "1", offset: -1
+        },
+        {
+          column: "4 / span 1", row: "1", offset: 1
+        },
+        {
+          column: "1 / span 1", row: "2 / span 2", offset: -2
+        },
+        {
+          column: "2 / span 2", row: "2", offset: 0
+        },
+        {
+          column: "2 / span 3", row: "3", offset: 2
+        }].map(({ column, row, offset }, i) => {
+          if (isMobile && column === "4 / span 1") return null;
+          if (isMobile && column === "2 / span 2" && row === "2") return null;
 
-            // Enlever le rendu pour la colonne 2 ligne 2
-            if (isMobile && column === "2 / span 2" && row === "2") return null;
-
-            return (
-              <Box
-                key={i}
-                gridColumn={column}
-                gridRow={row}
-                p={2}
-                alignItems="left"
-                cursor="pointer"
-                minWidth="150px"
-                minHeight="150px"
-                width="100%"
-                height="100%"
-                position="relative"
-                onClick={() => {
-                  moveToIndex((index + offset + items.length) % items.length);
-                  if (column === "2 / span 2" && row === "2") {
-                    handleClick(items[(index + offset + items.length) % items.length]);
-                  }
-                }}
-              >
-                {items.length > 0 && renderContent(items[(index + offset + items.length) % items.length])}
-              </Box>
-            );
-          })}
-
-          {items.length > 0 && (
+          return (
             <Box
-              gridColumn={isMobile ? "2 / span 2" : "4 / span 1"} // Ajustement de la colonne pour le cartel
-              gridRow="2"
-              display="flex"
-              flexDirection="column"
-              alignItems="center"
-              justifyContent="center"
+              key={i}
+              gridColumn={column}
+              gridRow={row}
               p={2}
-              borderRadius="md"
-              boxShadow="md"
-              bg="rgba(0, 0, 0, 0.7)"
-              color="white"
+              alignItems="left"
+              cursor="pointer"
+              minWidth="150px"
+              minHeight="150px"
+              width="100%"
+              height="100%"
+              position="relative"
+              onClick={() => {
+                moveToIndex((index + offset + items.length) % items.length);
+                if (column === "2 / span 2" && row === "2") {
+                  handleClick(items[(index + offset + items.length) % items.length]);
+                }
+              }}
             >
-            {items[index].type === "haiku" ? (
-              <>
-                {typeof items[index].content !== "string" && (
-                  <>
-                    <Text fontWeight="bold" mb={2}>
-                      {"Poète inconnu"}
-                    </Text>
-                    <Text fontStyle="italic">
-                      {"Titre du haiku"} {/* Ici, on accède à poemText uniquement pour un haiku */}
-                    </Text>
-                  </>
-                )}
-              </>
-            ) : items[index].type === "nft" ? (
-              <>
-                {typeof items[index].content !== "string" && (
-                  <>
-                    <Text fontWeight="bold" mb={2}>
-                      {"Artiste inconnu"}
-                    </Text>
-                    <Text>{"Nom de l'œuvre"}</Text>
-                  </>
-                )}
-              </>
-            ) : (
-              <Text>{"Un poème, une œuvre."}</Text>
-            )}
-
+              {items.length > 0 && renderContent(items[(index + offset + items.length) % items.length])}
             </Box>
+          );
+        })}
+
+        {items.length > 0 && (
+          <Box
+            gridColumn={isMobile ? "2 / span 2" : "4 / span 1"}
+            gridRow="2"
+            display="flex"
+            flexDirection="column"
+            alignItems="center"
+            justifyContent="center"
+            p={2}
+            borderRadius="md"
+            boxShadow="md"
+            bg="rgba(0, 0, 0, 0.7)"
+            color="white"
+          >
+          {items[index].type === "haiku" ? (
+            <>
+              {typeof items[index].content !== "string" && (
+                <>
+                  <Text fontWeight="bold" mb={2}>
+                    {"Poète inconnu"}
+                  </Text>
+                  <Text fontStyle="italic">
+                    {"Titre du haiku"}
+                  </Text>
+                </>
+              )}
+            </>
+          ) : items[index].type === "nft" ? (
+            <>
+              {typeof items[index].content !== "string" && (
+                <>
+                  <Text fontWeight="bold" mb={2}>
+                    {"Artiste inconnu"}
+                  </Text>
+                  <Text>{"Nom de l'œuvre"}</Text>
+                </>
+              )}
+            </>
+          ) : (
+            <Text>{"Un poème, une œuvre."}</Text>
           )}
-        </Box>
+          </Box>
+        )}
       </Box>
-    );
+    </Box>
+  );
 };
 
 export default GridLayout;

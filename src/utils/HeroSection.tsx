@@ -25,18 +25,33 @@ interface HeroSectionProps {
 
 const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
   const [index, setIndex] = useState(0);
-  const [hovered, setHovered] = useState<"nft" | null>(null); // Typage explicite
+  const [hovered, setHovered] = useState<"nft" | null>(null);
   const router = useRouter();
 
   useEffect(() => {
-    const selectedHaikus = haikus.sort(() => 0.5 - Math.random()).slice(0, 5);
-    const selectedNfts = nfts.sort(() => 0.5 - Math.random()).slice(0, 5);
+    // Récupérer les éléments du localStorage
+    const cachedItems = localStorage.getItem("selectedItems");
 
-    localStorage.setItem("selectedItems", JSON.stringify({ selectedHaikus, selectedNfts }));
+    let selectedNfts: Nft[] = [];
+    let selectedHaikus: Haiku[] = [];
+
+    // Si le localStorage contient des éléments, les utiliser
+    if (cachedItems) {
+      const parsedItems = JSON.parse(cachedItems);
+      selectedNfts = parsedItems.selectedNfts || [];
+      selectedHaikus = parsedItems.selectedHaikus || [];
+    } else {
+      // Sinon, en sélectionner des nouveaux
+      selectedNfts = nfts.sort(() => 0.5 - Math.random()).slice(0, 5);
+      selectedHaikus = haikus.sort(() => 0.5 - Math.random()).slice(0, 5);
+
+      // Stoker les nouveaux éléments dans le localStorage
+      localStorage.setItem("selectedItems", JSON.stringify({ selectedHaikus, selectedNfts }));
+    }
 
     const interval = setInterval(() => {
       setIndex((prevIndex) => (prevIndex + 1) % selectedNfts.length);
-    }, 60000); // 1h (3600000)
+    }, 43200000); // Changer toutes les 12h
 
     return () => clearInterval(interval);
   }, [nfts, haikus]);
@@ -51,6 +66,9 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
     }
   };
 
+  // Récupération des NFT et Haikus locaux ou par défaut, pour le rendu
+  const { selectedNfts, selectedHaikus } = JSON.parse(localStorage.getItem("selectedItems") || '{}') || { selectedNfts: [], selectedHaikus: [] };
+
   return (
     <Box
       position="relative"
@@ -62,12 +80,11 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
       h="400px"
       bg="transparent"
       color="white"
-      px={4} // Moins de padding latéral sur mobile
+      px={4}
       py={10}
       pb={100}
-
     >
-      {nfts.length > 0 && haikus.length > 0 && (
+      {selectedNfts.length > 0 && selectedHaikus.length > 0 && (
         <>
           <Box
             position="relative"
@@ -80,8 +97,8 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
             onMouseLeave={() => setHovered(null)}
           >
             <Image
-              src={nfts[index].image}
-              alt={nfts[index].name || "NFT"}
+              src={selectedNfts[index].image}
+              alt={selectedNfts[index].name || "NFT"}
               objectFit="cover"
               w="100%"
               h="100%"
@@ -102,9 +119,10 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
               zIndex={2}
             >
               <VStack textAlign="center" color="white" maxWidth="80%">
-                {haikus[index]?.poemText
-                  ? haikus[index].poemText.split("\n").map((line, i) => (
-                      <Text key={i} fontStyle="italic" fontSize="sm"> {/* Texte plus petit */}
+                {selectedHaikus[index]?.poemText
+                  ? selectedHaikus[index].poemText.split("\n").map((line: string, i: number) => (
+
+                      <Text key={i} fontStyle="italic" fontSize="sm">
                         {line}
                       </Text>
                     ))
@@ -113,29 +131,26 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
             </Box>
           </Box>
 
-          <HStack spacing={4} mt={4} align="start" flexDirection="column"> {/* Colonne pour éviter les sauts de ligne inégaux */}
+          <HStack spacing={4} mt={4} align="start" flexDirection="column">
             <Box>
-              <Text fontWeight="bold" fontSize="md"> {/* Réduction de la taille */}
-                Œuvre : <Text as="span" fontWeight="normal">{nfts[index]?.artist || "Artiste inconnu"}</Text>
+              <Text fontWeight="bold" fontSize="md">
+                Œuvre : <Text as="span" fontWeight="normal">{selectedNfts[index]?.artist || "Artiste inconnu"}</Text>
               </Text>
-              <Text fontStyle="italic" fontSize="sm"> {/* Plus petit */}
-                {nfts[index]?.name || "Titre de l'œuvre"}
+              <Text fontStyle="italic" fontSize="sm">
+                {selectedNfts[index]?.name || "Titre de l'œuvre"}
               </Text>
             </Box>
 
             <Box>
               <Text fontWeight="bold" fontSize="md">
-                Poème : <Text as="span" fontWeight="normal">{haikus[index]?.poet || "Poète inconnu"}</Text>
+                Poème : <Text as="span" fontWeight="normal">{selectedHaikus[index]?.poet || "Poète inconnu"}</Text>
               </Text>
-            
             </Box>
           </HStack>
         </>
       )}
     </Box>
   );
-
 };
-
 
 export default HeroSection;
