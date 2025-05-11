@@ -210,34 +210,42 @@ const UniqueArtGalerie: React.FC = () => {
   };
 
 
+  // Pour déclencher une recherche manuelle (formulaire)
   const handleSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-      e.preventDefault();
-      if (searchTerm) {
-          const results = collections.filter(collection =>
-              collection.name.toLowerCase().includes(searchTerm.toLowerCase()) || // Filtre par nom de la collection
-              collection.creator.toLowerCase().includes(searchTerm.toLowerCase()) || // Filtre par créateur
-              collection.collectionType.toLowerCase().includes(searchTerm.toLowerCase()) ||// Filtre par type de collection
-              collection.id.toLowerCase().includes(searchTerm.toLowerCase()) // Filtre par type de collection
+    e.preventDefault();
+    if (!searchTerm) return;
 
-              // Vous pouvez ajouter d'autres filtres ici
-          );
+    // Mettre à jour l'URL (shallow: true évite le rechargement complet)
+    router.push(`?search=${searchTerm}`, undefined, { shallow: true });
 
-          setSearchResults(results); // Met à jour l'état avec les résultats de recherche
-          setShowSearchResults(true); // Affiche les résultats
-      }
+    // Déclencher la recherche
+    handleSearch(searchTerm);
   };
 
+  // Fonction centrale pour filtrer
+  const handleSearch = (term: string) => {
+    const results = collections.filter((collection) =>
+      collection.name.toLowerCase().includes(term.toLowerCase()) ||
+      collection.creator.toLowerCase().includes(term.toLowerCase()) ||
+      collection.collectionType.toLowerCase().includes(term.toLowerCase()) ||
+      collection.id.toLowerCase().includes(term.toLowerCase())
+    );
 
+    setSearchResults(results);
+    setShowSearchResults(true);
+    setCurrentTabIndex(3); // Onglet "Résultats"
+  };
+
+  // Effet pour capter les paramètres URL
   useEffect(() => {
-    const { collectionId, contractAddress } = router.query;
+    if (!router.isReady) return;
 
-    if (typeof collectionId === 'string' && typeof contractAddress === 'string') {
-      setSelectedCollectionId(collectionId);
-      fetchNFTs(collectionId, contractAddress);
-      setCurrentTabIndex(2); // Pour ouvrir l'onglet avec la collection
+    const { search } = router.query;
+    if (typeof search === 'string' && search.trim() !== '') {
+      setSearchTerm(search);
+      handleSearch(search);
     }
-  }, [router.query]);
-
+  }, [router.isReady, router.query, collections]);
 
 
   const handleCollectionClick = (collectionId: string, associatedAddress: string) => {
@@ -262,12 +270,17 @@ const UniqueArtGalerie: React.FC = () => {
                   />
               </form>
               <Tabs index={currentTabIndex} onChange={(index) => setCurrentTabIndex(index)}>
-                  <TabList>
-                      <Tab>Collections mise en avant</Tab>
-                      <Tab>Collections</Tab>
-                      {selectedCollectionId && <Tab>{collections.find(collection => collection.id === selectedCollectionId)?.name || 'NFTs'}</Tab>}
-                      {showSearchResults && <Tab>Résultats de recherche</Tab>} {/* Nouvel onglet pour les résultats */}
-                  </TabList>
+              <TabList>
+                  <Tab>Accueil</Tab>
+                  <Tab>Collections</Tab>
+                  <Tab isDisabled={!selectedCollectionId}>
+                  {selectedCollectionId ? collections.find(c => c.id === selectedCollectionId)?.name || 'NFTs' : 'NFTs'}
+                  </Tab>
+                  <Tab isDisabled={!showSearchResults}>
+                    {showSearchResults ? 'Résultats de recherche' : ''}
+                  </Tab>
+                </TabList>
+
 
         <TabPanels>
           {/* Collections mises en avant */}
@@ -350,61 +363,69 @@ const UniqueArtGalerie: React.FC = () => {
             )}
           </TabPanel>
 
-          {/* NFTs */}
-          {selectedCollectionId && ( // Afficher uniquement si une collection a été cliquée
-            <TabPanel>
-              {isLoading ? (
-                <Spinner />
+          <TabPanel>
+        {selectedCollectionId ? (
+          isLoading ? (
+            <Spinner />
+          ) : (
+            <Grid templateColumns="repeat(auto-fill, minmax(250px, 1fr))" gap={6} justifyItems="center">
+              {nfts.length === 0 ? (
+                <Text>Aucun NFT trouvé.</Text>
               ) : (
-                <Grid templateColumns="repeat(auto-fill, minmax(250px, 1fr))" gap={6} justifyItems="center">
-                  {nfts.length === 0 ? (
-                    <Text>Aucun NFT trouvé.</Text>
-                  ) : (
-                    nfts.map((nft) => (
-                        <Box
-                            key={nft.tokenId}
-                            onClick={() => router.push(`/oeuvresId/${nft.mintContractAddress}/${nft.tokenId}`)}
-                            cursor="pointer"
-                            width="100%"
-                        >
-                            <NFTCard
-                                nft={nft}
-                                buyNFT={() => buyNFT(nft)}
-                                isForSale={nft.forSale} // Transmettez isForSale ici
-                                proprietaire={nft.owner}
-                            />
-                        </Box>
-                    ))
-                  )}
-                </Grid>
+                nfts.map((nft) => (
+                  <Box
+                    key={nft.tokenId}
+                    onClick={() => router.push(`/oeuvresId/${nft.mintContractAddress}/${nft.tokenId}`)}
+                    cursor="pointer"
+                    width="100%"
+                  >
+                    <NFTCard
+                      nft={nft}
+                      buyNFT={() => buyNFT(nft)}
+                      isForSale={nft.forSale}
+                      proprietaire={nft.owner}
+                    />
+                  </Box>
+                ))
               )}
-            </TabPanel>
-          )}
+            </Grid>
+          )
+        ) : (
+          <Text>Sélectionnez une collection pour afficher les NFTs.</Text>
+        )}
+      </TabPanel>
 
-          {/* Résultats de recherche */}
-          {showSearchResults && (
-              <TabPanel>
-                  {searchResults.length === 0 ? (
-                      <Text>Aucune collection trouvée.</Text>
-                  ) : (
-                      <Grid templateColumns="repeat(auto-fill, minmax(250px, 1fr))" gap={6}>
-                          {searchResults.map((collection) => (
-                            <Box
-                              key={collection.id}
-                              borderWidth="1px"
-                              borderRadius="lg"
-                              p={4}
-                              cursor="pointer"
-                              onClick={() => handleCollectionClick(collection.id, collection.mintContractAddress)}
-                            >
-                                  <Text>{collection.name}</Text>
-                                  <img src={collection.imageUrl} alt={collection.name} style={{ width: '100%', height: 'auto' }} />
-                              </Box>
-                          ))}
-                      </Grid>
-                  )}
-              </TabPanel>
-          )}
+      {/* Tab 3: Résultats de recherche */}
+      <TabPanel>
+        {showSearchResults ? (
+          searchResults.length > 0 ? (
+            <Grid templateColumns="repeat(auto-fill, minmax(250px, 1fr))" gap={6}>
+              {searchResults.map((collection) => (
+                <Box
+                  key={collection.id}
+                  borderWidth="1px"
+                  borderRadius="lg"
+                  p={4}
+                  cursor="pointer"
+                  onClick={() => handleCollectionClick(collection.id, collection.mintContractAddress)}
+                >
+                  <Text fontWeight="bold">{collection.name}</Text>
+                  <img
+                    src={collection.imageUrl}
+                    alt={collection.name}
+                    style={{ width: '100%', height: 'auto' }}
+                  />
+                </Box>
+              ))}
+            </Grid>
+          ) : (
+            <Text>Aucune collection trouvée.</Text>
+          )
+        ) : (
+          <Text>Veuillez effectuer une recherche.</Text>
+        )}
+      </TabPanel>
+
 
         </TabPanels>
       </Tabs>

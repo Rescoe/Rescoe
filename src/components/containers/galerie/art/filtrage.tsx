@@ -105,7 +105,14 @@ const FilteredCollectionsCarousel: React.FC<FilteredCollectionsCarouselProps> = 
                     ) : (
 
                         collections.map((collection) => (
-                          <Link key={collection.id} href={`/galerie/${typeRedirection}`} passHref>
+                          <Link
+                            key={collection.id}
+                            href={{
+                              pathname: `/galerie/${typeRedirection}`,
+                              query: { search: collection.name }
+                            }}
+                            passHref
+                          >
                             <CollectionCard key={collection.id} collection={collection} type={type} />
                           </Link>
 
