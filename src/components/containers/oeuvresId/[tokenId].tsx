@@ -67,6 +67,9 @@ interface HistoryData {
     transactionHistory: Transaction[];
 }
 
+interface CustomError extends Error {
+    message: string;
+}
 
 type NFTCache = Record<string, NFTData>;
 
@@ -77,7 +80,7 @@ const TokenPage: React.FC = () => {
 
   const [nftData, setNftData] = useState<NFTData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | any>(null);
   const [membershipStatus, setMembershipStatus] = useState<string>('');
   const [name, setName] = useState<string>('');
   const [bio, setBio] = useState<string>('');
@@ -89,7 +92,11 @@ const TokenPage: React.FC = () => {
   const [nftCache, setNFTCache] = useState<NFTCache>({});
   //const [collectionId, setCollectionId] = useState<bigint>({});
   const [transacActivity, setTransacActivity] = useState<boolean>(false);
+  const [tabIndex, setTabIndex] = useState(0); // Initialement l'onglet 0 (Détails)
 
+  const [isOwner, setIsOwner] = useState(false);
+  const [canPurchase, setCanPurchase] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
   const [formattedTransactions, setFormattedTransactions] = useState<
     { oldOwner: string; newOwner: string; date: string; price: string }[]
@@ -140,6 +147,13 @@ const TokenPage: React.FC = () => {
     const fetchNFT = async () => {
       try {
         const data = await fetchNFTData(contractAddress, Number(tokenId));
+
+            if (!data) {  // Vérifiez si `data` est `null`
+        setErrorMessage('Cette œuvre a été détruite ou n\'existe pas encore.');
+        setNftData(null);  // Optionnel, mais permet de réinitialiser les données de l'NFT
+        return; // Arrêtez l'exécution ici si le token n'existe pas
+
+        }
         setNftData(data);
         setIsForSale(data.forsale);
         setMembershipStatus(data.forsale ? 'actif' : 'expiré');
@@ -148,13 +162,23 @@ const TokenPage: React.FC = () => {
         setFormattedTransactions(data.transactions); // Mettre à jour ici
         //setCollectionId(data.collectionId);
 
-      } catch (error) {
-        console.error('Erreur lors de la récupération du NFT');
-        setError('Erreur lors de la récupération des données.');
-      } finally {
+        setErrorMessage(''); // Réinitialiser le message d'erreur
+
+        }catch (error: unknown) {
+            const customError = error as CustomError;
+
+            console.error('Erreur lors de la récupération des détails du token :', customError);
+            if (customError.message && customError.message.includes('nonexistent')) {
+                setErrorMessage('Cette œuvre a été détruite ou n\'existe pas encore.');
+            } else {
+                setErrorMessage('Une erreur s\'est produite lors de la récupération des détails du token.');
+            }
+        }
+      finally {
         setIsLoading(false);
       }
     };
+
 
     fetchNFT();
   }, [router.isReady, contractAddress, tokenId]);
@@ -167,8 +191,12 @@ if (!address) return '';
 return `${address.slice(0, 6)}...${address.slice(-4)}`;
 };
 
+const formatAddress5lettres = (address: string) => {
+if (!address) return '';
+return `${address.slice(0, 8)}`;
+};
 
-const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<NFTData> => {
+const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<NFTData | null> => {
     const cacheKey = `${contractAddress}_${tokenId}`;
     if (nftCache[cacheKey]) return nftCache[cacheKey];
 
@@ -178,7 +206,23 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
         const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
         const contract = new Contract(contractAddress, ABI, provider);
 
-        const fullDetails = await contract.getTokenFullDetails(tokenId);
+        let fullDetails;
+        try {
+            fullDetails = await contract.getTokenFullDetails(tokenId);
+        } catch (error: any) { // Typage en 'any'
+            if (error.message && error.message.includes('ERC721NonexistentToken')) {
+                // Retourner null sans afficher d'erreur dans la console
+                return null; // Indique que le token n'existe pas
+            } else {
+                console.error('Erreur non prévue:', error);
+                throw error; // Relancez l'erreur pour le traitement ultérieur
+            }
+        }
+
+
+                if (!fullDetails) {
+                    return null;  // Si aucun détail n'est trouvé
+                }
 
         const owner: string = fullDetails.owner;
         const mintDate: bigint = fullDetails.mintDate;
@@ -188,20 +232,12 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
         const transactions: Transaction[] = fullDetails.transactions;
         const collectionId: bigint = fullDetails[6];
 
-        // Formatter les transactions
         const formattedTransactions = transactions.map((transaction: Transaction) => ({
             oldOwner: transaction.seller,
             newOwner: transaction.buyer,
-            date: formatTimestamp(transaction.timestamp), // Conversion en string pour éviter les erreurs
+            date: formatTimestamp(transaction.timestamp),
             price: formatUnits(transaction.price, 18),
         }));
-
-
-        if(formattedTransactions.length != 0){
-          setTransacActivity(true);
-        }
-
-
 
         const priceInEther = formatUnits(currentPrice, 18);
         setPrice(priceInEther);
@@ -225,18 +261,18 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
             artist: data.artist,
             forsale,
             price: priceInEther,
-            collectionId: Number(collectionId), // Assurez-vous qu'il soit un nombre
+            collectionId: Number(collectionId),
         };
-
-
 
         nftCache[cacheKey] = nftData;
         return nftData;
+
     } catch (error: any) {
-        console.error("Erreur lors de la récupération des données NFT:", error);
-        throw new Error(`Erreur lors de la récupération des données NFT: ${error.message}`);
+        console.error('Erreur lors de la récupération des détails du token :', error);
+        return null; // Indiquez que l'opération a échoué sans lancer d'erreurs sur l'application
     }
 };
+
 
 const fetchHistory = async (contractAddress: string, tokenId: number): Promise<HistoryData> => {
     const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
@@ -259,7 +295,6 @@ const fetchHistory = async (contractAddress: string, tokenId: number): Promise<H
 
 const handleUpdateInfo = async () => {
   if (!web3 || !contractAddress || !tokenId || accounts.length === 0) return;
-
   try {
     const contract = new web3.eth.Contract(ABI as any, contractAddress);
     await contract.methods.setNameAndBio(tokenId, name, bio)
@@ -268,6 +303,19 @@ const handleUpdateInfo = async () => {
     alert("Informations mises à jour avec succès.");
   } catch (error) {
     console.error('Erreur lors de la mise à jour des informations');
+  }
+};
+
+const handleBurn = async () => {
+  if (!web3 || !contractAddress || !tokenId || accounts.length === 0) return;
+  try {
+    const contract = new web3.eth.Contract(ABI as any, contractAddress);
+    await contract.methods.burn(tokenId)
+      .send({ from: accounts[0] });
+
+    alert("Oeuvres détruite avec succès");
+  } catch (error) {
+    console.error("Erreur lors de la destruction de l'oeuvre");
   }
 };
 
@@ -331,13 +379,22 @@ const handleListForSale = async () => {
   if (!nftData) {
     return (
       <Box textAlign="center" mt={10}>
-        <Text fontSize="2xl">NFT non trouvé.</Text>
+        <Text fontSize="2xl">Cette œuvre n'existe pas encore ou a été détruite</Text>
+        <Button
+          mt={4}
+          colorScheme="teal"
+          onClick={() => router.push('../../galerie/art')} // Remplacez '/url-de-votre-collection' par le chemin réel de votre collection
+        >
+          Retourner aux collections
+        </Button>
       </Box>
     );
   }
 
-  const isOwner = authAddress && authAddress.toLowerCase() === nftData.owner.toLowerCase();
-  const canPurchase = !isOwner && nftData.forsale; // L'utilisateur ne doit pas être le propriétaire et le NFT doit être en vente
+const handleTabChange = (index: number) => {
+  setTabIndex(index); // Met à jour l'index de l'onglet actif
+};
+
 
 
   return (
@@ -356,144 +413,183 @@ const handleListForSale = async () => {
         </Heading>
       </Stack>
 
-      <Tabs variant="enclosed" colorScheme="teal" mt={6} w="full" maxW="container.lg">
-        <TabList flexWrap="wrap">
-          <Tab>Détails</Tab>
-          {isOwner && <Tab>Paramètres</Tab>}
-          {canPurchase && <Tab>Acheter</Tab>}
-        </TabList>
+      <Tabs
+        variant="enclosed"
+        colorScheme="teal"
+        mt={6}
+        w="full"
+        maxW="container.lg"
+        index={tabIndex}
+        onChange={handleTabChange} // Écoute les changements d'onglet
+      >
+          <TabList flexWrap="wrap">
+            <Tab>Détails</Tab>
+            {isOwner && <Tab>Paramètres</Tab>}
+            {canPurchase && <Tab>Acheter</Tab>}
+          </TabList>
 
-        <TabPanels>
-          <TabPanel>
-            <Stack direction={{ base: "column", md: "row" }} spacing={6} mb={6} align="start">
+          <TabPanels>
+            <TabPanel>
+              <Stack direction={{ base: "column", md: "row" }} spacing={6} mb={6} align="start">
 
-              {/* Image NFT */}
-              <Box
-                borderWidth="1px"
-                borderRadius="lg"
-                overflow="hidden"
-                p={4}
-                w={{ base: "100%", md: "300px" }}
-              >
-                <Box h="300px" overflow="hidden">
-                  <Image
-                    src={nftData.image}
-                    alt={nftData.name}
-                    objectFit="cover"
-                    w="100%"
-                    h="100%"
-                  />
+                {/* Image NFT */}
+                <Box
+                  borderWidth="1px"
+                  borderRadius="lg"
+                  overflow="hidden"
+                  p={4}
+                  w={{ base: "100%", md: "300px" }}
+                >
+                  <Box h="300px" overflow="hidden">
+                    <Image
+                      src={nftData.image}
+                      alt={nftData.name}
+                      objectFit="cover"
+                      w="100%"
+                      h="100%"
+                    />
+                  </Box>
                 </Box>
+
+                {/* Infos Texte */}
+                <VStack spacing={4} alignItems="start" mb={6}>
+                    <Text fontSize="lg"><strong>Nom :</strong> {nftData.name}</Text>
+                    <Text fontSize="lg"><strong>Description :</strong> {nftData.description}</Text>
+                    <Text fontSize="lg"><strong>Artiste :</strong> {nftData.artist}</Text>
+                    <Text fontSize="lg"><strong>Propriétaire :</strong> {formatAddress(nftData.owner)}</Text>
+                    <Text fontSize="lg"><strong>Date de mint :</strong> {formatTimestamp(Number(nftData.mintDate))}</Text>
+                    <Text fontSize="lg"><strong>Prix actuel :</strong> {nftData.price} ETH</Text>
+                    <Text fontSize="lg"><strong>En vente :</strong> {nftData.forsale ? 'Oui' : 'Non'}</Text>
+                    <Text fontSize="lg"><strong>Historique des prix :</strong> {nftData.priceHistory.join(', ')} ETH</Text>
+                    <Text fontSize="lg"><strong>Collection ID :</strong> {nftData.collectionId ? nftData.collectionId.toString() : 'Aucune collection'}</Text>
+                    <Text fontSize="lg">  <strong>Adresse de contrat :</strong>{' '}{contractAddress ? formatAddress(contractAddress) : 'Adresse inconnue'}</Text>
+                </VStack>
+              </Stack>
+
+              {/* Tableau transactions */}
+              <Divider my={6} />
+
+
+              {transacActivity === true &&
+
+              <Box overflowX="auto" w="full">
+                <Table variant="simple" size="sm" minW="600px">
+                  <Thead>
+                    <Tr>
+                      <Th>Ancien</Th>
+                      <Th>Nouveau</Th>
+                      <Th>Date</Th>
+                      <Th>Prix</Th>
+                    </Tr>
+                  </Thead>
+
+                  <Tbody>
+                    {formattedTransactions.map((tx, i) => (
+                      <Tr key={i}>
+                        <Td>{formatAddress(tx.oldOwner)}</Td>
+                        <Td>{formatAddress(tx.newOwner)}</Td>
+                        <Td>{tx.date}</Td>
+                        <Td>{tx.price} ETH</Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </Table>
+
               </Box>
+            }
 
-              {/* Infos Texte */}
-              <VStack spacing={4} alignItems="start" mb={6}>
-                  <Text fontSize="lg"><strong>Nom :</strong> {nftData.name}</Text>
-                  <Text fontSize="lg"><strong>Description :</strong> {nftData.description}</Text>
-                  <Text fontSize="lg"><strong>Artiste :</strong> {nftData.artist}</Text>
-                  <Text fontSize="lg"><strong>Propriétaire :</strong> {formatAddress(nftData.owner)}</Text>
-                  <Text fontSize="lg"><strong>Date de mint :</strong> {formatTimestamp(Number(nftData.mintDate))}</Text>
-                  <Text fontSize="lg"><strong>Prix actuel :</strong> {nftData.price} ETH</Text>
-                  <Text fontSize="lg"><strong>En vente :</strong> {nftData.forsale ? 'Oui' : 'Non'}</Text>
-                  <Text fontSize="lg"><strong>Historique des prix :</strong> {nftData.priceHistory.join(', ')} ETH</Text>
-                  <Text fontSize="lg"><strong>Collection ID :</strong> {nftData.collectionId ? nftData.collectionId.toString() : 'Aucune collection'}</Text>
-                  <Text fontSize="lg">  <strong>Adresse de contrat :</strong>{' '}{contractAddress ? formatAddress(contractAddress) : 'Adresse inconnue'}</Text>
-              </VStack>
-            </Stack>
-
-            {/* Tableau transactions */}
-
-            {transacActivity === true &&
+            {transacActivity === false &&
 
             <Box overflowX="auto" w="full">
-              <Table variant="simple" size="sm" minW="600px">
-                <Thead>
-                  <Tr>
-                    <Th>Ancien</Th>
-                    <Th>Nouveau</Th>
-                    <Th>Date</Th>
-                    <Th>Prix</Th>
-                  </Tr>
-                </Thead>
-
-                <Tbody>
-                  {formattedTransactions.map((tx, i) => (
-                    <Tr key={i}>
-                      <Td>{formatAddress(tx.oldOwner)}</Td>
-                      <Td>{formatAddress(tx.newOwner)}</Td>
-                      <Td>{tx.date}</Td>
-                      <Td>{tx.price} ETH</Td>
-                    </Tr>
-                  ))}
-                </Tbody>
-              </Table>
-
+            <Text>
+              Aucune transaction enregistrée pour le moment
+            </Text>
             </Box>
           }
-          </TabPanel>
+
 
           <Divider my={6} />
 
-          <TabPanel>
-          <Text mt={4}>
-            Données :
-          </Text>
-          {isOwner && (
-            <FormControl mt={4}>
-              <FormLabel htmlFor="name">Nom</FormLabel>
-              <Input
-                id="name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Entrez votre nom"
-              />
 
-              <FormLabel htmlFor="bio">Description :</FormLabel>
-              <Input
-                id="bio"
-                type="text"
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                placeholder="Entrez votre biographie"
-              />
-              <Button colorScheme="blue" mt={4} onClick={handleUpdateInfo}>Mettre à jour</Button>
-
-              <Text mt={10}>
-              Mettre en vente :
-              </Text>
-
-              <FormLabel htmlFor="price">Mettre a jour le prix de vente :</FormLabel>
-              <Input
-                id="price"
-                type="text"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="Ex: 0.01"
-              />
-              <Button colorScheme="teal" mt={4} onClick={handleListForSale}>Mettre en vente</Button>
-            </FormControl>
-          )}
-
-          {(canPurchase  && isForSale) ? (
-                  <Button colorScheme="green" mt={4} onClick={handlePurchase}>
-                    Acheter ce NFT
-                  </Button>
-                ) : (
-                  <Text mt={4}>
-                    Ce NFT n'est pas à vendre
-                  </Text>
-          )}
+            </TabPanel>
 
 
-          </TabPanel>
-        </TabPanels>
+            <TabPanel>
+            <Text mt={4}>
+              Données :
+            </Text>
+            {isOwner === true &&
+              <FormControl mt={4}>
+                <FormLabel htmlFor="name">Nom</FormLabel>
+                <Input
+                  id="name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Entrez votre nom"
+                />
+
+                <FormLabel htmlFor="bio">Description :</FormLabel>
+                <Input
+                  id="bio"
+                  type="text"
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  placeholder="Entrez votre biographie"
+                />
+                <Button colorScheme="blue" mt={4} onClick={handleUpdateInfo}>Mettre à jour</Button>
+
+                <Divider my={6} />
+
+                <Text mt={10}>
+                Mettre en vente :
+                </Text>
+
+                <FormLabel htmlFor="price">Mettre a jour le prix de vente :</FormLabel>
+                <Input
+                  id="price"
+                  type="text"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="Ex: 0.01"
+                />
+                <Button colorScheme="teal" mt={4} onClick={handleListForSale}>Mettre en vente</Button>
+
+                <Divider my={6} />
+
+                <Text>
+                  Détruire l'oeuvre :
+                </Text>
+                <Button colorScheme="red" mt={4} onClick={handleBurn}>Brûler</Button>
+
+              </FormControl>
+
+            }
+
+            {(canPurchase && isForSale) ? (
+                    <Button colorScheme="green" mt={4} onClick={handlePurchase}>
+                      Acheter ce NFT
+                    </Button>
+                  ) : (
+                    <Text mt={4}>
+                      Ce NFT n'est pas à vendre
+                    </Text>
+            )}
+
+
+
+            </TabPanel>
+
+
+          </TabPanels>
       </Tabs>
+
+      <Divider my={6} />
 
       {/* Carrousels */}
       <Box mt={5} w="full">
         <Heading size="md" mb={3}>
-          Découvrez les autres collections de {nftData.artist}
+          Découvrez les autres collections de {formatAddress5lettres(nftData.artist)}
         </Heading>
         <Stack direction={{ base: "column", md: "row" }} spacing={2}>
           <FilteredCollectionsCarousel

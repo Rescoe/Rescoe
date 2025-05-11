@@ -117,9 +117,9 @@ const UniqueArtGalerie: React.FC = () => {
     }
   };
 
-
   const fetchNFTs = async (collectionId: string, associatedAddress: string) => {
       setIsLoading(true);
+
       try {
           const collectionContract = new Contract(associatedAddress, ABI_MINT_CONTRACT, provider);
           const tokenIds: string[] = await collectionContract.getTokenPaginated(0, 10);
@@ -127,11 +127,20 @@ const UniqueArtGalerie: React.FC = () => {
           const nftsData = await Promise.all(
               tokenIds.map(async (tokenId: string) => {
                   try {
+                      // Récupérez le tokenURI pour le NFT
                       const tokenURI: string = await collectionContract.tokenURI(tokenId);
                       const cachedMetadata = localStorage.getItem(tokenURI);
-                      const metadata = cachedMetadata
-                          ? JSON.parse(cachedMetadata)
-                          : await (await fetch(`/api/proxyPinata?ipfsHash=${tokenURI.split('/').pop()}`)).json();
+
+                      // Vérifier si le cache est éligible
+                      if (cachedMetadata) {
+                          return JSON.parse(cachedMetadata);
+                      }
+
+                      // Si le cachedMetadata n'est pas disponible, essayer de le récupérer à partir de l'API
+                      const metadata = await (await fetch(`/api/proxyPinata?ipfsHash=${tokenURI.split('/').pop()}`)).json();
+
+                      // Enregistrez le tokenURI dans localStorage
+                      localStorage.setItem(tokenURI, JSON.stringify(metadata));
 
                       // Récupération du prix à l'aide de la fonction getTokenPrice
                       const priceInWei: BigNumberish = await collectionContract.getTokenPrice(tokenId);
@@ -139,42 +148,44 @@ const UniqueArtGalerie: React.FC = () => {
                       // Vérifiez si le NFT est en vente à l'aide de la fonction isNFTForSale
                       const isForSale: boolean = await collectionContract.isNFTForSale(tokenId);
 
-                      // Conversion de wei à ethers (si besoin)
-                      const priceInEthers = Number(priceInWei) / 1e18; // Division par 10^18 pour convertir de Wei vers Ether
-
                       const proprietaire = await collectionContract.ownerOf(tokenId);
 
-                      if (!cachedMetadata) {
-                          localStorage.setItem(tokenURI, JSON.stringify(metadata));
-                      }
-
                       return {
-                          owner:proprietaire,
+                          owner: proprietaire,
                           tokenId: tokenId.toString(),
                           image: metadata.image,
                           name: metadata.name,
                           description: metadata.description,
-                          priceInWei: priceInWei.toString(), // Garder le prix en Wei pour l'achat
-                          price: priceInEthers || 0, // Convertit à un nombre pour l'affichage
-                          forSale: isForSale, // Ajout de l'indication de vente
+                          priceInWei: priceInWei.toString(),
+                          price: Number(priceInWei) / 1e18 || 0,
+                          forSale: isForSale,
                           tags: metadata.tags || [],
                           mintContractAddress: associatedAddress,
                       };
+
                   } catch (error) {
                       console.error(`Erreur pour le tokenId ${tokenId}:`, error);
-                      return null;
+                      return null; // Retourner null pour filtrer les NFTs invalides
                   }
               })
           );
 
           const filteredNFTsData = nftsData.filter((nft): nft is NFT => nft !== null);
           setNfts(filteredNFTsData);
+
+          // Stocker dans localStorage avec le temps de sauvegarde
+          const settingsToStore = {
+              nfts: filteredNFTsData,
+          };
+          localStorage.setItem("nftsData", JSON.stringify(settingsToStore));
+
       } catch (error) {
           console.error('Erreur lors de la récupération des NFTs :', error);
       } finally {
           setIsLoading(false);
       }
   };
+
 
 
 
