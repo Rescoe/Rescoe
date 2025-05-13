@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Image, Heading, VStack, Button, Text, Link, HStack, Grid, Tab, TabList, TabPanel, TabPanels, Tabs, FormLabel, Spinner, Divider, useToast, useClipboard } from '@chakra-ui/react';
+import { InfoOutlineIcon } from "@chakra-ui/icons";
+import { Box, Tooltip, Icon, Image, Heading, VStack, Button, Text, Link, HStack, Grid, Tab, TabList, TabPanel, TabPanels, Tabs, FormLabel, Spinner, Divider, useToast, useClipboard } from '@chakra-ui/react';
 import * as jdenticon from 'jdenticon';
 import { useAuth } from '../../../utils/authContext';
 import { JsonRpcProvider } from 'ethers';
@@ -8,6 +9,10 @@ import { Contract } from 'ethers';
 import ABI from '../../ABI/ABIAdhesion.json';
 import ABIRESCOLLECTION from '../../ABI/ABI_Collections.json';
 import ABI_ADHESION_MANAGEMENT from '../../ABI/ABI_ADHESION_MANAGEMENT.json';
+
+import CreateCollection from './CreateCollection';
+import {FilteredCollectionsCarousel} from '../galerie/art'; // Mettez à jour le chemin
+
 
 import { BrowserProvider, Eip1193Provider } from "ethers";
 
@@ -150,14 +155,10 @@ const formatAddress = (address: string) => {
     const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
     const contract = new Contract(contratAdhesionManagement, ABI_ADHESION_MANAGEMENT, provider);
     const contractadhesion = new Contract(contractAdhesion, ABI, provider);
-    console.log(userAddress);
-
-    console.log(Number(nombreTotalMint));
 
     try {
 
       const tokenIds = await contract.getTokensByOwnerPaginated(userAddress, 0, Number(nombreTotalMint));
-      console.log('test');
       const userInfos = await contract.getUserInfo(userAddress);
 
       const username = userInfos.name;
@@ -353,8 +354,8 @@ const formatAddress = (address: string) => {
 
 
   return (
-    <Box p={6} display="flex" flexDirection="column" alignItems="center" justifyContent="center">
-      <VStack spacing={8} align="stretch" width="100%" maxW="800px">
+  <Box p={6} maxW="100%" mx="auto">
+
       <Box display="flex" justifyContent="center" alignItems="center">
           <HStack spacing={4}>
             <Box
@@ -388,136 +389,180 @@ const formatAddress = (address: string) => {
           </HStack>
         </Box>
 
-        <Tabs variant="enclosed">
-          <TabList>
-            <Tab>Vos adhésions</Tab>
-            <Tab>Gérer vos collections</Tab>
-            <Tab>Statistiques</Tab>
-          </TabList>
-          <TabPanels>
-            <TabPanel>
-              <VStack spacing={4}>
-                <Text>Voici vos jetons d'adhésion (Insectes) :</Text>
-                <Grid templateColumns="repeat(auto-fill, minmax(150px, 1fr))" gap={4}>
-                  {images.length > 0 && roles.length > 0 ? (
-                    images.map((imgUri, index) => (
-                      <VStack key={index} spacing={2}>
-                        <Link
-                          href={`/AdhesionId/${contractAdhesion}/${tokensIdsAdherent[index]}`}
-                        >
-                          <Box
-                            as="a"
-                            cursor="pointer"
-                            width="100%"
-                            p={2}
-                          >
-                            <img
-                              src={imgUri}
-                              alt={`Adhesion ${index}`}
-                              style={{ width: '100%', height: 'auto', objectFit: 'cover' }}
-                            />
-                          </Box>
-                        </Link>
-                        <Text>{roles[index] ? `${roles[index]}` : 'Aucun rôle associé'}</Text>
-                      </VStack>
-                    ))
-                  ) : (
-                    <VStack>
-                      <Text>Aucun insecte ou rôle trouvé</Text>
-                      <Button onClick={() => fetchRolesAndImages(address)}>Rafraîchir mes jetons</Button>
-                    </VStack>
-                  )}
-                </Grid>
-              </VStack>
-            </TabPanel>
-
-            <TabPanel>
-              {isLoading ? (
-                <Spinner />
-              ) : (
-                <Grid templateColumns="repeat(auto-fill, minmax(200px, 1fr))" gap={6}>
-                  {collections.length === 0 ? (
-                    <Text>Aucune collection trouvée.</Text>
-                  ) : (
-                    collections.map((collection) => (
-                      <Box
-                        key={collection.id}
-                        borderWidth="1px"
-                        borderRadius="lg"
-                        p={4}
-                        cursor="pointer"
-                        textAlign="center"
-                      >
-                        {collection.imageUrl && (
-                          <Box
-                            width="100%"
-                            height="150px"
-                            overflow="hidden"
-                            borderRadius="md"
-                          >
-                            <img
-                              src={collection.imageUrl}
-                              alt={collection.name}
-                              style={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover',
-                              }}
-                            />
-                          </Box>
-                        )}
-                        <Box mt={2} textAlign="center">
-                          <Text>{collection.name}</Text>
-                        </Box>
-                      </Box>
-                    ))
-                  )}
-                </Grid>
-              )}
-
-              <Divider my={6} borderColor="gray.200" />
-              <Box mt={2} textAlign="center" p={4}>
-                <Link href="/u/createCollection">
-                  <Button colorScheme="teal">
-                    Créer une collection
-                  </Button>
-                </Link>
-              </Box>
-            </TabPanel>
-
-            <TabPanel>
-              <VStack>
-                <Text mt={4}>Collections créées : {userCollections}.</Text>
-                <Text mt={4}>Collections restantes : {remainingCollections}.</Text>
-                <VStack>
-
-                <div>
-                  <h1>Points d'Adhésion</h1>
-                  <p>Points actuels: {rewardPoints}</p>
-                  <input
-                    type="number"
-                    value={pointsToBuy}
-                    onChange={(e) => setPointsToBuy(parseInt(e.target.value))}
-                    placeholder="Nombre de points à acheter"
-                  />
-                  <button onClick={() => buyAdhesionPoints(address)} >Acheter des Points</button>
-                </div>
+        <Divider my={4} />
 
 
-                  <Text mt={4}>Points d'Adhésion</Text>
+    <Tabs variant="soft-rounded" colorScheme="purple" isFitted>
+      <TabList mb={4}>
+        <Tab>Profil & Statistiques</Tab>
+        <Tab>Créer une Collection</Tab>
+        <Tab>Mes Collections</Tab>
+      </TabList>
+
+      <TabPanels>
+        {/* Fusion Tab 1 + 3 : Profil et Statistiques */}
+        <TabPanel>
+          <Grid templateColumns={{ base: "1fr", md: "1fr 1fr" }} gap={6}>
+            {/* Jetons d'adhésion */}
+            <Box borderWidth="1px" borderRadius="xl" p={4} shadow="md">
+              <Heading size="md" mb={3}>Jetons d'Adhésion</Heading>
+              <HStack spacing={4} flexWrap="wrap">
+                {images.length > 0 ? images.map((img, index) => (
+                  <Link
+                    href={`/AdhesionId/${contractAdhesion}/${tokensIdsAdherent[index]}`}
+                  >
+                  <Box key={index} textAlign="center">
+                    <Image src={img} alt={`Jeton ${index}`} borderRadius="md" boxSize="100px" objectFit="cover" />
+                    <Text fontSize="sm" mt={2}>#{tokensIdsAdherent[index]} - {usernames[index]} </Text>
+                    <Text fontSize="xs" color="gray.500">{roles[index]}</Text>
+                  </Box>
+                  </Link>
+                )) :
+                <Box>
+                  <Text color="gray.500">Aucun jeton trouvé.</Text>
+                  <Button onClick={() => fetchRolesAndImages(address)}>Rafraîchir mes jetons</Button>
+                </Box>
+              }
+              </HStack>
+
+              <Divider my={4} />
+
+              <FormLabel htmlFor="pointsToBuy" display="flex" alignItems="center">
+                Acheter des points :
+                <Tooltip label="La création d'une collection coute 5 points. Les points RESCOE sont attribués en vendant des oeuvres ou peuvent être achetées. Vous ne perdez jamais de points, même après les avoir utilisés.Cependant une fois comptabilisé dans la création d'une collection les points utilsiés ne sont plus réutilisables !" fontSize="sm" hasArrow>
+                  <span>
+                    <Icon as={InfoOutlineIcon} ml={2} color="gray.500" cursor="pointer" />
+                  </span>
+                </Tooltip>
+              </FormLabel>
+
+              <HStack>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  colorScheme="teal"
+                  onClick={() => setPointsToBuy(pointsToBuy - 10)}
+                  isDisabled={pointsToBuy <= 0}
+                >-</Button>
+
+                <Text>{pointsToBuy}</Text>
+
+                <Button
+                  size="sm"
+                  variant="outline"
+                  colorScheme="teal"
+                  onClick={() => setPointsToBuy(pointsToBuy + 10)}
+                >+</Button>
+
+                <Button
+                  size="sm"
+                  colorScheme="purple"
+                  borderRadius="full"
+                  px={6}
+                  _hover={{ transform: "scale(1.05)" }}
+                  transition="all 0.2s ease"
+                  onClick={() => buyAdhesionPoints(address)}
+                >
+                  Acheter
+                </Button>
+              </HStack>
+
+
+            </Box>
+
+            {/* Statistiques utilisateur */}
+            <Box borderWidth="1px" borderRadius="xl" p={4} shadow="md">
+              <Heading size="md" mb={3}>Statistiques</Heading>
+              <VStack align="start" spacing={3}>
+                <Text><strong>Nom :</strong> {usernames[0] || 'Non défini'}</Text>
+                <Text><strong>ENS :</strong> {ensName}</Text>
+                <Text><strong>Adresse :</strong> {formatAddress(address)}</Text>
+                <Text><strong>Bio :</strong> {biographies[0]}</Text>
+                <Divider />
+                <Text><strong>Collections créées :</strong> {userCollections}</Text>
+                <Text><strong>Collections restantes :</strong> {remainingCollections}</Text>
+
+                <Text mt={4}>Points d'Adhésion : </Text>
                   {rewardPoints !== null ? (
                     <Text>Vos points Rescoe : {rewardPoints} 🐝</Text>
                   ) : (
                     <Text>Chargement des points...</Text>
                   )}
-                </VStack>
+
+
               </VStack>
-            </TabPanel>
-          </TabPanels>
-        </Tabs>
-      </VStack>
-    </Box>
-  );
+            </Box>
+          </Grid>
+        </TabPanel>
+
+        {/* Création de Collection */}
+        <TabPanel>
+        {isLoading ? (
+          <Spinner />
+        ) : (
+          <Grid templateColumns="repeat(auto-fill, minmax(200px, 1fr))" gap={6}>
+            {collections.length === 0 ? (
+              <Text>Aucune collection trouvée.</Text>
+            ) : (
+              collections.map((collection) => (
+                <Box
+                  key={collection.id}
+                  borderWidth="1px"
+                  borderRadius="lg"
+                  p={4}
+                  cursor="pointer"
+                  textAlign="center"
+                >
+                  {collection.imageUrl && (
+                    <Box
+                      width="100%"
+                      height="150px"
+                      overflow="hidden"
+                      borderRadius="md"
+                    >
+                      <img
+                        src={collection.imageUrl}
+                        alt={collection.name}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                        }}
+                      />
+                    </Box>
+                  )}
+                  <Box mt={2} textAlign="center">
+                    <Text>{collection.name}</Text>
+                  </Box>
+                </Box>
+              ))
+            )}
+          </Grid>
+        )}
+
+        <Divider my={6} borderColor="gray.200" />
+
+        <CreateCollection/>
+        <Box mt={2} textAlign="center" p={4}>
+          <Link href="/u/createCollection">
+            <Button colorScheme="teal">
+              Créer une collection
+            </Button>
+          </Link>
+        </Box>
+        </TabPanel>
+
+        {/* Placeholder pour collections utilisateur */}
+        <TabPanel>
+          <Box borderWidth="1px" borderRadius="xl" p={6} shadow="md">
+            <Heading size="md" mb={4}>Mes Collections</Heading>
+            <Text color="gray.500">Fonctionnalité à venir…</Text>
+          </Box>
+        </TabPanel>
+      </TabPanels>
+    </Tabs>
+  </Box>
+);
 };
 
 export default Dashboard;

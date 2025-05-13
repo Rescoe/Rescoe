@@ -48,7 +48,7 @@ const contractAdhesion = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS as string;
 
 const TokenPage = () => {
   const router = useRouter();
-  const { contractAdhesion, tokenId } = router.query;
+  const { tokenId } = router.query;
   const { address: authAddress } = useAuth();
 
   const [nftData, setNftData] = useState<NFTData | null>(null);
@@ -103,7 +103,11 @@ useEffect(() => {
 
 
 useEffect(() => {
-    if (!router.isReady || !contractAdhesion || !tokenId) return;
+  console.log("router.isReady:", router.isReady);
+  console.log("contractAdhesion:", contractAdhesion);
+  console.log("tokenId:", tokenId);
+
+  if (!router.isReady || !contractAdhesion || !tokenId) return;
 
     setIsLoading(true);
 
