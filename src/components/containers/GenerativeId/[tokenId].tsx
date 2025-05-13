@@ -12,9 +12,12 @@ import {
   Spinner,
   VStack,
   HStack,
+  Stack
 } from '@chakra-ui/react';
 import { useAuth } from '../../../utils/authContext';
 import ABI_MINT_CONTRACT from '../../../components/ABI/ABI_GENERATIVE_ART.json';
+
+import {FilteredCollectionsCarousel} from '../galerie/art'; // Mettez à jour le chemin
 
 const TokenPage: React.FC = () => {
   const router = useRouter();
@@ -49,6 +52,17 @@ const TokenPage: React.FC = () => {
     setupWeb3();
   }, []);
 
+  // Fonction pour raccourcir l'adresse Ethereum
+  const formatAddress = (address: string) => {
+  if (!address) return '';
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  };
+
+  const formatAddress5lettres = (address: string) => {
+  if (!address) return '';
+  return `${address.slice(0, 8)}`;
+  };
+
   useEffect(() => {
     if (!router.isReady || !contractAddress || !tokenId) return;
 
@@ -57,6 +71,29 @@ const TokenPage: React.FC = () => {
       try {
         const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
         const contract = new Contract(contractAddress, ABI_MINT_CONTRACT, provider);
+
+/*
+        let fullDetails;
+        try {
+            fullDetails = await contract.getFullDetails(tokenId);
+        } catch (error: any) { // Typage en 'any'
+            if (error.message && error.message.includes('ERC721NonexistentToken')) {
+                // Retourner null sans afficher d'erreur dans la console
+                return null; // Indique que le token n'existe pas
+            } else {
+                console.error('Erreur non prévue:', error);
+                throw error; // Relancez l'erreur pour le traitement ultérieur
+            }
+        }
+                if (!fullDetails) {
+                    return null;  // Si aucun détail n'est trouvé
+                    console.log("AucunFull details");
+                }
+
+        */
+        const fullDetails = await contract.getFullDetails(tokenId);
+        console.log("Fulld etails : ");
+        console.log(fullDetails);
 
         // Récupérer le tokenURI du NFT
         const uri = await contract.tokenURI(tokenId as string);
@@ -68,13 +105,20 @@ const TokenPage: React.FC = () => {
         const res = await fetch(`/api/proxyPinata?ipfsHash=${uri.split('/').pop()}`);
         const data = await res.json();
 
+        const owner: string = fullDetails[0];
+        const collectionId: bigint = fullDetails[5];
+
+        console.log(owner);
+
         setNftData({
           name: data.name,
           description: data.description,
           image: IndexLoad,
           price: price,
+          collectionId: Number(collectionId),
+          owner,
         });
-        console.log(data);
+
       } catch (err) {
         console.error('Error fetching NFT data:', err);
         setError('Erreur lors de la récupération des données du NFT');
@@ -152,6 +196,31 @@ const TokenPage: React.FC = () => {
         <Text>Prix: {nftData.price} ETH</Text>
         <Button colorScheme="blue" onClick={handleMint}>Minter une itération</Button>
       </VStack>
+
+      {/* Carrousels */}
+      <Box mt={5} w="full">
+        <Heading size="md" mb={3}>
+          Découvrez les autres collections du même artiste
+        </Heading>
+        <Stack direction={{ base: "column", md: "row" }} spacing={2}>
+          <FilteredCollectionsCarousel
+            creator={nftData.owner}
+            selectedCollectionId={nftData.collectionId}
+            type="Art"
+          />
+          <FilteredCollectionsCarousel
+            creator={nftData.owner}
+            selectedCollectionId={nftData.collectionId}
+            type="Poesie"
+          />
+          <FilteredCollectionsCarousel
+            creator={nftData.owner}
+            selectedCollectionId={nftData.collectionId}
+            type="Generative"
+          />
+        </Stack>
+      </Box>
+
     </Box>
   );
 };
