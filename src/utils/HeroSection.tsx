@@ -29,36 +29,50 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
   const router = useRouter();
 
   useEffect(() => {
-    // Récupérer les éléments du localStorage
-    const cachedItems = localStorage.getItem("selectedItems");
+    const SIX_HOURS = 6 * 60 * 60 * 1000; // 6 heures en ms
+    const now = Date.now();
 
+    const cachedItems = localStorage.getItem("selectedItems");
     let selectedNfts: Nft[] = [];
     let selectedHaikus: Haiku[] = [];
 
-    // Si le localStorage contient des éléments, les utiliser
+    let shouldUpdate = true;
+
     if (cachedItems) {
       try {
         const parsedItems = JSON.parse(cachedItems);
-        selectedNfts = Array.isArray(parsedItems.selectedNfts) ? parsedItems.selectedNfts : [];
-        selectedHaikus = Array.isArray(parsedItems.selectedHaikus) ? parsedItems.selectedHaikus : [];
+        const lastUpdate = parsedItems.timestamp || 0;
+
+        // Si les données ont moins de 6h, on les garde
+        if (now - lastUpdate < SIX_HOURS) {
+          selectedNfts = Array.isArray(parsedItems.selectedNfts) ? parsedItems.selectedNfts : [];
+          selectedHaikus = Array.isArray(parsedItems.selectedHaikus) ? parsedItems.selectedHaikus : [];
+          shouldUpdate = false;
+        }
       } catch (error) {
         console.error("Erreur de parsing des éléments du localStorage:", error);
       }
-    } else {
-      // Sinon, en sélectionner des nouveaux
+    }
+
+    // Mise à jour si nécessaire
+    if (shouldUpdate) {
       selectedNfts = nfts.sort(() => 0.5 - Math.random()).slice(0, 5);
       selectedHaikus = haikus.sort(() => 0.5 - Math.random()).slice(0, 5);
 
-      // Stoker les nouveaux éléments dans le localStorage
-      localStorage.setItem("selectedItems", JSON.stringify({ selectedHaikus, selectedNfts }));
+      localStorage.setItem("selectedItems", JSON.stringify({
+        selectedNfts,
+        selectedHaikus,
+        timestamp: now
+      }));
     }
 
     const interval = setInterval(() => {
       setIndex((prevIndex) => (prevIndex + 1) % selectedNfts.length);
-    }, 43200000); // Changer toutes les 12h
+    }, 6000); // ceci fait défiler les NFT, à adapter si besoin
 
     return () => clearInterval(interval);
   }, [nfts, haikus]);
+
 
   // Fonction pour raccourcir l'adresse Ethereum
   const formatAddress = (address: string) => {
@@ -78,7 +92,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
   };
 
   // Récupération sécurisée des NFT et Haikus locaux ou par défaut, pour le rendu
-  const { selectedNfts = [], selectedHaikus = [] } = JSON.parse(localStorage.getItem("selectedItems") || '{}') || {};
+  const { selectedNfts = [], selectedHaikus = [] } = JSON.parse(localStorage.getItem("selectedItems") || '{}');
 
   // Vérification que selectedNfts et selectedHaikus sont valides avant de les utiliser
   const currentNft = selectedNfts.length > 0 ? selectedNfts[index % selectedNfts.length] : null;

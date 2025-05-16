@@ -43,13 +43,17 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
   const [loading, setLoading] = useState<boolean>(true);
   const router = useRouter();
 
+
   useEffect(() => {
-    setLoading(true);
-    setTimeout(() => {
+    const cacheKey = "carouselData";
+    const cacheDuration = 0.01 * 60 * 60 * 1000; // 6 minutes
+    const isDataReady = nfts.length > 0 && haikus.length > 0;
+
+    if (!isDataReady) return;
+
+    const generateItems = () => {
       const selectedNfts = nfts.slice(0, maxNfts);
       const selectedHaikus = haikus.slice(0, maxHaikus);
-
-
       const alternateItems: AlternatingItem[] = [];
       const maxLength = Math.max(selectedNfts.length, selectedHaikus.length);
 
@@ -58,8 +62,8 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
           alternateItems.push({
             type: "haiku",
             content: {
-              poemText: selectedHaikus[i].poemText.split("\n").map(line => line.trim()).join("\n"), // Créer un objet Haiku
-            } as Haiku, // S'assurer que c'est bien de type Haiku
+              poemText: selectedHaikus[i].poemText.split("\n").map(line => line.trim()).join("\n"),
+            },
             associatedNft: selectedNfts[i % selectedNfts.length],
           });
         }
@@ -67,17 +71,58 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
           alternateItems.push({
             type: "nft",
             content: selectedNfts[i],
-            associatedHaiku: selectedHaikus[i % selectedHaikus.length]?.poemText.split("\n").map(line => line.trim()).join("\n"), // Vous pourrez faire la même vérification ici si nécessaire
+            associatedHaiku: selectedHaikus[i % selectedHaikus.length]?.poemText.split("\n").map(line => line.trim()).join("\n"),
           });
         }
       }
 
+      return alternateItems;
+    };
 
+    const loadData = () => {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          const isValid = Date.now() - parsed.timestamp < cacheDuration;
+          if (isValid) {
+            setItems(parsed.items);
+            setLoading(false);
+            return;
+          }
+        } catch (err) {
+          console.warn("Erreur lecture cache:", err);
+        }
+      }
 
-      setItems(alternateItems);
+      const newItems = generateItems();
+      localStorage.setItem(cacheKey, JSON.stringify({
+        timestamp: Date.now(),
+        items: newItems
+      }));
+      setItems(newItems);
       setLoading(false);
+    };
+
+    // Chargement initial
+    setLoading(true);
+    const initialTimeout = setTimeout(() => {
+      loadData();
     }, delay * 1000);
+
+    // Rafraîchissement automatique chaque minute
+    const interval = setInterval(() => {
+      loadData();
+    }, 60 * 1000); // 1 minute
+
+    return () => {
+      clearTimeout(initialTimeout);
+      clearInterval(interval);
+    };
   }, [nfts, haikus, delay, maxNfts, maxHaikus]);
+
+
+
 
   // Fonction pour raccourcir l'adresse Ethereum
   const formatAddress = (address: string) => {
