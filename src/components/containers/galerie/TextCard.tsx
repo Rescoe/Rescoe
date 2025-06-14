@@ -1,27 +1,43 @@
 import React, { useState } from 'react';
-import { VStack, Text } from '@chakra-ui/react';
-
+import { VStack, Text, Button, Divider } from '@chakra-ui/react';
+import { useAuth } from '../../../utils/authContext';
 
 interface TextCardProps {
   nft: {
+    tokenId: string;
     poemText: string;
     creatorAddress: string;
     totalEditions: string;
     price: string;
     mintContractAddress: string;
-    image?: string; // image est optionnel
+    image?: string;
+    totalMinted: string;
+    availableEditions?: string;
+    isForSale: boolean;
   };
+  showBuyButton?: boolean;
+  onBuy?: () => void;
 }
 
-const TextCard: React.FC<TextCardProps> = ({ nft }) => {
-  // État pour contrôler l'affichage des informations supplémentaires
+const TextCard: React.FC<TextCardProps> = ({ nft, showBuyButton = false, onBuy }) => {
   const [showDetails, setShowDetails] = useState(false);
-  const priceInEth = parseFloat(nft.price) / 1e18;
+  const priceInEth = nft?.price ? parseFloat(nft.price) / 1e18 : 0;
 
+  const { address: authAddress, connectWallet } = useAuth();
 
-  // Fonction pour basculer l'affichage des détails
-  const toggleDetails = () => {
-    setShowDetails(!showDetails);
+  const isOwner = authAddress?.toLowerCase() === nft.creatorAddress.toLowerCase();
+
+  const canPurchase =
+    showBuyButton && !isOwner && nft.isForSale && parseInt(nft.availableEditions || '0') > 0;
+
+  const handleBuy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!authAddress) {
+      await connectWallet();
+    }
+    if (authAddress && onBuy) {
+      onBuy();
+    }
   };
 
   return (
@@ -32,68 +48,73 @@ const TextCard: React.FC<TextCardProps> = ({ nft }) => {
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
-        height: '100%', // Laisse la hauteur flexible
+        height: '100%',
         boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
         padding: '10px',
+        backgroundColor: '#1a202c',
       }}
     >
-    <div style={{ padding: '10px', textAlign: 'center' }}>
-      {/* Affichage du texte du poème avec des retours à la ligne */}
       <VStack textAlign="center" color="white" maxWidth="120%">
         {nft.poemText
-          ? nft.poemText.split("\n").map((line, i) => (
-              <Text key={i} fontStyle="italic" fontSize="sm"> {/* Texte plus petit */}
+          ? nft.poemText.split('\n').map((line, i) => (
+              <Text key={i} fontStyle="italic" fontSize="sm">
                 {line}
               </Text>
             ))
-          : "Pas de poème disponible"}
+          : 'Pas de poème disponible'}
       </VStack>
 
-        {/* Affichage du prix */}
-        <p style={{ fontSize: '1rem', color: '#555', marginBottom: '10px' }}>
-          <strong>Prix :</strong> {priceInEth} ETH
-        </p>
+      <p style={{ fontSize: '1rem', color: '#ccc', marginTop: '10px' }}>
+        <strong>Prix :</strong> {priceInEth} ETH
+      </p>
 
-        {/* Affichage de la disponibilité */}
-        <p style={{ fontSize: '1rem', color: '#555', marginBottom: '10px' }}>
-          <strong>Disponibilité :</strong> {nft.totalEditions} éditions
-        </p>
+      <p style={{ fontSize: '1rem', color: '#ccc', marginBottom: '10px' }}>
+        <strong>Disponibilité :</strong> {nft.availableEditions || 0} / {nft.totalEditions} éditions
+      </p>
 
-        {/* Bouton pour afficher/cacher plus d'informations */}
-        <button onClick={toggleDetails} style={{ marginTop: '10px' }}>
-          {showDetails ? 'Moins' : 'Plus'}
-        </button>
+      {canPurchase ? (
+        <Button onClick={handleBuy} colorScheme="teal" mt={2} size="sm">
+          Acheter {priceInEth} ETH
+        </Button>
+      ) : showBuyButton && isOwner ? (
+        <Text fontSize="sm" color="gray.400">
+          Vous êtes le créateur de ce poème
+        </Text>
+      ) : showBuyButton ? (
+        <Text fontSize="sm" color="gray.400">
+          Non disponible à la vente
+        </Text>
+      ) : null}
 
-        {/* Affichage des détails supplémentaires si showDetails est vrai */}
-        {showDetails && (
-          <div style={{ marginTop: '10px' }}>
-            {/* Affichage du créateur */}
-            <p style={{ fontSize: '1rem', color: '#555', marginBottom: '10px' }}>
-              <strong>Créateur :</strong> {nft.creatorAddress}
-            </p>
+      <Divider mt={3} />
 
-            {/* Affichage de l'adresse du contrat de mint */}
-            <p style={{ fontSize: '1rem', color: '#555', marginBottom: '10px' }}>
-              <strong>Contrat de Mint :</strong> {nft.mintContractAddress}
-            </p>
+      <button onClick={() => setShowDetails(!showDetails)} style={{ marginTop: '10px' }}>
+        {showDetails ? 'Moins' : 'Plus'}
+      </button>
 
-            {/* Affichage de l'image associée si disponible */}
-            {nft.image && (
-              <img
-                src={nft.image}
-                alt="Poème"
-                style={{
-                  width: '100%',
-                  marginTop: '10px',
-                  borderRadius: '8px',
-                  maxHeight: '200px',
-                  objectFit: 'cover',
-                }}
-              />
-            )}
-          </div>
-        )}
-      </div>
+      {showDetails && (
+        <div style={{ marginTop: '10px' }}>
+          <p style={{ fontSize: '1rem', color: '#aaa', marginBottom: '10px' }}>
+            <strong>Créateur :</strong> {nft.creatorAddress}
+          </p>
+          <p style={{ fontSize: '1rem', color: '#aaa', marginBottom: '10px' }}>
+            <strong>Contrat de Mint :</strong> {nft.mintContractAddress}
+          </p>
+          {nft.image && (
+            <img
+              src={nft.image}
+              alt="Poème"
+              style={{
+                width: '100%',
+                marginTop: '10px',
+                borderRadius: '8px',
+                maxHeight: '200px',
+                objectFit: 'cover',
+              }}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 };

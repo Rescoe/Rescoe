@@ -17,9 +17,9 @@ import { useRouter } from "next/router";
 import ABIRESCOLLECTION from "../../../ABI/ABI_Collections.json";
 import ABI from "../../../ABI/HaikuEditions.json";
 
+import { useAuth } from '../../../../utils/authContext';
 import TextCard from "../TextCard";
 
-// Typage des collections et poèmes
 interface Collection {
   id: string;
   name: string;
@@ -35,6 +35,9 @@ interface Poem {
   totalEditions: string;
   mintContractAddress: string;
   price: string;
+  totalMinted: string;
+  availableEditions?: string;
+  isForSale: boolean;
 }
 
 const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!;
@@ -43,26 +46,24 @@ const PoetryGallery: React.FC = () => {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [poems, setPoems] = useState<Poem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null); // État pour collection sélectionnée
-  const [currentTabIndex, setCurrentTabIndex] = useState<number>(0); // État pour l'index du tab
-  const router = useRouter();
-  const [isMobile] = useMediaQuery('(max-width: 768px)'); // Détection mobile
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
+  const [currentTabIndex, setCurrentTabIndex] = useState<number>(0);
+  const [isMobile] = useMediaQuery('(max-width: 768px)');
+  const { web3, address } = useAuth();
 
   const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
   const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
 
-  // Récupérer les collections de poésie
   const fetchPoetryCollections = async () => {
     setIsLoading(true);
     try {
       const total: BigNumberish = await contract.getTotalCollectionsMinted();
       const totalNumber = total.toString();
-      const collectionsPaginated = await contract.getCollectionsPaginated(0, Number(totalNumber));
+      const collectionsPaginated = await contract.getCollectionsPaginated(7, Number(totalNumber));
 
       const collectionsData: Collection[] = await Promise.all(
         collectionsPaginated.map(async (tuple: any) => {
           const [id, name, collectionType, , associatedAddresses, , isFeatured] = tuple;
-
           if (collectionType !== "Poesie") return null;
 
           const uri: string = await contract.getCollectionURI(id);
@@ -94,7 +95,7 @@ const PoetryGallery: React.FC = () => {
         })
       );
 
-      setCollections(collectionsData.filter((c) => c !== null).sort((a, b) => Number(b.isFeatured) - Number(a.isFeatured)));
+      setCollections(collectionsData.filter(Boolean).sort((a, b) => Number(b!.isFeatured) - Number(a!.isFeatured)));
     } catch (error) {
       console.error("Erreur lors de la récupération des collections :", error);
     } finally {
@@ -106,30 +107,26 @@ const PoetryGallery: React.FC = () => {
     setIsLoading(true);
     try {
       const collectionContract = new Contract(associatedAddress, ABI, provider);
-
-      const uniqueTokenCount: BigNumberish = await collectionContract.getUniqueNFTCount();
-      const numberUniqueTokenCount = Number(uniqueTokenCount);
-
-      const tokenIds = Array.from({ length: numberUniqueTokenCount }, (_, i) => i + 1);
+      const uniqueHaikuCount: BigNumberish = await collectionContract.getLastUniqueHaikusMinted();
 
       const poemsData: Poem[] = await Promise.all(
-        tokenIds.map(async (tokenId) => {
-          const haikuText: string = await collectionContract.getHaiku(tokenId);
-          const creatorAddress: string = await collectionContract.getCreator(tokenId);
-          const totalEditions: BigNumberish = await collectionContract.getTotalSupply(tokenId);
-          const price: BigNumberish = await collectionContract.getSalePrice(tokenId);
+        Array.from({ length: Number(uniqueHaikuCount) }, (_, i) => i + 1).map(async (uniqueHaikuId) => {
+          const [firstTokenId] = await collectionContract.getHaikuInfoUnique(uniqueHaikuId);
+          const tokenDetails = await collectionContract.getTokenFullDetails(firstTokenId);
 
           return {
-            tokenId: tokenId.toString(),
-            poemText: haikuText,
-            creatorAddress,
-            totalEditions: totalEditions.toString(),
+            tokenId: firstTokenId.toString(),
+            poemText: tokenDetails.haiku_,
+            creatorAddress: tokenDetails.owner.toString(),
+            totalEditions: tokenDetails.totalEditions,
             mintContractAddress: associatedAddress,
-            price: price.toString(),
+            price: tokenDetails.currentPrice.toString(),
+            totalMinted: tokenDetails.totalEditions,
+            availableEditions: await collectionContract.getRemainingEditions(uniqueHaikuId),
+            isForSale: tokenDetails.forSale,
           };
         })
       );
-
       setPoems(poemsData);
     } catch (error) {
       console.error("Erreur lors de la récupération des poèmes :", error);
@@ -139,10 +136,40 @@ const PoetryGallery: React.FC = () => {
     }
   };
 
+  const handleBuy = async (nft: Poem) => {
+    if (!web3 || !address) {
+      alert("Connectez votre wallet pour acheter un haiku.");
+      return;
+    }
+
+    try {
+      const contract = new web3.eth.Contract(ABI, nft.mintContractAddress);
+      const isForSale = await contract.methods.isForSale(nft.tokenId).call();
+      if (!isForSale) return alert("Ce haiku n'est pas en vente.");
+
+      const priceOnChain = await contract.methods.getSalePrice(nft.tokenId).call();
+      if (Number(priceOnChain).toString() !== nft.price.toString()) {
+        return alert("Le prix a changé, veuillez rafraîchir.");
+      }
+
+      const editionsRemaining = await contract.methods.getRemainingEditions(nft.tokenId).call();
+      if (Number(editionsRemaining) <= 0) {
+        return alert("Plus d'éditions disponibles.");
+      }
+
+      const receipt = await contract.methods.buyHaiku(nft.tokenId).send({ from: address, value: nft.price });
+      alert("Haiku acheté avec succès !");
+      console.log(receipt);
+    } catch (error: any) {
+      console.error("Erreur lors de l'achat :", error);
+      alert("Erreur lors de l'achat : " + (error.message || "inconnue"));
+    }
+  };
+
   const handleCollectionClick = (collectionId: string, associatedAddress: string) => {
-    setSelectedCollectionId(collectionId); // Mettre à jour l'ID de la collection sélectionnée
+    setSelectedCollectionId(collectionId);
     fetchPoems(collectionId, associatedAddress);
-    setCurrentTabIndex(1); // Changer l'index du tab pour afficher les poèmes
+    setCurrentTabIndex(1);
   };
 
   useEffect(() => {
@@ -152,144 +179,62 @@ const PoetryGallery: React.FC = () => {
   return (
     <Box p={6}>
       <Heading mb={4}>Galerie de Poésie</Heading>
-      {isLoading ? (
-        <Spinner />
-      ) : (
-        <Grid templateColumns="repeat(3, 1fr)" gap={6} display={isMobile ? 'none' : 'grid'}>
-          {collections.length === 0 ? (
-            <Text>Aucune collection de poésie trouvée.</Text>
-          ) : (
-            collections.map((collection) => (
-              <Box
-                key={collection.id}
-                borderWidth="1px"
-                borderRadius="lg"
-                p={4}
-                cursor="pointer"
-                onClick={() => handleCollectionClick(collection.id, collection.mintContractAddress)}
-              >
-                {collection.imageUrl && (
-                  <Box width="100%" height="150px" overflow="hidden" borderRadius="md">
-                    <img
-                      src={collection.imageUrl}
-                      alt={collection.name}
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                      }}
-                    />
-                  </Box>
-                )}
-                <Text>{collection.name}</Text>
-              </Box>
-            ))
-          )}
-        </Grid>
-      )}
+      {isLoading && <Spinner />}
 
-      {isMobile ? ( // Affichage pour mobile
-                <Tabs
-          index={currentTabIndex}
-          onChange={(index) => {
-            setCurrentTabIndex(index);
-            if (index === 0) {
-              setPoems([]); // Vider les poèmes affichés lorsque l'onglet collection est activé
-              setSelectedCollectionId(null); // Réinitialiser la sélection de collection
-            }
-          }}
-        >
-          <TabList>
-            <Tab>Collections de Poésie</Tab>
-            {poems.length > 0 && selectedCollectionId && (
-              <Tab>{collections.find(collection => collection.id === selectedCollectionId)?.name || 'Poèmes'}</Tab>
-            )}
-          </TabList>
+      <Tabs index={currentTabIndex} onChange={(index) => {
+        setCurrentTabIndex(index);
+        if (index === 0) {
+          setPoems([]);
+          setSelectedCollectionId(null);
+        }
+      }}>
+        <TabList>
+          <Tab>Collections</Tab>
+          {poems.length > 0 && <Tab>Poèmes</Tab>}
+        </TabList>
 
-          <TabPanels>
-            <TabPanel>
-              {isLoading ? (
-                <Spinner />
-              ) : (
-                <Grid templateColumns="repeat(2, 1fr)" gap={6}>
-                  {collections.length === 0 ? (
-                    <Text>Aucune collection de poésie trouvée.</Text>
-                  ) : (
-                    collections.map((collection) => (
-                      <Box
-                        key={collection.id}
-                        borderWidth="1px"
-                        borderRadius="lg"
-                        p={4}
-                        cursor="pointer"
-                        onClick={() => handleCollectionClick(collection.id, collection.mintContractAddress)}
-                      >
-                        {collection.imageUrl && (
-                          <Box width="100%" height="150px" overflow="hidden" borderRadius="md">
-                            <img
-                              src={collection.imageUrl}
-                              alt={collection.name}
-                              style={{
-                                width: "100%",
-                                height: "100%",
-                                objectFit: "cover",
-                              }}
-                            />
-                          </Box>
-                        )}
-                        <Text>{collection.name}</Text>
-                      </Box>
-                    ))
-                  )}
-                </Grid>
-              )}
-            </TabPanel>
-
-            <TabPanel>
-              {isLoading ? (
-                <Spinner />
-              ) : (
-                <Box>
-                  {selectedCollectionId && collections.find(col => col.id === selectedCollectionId)?.imageUrl && (
-                    <Box width="100%" height="150px" overflow="hidden" borderRadius="md" mb={4}>
+        <TabPanels>
+          <TabPanel>
+            <Grid templateColumns={{ base: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }} gap={6}>
+              {collections.map((collection) => (
+                <Box
+                  key={collection.id}
+                  borderWidth="1px"
+                  borderRadius="lg"
+                  p={4}
+                  cursor="pointer"
+                  onClick={() => handleCollectionClick(collection.id, collection.mintContractAddress)}
+                >
+                  {collection.imageUrl && (
+                    <Box width="100%" height="150px" overflow="hidden" borderRadius="md">
                       <img
-                        src={collections.find(col => col.id === selectedCollectionId)?.imageUrl}
-                        alt={collections.find(col => col.id === selectedCollectionId)?.name}
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                        }}
+                        src={collection.imageUrl}
+                        alt={collection.name}
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
                       />
                     </Box>
                   )}
-                  <Grid templateColumns="repeat(auto-fill, minmax(250px, 1fr))" gap={6} justifyItems="center">
-                    {poems.map((poem) => (
-                      <Box key={poem.tokenId} width="100%">
-                        <TextCard nft={poem} />
-                      </Box>
-                    ))}
-                  </Grid>
-                </Box>
-              )}
-            </TabPanel>
-          </TabPanels>
-        </Tabs>
-
-      ) : ( // Affichage pour desktop
-        poems.length > 0 && (
-          <Box mt={8}>
-            <Heading size="md" mb={4}>Poèmes</Heading>
-            <Grid templateColumns="repeat(auto-fill, minmax(250px, 1fr))" gap={6} justifyItems="center">
-              {poems.map((poem) => (
-                <Box key={poem.tokenId} width="100%">
-                  <TextCard nft={poem} />
+                  <Text>{collection.name}</Text>
                 </Box>
               ))}
             </Grid>
-          </Box>
-        )
-      )}
+          </TabPanel>
+
+          <TabPanel>
+            <Grid templateColumns={{ base: 'repeat(1, 1fr)', md: 'repeat(2, 1fr)' }} gap={6}>
+              {poems.map((poem) => (
+                <TextCard
+                  key={poem.tokenId}
+                  nft={poem}
+                  showBuyButton={true}
+                  onBuy={() => handleBuy(poem)}
+                />
+
+              ))}
+            </Grid>
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
     </Box>
   );
 };

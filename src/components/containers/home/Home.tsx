@@ -117,8 +117,8 @@ const fetchCollections = async () => {
     });
 
     setCollections(sortedCollections); // Mise à jour de l'état avec les collections filtrées
-
-  } catch (error) {
+    //console.log(collections)
+  } catch (error) {;
     console.error('Error fetching collections:', error);
   } finally {
     setIsLoading(false);
@@ -132,19 +132,20 @@ const fetchPoems = async (collectionId: string, associatedAddress: string) => {
   setIsLoading(true);
   try {
     const collectionContract = new Contract(associatedAddress, haikuContractABI, provider);
-    const uniqueTokenCount = await collectionContract.getUniqueNFTCount();
+    const uniqueTokenCount = await collectionContract.getLastUniqueHaikusMinted();  //Nombre de poemes unique dans la collection (independant du nombre d'editions)
 
-    const tokenIds = Array.from({ length: Number(uniqueTokenCount) }, (_, i) => i + 1);
+    const tokenIds = Array.from({ length: Number(uniqueTokenCount) }, (_, i) => i + 2);
 
     const poemsData = await Promise.all(
       tokenIds.map(async (tokenId) => {
-        const haikuText = await collectionContract.getHaiku(tokenId);
+        const haikuText = await collectionContract.getTokenFullDetails(tokenId);
 
-        const creatorAddress = await collectionContract.getCreator(tokenId);
+        const creatorAddress = haikuText[7];
+        //console.log(creatorAddress);
 
-        const totalEditions = await collectionContract.getTotalSupply(tokenId);
-
-        const price = await collectionContract.getSalePrice(tokenId);
+        const totalEditions = await collectionContract.getRemainingEditions(tokenId);
+        //console.log(totalEditions);
+        //const price = haikuText[4];
 
         return {
           tokenId: tokenId.toString(),
@@ -160,8 +161,10 @@ const fetchPoems = async (collectionId: string, associatedAddress: string) => {
     );
 
     setHaikus(poemsData);
+    //console.log(poemsData);
+
   } catch (error) {
-    console.error('Error fetching poems:' );
+    console.error('Error fetching poems:', error);
   } finally {
     setIsLoading(false);
   }
@@ -172,8 +175,16 @@ const fetchNFTs = async (collectionId: string, associatedAddress: string) => {
     setIsLoading(true);
     try {
         const collectionContract = new Contract(associatedAddress, nftContractABI, provider);
-        //const max = await collectionContract.getTotalMinted();  //Penser a ajouter cette fonction ou un similaire
-        const tokenIds = await collectionContract.getTokenPaginated(0, 15);
+        console.log(collectionContract);
+        /*let max = await collectionContract.getLastMintedTokenId();  //Penser a ajouter cette fonction ou un similaire
+
+
+        if(max > 10){
+          max = 10;
+        }
+        */
+        const max = 10;
+        const tokenIds = await collectionContract.getTokenPaginated(0, max);
 
         const nftsData = await Promise.all(
             tokenIds.map(async (tokenId: string) => {
@@ -250,13 +261,13 @@ useEffect(() => {
 
     if (poetryCollections.length > 0) {
       const randomPoetryCollection = poetryCollections[Math.floor(Math.random() * poetryCollections.length)];
-
       if (
         typeof randomPoetryCollection.id === 'string' &&
         typeof randomPoetryCollection.mintContractAddress === 'string'
       ) {
         const poetryCollectionId = randomPoetryCollection.id;
         const poetryCollectionMintContractAddress = randomPoetryCollection.mintContractAddress;
+
         fetchPoems(poetryCollectionId, poetryCollectionMintContractAddress);
       } else {
         console.error('Propriétés id et/ou mintContractAddress manquantes ou de type invalide dans l\'objet randomPoetryCollection');

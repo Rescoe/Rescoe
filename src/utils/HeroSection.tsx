@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { Box, Image, Text, VStack, HStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 
-// Définition des types pour les props
 interface Nft {
   image: string;
   name?: string;
@@ -14,7 +13,7 @@ interface Nft {
 }
 
 interface Haiku {
-  poemText: string;
+  poemText: any; // Modifié pour accepter tout type (pour gérer le Proxy)
   poet?: string;
 }
 
@@ -24,79 +23,43 @@ interface HeroSectionProps {
 }
 
 const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
-  const [index, setIndex] = useState(0);
-  const [hovered, setHovered] = useState<"nft" | null>(null);
+  const [selectedNft, setSelectedNft] = useState<Nft | null>(null);
+  const [selectedHaiku, setSelectedHaiku] = useState<Haiku | null>(null);
   const router = useRouter();
 
   useEffect(() => {
-    const SIX_HOURS = 6 * 60 * 60 * 1000; // 6 heures en ms
-    const now = Date.now();
-
-    const cachedItems = localStorage.getItem("selectedItems");
-    let selectedNfts: Nft[] = [];
-    let selectedHaikus: Haiku[] = [];
-
-    let shouldUpdate = true;
-
-    if (cachedItems) {
-      try {
-        const parsedItems = JSON.parse(cachedItems);
-        const lastUpdate = parsedItems.timestamp || 0;
-
-        // Si les données ont moins de 6h, on les garde
-        if (now - lastUpdate < SIX_HOURS) {
-          selectedNfts = Array.isArray(parsedItems.selectedNfts) ? parsedItems.selectedNfts : [];
-          selectedHaikus = Array.isArray(parsedItems.selectedHaikus) ? parsedItems.selectedHaikus : [];
-          shouldUpdate = false;
-        }
-      } catch (error) {
-        console.error("Erreur de parsing des éléments du localStorage:", error);
-      }
+    if (nfts.length > 0 && haikus.length > 0) {
+      const randomNft = nfts[Math.floor(Math.random() * nfts.length)];
+      const randomHaiku = haikus[Math.floor(Math.random() * haikus.length)];
+      setSelectedNft(randomNft);
+      setSelectedHaiku(randomHaiku);
+    } else {
+      console.warn(`Haiku manquant`);
     }
-
-    // Mise à jour si nécessaire
-    if (shouldUpdate) {
-      selectedNfts = nfts.sort(() => 0.5 - Math.random()).slice(0, 5);
-      selectedHaikus = haikus.sort(() => 0.5 - Math.random()).slice(0, 5);
-
-      localStorage.setItem("selectedItems", JSON.stringify({
-        selectedNfts,
-        selectedHaikus,
-        timestamp: now
-      }));
-    }
-
-    const interval = setInterval(() => {
-      setIndex((prevIndex) => (prevIndex + 1) % selectedNfts.length);
-    }, 6000); // ceci fait défiler les NFT, à adapter si besoin
-
-    return () => clearInterval(interval);
   }, [nfts, haikus]);
 
-
-  // Fonction pour raccourcir l'adresse Ethereum
-  const formatAddress = (address: string) => {
-  if (!address) return '';
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  const formatAddress = (address?: string) => {
+    if (!address) return "Adresse inconnue";
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
+  const handleClick = (item: Nft) => {
+    const nftId = item.content.tokenId;
+    const collectionAddress = item.content.mintContractAddress;
+    router.push(`/tokenId/${collectionAddress}/${nftId}`);
+  };
 
-  const handleClick = (item: Nft | Haiku) => {
-    if ("content" in item) {
-      const nftId = item.content.tokenId;
-      const collectionAddress = item.content.mintContractAddress;
-      router.push(`/tokenId/${collectionAddress}/${nftId}`);
+  // Fonction pour extraire le poème du Proxy
+  const getPoemText = (poemText: any) => {
+    // Assurez-vous que poemText est accessible et contient le bon texte
+    if (Array.isArray(poemText) && poemText.length > 6) {
+      return poemText[6]; // Accéder directement à la chaîne de caractères
+    } else if (typeof poemText === "string") {
+      return poemText; // Si c'est déjà une chaîne de caractères
     } else {
-      alert("Haiku cliqué");
+      return "Texte introuvable"; // Gestion de l'erreur
     }
   };
-
-  // Récupération sécurisée des NFT et Haikus locaux ou par défaut, pour le rendu
-  const { selectedNfts = [], selectedHaikus = [] } = JSON.parse(localStorage.getItem("selectedItems") || '{}');
-
-  // Vérification que selectedNfts et selectedHaikus sont valides avant de les utiliser
-  const currentNft = selectedNfts.length > 0 ? selectedNfts[index % selectedNfts.length] : null;
-  const currentHaiku = selectedHaikus.length > 0 ? selectedHaikus[index % selectedHaikus.length] : null;
 
   return (
     <Box
@@ -113,7 +76,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
       py={10}
       pb={100}
     >
-      {currentNft && currentHaiku && (
+      {selectedNft && selectedHaiku && (
         <>
           <Box
             position="relative"
@@ -122,19 +85,16 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
             h="100%"
             borderRadius="md"
             cursor="pointer"
-            onMouseEnter={() => setHovered("nft")}
-            onMouseLeave={() => setHovered(null)}
+            onClick={() => handleClick(selectedNft)}
           >
             <Image
-              src={currentNft.image}
-              alt={currentNft.name || "NFT"}
+              src={selectedNft.image}
+              alt={selectedNft.name || "NFT"}
               objectFit="cover"
               w="100%"
               h="100%"
               borderRadius="md"
-              opacity={hovered === "nft" ? 1 : 0.95}
             />
-
             <Box
               position="absolute"
               top="0"
@@ -148,30 +108,27 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
               zIndex={2}
             >
               <VStack textAlign="center" color="white" maxWidth="80%">
-                {currentHaiku.poemText
-                  ? currentHaiku.poemText.split("\n").map((line: string, i: number) => (
-                      <Text key={i} fontStyle="italic" fontSize="sm">
-                        {line}
-                      </Text>
-                    ))
-                  : "Pas de poème disponible"}
+              {getPoemText(selectedHaiku.poemText)?.split("\n").map((line: string, i: number) => (
+                <Text key={i} fontStyle="italic" fontSize="sm">
+                  {line}
+                </Text>
+              ))}
+
               </VStack>
             </Box>
           </Box>
-
           <HStack spacing={4} mt={4} align="start" flexDirection="column">
             <Box>
               <Text fontWeight="bold" fontSize="md">
-                Œuvre : <Text as="span" fontWeight="normal">{currentNft.name || "Artiste"}</Text>
+                Œuvre : <Text as="span" fontWeight="normal">{selectedNft.name || "Sans nom"}</Text>
               </Text>
               <Text fontStyle="italic" fontSize="sm">
-                {formatAddress(currentNft.artist) || "Oeuvre sans nom"}
+                {formatAddress(selectedNft.artist)}
               </Text>
             </Box>
-
             <Box>
               <Text fontWeight="bold" fontSize="md">
-                Poème : <Text as="span" fontWeight="normal">{currentHaiku.poet || "Poète inconnu"}</Text>
+                Poème : <Text as="span" fontWeight="normal">{selectedHaiku.poet || "Poète inconnu"}</Text>
               </Text>
             </Box>
           </HStack>

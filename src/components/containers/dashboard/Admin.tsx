@@ -27,6 +27,16 @@ import {
 import detectEthereumProvider from '@metamask/detect-provider';
 
 
+type Collection =  {
+  id: string;
+  name: string;
+  imageUrl: string;
+  mintContractAddress: string;
+  isFeatured: boolean;
+  creator: string;        // Ajouté
+  collectionType: string; // Ajouté
+}
+
 interface Detail {
     uri: string;
     role: string;
@@ -63,9 +73,19 @@ const AdminPage: React.FC = () => {
     const[prixPoints, setprixPoints] = useState<string>('');
     const [mintPrice, setMintPrice] = useState<number>(0);
 
+    const [searchId, setSearchId] = useState<string>('');
+    const [searchedCollection, setSearchedCollection] = useState<any | null>(null);
+
+    const [activeNFTTab, setActiveNFTTab] = useState<string>('ManageFeatured');
+
+
     const [newPointPrice, setNewPointPrice] = useState<number>(0);
     const [numberOfAdhesions, setNumberOfAdhesions] = useState<number>(1); // Nombre par défaut
     const [adhesionData, setAdhesionData] = useState<{ address: string; role: string; name: string; bio: string }[]>([{ address: '', role: '', name: '', bio: 'Biographie (modifiable)' }]);
+
+    const [featuredCollections, setFeaturedCollections] = useState<number[]>([]);
+    const [collectionId, setCollectionId] = useState<string>('');
+
 
 
     const roleMapping: Record<string, number> = {
@@ -281,63 +301,7 @@ const handleMintMultiple = async (): Promise<void> => {
     }
 };
 
-/*
-//############################################################################# => Systeme de mint multiple accessible uniquement a l'admin
-// Vérification si window.ethereum est défini
-const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const count = parseInt(e.target.value);
-        if (!isNaN(count) && count >= 1) {
-            setNumberOfAdhesions(count);
-            const updatedAdhesionData = Array.from({ length: count }, (_, index) => ({
-                address: '',
-                role: '',
-                name: '',
-                bio: index === 0 ? 'Biographie (modifiable)' : '',
-            }));
-            setAdhesionData(updatedAdhesionData);
-        } else {
-            setNumberOfAdhesions(1);
-            setAdhesionData([{ address: '', role: '', name: '', bio: 'Biographie (modifiable)' }]);
-        }
-    };
 
-    const handleAdhesionChange = (index: number, field: 'address' | 'role' | 'name' | 'bio', value: string) => {
-        const updatedData = [...adhesionData];
-        updatedData[index][field] = value;
-        setAdhesionData(updatedData);
-    };
-
-    const handleMintMultiple = async (): Promise<void> => {
-        if (window.ethereum) {
-            const web3 = new Web3(window.ethereum as any);
-            const contract = new web3.eth.Contract(ABI, contractAddress);
-
-            try {
-                const accounts: string[] = await web3.eth.getAccounts();
-
-                const recipientsArray: string[] = adhesionData.map(adhesion => adhesion.address.trim());
-                const rolesArray: number[] = adhesionData.map(adhesion => roleMapping[adhesion.role]); // Assurez-vous que le rôle est correctement décodé
-                const nameArray: string[] = adhesionData.map(adhesion => adhesion.name || "");
-                const bioArray: string[] = adhesionData.map(adhesion => adhesion.bio || "");
-
-                // Vérifier que chaque tableau a la même longueur
-                if (recipientsArray.length !== rolesArray.length || recipientsArray.length !== nameArray.length || recipientsArray.length !== bioArray.length) {
-                    alert('Le nombre d\'adresses, de rôles, de noms et de bios doit être le même.');
-                    return;
-                }
-
-                await contract.methods.mintMultiple(recipientsArray, rolesArray, nameArray, bioArray).send({ from: accounts[0] });
-                alert('NFTs mintés avec succès !');
-            } catch (error) {
-                console.error("Minting failed:");
-                alert('Minting failed: ');
-            }
-        } else {
-            alert('MetaMask ou un autre fournisseur Web3 n\'est pas installé.');
-        }
-    };
-
-*/
 //############################################################# => Gestion du prix des adhesion et des points de récompense
 const setPointPrice = async (newPrice: number) => {
     if (window.ethereum && web3 && account) {
@@ -377,6 +341,134 @@ const fetchPointPrice = async () => {
   }
 };
 
+
+const fetchFeaturedCollections = async (web3Instance: Web3, userAccount: string) => {
+  if (web3) {
+    try {
+      const contract = new web3.eth.Contract(ABICollection, contratRescollection);
+      const total = await contract.methods._totalCollectionMinted().call() as string;
+
+
+        const featured: number[] = [];
+
+        for (let i = 0; i < parseInt(total); i++) {
+          const collection = await contract.methods.collections(i).call() as Collection;
+            if (collection && collection.isFeatured) {
+              fetchCollectionById(collection.id);
+              featured.push(parseInt(collection.id, 10));
+            }
+        }
+
+        setFeaturedCollections(featured);
+    } catch (err) {
+        console.error('Erreur lors du chargement des collections en vedette :', err);
+    }
+  }
+};
+
+
+const handleFeature = async (isFeatured: boolean) => {
+    if (!collectionId) return alert('Veuillez renseigner un ID de collection.');
+    if (web3 && account) {
+        try {
+            const contract = new web3.eth.Contract(ABICollection as any, contratRescollection);
+            await contract.methods.featureCollection(parseInt(collectionId), isFeatured).send({ from: account });
+            alert(`La collection ${collectionId} a été ${isFeatured ? 'mise en avant' : 'retirée des mises en avant'}.`);
+            setCollectionId('');
+            await fetchFeaturedCollections(web3, account); // Refresh after update
+        } catch (error) {
+            console.error('Erreur lors de la mise à jour de la mise en avant :', error);
+            alert('Erreur lors de la mise à jour de la collection.');
+        }
+    } else {
+        alert("Assurez-vous d'être connecté et d'avoir une instance Web3 disponible.");
+    }
+};
+
+useEffect(() => {
+
+  const fetchFeaturedCollections = async () => {
+    if (window.ethereum && web3) {
+      try {
+        const contract = new web3.eth.Contract(ABICollection, contratRescollection);
+        const total = await contract.methods.getTotalCollectionsMinted().call() as string;
+
+
+          const featured: number[] = [];
+
+          for (let i = 0; i < parseInt(total); i++) {
+            const collection = await contract.methods.collections(i).call() as Collection;
+              if (collection && collection.isFeatured) {
+                fetchCollectionById(collection.id);
+                featured.push(parseInt(collection.id, 10));
+              }
+          }
+
+          setFeaturedCollections(featured);
+      } catch (error) {
+        console.error('Erreur lors du chargement des collections mises en avant :', error);
+      }
+    }
+  };
+
+  fetchFeaturedCollections();
+}, [web3]);
+
+
+const fetchCollectionById = async (id: string) => {
+  if (!web3) return;
+
+  try {
+    const contract = new web3.eth.Contract(ABICollection, contratRescollection);
+
+    const collection = await contract.methods.getCollection(id).call() as Collection;
+    const type = collection.collectionType;
+    const uri = await contract.methods.getCollectionURI(id).call() as string;
+
+    // Conversion IPFS -> HTTP (si nécessaire)
+    const normalizedUri = uri.startsWith('ipfs://')
+      ? uri.replace('ipfs://', 'https://ipfs.io/ipfs/')
+      : uri;
+
+    // Fetch du JSON de métadonnées
+    const res = await fetch(normalizedUri);
+    const metadata = await res.json();
+
+    // Récupération et normalisation de l'image
+    const image = metadata.image?.startsWith('ipfs://')
+      ? metadata.image.replace('ipfs://', 'https://ipfs.io/ipfs/')
+      : metadata.image;
+
+    return {
+
+      id,
+      uri: normalizedUri,        // URI du JSON
+      image,                     // URL directe de l’image
+      name: metadata.name,       // Ajoute le nom si présent
+      description: metadata.description, // Optionnel
+      tags: metadata.tags || [],
+      type,
+    };
+  } catch (error) {
+    console.error(`Erreur lors de la récupération de la collection ${id}:`, error);
+    return null;
+  }
+};
+
+
+
+const handleSearch = async () => {
+  const id = parseInt(searchId);
+  if (isNaN(id)) return alert("ID invalide");
+
+  const result = await fetchCollectionById(id.toString());
+  if (result) {
+    setSearchedCollection(result);
+  } else {
+    alert("Collection non trouvée.");
+    setSearchedCollection(null);
+  }
+};
 
 
 const handleSetMintPrice = async (): Promise<void> => {
@@ -465,6 +557,7 @@ const handleBurnNFT = async (): Promise<void> => {
 const ManageFeaturedCollections = () => {
     const [collectionId, setCollectionId] = useState<string>('');
 
+
     const handleFeature = async (isFeatured: boolean) => {
         if (!collectionId) return alert('Veuillez renseigner un ID de collection.');
 
@@ -483,22 +576,123 @@ const ManageFeaturedCollections = () => {
     };
 
     return (
-        <VStack spacing={4} align="start">
-            <Heading size="md">Mettre une collection en avant</Heading>
-            <Input
+      <VStack spacing={8} align="stretch" maxW="800px" mx="auto" py={6}>
+        {/* Formulaire de recherche */}
+        <Box>
+          <Heading size="md" mb={4}>
+            Rechercher une collection par ID
+          </Heading>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSearch();
+            }}
+          >
+            <HStack>
+              <Input
+                autoFocus
                 placeholder="ID de la collection"
-                value={collectionId}
-                onChange={(e) => setCollectionId(e.target.value)}
+                value={searchId}
+                onChange={(e) => setSearchId(e.target.value)}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+              />
+              <Button type="submit" colorScheme="blue">
+                Rechercher
+              </Button>
+            </HStack>
+          </form>
+        </Box>
+
+        {/* Résultat de la recherche */}
+        {searchedCollection && (
+          <Box
+            borderWidth="1px"
+            borderRadius="lg"
+            p={4}
+            boxShadow="sm"
+            bg="black.500"
+          >
+            <HStack align="start" spacing={6}>
+              {/* Texte */}
+              <Box flex="1">
+                <Text><strong>Type :</strong> {searchedCollection.type}</Text>
+                {searchedCollection.name && (
+                  <Text><strong>Nom :</strong> {searchedCollection.name}</Text>
+                )}
+                <Text>
+                  <strong>Featured :</strong>{' '}
+                  {searchedCollection.isFeatured ? '✅ Oui' : '❌ Non'}
+                </Text>
+                <Button
+                  mt={3}
+                  size="sm"
+                  colorScheme="teal"
+                  onClick={() => setCollectionId(searchedCollection.id.toString())}
+                >
+                  Utiliser cet ID
+                </Button>
+              </Box>
+
+              {/* Image */}
+              {searchedCollection.image && (
+                <Box>
+                  <img
+                    src={searchedCollection.image}
+                    alt="Poème"
+                    style={{
+                      width: '160px',
+                      borderRadius: '8px',
+                      objectFit: 'cover',
+                    }}
+                  />
+                </Box>
+              )}
+            </HStack>
+          </Box>
+        )}
+
+        <Divider />
+
+        {/* Collections mises en avant */}
+        <Box>
+          <Heading size="md" mb={2}>Collections mises en avant</Heading>
+          {featuredCollections.length === 0 ? (
+            <Text>Aucune collection n’est mise en avant pour le moment.</Text>
+          ) : (
+            <Box as="ul" pl={4}>
+            {featuredCollections.map((id) => (
+              <Text key={id}>Collection {id}</Text>
+            ))}
+            </Box>
+          )}
+        </Box>
+
+        <Divider />
+
+        {/* Mise en avant */}
+        <Box>
+          <Heading size="md" mb={2}>Mettre une collection en avant</Heading>
+          <VStack align="stretch" spacing={3}>
+            <Input
+              placeholder="ID de la collection"
+              value={collectionId}
+              onChange={(e) => setCollectionId(e.target.value)}
             />
             <HStack>
-                <Button colorScheme="green" onClick={() => handleFeature(true)}>Mettre en avant</Button>
-                <Button colorScheme="red" onClick={() => handleFeature(false)}>Retirer</Button>
+              <Button colorScheme="green" onClick={() => handleFeature(true)}>
+                Mettre en avant
+              </Button>
+              <Button colorScheme="red" onClick={() => handleFeature(false)}>
+                Retirer
+              </Button>
             </HStack>
-        </VStack>
+          </VStack>
+        </Box>
+      </VStack>
     );
 };
-
-
 
 
     const ManageRoles = () => (
@@ -576,23 +770,25 @@ const ManageFeaturedCollections = () => {
     );
 
     const ManageNFT = () => {
-        const [activeNFTTab, setActiveNFTTab] = useState<string>('ManageNFT');
 
         return (
             <VStack>
                 <HStack spacing={4}>
+
+                <Button
+                    onClick={() => setActiveNFTTab('ManageFeatured')}
+                    variant={activeNFTTab === 'ManageFeatured' ? 'solid' : 'outline'}
+                >
+                    Collections mises en avant
+                </Button>
+
                     <Button
                         onClick={() => setActiveNFTTab('ManageNFT')}
                         variant={activeNFTTab === 'ManageNFT' ? 'solid' : 'outline'}
                     >
                         Gérer les NFTs
                     </Button>
-                    <Button
-                        onClick={() => setActiveNFTTab('ManageFeatured')}
-                        variant={activeNFTTab === 'ManageFeatured' ? 'solid' : 'outline'}
-                    >
-                        Collections mises en avant
-                    </Button>
+
                 </HStack>
                 {activeNFTTab === 'ManageNFT' && (
                     <>

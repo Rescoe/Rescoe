@@ -21,7 +21,8 @@ const PoemMintingPage: React.FC = () => {
   const [line2, setLine2] = useState<string>("");
   const [line3, setLine3] = useState<string>("");
   const [editions, setEditions] = useState<number>(1);
-  const [salePrice, setSalePrice] = useState<string>("");
+  const [editionsForSale, setEditionsForSale] = useState<number>(0); // État pour le nombre d'éditions à mettre en vente
+  const [salePrice, setSalePrice] = useState<number>(0); // Prix de vente en Wei
   const [isMinting, setIsMinting] = useState<boolean>(false);
   const [contractAddress, setContractAddress] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
@@ -31,7 +32,6 @@ const PoemMintingPage: React.FC = () => {
   const toast = useToast();
 
   useEffect(() => {
-    // Vérifiez si nous sommes dans le navigateur
     if (typeof window !== "undefined" && (window as any).ethereum) {
       const web3Instance = new Web3((window as any).ethereum);
       setWeb3(web3Instance);
@@ -89,7 +89,17 @@ const PoemMintingPage: React.FC = () => {
   };
 
   const mintPoem = async () => {
-    if (!line1 || !line2 || !line3 || !selectedCollectionId || !salePrice || !contractAddress || !web3) {
+    if (
+      !line1 ||
+      !line2 ||
+      !line3 ||
+      !selectedCollectionId ||
+      !contractAddress ||
+      !web3 ||
+      !editions ||
+      !editionsForSale ||
+      salePrice <= 0
+    ) {
       toast({
         title: "Missing Information",
         description: "Please provide all fields to mint the haiku.",
@@ -99,13 +109,22 @@ const PoemMintingPage: React.FC = () => {
       });
       return;
     }
+
     try {
       setIsMinting(true);
+
       const contract = new web3.eth.Contract(ABI, contractAddress);
       const accounts = await web3.eth.getAccounts();
       const userAddress = accounts[0];
+
       const fullHaiku = `${line1}\n${line2}\n${line3}`;
-      await contract.methods.createHaiku(fullHaiku, editions, web3.utils.toWei(salePrice, "ether")).send({ from: userAddress });
+      const salePriceInWei = Web3.utils.toWei(salePrice.toString(), "ether"); // Convertir le prix en Wei
+
+      // Mint le haiku
+      await contract.methods
+        .mint(editions, fullHaiku, salePriceInWei, editionsForSale)
+        .send({ from: userAddress });
+
       toast({
         title: "Haiku Minted!",
         description: "Your haiku has been successfully minted.",
@@ -113,14 +132,19 @@ const PoemMintingPage: React.FC = () => {
         duration: 3000,
         isClosable: true,
       });
+
+      // Réinitialisation des champs
       setLine1("");
       setLine2("");
       setLine3("");
       setEditions(1);
-      setSalePrice("");
+      setEditionsForSale(0);
+      setSalePrice(0); // Reset to zero
       setSelectedCollectionId("");
       setContractAddress("");
+
     } catch (error) {
+      console.error("Minting error:", error);
       toast({
         title: "Minting Failed",
         description: "Something went wrong. Please try again later.",
@@ -162,7 +186,7 @@ const PoemMintingPage: React.FC = () => {
       <Select
         onChange={(e) => {
           setSelectedCollectionId(e.target.value);
-          fetchMintingContractAddress(e.target.value); // Récupérer l'adresse du contrat après sélection
+          fetchMintingContractAddress(e.target.value);
         }}
         placeholder="Select a Poetry Collection"
       >
@@ -182,12 +206,24 @@ const PoemMintingPage: React.FC = () => {
         placeholder="Number of Editions"
       />
 
-      <FormLabel mt={5}>Sale Price (ETH)</FormLabel>
+      <FormLabel mt={5}>Number of Editions to Sell</FormLabel>
       <Input
         type="number"
+        min="0"
+        max={editions} // Limiter l'entrée à ne pas dépasser le nombre total d'éditions
+        value={editionsForSale}
+        onChange={(e) => setEditionsForSale(Number(e.target.value))}
+        placeholder="Editions to Sell (0 to total editions)"
+      />
+
+      <FormLabel mt={5}>Sale Price (in ETH)</FormLabel>
+      <Input
+        type="number"
+        min="0"
+        step="0.0001"
         value={salePrice}
-        onChange={(e) => setSalePrice(e.target.value)}
-        placeholder="Sale Price in ETH"
+        onChange={(e) => setSalePrice(Number(e.target.value))}
+        placeholder="Prix de vente par édition (en ETH)"
       />
 
       <Button
@@ -195,7 +231,7 @@ const PoemMintingPage: React.FC = () => {
         colorScheme="teal"
         onClick={mintPoem}
         isLoading={isMinting}
-        isDisabled={!line1 || !line2 || !line3 || !selectedCollectionId || !salePrice || !editions || !contractAddress}
+        isDisabled={!line1 || !line2 || !line3 || !selectedCollectionId || !editions || !editionsForSale || salePrice <= 0 || !contractAddress}
       >
         Mint Haiku
       </Button>

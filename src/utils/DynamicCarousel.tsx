@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Box, Image, Text } from "@chakra-ui/react";
+import { Box, Image, Text, useMediaQuery } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import { useMediaQuery } from '@chakra-ui/react';
-
 
 interface Nft {
   id: string;
@@ -17,6 +15,7 @@ interface Nft {
 
 interface Haiku {
   poemText: string;
+  poet?: string;
 }
 
 interface AlternatingItem {
@@ -29,129 +28,51 @@ interface AlternatingItem {
 interface GridLayoutProps {
   nfts: Nft[];
   haikus: Haiku[];
-  delay?: number; // Délai de chargement en secondes
-  maxNfts?: number; // Nombre max de NFTs affichés
-  maxHaikus?: number; // Nombre max de haikus affichés
+  delay?: number;
+  maxNfts?: number;
+  maxHaikus?: number;
 }
 
 const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNfts = 5, maxHaikus = 5 }) => {
-  const [isMobile] = useMediaQuery('(max-width: 768px)'); // Ajuster la largeur selon vos besoins
-
-  const [index, setIndex] = useState<number>(0);
   const [items, setItems] = useState<AlternatingItem[]>([]);
+  const [index, setIndex] = useState(0);
   const [hoveredItem, setHoveredItem] = useState<AlternatingItem | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [isMobile] = useMediaQuery("(max-width: 768px)");
   const router = useRouter();
 
-
   useEffect(() => {
-    const cacheKey = "carouselData";
-    const cacheDuration = 0.01 * 60 * 60 * 1000; // 6 minutes
-    const isDataReady = nfts.length > 0 && haikus.length > 0;
+    const shuffledNfts = [...nfts].sort(() => Math.random() - 0.5).slice(0, maxNfts);
+    const shuffledHaikus = [...haikus].sort(() => Math.random() - 0.5).slice(0, maxHaikus);
 
-    if (!isDataReady) return;
-
-    const generateItems = () => {
-      const selectedNfts = nfts.slice(0, maxNfts);
-      const selectedHaikus = haikus.slice(0, maxHaikus);
-      const alternateItems: AlternatingItem[] = [];
-      const maxLength = Math.max(selectedNfts.length, selectedHaikus.length);
-
-      for (let i = 0; i < maxLength; i++) {
-        if (i < selectedHaikus.length) {
-          alternateItems.push({
-            type: "haiku",
-            content: {
-              poemText: selectedHaikus[i].poemText.split("\n").map(line => line.trim()).join("\n"),
-            },
-            associatedNft: selectedNfts[i % selectedNfts.length],
-          });
-        }
-        if (i < selectedNfts.length) {
-          alternateItems.push({
-            type: "nft",
-            content: selectedNfts[i],
-            associatedHaiku: selectedHaikus[i % selectedHaikus.length]?.poemText.split("\n").map(line => line.trim()).join("\n"),
-          });
-        }
+    const combined: AlternatingItem[] = [];
+    shuffledNfts.forEach((nft, i) => {
+      const haiku = shuffledHaikus[i];
+      if (haiku) {
+        combined.push({ type: "nft", content: nft, associatedHaiku: haiku.poemText[6] });
+        combined.push({ type: "haiku", content: haiku, associatedNft: nft });
+        //console.log(haiku.poemText[6]);
       }
+    });
 
-      return alternateItems;
-    };
+    setItems(combined);
+  }, [nfts, haikus, maxNfts, maxHaikus]);
 
-    const loadData = () => {
-      const cached = localStorage.getItem(cacheKey);
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
-          const isValid = Date.now() - parsed.timestamp < cacheDuration;
-          if (isValid) {
-            setItems(parsed.items);
-            setLoading(false);
-            return;
-          }
-        } catch (err) {
-          console.warn("Erreur lecture cache:", err);
-        }
-      }
-
-      const newItems = generateItems();
-      localStorage.setItem(cacheKey, JSON.stringify({
-        timestamp: Date.now(),
-        items: newItems
-      }));
-      setItems(newItems);
-      setLoading(false);
-    };
-
-    // Chargement initial
-    setLoading(true);
-    const initialTimeout = setTimeout(() => {
-      loadData();
-    }, delay * 1000);
-
-    // Rafraîchissement automatique chaque minute
-    const interval = setInterval(() => {
-      loadData();
-    }, 60 * 1000); // 1 minute
-
-    return () => {
-      clearTimeout(initialTimeout);
-      clearInterval(interval);
-    };
-  }, [nfts, haikus, delay, maxNfts, maxHaikus]);
-
-
-
-
-  // Fonction pour raccourcir l'adresse Ethereum
-  const formatAddress = (address: string) => {
-  if (!address) return '';
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  const moveToIndex = (offset: number) => {
+    setIndex((prev) => (prev + offset + items.length) % items.length);
   };
 
-  const moveToIndex = (newIndex: number) => {
-    setIndex(newIndex % items.length);
-  };
+  const formatAddress = (addr?: string) => addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : "";
 
   const handleClick = (item: AlternatingItem) => {
-    if (item?.type === "nft") {
-      const nftId = (item.content as Nft).content.tokenId;
-      const Contrat = (item.content as Nft).content.mintContractAddress;
-
-      router.push(`/oeuvresId/${Contrat}/${nftId}`);
+    if (item.type === "nft") {
+      const { tokenId, mintContractAddress } = (item.content as Nft).content;
+      router.push(`/nfts/${mintContractAddress}/${tokenId}`);
     }
   };
-
-  if (loading) {
-    return <Text>Chargement des données...</Text>;
-  }
-
   const renderContent = (item: AlternatingItem) => {
     if (item.type === "haiku") {
 
       const haikuContent = item.content as Haiku; // Assertion de type
-
       return (
         <Box
           position="relative"
@@ -175,7 +96,7 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
 
 
             <Text fontStyle="italic" textAlign="center">
-            {typeof haikuContent.poemText ? haikuContent.poemText : "Contenu du haiku introuvable"}
+            {typeof haikuContent.poemText ? haikuContent.poemText[6] : "Contenu du haiku introuvable"}
             </Text>
           </Box>
           {hoveredItem?.type === "haiku" && hoveredItem.content === item.content && (
