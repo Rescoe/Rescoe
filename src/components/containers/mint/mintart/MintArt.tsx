@@ -7,6 +7,7 @@ import axios from "axios";
 import contractABI from '../../../ABI/ABI_ART.json';
 import ABIRESCOLLECTION from '../../../ABI/ABI_Collections.json';
 import { useAuth } from '../../../../utils/authContext';
+import { useRouter } from 'next/router';
 
 import dynamic from 'next/dynamic';
 import { Canvas } from '@react-three/fiber';
@@ -22,7 +23,12 @@ import {
   Heading,
   VStack,
   Image,
-  Checkbox
+  Checkbox,
+  Stack,
+  CloseButton,
+  Divider,
+  Flex,
+  useToast
 } from "@chakra-ui/react";
 
 interface Metadata {
@@ -67,6 +73,14 @@ interface MintResult {
   };
 }
 
+interface PublishToastProps {
+  tokenId: number;
+  collectionMintAddress: string;
+  onClose: () => void;
+  router: any; // ici je mets any si tu n'as pas le type précis, sinon précise-le
+  listForSale: (price: string) => Promise<void>;
+  isSaleListing: boolean;
+}
 
 const Bananas = dynamic(() => import('../../../modules/Bananas'), { ssr: false });
 
@@ -88,8 +102,14 @@ const MintArt: React.FC = () => {
   const [salePrice, setSalePrice] = useState<string>("");
   const [isSaleListing, setIsSaleListing] = useState<boolean>(false);
   const [showBananas, setShowBananas] = useState<boolean>(false);
+  const [tokenId, setTokenId] = useState<number>(0);
+  const [collectionMint, setCollectionMint] = useState<string>("");
+  const [showPriceInput, setShowPriceInput] = useState(false);
+  const [manualPrice, setManualPrice] = useState("");
 
   const { address, web3, provider } = useAuth();
+  const toast = useToast();
+  const router = useRouter();
 
 
 
@@ -192,6 +212,17 @@ const MintArt: React.FC = () => {
         );
 
         setIpfsUrl(`https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`);
+
+        toast({
+          title: "Oeuvre uploadée",
+          description: ipfsUrl,
+          status: "success",
+          duration: 1000,
+          isClosable: true,
+          position: "top",
+        });
+
+
       } catch (error) {
         console.error('Error uploading to IPFS:', error);
         alert('Error uploading to IPFS');
@@ -203,178 +234,492 @@ const MintArt: React.FC = () => {
     }
   };
 
-
   const mintNFT = async (): Promise<void> => {
-      if (!ipfsUrl || selectedCollectionId === null) {
-          alert("Veuillez télécharger les métadonnées sur IPFS et sélectionner une collection.");
-          return;
+    if (!ipfsUrl || selectedCollectionId === null) {
+      alert("Veuillez télécharger les métadonnées sur IPFS et sélectionner une collection.");
+      return;
+    }
+
+    if (!web3) {
+      alert("Web3 non initialisé. Veuillez vous reconnecter.");
+      return;
+    }
+
+    setIsMinting(true);
+    fetchLastTokenId();
+
+    try {
+      const userAddress: string | null = address;
+
+      const contractResCollection = new web3.eth.Contract(ABIRESCOLLECTION, contractRESCOLLECTION);
+
+      // collectionDetails doit exister si tout va bien
+      const collectionDetails: CollectionDetails = await contractResCollection.methods.getCollection(selectedCollectionId).call();
+
+      if (!collectionDetails) {
+        throw new Error("Détails de la collection introuvables.");
       }
 
-      if (!web3) {
-          alert("Web3 non initialisé. Veuillez vous reconnecter.");
-          return;
+      if (collectionDetails.collectionType !== "Art") {
+        alert("Vous ne pouvez pas minter une poésie. Veuillez sélectionner une collection d'art.");
+        return;
       }
+
+      const collectionMintAddress: string = collectionDetails.collectionAddress;
+      if (!web3.utils.isAddress(collectionMintAddress)) {
+        throw new Error(`Adresse de contrat invalide : ${collectionMintAddress}`);
+      }
+
+      setCollectionMint(collectionMintAddress);
+
+      const editions: number = 1;
+      const mintContract = new web3.eth.Contract(contractABI, collectionMintAddress);
+
+      if (!userAddress) {
+        throw new Error("L'adresse utilisateur est invalide ou non connectée.");
+      }
+
+      const mintResult = await mintContract.methods.mint(ipfsUrl, editions).send({ from: userAddress });
+
+      const lastTokenIdStr: string = await mintContract.methods.getLastMintedTokenId().call();
+      const currentTokenId: number = Number(lastTokenIdStr);
+      setTokenId(currentTokenId);
+
+      console.log("tokenId lors du mint : ", currentTokenId);
+
+      if (isSaleListing && salePrice && parseFloat(salePrice) > 0) {
+        const priceWei: string = web3.utils.toWei(salePrice, "ether");
+        console.log(priceWei);
+
+        await mintContract.methods.listNFTForSale(currentTokenId, priceWei).send({ from: userAddress });
+      }
+
+      publishSuccess(currentTokenId, collectionMintAddress);
+
+    } catch (error: unknown) {
+      console.error("Erreur lors du minting NFT :", error);
+      alert("Erreur lors de la publication de l'œuvre. Vérifiez la console pour plus de détails.");
+    } finally {
+      setIsMinting(false);
+    }
+  };
+
+  const listForSale = async (salePrice: string): Promise<void> => {
+    if (!web3) {
+      alert("Web3 non initialisé. Veuillez vous reconnecter.");
+      return;
+    }
+    try {
+      fetchLastTokenId();
+
+      const userAddress: string | null = address;
+
+      if (!userAddress) throw new Error("Adresse utilisateur non définie");
+
+      const contractResCollection = new web3.eth.Contract(ABIRESCOLLECTION, contractRESCOLLECTION);
+
+      const collectionDetails: CollectionDetails = await contractResCollection.methods.getCollection(selectedCollectionId!).call();
+
+      const collectionMintAddress: string = collectionDetails.collectionAddress;
+
+      const mintContract = new web3.eth.Contract(contractABI, collectionMintAddress);
 
 /*
-if(web3){
-try {
-    const accounts = await web3.eth.getAccounts(); // Récupération des comptes
-    if (!accounts[0]) {
-        alert("Aucun compte Ethereum détecté. Ouvrez MetaMask pour vous connecter.");
-        return; // Quitte la fonction si aucun compte n'est disponible
-    }
+      const lastTokenIdStr: string = await mintContract.methods.getLastMintedTokenId().call();
+      const currentTokenId: number = Number(lastTokenIdStr);
 
-    // Récupération des détails de la collection
+      setTokenId(currentTokenId);
+
+      console.log("tokenId lors du sale : ", currentTokenId);
+*/
+      if (salePrice && parseFloat(salePrice) > 0) {
+        const priceWei: string = web3.utils.toWei(salePrice, "ether");
+        console.log(priceWei);
+
+        await mintContract.methods.listNFTForSale(tokenId, priceWei).send({ from: userAddress });
+
+        toast({
+          title: "✅ NFT listé à la vente !",
+          description: `Token #${tokenId} à ${salePrice} ETH`,
+          status: "success",
+          duration: 2000,
+          isClosable: true,
+          position: "top",
+        });
+
+        // setIsSaleListing(true); // garder ton état à jour si nécessaire
+
+        publishSuccess(tokenId, collectionMintAddress);
+      }
+    } catch (err: any) {
+      console.error("Erreur lors du listing", err);
+      toast({
+        title: "Erreur lors du listing",
+        description: err.message || "Vérifiez la console.",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+        position: "top",
+      });
+    }
+  };
+
+  const fetchLastTokenId = async (): Promise<void> => {
+    const userAddress: string | null = address;
+
+    if (!web3 || !selectedCollectionId) return;
+
     const contractResCollection = new web3.eth.Contract(ABIRESCOLLECTION, contractRESCOLLECTION);
+
     const collectionDetails: CollectionDetails = await contractResCollection.methods.getCollection(selectedCollectionId).call();
 
-    if (!collectionDetails) {
-        throw new Error("Détails de la collection introuvables.");
-    }
-
-    // Vérification du type de la collection
-    if (collectionDetails.collectionType !== "Art") {
-        alert("Vous ne pouvez pas mint une poésie. Veuillez sélectionner une collection d'art.");
-        return;
-    }
-
-    // Récupération de l'adresse du contrat de mint
     const collectionMintAddress: string = collectionDetails.collectionAddress;
-    if (!web3.utils.isAddress(collectionMintAddress)) {
-        throw new Error(`Adresse de contrat invalide : ${collectionMintAddress}`);
-    }
 
-    const editions = 1; // Nombre d'éditions à mint
     const mintContract = new web3.eth.Contract(contractABI, collectionMintAddress);
 
-    // Appel de la fonction de mint
-    const mintResult: MintResult = await mintContract.methods.mint(ipfsUrl, editions).send({ from: accounts[0] });
+    if (!mintContract) return;
 
-    if (!mintResult.events?.Transfer?.returnValues?.tokenId) {
-        throw new Error("Token ID introuvable dans l'événement Transfer.");
-    }
+    try {
+      const lastTokenIdStr: string = await mintContract.methods.getLastMintedTokenId().call();
+      const currentTokenId: number = Number(lastTokenIdStr);
 
-    const tokenId = mintResult.events.Transfer.returnValues.tokenId; // Récupération du token ID
-
-    // Si mise en vente activée, ajout automatique à la liste
-    if (isSaleListing) {
-        // Vous pouvez ajouter ici la logique pour la mise en vente si nécessaire
-    }
-
-    alert("Félicitations ! Votre œuvre est publiée !");
-} catch (error) {
-    console.error("Erreur lors du minting NFT :", error);
-    alert('Erreur lors de la publication de l\'œuvre. Vérifiez la console pour plus de détails.');
-} finally {
-    setIsMinting(false); // Termine l'état de minting
-}
-}
-};
-*/
-
-      setIsMinting(true); // Indique que le mint commence
-      try {
-          const userAddress = address; // Utilisez l'adresse depuis l'authContext
-
-          //const contractResCollection = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
-          const contractResCollection = new web3.eth.Contract(ABIRESCOLLECTION, contractRESCOLLECTION);
-
-
-
-          const collectionDetails: CollectionDetails = await contractResCollection.methods.getCollection(selectedCollectionId).call();
-
-
-          if (!collectionDetails) {
-              throw new Error("Détails de la collection introuvables.");
-          }
-
-          if (collectionDetails.collectionType !== "Art") {
-              alert("Vous ne pouvez pas mint une poésie. Veuillez sélectionner une collection d'art.");
-              return;
-          }
-
-          const collectionMintAddress = collectionDetails.collectionAddress;
-          if (!web3.utils.isAddress(collectionMintAddress)) {
-              throw new Error(`Adresse de contrat invalide : ${collectionMintAddress}`);
-          }
-
-          const editions = 1; // Nombre d'éditions à mint
-          const mintContract = new web3.eth.Contract(contractABI, collectionMintAddress);
-
-          if (!userAddress) {
-              throw new Error("L'adresse utilisateur est invalide ou non connectée.");
-          }
-
-          const mintResult = await mintContract.methods.mint(ipfsUrl, editions).send({ from: userAddress });
-
-          if (!mintResult.events?.Transfer?.returnValues?.tokenId) {
-              throw new Error("Token ID introuvable dans l'événement Transfer.");
-          }
-
-          alert("Félicitations ! Votre œuvre est publiée !");
-      } catch (error) {
-          console.error("Erreur lors du minting NFT :", error);
-          alert('Erreur lors de la publication de l\'œuvre. Vérifiez la console pour plus de détails.');
-      } finally {
-          setIsMinting(false);
+      if (isNaN(currentTokenId) || currentTokenId <= 0) {
+        console.warn("TokenId invalide, tentative de re-fetch...");
+        setTimeout(fetchLastTokenId, 1000);
+        return;
       }
+
+      setTokenId(currentTokenId);
+      console.log("✅ Nouveau tokenId : ", currentTokenId);
+    } catch (err) {
+      console.error("Erreur lors du fetch du tokenId :", err);
+    }
+  };
+
+  const publishSuccess = (tokenId: number, collectionMintAddress: string): void => {
+    toast({
+      duration: null,
+      isClosable: true,
+      position: 'top',
+      render: ({ onClose }: { onClose: () => void }) => (
+        <PublishToast
+          tokenId={tokenId}
+          collectionMintAddress={collectionMintAddress}
+          onClose={onClose}
+          router={router}
+          listForSale={listForSale}
+          isSaleListing={isSaleListing}
+        />
+      ),
+    });
   };
 
 
-
+  const PublishToast = ({
+    tokenId,
+    collectionMintAddress,
+    onClose,
+    router,
+    listForSale,
+    isSaleListing
+  }: PublishToastProps) => {
+  const [showPriceInput, setShowPriceInput] = useState(false);
+  const [customPrice, setCustomPrice] = useState("");
 
   return (
-    <Box p={5} maxWidth="600px" mx="auto" boxShadow="md" borderRadius="md">
-      <Heading size="lg" mb={5}>Mint NFT</Heading>
-      <FormLabel>Upload File</FormLabel>
-      <Input type="file" onChange={handleFileChange} mb={3} />
-      {previewUrl && <Image src={previewUrl} alt="Preview" mb={3} boxSize="200px" objectFit="cover" />}
-      <VStack spacing={3} align="stretch">
-        {/*}<Input placeholder="Artist" name="artist" value={metadata.artist} onChange={handleMetadataChange} />*/}
-        <Input placeholder="Name" name="name" value={metadata.name} onChange={handleMetadataChange} />
-        <Input placeholder="Description (pensez à ajouter votre nom d'artiste)" name="description" value={metadata.description} onChange={handleMetadataChange} />
-        <Input placeholder="Tags (comma-separated)" name="tags" value={metadata.tags} onChange={handleMetadataChange} />
-      </VStack>
-      <Button mt={4} colorScheme="teal" onClick={uploadFileToIPFS} isLoading={isUploading}>
-        Upload to IPFS
+    <Box
+  bg="white"
+  color="black"
+  p={6}
+  borderRadius="xl"
+  boxShadow="xl"
+  textAlign="center"
+  maxW="sm"
+  mx="auto"
+  mt={10}
+  position="relative" // 👈 important pour positionner le bouton de fermeture
+>
+  {/* 🔹 Bouton de fermeture en haut à droite */}
+  <CloseButton
+    position="absolute"
+    top="2"
+    right="2"
+    onClick={onClose}
+  />
+
+  <Text fontSize="xl" fontWeight="bold" mb={2}>🎉 Félicitations !</Text>
+  <Text mb={4}>Votre œuvre est publiée{ isSaleListing ? " et listée à la vente!" : " !" }</Text>
+
+  <Stack direction="column" spacing={4} justify="center">
+    <Button colorScheme="blue" onClick={() => { onClose(); mintAgain(); }}>
+      Mint une autre
+    </Button>
+    <Button
+      colorScheme="green"
+      variant="outline"
+      onClick={() => router.push(`/oeuvresId/${collectionMintAddress}/${tokenId}`)}
+    >
+      Voir l'œuvre
+    </Button>
+
+    {!isSaleListing && !showPriceInput && (
+      <Button colorScheme="blue" onClick={() => setShowPriceInput(true)}>
+        Mettre en vente
       </Button>
-    {/*}  {ipfsUrl && <Text mt={3} wordBreak="break-word">IPFS URL: {ipfsUrl}</Text>} */}
+    )}
 
-      <FormLabel mt={5}>Select Collection</FormLabel>
-      <Select onChange={(e) => setSelectedCollectionId(e.target.value)} placeholder="Select a Collection">
-  {collections.map((collection) => (
-    <option key={collection.id} value={collection.id.toString()}>  {/* Conversion ici */}
-      {collection.name}
-    </option>
-  ))}
-</Select>
-
-      <Checkbox mt={3} isChecked={isSaleListing} onChange={(e) => setIsSaleListing(e.target.checked)}>
-        List on Sale
-      </Checkbox>
-      {isSaleListing && (
+    {!isSaleListing && showPriceInput && (
+      <>
         <Input
-          mt={3}
           type="number"
-          placeholder="Sale Price (ETH)"
-          value={salePrice}
-          onChange={(e) => setSalePrice(e.target.value)}
+          placeholder="Prix en ETH"
+          value={customPrice}
+          variant="outline"
+          onChange={(e) => setCustomPrice(e.target.value)}
         />
-      )}
+        <Button colorScheme="teal"
+        onClick={async () => { //Ne se ferme que si la vente réussi !
+              try {
+                await listForSale(customPrice);
+                onClose();
+              } catch (error) {
+                console.error("Erreur lors de la mise en vente :", error);
+                // Optionnel : afficher une alerte ou un message d’erreur ici
+              }
+            }}>
+          Confirmer la vente
+        </Button>
+      </>
+    )}
+  </Stack>
+</Box>
 
+  );
+};
+
+
+  const mintAgain = () => {
+    setFile(null);
+    setPreviewUrl(null);
+    setMetadata({ name: "", description: "", tags: "" });
+    setCustomFee(10); // Réinitialiser la valeur si nécessaire
+    setIpfsUrl(null);
+    setSelectedCollectionId("");
+    setSalePrice(""); // Réinitialiser si elle a été utilisée
+    setIsSaleListing(false); // Réinitialiser si elle a été choisie
+};
+
+
+
+return (
+  <Box
+    maxW="700px"
+    mx="auto"
+    mt={10}
+    p={10}
+    borderRadius="3xl"
+    boxShadow="dark-lg"
+    border="1px solid"
+    borderColor="purple.300"
+  >
+    <Heading
+      size="2xl"
+      mb={6}
+      textAlign="center"
+      fontWeight="black"
+      bgGradient="linear(to-r, purple.400, pink.400)"
+      bgClip="text"
+      letterSpacing="tight"
+    >
+      Mintez
+    </Heading>
+
+    <FormLabel fontWeight="bold" color="gray.200">
+      Choisir un fichier à minter
+    </FormLabel>
+    <Input
+      type="file"
+      onChange={handleFileChange}
+      mb={5}
+      border="2px dashed"
+      borderColor="purple.400"
+      bg="blackAlpha.300"
+      color="white"
+      _hover={{ bg: "blackAlpha.400" }}
+      _focus={{
+        borderColor: "pink.400",
+        boxShadow: "0 0 0 2px rgba(236, 72, 153, 0.4)",
+      }}
+      py={2}
+    />
+
+    {previewUrl && (
+      <Box
+        borderRadius="xl"
+        overflow="hidden"
+        boxShadow="md"
+        mb={6}
+        border="1px solid"
+        borderColor="purple.300"
+      >
+        <Image
+          src={previewUrl}
+          alt="Preview"
+          boxSize="300px"
+          objectFit="cover"
+          mx="auto"
+          transition="transform 0.3s ease"
+          _hover={{ transform: "scale(1.05)" }}
+        />
+      </Box>
+    )}
+
+    <VStack spacing={4} align="stretch">
+      <Input
+        placeholder="Nom de l’œuvre"
+        name="name"
+        value={metadata.name}
+        onChange={handleMetadataChange}
+        bg="blackAlpha.300"
+        color="white"
+        _placeholder={{ color: "gray.400" }}
+        borderColor="purple.300"
+      />
+      <Input
+        placeholder="Description (avec votre nom d'artiste)"
+        name="description"
+        value={metadata.description}
+        onChange={handleMetadataChange}
+        bg="blackAlpha.300"
+        color="white"
+        _placeholder={{ color: "gray.400" }}
+        borderColor="purple.300"
+      />
+      <Input
+        placeholder="Tags (séparés par des virgules)"
+        name="tags"
+        value={metadata.tags}
+        onChange={handleMetadataChange}
+        bg="blackAlpha.300"
+        color="white"
+        _placeholder={{ color: "gray.400" }}
+        borderColor="purple.300"
+      />
+    </VStack>
+
+    <Flex justify="center" mt={8}>
       <Button
-        mt={4}
-        colorScheme="teal"
-        onClick={mintNFT}
+        px={8}
+        py={5}
+        fontSize="md"
+        fontWeight="semibold"
+        borderRadius="full"
+        bgGradient="linear(to-r, purple.700, pink.600)"
+        color="white"
+        boxShadow="lg"
+        _hover={{
+          transform: "scale(1.05)",
+          boxShadow: "xl",
+        }}
+        _active={{
+          transform: "scale(0.97)",
+        }}
+        onClick={uploadFileToIPFS}
+        isLoading={isUploading}
+      >
+        🧾 Upload vers IPFS
+      </Button>
+    </Flex>
+
+    <FormLabel mt={8} color="gray.300" fontWeight="bold">
+      Choisir une collection
+    </FormLabel>
+    <Select
+      placeholder="Sélectionnez une collection"
+      onChange={(e) => {
+        setSelectedCollectionId(e.target.value);
+      }}
+      bg="blackAlpha.300"
+      color="white"
+      borderColor="purple.300"
+      mb={4}
+    >
+      {collections.map((collection) => (
+        <option
+          key={collection.id}
+          value={collection.id.toString()}
+          style={{ backgroundColor: "#1A202C", color: "white" }}
+        >
+          {collection.name}
+        </option>
+      ))}
+    </Select>
+
+    <Text fontSize="sm" color="gray.300" mb={4}>
+  📁 Prochaine oeuvre crée dans cette collection : {" "}
+  <Text as="span" color="purple.200" fontWeight="semibold">
+    {tokenId || "aucune"}
+  </Text>
+</Text>
+
+
+    <Checkbox
+      mt={4}
+      isChecked={isSaleListing}
+      onChange={(e) => setIsSaleListing(e.target.checked)}
+      colorScheme="purple"
+    >
+      Mettre en vente
+    </Checkbox>
+
+    {isSaleListing && (
+      <Input
+        mt={3}
+        type="number"
+        placeholder="Prix de vente (ETH)"
+        value={salePrice}
+        onChange={(e) => setSalePrice(e.target.value)}
+        bg="blackAlpha.300"
+        color="white"
+        _placeholder={{ color: "gray.400" }}
+        borderColor="purple.300"
+      />
+    )}
+
+    <Divider my={10} borderColor="purple.300" />
+
+    <Flex justify="center" mt={8}>
+      <Button
+        px={10}
+        py={6}
+        fontSize="lg"
+        fontWeight="bold"
+        borderRadius="full"
+        bgGradient="linear(to-r, purple.700, pink.600)"
+        color="white"
+        boxShadow="lg"
+        _hover={{
+          transform: "scale(1.05)",
+          boxShadow: "2xl",
+        }}
+        _active={{
+          transform: "scale(0.98)",
+        }}
+        transition="all 0.25s ease"
         isLoading={isMinting}
         isDisabled={!ipfsUrl || !selectedCollectionId}
+        onClick={mintNFT}
       >
-        Mint NFT
+        💾 Créer l'œuvre
       </Button>
-      <Text mt={2}>Wallet connecté : {address}</Text>
+    </Flex>
 
-    </Box>
-  );
+    <Text mt={6} textAlign="center" color="gray.400" fontSize="sm">
+      Wallet connecté : <b>{address}</b>
+    </Text>
+  </Box>
+);
+
 };
 
 export default MintArt;

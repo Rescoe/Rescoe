@@ -121,7 +121,7 @@ const UniqueArtGalerie: React.FC = () => {
       setIsLoading(true);
       try {
           const collectionContract = new Contract(associatedAddress, ABI_MINT_CONTRACT, provider);
-          const tokenIds: string[] = await collectionContract.getTokenPaginated(0, 10);
+          const tokenIds: string[] = await collectionContract.getTokenPaginated(0, 19);
 
           const nftsData = await Promise.all(
               tokenIds.map(async (tokenId: string) => {

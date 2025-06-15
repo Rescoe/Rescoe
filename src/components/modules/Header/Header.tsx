@@ -204,8 +204,7 @@ const Header = () => {
                 </span>
               </Tooltip>
             )}
-
-            <ColorModeButton />
+// Ici ce trouvait le colormodeBouton
           </HStack>
         </Flex>
 

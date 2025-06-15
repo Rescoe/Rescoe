@@ -32,6 +32,7 @@ import {
   Td,
   Tbody,
   Stack,
+  useToast,
 } from '@chakra-ui/react';
 import ABI from '../../../components/ABI/ABI_ART.json';
 import { useAuth } from '../../../utils/authContext';
@@ -77,6 +78,8 @@ const TokenPage: React.FC = () => {
   const router = useRouter();
   const { contractAddress, tokenId } = router.query as { contractAddress?: string; tokenId?: string };
   const { address: authAddress } = useAuth();
+  const toast = useToast();
+
 
   const [nftData, setNftData] = useState<NFTData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -242,7 +245,7 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
         if(formattedTransactions.length != 0){
           setTransacActivity(true);
         }
-        
+
         const priceInEther = formatUnits(currentPrice, 18);
         setPrice(priceInEther);
 
@@ -405,6 +408,18 @@ const handleTabChange = (index: number) => {
   setTabIndex(index); // Met à jour l'index de l'onglet actif
 };
 
+const handleCopy = () => {
+  if (contractAddress) {
+    navigator.clipboard.writeText(contractAddress);
+    toast({
+      title: 'Adresse copiée dans le presse-papier',
+      status: 'success',
+      duration: 1000,
+      isClosable: true,
+    });
+  }
+};
+
 
 
   return (
@@ -465,14 +480,14 @@ const handleTabChange = (index: number) => {
                 <VStack spacing={4} alignItems="start" mb={6}>
                     <Text fontSize="lg"><strong>Nom :</strong> {nftData.name}</Text>
                     <Text fontSize="lg"><strong>Description :</strong> {nftData.description}</Text>
-                    <Text fontSize="lg"><strong>Artiste :</strong> {nftData.artist}</Text>
-                    <Text fontSize="lg"><strong>Propriétaire :</strong> {formatAddress(nftData.owner)}</Text>
+                    <Text fontSize="lg" cursor="pointer" onClick={handleCopy}><strong>Artiste :</strong> {formatAddress(nftData.artist)}</Text>
+                    <Text fontSize="lg" cursor="pointer" onClick={handleCopy}><strong>Propriétaire :</strong> {formatAddress(nftData.owner)}</Text>
                     <Text fontSize="lg"><strong>Date de mint :</strong> {formatTimestamp(Number(nftData.mintDate))}</Text>
                     <Text fontSize="lg"><strong>Prix actuel :</strong> {nftData.price} ETH</Text>
                     <Text fontSize="lg"><strong>En vente :</strong> {nftData.forsale ? 'Oui' : 'Non'}</Text>
                     <Text fontSize="lg"><strong>Historique des prix :</strong> {nftData.priceHistory.join(', ')} ETH</Text>
                     <Text fontSize="lg"><strong>Collection ID :</strong> {nftData.collectionId ? nftData.collectionId.toString() : 'Aucune collection'}</Text>
-                    <Text fontSize="lg">  <strong>Adresse de contrat :</strong>{' '}{contractAddress ? formatAddress(contractAddress) : 'Adresse inconnue'}</Text>
+                    <Text fontSize="lg" cursor="pointer" onClick={handleCopy}>  <strong>Adresse de contrat :</strong>{' '}{contractAddress ? formatAddress(contractAddress) : 'Adresse inconnue'}</Text>
                 </VStack>
               </Stack>
 
