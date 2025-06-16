@@ -11,14 +11,17 @@ const links = {
 
 const Footer = () => {
   return (
+
     <Box
       mt={10}
       textAlign="center"
       p={4}
+      boxShadow="dark-lg"
       borderWidth={1}
       borderRadius="lg"
-      borderColor="gray.300"
-      maxWidth="80%" // Limite la largeur de la box
+      border="1px solid"
+      borderColor="purple.300"
+      maxWidth="95%" // Limite la largeur de la box
       mx="auto"
     >
       <VStack spacing={3}>
@@ -32,7 +35,26 @@ const Footer = () => {
             Rejoignez le réseau !
           </Text>
           <NextLink href="/adhesion" passHref>
-            <Button colorScheme="pink">Adhérer Maintenant</Button>
+            <Button
+              px={10}
+              py={6}
+              fontSize="lg"
+              fontWeight="bold"
+              borderRadius="full"
+              bgGradient="linear(to-r, purple.700, pink.600)"
+              color="white"
+              boxShadow="lg"
+              _hover={{
+                transform: "scale(1.05)",
+                boxShadow: "2xl",
+              }}
+              _active={{
+                transform: "scale(0.98)",
+              }}
+              >
+              Adhérer Maintenant
+              </Button>
+
           </NextLink>
         </Box>
 

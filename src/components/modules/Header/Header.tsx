@@ -77,153 +77,284 @@ const Header = () => {
   }, [isInsectVisible]);
 
   return (
-    <Box ref={headerRef} borderBottom="1px" borderBottomColor="chakra-border-color">
-      <Container maxW="container.xl" p={'20px'}>
-        <Flex align="center" justify="space-between" flexDirection={{ base: 'column', md: 'row' }} w="100%" p={4} minHeight="70px">
-          {/* Logo avec taille fixe et non affecté par le Flex */}
-          <Box style={{ minWidth: '150px', maxWidth: '150px', height: 'auto' }}>
-            <GenerativeLogo />
-          </Box>
+  <Box
+    ref={headerRef}
+    borderBottom="1px"
+    borderBottomColor="chakra-border-color"
+    bg="gray.900"
+    color="gray.100"
+    role="banner"
+    aria-label="En-tête du site"
+    shadow="md"
+    position="sticky"
+    top={0}
+    zIndex={1000}
+  >
+    <Container maxW="container.xl" p="20px">
+      <Flex
+        align="center"
+        justify="space-between"
+        flexDirection={{ base: 'column', md: 'row' }}
+        w="100%"
+        p={4}
+        minHeight="70px"
+        gap={{ base: 4, md: 0 }}
+      >
+        {/* Logo */}
+        <Box
+          style={{ minWidth: '150px', maxWidth: '150px', height: 'auto' }}
+          aria-label="Logo de l'association"
+        >
+          <GenerativeLogo />
+        </Box>
 
-          {/* Affichage conditionnel du NavBar pour mobile */}
-          <HStack display={{ base: 'flex', md: 'none' }} gap={'20px'}>
-            <Button onClick={onOpen} variant="ghost" aria-label="Ouvrir le menu">
-              <FaBars />
-            </Button>
-          </HStack>
+        {/* Menu burger mobile */}
+        <HStack display={{ base: 'flex', md: 'none' }} gap="20px" aria-label="Menu mobile">
+          <Button
+            onClick={onOpen}
+            variant="ghost"
+            aria-label="Ouvrir le menu de navigation"
+            _hover={{ bg: 'purple.700' }}
+            _focus={{ boxShadow: 'outline' }}
+            fontSize="2xl"
+          >
+            <FaBars />
+          </Button>
+        </HStack>
 
-          <HStack display={{ base: 'none', md: 'flex' }} gap={'20px'}>
-            <NavBar />
-          </HStack>
+        {/* Menu desktop */}
+        <HStack
+          display={{ base: 'none', md: 'flex' }}
+          gap="20px"
+          aria-label="Menu de navigation principal"
+        >
+          <NavBar />
+        </HStack>
 
-          {/* Autres éléments */}
-          <HStack gap={'20px'} spacing={{ base: 2, md: 4 }} direction={{ base: 'column', md: 'row' }}>
-            <ConnectBouton />
+        {/* Boutons utilisateur et rôles */}
+        <HStack
+          gap="20px"
+          spacing={{ base: 2, md: 4 }}
+          direction={{ base: 'column', md: 'row' }}
+          aria-label="Actions utilisateur"
+        >
+          <ConnectBouton />
 
-            {isAdmin && (
+          {isAdmin && (
+            <Menu>
+              <MenuButton
+                as={Button}
+                rightIcon={<ChevronDownIcon />}
+                px={10}
+                py={6}
+                fontSize="sm"
+                fontWeight="bold"
+                borderRadius="full"
+                bgGradient="linear(to-r, teal.300, green.400)"
+                color="white"
+                boxShadow="lg"
+                _hover={{
+                  transform: "scale(1.05)",
+                  boxShadow: "2xl",
+                }}
+                _active={{
+                  transform: "scale(0.98)",
+                }}
+                transition="all 0.25s ease"
+              >
+                Admin
+              </MenuButton>
+              <MenuList bg="gray.800" borderColor="purple.600">
+                <NextLink href="/u/admin" passHref>
+                  <MenuItem as="a">Gestion du site</MenuItem>
+                </NextLink>
+                <NextLink href="/u/dashboard" passHref>
+                  <MenuItem as="a">Dashboard</MenuItem>
+                </NextLink>
+              </MenuList>
+            </Menu>
+          )}
+
+          {isContributor && (
+            <NextLink href="/u/dashboard" passHref>
+              <Button
+                px={10}
+                py={6}
+                fontSize="sm"
+                fontWeight="bold"
+                borderRadius="full"
+                bgGradient="linear(to-r, purple.700, teal.600)"
+                color="white"
+                boxShadow="lg"
+                _hover={{
+                  transform: "scale(1.05)",
+                  boxShadow: "2xl",
+                }}
+                _active={{
+                  transform: "scale(0.98)",
+                }}
+                transition="all 0.25s ease"
+                as="a"
+              >
+                Contributeur
+              </Button>
+            </NextLink>
+          )}
+
+          {isPoet && (
+            <NextLink href="/u/dashboard" passHref>
+              <Button
+                px={10}
+                py={6}
+                fontSize="sm"
+                fontWeight="bold"
+                borderRadius="full"
+                bgGradient="linear(to-r, blue.400, blue.600)"
+                color="white"
+                boxShadow="lg"
+                _hover={{
+                  transform: "scale(1.05)",
+                  boxShadow: "2xl",
+                }}
+                _active={{
+                  transform: "scale(0.98)",
+                }}
+                transition="all 0.25s ease"
+                as="a"
+              >
+                Poète
+              </Button>
+            </NextLink>
+          )}
+
+          {isArtist && (
+            <NextLink href="/u/dashboard" passHref>
+              <Button
+                px={10}
+                py={6}
+                fontSize="sm"
+                fontWeight="bold"
+                borderRadius="full"
+                bgGradient="linear(to-r, purple.500, purple.700)"
+                color="white"
+                boxShadow="lg"
+                _hover={{
+                  transform: "scale(1.05)",
+                  boxShadow: "2xl",
+                }}
+                _active={{
+                  transform: "scale(0.98)",
+                }}
+                transition="all 0.25s ease"
+                as="a"
+              >
+                Artiste
+              </Button>
+            </NextLink>
+          )}
+
+          {isTrainee && (
+            <NextLink href="/u/dashboard" passHref>
+              <Button
+                px={10}
+                py={6}
+                fontSize="sm"
+                fontWeight="bold"
+                borderRadius="full"
+                bgGradient="linear(to-r, orange.400, orange.600)"
+                color="white"
+                boxShadow="lg"
+                _hover={{
+                  transform: "scale(1.05)",
+                  boxShadow: "2xl",
+                }}
+                _active={{
+                  transform: "scale(0.98)",
+                }}
+                transition="all 0.25s ease"
+                as="a"
+              >
+                Apprenti
+              </Button>
+            </NextLink>
+          )}
+
+          {isAuthenticated && (
+            <HStack spacing={4} cursor="pointer" aria-label="Menu insecte">
               <Menu>
-                <MenuButton as={Button} rightIcon={<ChevronDownIcon />} colorScheme="green" size="sm">
-                  Admin
+                <MenuButton as="div">
+                  <Button colorScheme="teal" size="sm" aria-haspopup="true" aria-expanded="false">
+                    <FaBug />
+                  </Button>
                 </MenuButton>
-                <MenuList>
-                  <NextLink href="/u/admin" passHref>
-                    <MenuItem>Gestion du site</MenuItem>
-                  </NextLink>
-                  <NextLink href="/u/dashboard" passHref>
-                    <MenuItem>Dashboard</MenuItem>
-                  </NextLink>
+                <MenuList bg="gray.800" borderColor="purple.600" minW="180px">
+                  <Box mt={4} display="flex" justifyContent="center" />
+                  <MenuItem onClick={toggleInsectVisibility}>
+                    {isInsectVisible ? (
+                      <>
+                        <FaEyeSlash />
+                        <Box ml={2}>Cacher</Box>
+                      </>
+                    ) : (
+                      <>
+                        <FaEye />
+                        <Box ml={2}>Voir</Box>
+                      </>
+                    )}
+                  </MenuItem>
+                  <Box as="div" p={2}>
+                    <SelectInsect onSelect={handleSelectInsect} />
+                  </Box>
                 </MenuList>
               </Menu>
-            )}
+            </HStack>
+          )}
 
-            {isPoet && (
-              <NextLink href="/u/dashboard" passHref>
-                <Button colorScheme="blue" size="sm">
-                  Poète
-                </Button>
-              </NextLink>
-            )}
+          {!isAuthenticated && (
+            <Tooltip label="Veuillez d'abord connecter votre wallet pour adhérer" aria-label="Aide Adhésion">
+              <span>
+                <NextLink href="/adhesion" passHref>
+                  <Button
+                    colorScheme="yellow"
+                    size="sm"
+                    isDisabled={!isAuthenticated}
+                    as="a"
+                    aria-disabled={!isAuthenticated}
+                  >
+                    Adhérer
+                  </Button>
+                </NextLink>
+              </span>
+            </Tooltip>
+          )}
+        </HStack>
+      </Flex>
 
-            {isArtist && (
-              <NextLink href="/u/dashboard" passHref>
-                <Button colorScheme="purple" size="sm">
-                  Artiste
-                </Button>
-              </NextLink>
-            )}
+      {/* Affichage insecte */}
+      {isAuthenticated && isInsectVisible && selectedInsect && (
+        <Box mt={4} display="flex" justifyContent="center" aria-live="polite" aria-atomic="true">
+          <Insecte headerRef={headerRef} selectedInsect={selectedInsect.image} />
+        </Box>
+      )}
 
-            {isTrainee && (
-              <NextLink href="/u/dashboard" passHref>
-                <Button colorScheme="orange" size="sm">
-                  Apprenti
-                </Button>
-              </NextLink>
-            )}
-
-            {isContributor && (
-              <NextLink href="/u/dashboard" passHref>
-                <Button colorScheme="teal" size="sm">
-                  Contributeur
-                </Button>
-              </NextLink>
-            )}
-
-            {isAuthenticated && (
-              <HStack spacing={4} cursor="pointer">
-                <Menu>
-                  <MenuButton as="div">
-                    <Button colorScheme="teal" size="sm">
-                      <FaBug />
-                    </Button>
-                  </MenuButton>
-                  <MenuList>
-                    <Box mt={4} display="flex" justifyContent="center">
-                    </Box>
-                    <MenuItem onClick={toggleInsectVisibility}>
-                      {isInsectVisible ? (
-                        <>
-                          <FaEyeSlash />
-                          <Box ml={2}>Cacher</Box>
-                        </>
-                      ) : (
-                        <>
-                          <FaEye />
-                          <Box ml={2}>Voir</Box>
-                        </>
-                      )}
-                    </MenuItem>
-                    <Box as="div" p={2}>
-                      <SelectInsect onSelect={handleSelectInsect} />
-                    </Box>
-                  </MenuList>
-                </Menu>
-              </HStack>
-            )}
-
-            {isAuthenticated ? (
-              <Box mt={4} display="flex" justifyContent="center">
-                {isInsectVisible && selectedInsect && (
-                  <Insecte
-                    headerRef={headerRef}
-                    selectedInsect={selectedInsect.image}
-                  />
-                )}
-              </Box>
-            ) : (
-              <Tooltip label="Veuillez d'abord connecter votre wallet pour adhérer" aria-label="Aide Adhésion">
-                <span>
-                  <NextLink href="/adhesion" passHref>
-                    <Button
-                      colorScheme="yellow"
-                      size="sm"
-                      isDisabled={!isAuthenticated}
-                    >
-                      Adhérer
-                    </Button>
-                  </NextLink>
-                </span>
-              </Tooltip>
-            )}
-// Ici ce trouvait le colormodeBouton
-          </HStack>
-        </Flex>
-
-        {/* Drawer pour mobile */}
-        <Drawer isOpen={isOpen} onClose={onClose} placement="right">
-          <DrawerOverlay />
-          <DrawerContent>
-            <DrawerCloseButton />
-            <DrawerHeader>Menu</DrawerHeader>
-            <DrawerBody>
-              <VStack align="start" spacing={4}>
-                <NavBar />
-              </VStack>
-            </DrawerBody>
-          </DrawerContent>
-        </Drawer>
-      </Container>
-    </Box>
-  );
+      {/* Drawer mobile */}
+      <Drawer isOpen={isOpen} onClose={onClose} placement="right" size="xs" returnFocusOnClose={false}>
+        <DrawerOverlay />
+        <DrawerContent bg="gray.900" color="gray.100">
+          <DrawerCloseButton _focus={{ boxShadow: 'outline' }} />
+          <DrawerHeader borderBottomWidth="1px" borderBottomColor="purple.600">
+            Menu
+          </DrawerHeader>
+          <DrawerBody>
+            <VStack align="start" spacing={4}>
+              <NavBar />
+            </VStack>
+          </DrawerBody>
+        </DrawerContent>
+      </Drawer>
+    </Container>
+  </Box>
+);
 };
 
 export default Header;
