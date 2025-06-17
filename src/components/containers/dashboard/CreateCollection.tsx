@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Box, Heading, VStack, Input, Button, Text, FormLabel, useToast, Spinner, Tab, TabList, TabPanels, TabPanel, Tabs, Image, Grid, FormControl, Select } from "@chakra-ui/react";
+import { Box, Heading, VStack, HStack, Input, Button, Text, FormLabel, useToast, Spinner, Tab, TabList, TabPanels, TabPanel, Tabs, Image, Grid, FormControl, Select } from "@chakra-ui/react";
 import { JsonRpcProvider, Contract, ethers } from "ethers";
 import { useAuth } from '../../../utils/authContext';
 import ABIRESCOLLECTION from '../../ABI/ABI_Collections.json';
@@ -257,51 +257,15 @@ const [account, setAccount] = useState<string | null>(null);
           </TabList>
           <TabPanels>
             <TabPanel>
-              {isLoading ? (
-                <Spinner />
-              ) : (
-                <Grid templateColumns="repeat(3, 1fr)" gap={6}>
-                  {collections.length === 0 ? (
-                    <Text>Aucune collection trouvée.</Text>
-                  ) : (
-                    collections.map((collection) => (
-                      <Box
-                        key={collection.id}
-                        borderWidth="1px"
-                        borderRadius="lg"
-                        p={4}
-                        cursor="pointer"
-                      >
-                        {collection.imageUrl && (
-                          <Box
-                            width="100%"
-                            height="150px"
-                            overflow="hidden"
-                            borderRadius="md"
-                          >
-                            <img
-                              src={collection.imageUrl}
-                              alt={collection.name}
-                              style={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover',
-                              }}
-                            />
-                          </Box>
-                        )}
-                        <Text>{collection.name}</Text>
-                      </Box>
-                    ))
-                  )}
-                  <Text mt={4}>
-                    Vous avez {userCollections} collections créées.
-                  </Text>
-                  <Text mt={4}>
-                    Vous pouvez créer jusqu'à {remainingCollections} collections restantes.
-                  </Text>
-                </Grid>
-              )}
+            <HStack>
+            <Text mt={4}>
+              Vous avez {userCollections} collections créées.
+            </Text>
+            <Text mt={4}>
+              Vous pouvez créer jusqu'à {remainingCollections} collections restantes.
+            </Text>
+            </HStack>
+
               <FormLabel>Upload File</FormLabel>
               <Input type="file" onChange={handleFileChange} mb={3} />
               {previewUrl && <Image src={previewUrl} alt="Preview" mb={3} boxSize="200px" objectFit="cover" />}

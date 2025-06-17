@@ -63,25 +63,23 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
 
   return (
     <Box
-      position="relative"
       display="flex"
       flexDirection="column"
       alignItems="center"
       justifyContent="center"
-      w="100%"
-      h="400px"
+      w="50vw"
+      h="100vh"
       bg="transparent"
       color="white"
-      px={4}
-      py={10}
       pb={100}
+      mx="auto" // ✅ centrage horizontal
+
     >
       {selectedNft && selectedHaiku && (
         <>
           <Box
             position="relative"
             w="100%"
-            maxW="600px"
             h="100%"
             borderRadius="md"
             cursor="pointer"
@@ -107,14 +105,31 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
               alignItems="center"
               zIndex={2}
             >
-              <VStack textAlign="center" color="white" maxWidth="80%">
-              {getPoemText(selectedHaiku.poemText)?.split("\n").map((line: string, i: number) => (
-                <Text key={i} fontStyle="italic" fontSize="sm">
-                  {line}
-                </Text>
-              ))}
+            <VStack
+              spacing={2}
+              textAlign="center"
+              color="white"
+              maxW="80%"
+              mx="auto"
+              px={2}
+            >
+              {getPoemText(selectedHaiku.poemText)
+                ?.split("\n")
+                .map((line: string, i: number) => (
+                  <Text
+                    key={i}
+                    fontStyle="italic"
+                    fontSize={{ base: "md", md: "lg" }}
+                    lineHeight="1.6"
+                    fontWeight="medium"
+                    whiteSpace="pre-wrap"
+                    wordBreak="break-word"
+                  >
+                    {line}
+                  </Text>
+                ))}
+            </VStack>
 
-              </VStack>
             </Box>
           </Box>
           <HStack spacing={4} mt={4} align="start" flexDirection="column">

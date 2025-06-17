@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Heading, Text, Button, VStack, Grid, GridItem, Divider, Icon, Flex, Input, FormLabel, Select, Checkbox, useColorModeValue } from '@chakra-ui/react';
-import { FaBookOpen, FaUsers, FaLightbulb, FaHandsHelping  } from 'react-icons/fa';
+import { Box, Heading, Text, Button, VStack, Grid, GridItem, Divider, Icon, Flex, Input, FormLabel, Select, Checkbox, useColorModeValue, SimpleGrid, Stack,Collapse, HStack } from '@chakra-ui/react';
+import { FaBookOpen, FaUsers, FaLightbulb, FaHandsHelping, FaPaintBrush, FaGraduationCap, FaHandshake   } from 'react-icons/fa';
 //import useCheckMembership from '../../../utils/useCheckMembership';
 import NextLink from 'next/link';
 import { JsonRpcProvider, ethers, Contract } from 'ethers';
@@ -13,6 +13,28 @@ import { useRouter } from 'next/router';
 
 const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!;
 
+const benefits = [
+  {
+    icon: FaPaintBrush,
+    title: "Crée des collections",
+    description: "Expose tes œuvres ou poèmes dans des collections décentralisées.",
+  },
+  {
+    icon: FaGraduationCap,
+    title: "Formations & ateliers",
+    description: "Apprends à créer dans le Web3 avec nos ateliers artistiques ouverts.",
+  },
+  {
+    icon: FaUsers,
+    title: "Réseau phygital",
+    description: "Rejoins une communauté locale entre numérique et physique.",
+  },
+  {
+    icon: FaHandshake,
+    title: "Démarche solidaire",
+    description: "Participe à un projet associatif engagé et expérimental.",
+  },
+];
 
 const Home = () => {
 const [isLoading, setIsLoading] = useState(false);
@@ -54,8 +76,14 @@ interface Nft {
 
 // Typage de l'état `nfts` avec `Nft[]` (un tableau d'objets de type Nft)
 const [nfts, setNfts] = useState<Nft[]>([]);
-
 const [collections, setCollections] = useState<Collection[]>([]);
+const [openIndex, setOpenIndex] = useState<number | null>(null);
+
+function toggle(index: number) {
+  setOpenIndex(openIndex === index ? null : index);
+}
+
+
 
 
 const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
@@ -293,20 +321,15 @@ const getRandomItems = (array: Collection[], count: number): Collection[] => {
 
 
     return (
+
+
       <Box
-        p={{ base: 6, md: 12 }}
-        bg="gray.900"
-        boxShadow="dark-lg"
-        borderWidth={1}
-        borderRadius="lg"
-        border="1px solid"
-        borderColor="purple.900"
-        textAlign="center"
-        color="gray.100"
-        minHeight="100vh"
-        maxW="98%"
-        mx="auto"
-      >
+    mt={5}
+    textAlign="center"
+    w="100vw"
+    maxW="100%"
+  >
+
         <Heading
           size={{ base: "lg", md: "xl" }}
           bgGradient="linear(to-r, purple.400, pink.400)"
@@ -322,27 +345,23 @@ const getRandomItems = (array: Collection[], count: number): Collection[] => {
         </Heading>
 
         <Box
-          py={{ base: 8, md: 12 }}
-          mt={{ base: 6, md: 10 }}
-          px={{ base: 4, md: 8 }}
-          color="gray.100"
-          textAlign="center"
-          borderRadius="lg"
-          boxShadow="md"
-          bg="blackAlpha.600"
-          aria-label="Section principale avec œuvres et haikus"
+        py={{ base: 8, md: 12 }}
+        mt={{ base: 6, md: 10 }}
+        px={{ base: 4, md: 8 }}
+        maxW="1200px"
+        w="100%"
+        mx="auto"
         >
+
           <HeroSection nfts={nfts} haikus={haikus} />
 
           <Box
-            mt={4}
-            p={4}
-            borderWidth={1}
-            borderRadius="lg"
-            borderColor="gray.600"
-            bg="blackAlpha.500"
-            maxWidth="100%"
-            mx="auto"
+          mt={5}
+          maxW="1200px"
+          w="100%"
+          px={4}
+          mx="auto"
+
           >
             <Text fontSize={{ base: "md", md: "lg" }} color="gray.300">
               Pour une meilleure expérience sur smartphone, <br /> utilisez le navigateur intégré à votre wallet
@@ -350,10 +369,93 @@ const getRandomItems = (array: Collection[], count: number): Collection[] => {
           </Box>
         </Box>
 
+        <VStack
+        boxShadow="dark-lg"
+        borderWidth={1}
+        borderRadius="lg"
+        border="1px solid"
+        borderColor="purple.300"
+        maxWidth="95%" // Limite la largeur de la box
+        mx="auto"
+        >
+
         <Box mt={8}>
-          <Text fontSize={{ base: "md", md: "lg" }} mb={6} color="gray.200">
-            Découvrez, soutenez, participez.
-          </Text>
+
+        <Heading
+          size={{ base: "lg", md: "xl" }}
+          bgGradient="linear(to-r, purple.400, pink.400)"
+          bgClip="text"
+          mb={{ base: 4, md: 6 }}
+          fontWeight="extrabold"
+          letterSpacing="wide"
+          transition="transform 0.3s ease"
+          _hover={{ transform: "scale(1.05)" }}
+          tabIndex={0}
+        >
+        Découvrez, soutenez, participez.
+        </Heading>
+
+
+
+          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={12} mb={12}>
+            {benefits.map((benefit, index) => (
+              <Box
+                key={index}
+                as="button"
+                onClick={() => toggle(index)}
+                role="group"
+                px={{ base: 8, md: 10 }}
+                py={{ base: 6, md: 8 }}
+                borderRadius="lg"
+                bg="dark-lg"
+                boxShadow="md"
+                cursor="pointer"
+                transition="all 0.3s ease"
+                _hover={{
+                  bgGradient: "linear(to-r, purple.900, pink.800)",
+                  color: "white",
+                  boxShadow: "xl",
+                  transform: "scale(1.05)",
+                }}
+                _focus={{
+                  boxShadow: "outline",
+                }}
+                aria-label={`Avantage: ${benefit.title}`}
+                tabIndex={0}
+              >
+                <Stack align="center" spacing={4}>
+                  <Icon
+                    as={benefit.icon}
+                    boxSize={12}
+                    color="purple.600"
+                    _groupHover={{ color: "white" }}
+                    transition="color 0.3s ease"
+                  />
+                  <Text
+                    fontWeight="bold"
+                    fontSize={{ base: "lg", md: "xl" }}
+                    _groupHover={{ color: "white" }}
+                    transition="color 0.3s ease"
+                    textAlign="center"
+                  >
+                    {benefit.title}
+                  </Text>
+                  <Collapse in={openIndex === index} animateOpacity>
+                    <Text
+                      mt={4}
+                      fontSize="md"
+                      color={openIndex === index ? "whiteAlpha.900" : "gray.600"}
+                      maxW="320px"
+                      mx="auto"
+                    >
+                      {benefit.description}
+                    </Text>
+                  </Collapse>
+                </Stack>
+              </Box>
+            ))}
+          </SimpleGrid>
+
           <Flex justify="center" mt={8}>
             <NextLink href="/adhesion" passHref>
               <Button
@@ -392,13 +494,7 @@ const getRandomItems = (array: Collection[], count: number): Collection[] => {
           Rejoignez un réseau d'art numérique et de poésie solidaire
         </Heading>
 
-        <VStack
-          spacing={{ base: 8, md: 10 }}
-          mt={10}
-          textAlign="center"
-          maxW="900px"
-          mx="auto"
-        >
+
           <Heading
             as="h2"
             size={{ base: "md", md: "lg" }}
@@ -419,9 +515,11 @@ const getRandomItems = (array: Collection[], count: number): Collection[] => {
             RESCOE soutient les artistes émergents en leur offrant un accès privilégié à des outils numériques innovants, permettant de développer leur art à travers l'art génératif, la blockchain et l'art digital. <br /> Notre mission est de favoriser l'émergence de ce nouveau courant artistique en organisant des ateliers d'initiation au crypto-art, où chacun peut créer et minter ses premières œuvres sur notre plateforme décentralisée, tout en assurant la vente et la protection de ses droits.
           </Text>
 
-          <Divider my={6} borderColor="gray.700" w="80%" mx="auto" />
+          <Divider my={6} borderColor="purple.700" w="80%" mx="auto" />
 
           <Grid
+          py={{ base: 8, md: 12 }}
+          px={{ base: 4, md: 8 }}
             templateColumns={{ base: "1fr", md: "repeat(3, 1fr)" }}
             gap={6}
             w="100%"
@@ -433,7 +531,7 @@ const getRandomItems = (array: Collection[], count: number): Collection[] => {
                 icon: FaLightbulb,
                 title: "Un réseau solidaire",
                 description:
-                  "Faites partie d'un réseau unique, dédié à la promotion de l'art digital et à l'intégration de la blockchain dans les pratiques artistiques.",
+                  "Faites partie d'un réseau unique, dédié à la création d'oeuvres digitales et à l'intégration de la blockchain dans l'art'.",
               },
               {
                 icon: FaHandsHelping,
@@ -482,76 +580,100 @@ const getRandomItems = (array: Collection[], count: number): Collection[] => {
             ))}
           </Grid>
 
-          <Divider my={6} borderColor="gray.700" w="80%" mx="auto" />
+          </VStack>
 
-          <Box
-            mt={6}
-            w="100%"
-            maxW={{ base: "100%", md: "400px" }}
-            mx="auto"
-            display="flex"
-            flexDirection={{ base: "column", md: "column" }}
-            gap={4}
+          <Divider my={6} borderColor="purple.700" w="80%" mx="auto" />
+
+          <VStack>
+
+
+          <Box mt={8} maxW="600px" mx="auto" px={4}>
+      <VStack
+        spacing={6}
+        wrap={{ base: "wrap", md: "nowrap" }}
+        justify="center"
+      >
+        <NextLink href="/collections" passHref>
+          <Button
+            as="a"
+            flex="1 1 180px"
+            py={5}
+            fontSize="md"
+            fontWeight="semibold"
+            borderRadius="full"
+            bgGradient="linear(to-r, purple.700, pink.600)"
+            color="white"
+            boxShadow="0 4px 12px rgba(127, 86, 217, 0.4)"
+
+            _hover={{
+              bg: "white",
+              color: "purple.700",
+              boxShadow: "0 6px 16px rgba(127, 86, 217, 0.6)",
+              transform: "scale(1.05)",
+            }}
+            _active={{ transform: "scale(0.97)" }}
+            aria-label="Découvrez nos collections d'art"
           >
-            <NextLink href="/collections" passHref>
-              <Button
-                as="a"
-                px={10}
-                py={6}
-                fontSize="lg"
-                fontWeight="bold"
-                borderRadius="full"
-                bgGradient="linear(to-r, teal.700, teal.600)"
-                color="white"
-                boxShadow="lg"
-                _hover={{ bg: "teal.600", transform: "scale(1.05)" }}
-                transition="all 0.3s ease"
-                aria-label="Découvrez nos collections d'art"
-              >
-                Découvrez nos collections d'art
-              </Button>
-            </NextLink>
+            Collections d'art
+          </Button>
+        </NextLink>
 
-            <NextLink href="/ateliers" passHref>
-              <Button
-                as="a"
-                px={10}
-                py={6}
-                fontSize="lg"
-                fontWeight="bold"
-                borderRadius="full"
-                bgGradient="linear(to-r, purple.700, pink.600)"
-                color="white"
-                boxShadow="lg"
-                _hover={{ bg: "purple.500", transform: "scale(1.05)" }}
-                transition="all 0.3s ease"
-                aria-label="Rejoignez nos ateliers"
-              >
-                Rejoignez nos ateliers
-              </Button>
-            </NextLink>
+        <NextLink href="/ateliers" passHref>
+          <Button
+            as="a"
+            flex="1 1 180px"
+            py={5}
+            fontSize="md"
+            fontWeight="semibold"
+            borderRadius="full"
+            bgGradient="linear(to-r, purple.700, pink.600)"
+            color="white"
+            boxShadow="0 4px 12px rgba(127, 86, 217, 0.4)"
 
-            <NextLink href="/evenements" passHref>
-              <Button
-                as="a"
-                px={10}
-                py={6}
-                fontSize="lg"
-                fontWeight="bold"
-                borderRadius="full"
-                bgGradient="linear(to-r, pink.700, pink.600)"
-                color="white"
-                boxShadow="lg"
-                _hover={{ bg: "pink.500", transform: "scale(1.05)" }}
-                transition="all 0.3s ease"
-                aria-label="Participez à nos événements"
-              >
-                Participez à nos événements
-              </Button>
-            </NextLink>
-          </Box>
+            _hover={{
+              bg: "white",
+              color: "pink.600",
 
-          <Divider my={6} borderColor="gray.700" w="100%" mx="auto" />
+              boxShadow: "0 6px 16px rgba(219, 39, 119, 0.6)",
+              transform: "scale(1.05)",
+            }}
+            _active={{ transform: "scale(0.97)" }}
+            aria-label="Rejoignez nos ateliers"
+          >
+            Ateliers Web3
+          </Button>
+        </NextLink>
+
+        <NextLink href="/evenements" passHref>
+          <Button
+            as="a"
+            flex="1 1 180px"
+            py={5}
+            fontSize="md"
+            fontWeight="semibold"
+            borderRadius="full"
+            bgGradient="linear(to-r, purple.700, pink.600)"
+            color="white"
+            transition="all 0.3s ease"
+            boxShadow="0 4px 12px rgba(127, 86, 217, 0.4)"
+
+            _hover={{
+              bg: "white",
+              color: "red.500",
+
+              boxShadow: "0 6px 16px rgba(225, 29, 72, 0.6)",
+              transform: "scale(1.05)",
+            }}
+            _active={{ transform: "scale(0.97)" }}
+            aria-label="Participez à nos événements"
+          >
+            Événements
+          </Button>
+        </NextLink>
+      </VStack>
+    </Box>
+
+          <Divider my={6} borderColor="purple.700" w="100%" mx="auto" />
 
           <Heading
             as="h2"

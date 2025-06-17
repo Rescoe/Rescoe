@@ -234,9 +234,9 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
             );
           })}
 
-          {items.length > 0 && (
+          {items.length > 0 && items[index] && (
             <Box
-              gridColumn={isMobile ? "2 / span 2" : "4 / span 1"} // Ajustement de la colonne pour le cartel
+              gridColumn={isMobile ? "2 / span 2" : "4 / span 1"}
               gridRow="2"
               display="flex"
               flexDirection="column"
@@ -248,39 +248,30 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
               bg="rgba(0, 0, 0, 0.7)"
               color="white"
             >
-            {items[index].type === "haiku" ? (
-              <>
-                {typeof items[index].content !== "string" && (
-                  <>
-                    <Text fontWeight="bold" mb={2}>
-                      {"Poète inconnu"}
-                    </Text>
-                    <Text fontStyle="italic">
-                      {"Titre du haiku"} {/* Ici, on accède à poemText uniquement pour un haiku */}
-                    </Text>
-                  </>
-                )}
-              </>
-            ) : items[index].type === "nft" ? (
-              <>
-                {typeof items[index].content !== "string" && (
-                  <>
-                    <Text fontWeight="bold" mb={2}>
-                      {((items[index].content as Nft).name) || "Oeuvre sans nom"}
-                    </Text>
-                    <Text>
-                      {formatAddress((items[index].content as Nft).artist ?? "") || "Artiste inconnu"}
-                    </Text>
-
-                  </>
-                )}
-              </>
-            ) : (
-              <Text>{"Un poème, une œuvre."}</Text>
-            )}
-
+              {items[index].type === "haiku" ? (
+                <>
+                  <Text fontWeight="bold" mb={2}>
+                    {"Poète inconnu"}
+                  </Text>
+                  <Text fontStyle="italic">
+                    {"Titre du haiku"}
+                  </Text>
+                </>
+              ) : items[index].type === "nft" ? (
+                <>
+                  <Text fontWeight="bold" mb={2}>
+                    {(items[index].content as Nft).name || "Oeuvre sans nom"}
+                  </Text>
+                  <Text>
+                    {formatAddress((items[index].content as Nft).artist ?? "") || "Artiste inconnu"}
+                  </Text>
+                </>
+              ) : (
+                <Text>{"Un poème, une œuvre."}</Text>
+              )}
             </Box>
           )}
+
         </Box>
       </Box>
     );

@@ -609,19 +609,8 @@ const handleCopy = () => {
         <Stack direction={{ base: "column", md: "row" }} spacing={2}>
           <FilteredCollectionsCarousel
             creator={nftData.owner}
-            selectedCollectionId={nftData.collectionId.toString()}
-            type="Art"
           />
-          <FilteredCollectionsCarousel
-            creator={nftData.owner}
-            selectedCollectionId={nftData.collectionId.toString()}
-            type="Poesie"
-          />
-          <FilteredCollectionsCarousel
-            creator={nftData.owner}
-            selectedCollectionId={nftData.collectionId.toString()}
-            type="Generative"
-          />
+
         </Stack>
       </Box>
 

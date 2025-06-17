@@ -205,19 +205,8 @@ const TokenPage: React.FC = () => {
         <Stack direction={{ base: "column", md: "row" }} spacing={2}>
           <FilteredCollectionsCarousel
             creator={nftData.owner}
-            selectedCollectionId={nftData.collectionId}
-            type="Art"
-          />
-          <FilteredCollectionsCarousel
-            creator={nftData.owner}
-            selectedCollectionId={nftData.collectionId}
-            type="Poesie"
-          />
-          <FilteredCollectionsCarousel
-            creator={nftData.owner}
-            selectedCollectionId={nftData.collectionId}
-            type="Generative"
-          />
+
+            />
         </Stack>
       </Box>
 

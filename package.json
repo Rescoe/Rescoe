@@ -43,6 +43,7 @@
     "html2canvas": "^1.4.1",
     "jdenticon": "^3.3.0",
     "jszip": "^3.10.1",
+    "keen-slider": "^6.8.6",
     "localtunnel": "^2.0.2",
     "moralis": "^2.27.1",
     "moralis-v1": "^1.13.0",

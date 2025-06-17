@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { InfoOutlineIcon } from "@chakra-ui/icons";
-import { Box, Tooltip, Icon, Image, Heading, VStack, Button, Text, Link, HStack, Grid, Tab, TabList, TabPanel, TabPanels, Tabs, FormLabel, Spinner, Divider, useToast, useClipboard } from '@chakra-ui/react';
+import { Box, Tooltip, Icon, Image, Heading, VStack, Stack, Button, Text, Link, HStack, Grid, Tab, TabList, TabPanel, TabPanels, Tabs, FormLabel, Spinner, Divider, useToast, useClipboard } from '@chakra-ui/react';
 import * as jdenticon from 'jdenticon';
 import { useAuth } from '../../../utils/authContext';
 import { JsonRpcProvider } from 'ethers';
@@ -77,7 +77,11 @@ const Dashboard = () => {
   const [web3, setWeb3] = useState<Web3 | null>(null);
   const [pointsToBuy, setPointsToBuy] = useState(0);
   const [nombreTotalMint, setNombreTotalMint] = useState<number | null>(null);
+  const [visibleCount, setVisibleCount] = useState(6);
 
+  const handleLoadMore = () => {
+    setVisibleCount((prev) => prev + 6); // charger 6 collections de plus à chaque clic
+  };
 
   const toast = useToast();
 
@@ -497,68 +501,90 @@ const formatAddress = (address: string) => {
 
         {/* Création de Collection */}
         <TabPanel>
-        {isLoading ? (
-          <Spinner />
-        ) : (
-          <Grid templateColumns="repeat(auto-fill, minmax(200px, 1fr))" gap={6}>
-            {collections.length === 0 ? (
-              <Text>Aucune collection trouvée.</Text>
-            ) : (
-              collections.map((collection) => (
-                <Box
-                  key={collection.id}
-                  borderWidth="1px"
-                  borderRadius="lg"
-                  p={4}
-                  cursor="pointer"
-                  textAlign="center"
-                >
-                  {collection.imageUrl && (
-                    <Box
-                      width="100%"
-                      height="150px"
-                      overflow="hidden"
-                      borderRadius="md"
-                    >
-                      <img
-                        src={collection.imageUrl}
-                        alt={collection.name}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                        }}
-                      />
-                    </Box>
-                  )}
-                  <Box mt={2} textAlign="center">
-                    <Text>{collection.name}</Text>
-                  </Box>
-                </Box>
-              ))
-            )}
-          </Grid>
-        )}
 
-        <Divider my={6} borderColor="gray.200" />
 
         <CreateCollection/>
-        <Box mt={2} textAlign="center" p={4}>
-          <Link href="/u/createCollection">
-            <Button colorScheme="teal">
-              Créer une collection
-            </Button>
-          </Link>
-        </Box>
+
+
         </TabPanel>
 
         {/* Placeholder pour collections utilisateur */}
-        <TabPanel>
-          <Box borderWidth="1px" borderRadius="xl" p={6} shadow="md">
-            <Heading size="md" mb={4}>Mes Collections</Heading>
-            <Text color="gray.500">Fonctionnalité à venir…</Text>
-          </Box>
-        </TabPanel>
+        (
+     <TabPanel>
+       <Box borderWidth="1px" borderRadius="xl" p={6} shadow="md">
+         <Heading size="md" mb={4}>
+           Mes Collections
+         </Heading>
+
+         {/* Carrousels */}
+         <Box mt={5} w="full">
+           <Stack direction={{ base: "column", md: "row" }} spacing={2}>
+             <FilteredCollectionsCarousel creator={address} />
+           </Stack>
+         </Box>
+
+         <Divider my={6} borderColor="purple.700" />
+
+         {isLoading ? (
+           <Spinner />
+         ) : collections.length === 0 ? (
+           <Text>Aucune collection trouvée.</Text>
+         ) : (
+           <>
+             <Grid templateColumns="repeat(auto-fill, minmax(200px, 1fr))" gap={6}>
+               {collections.slice(0, visibleCount).map((collection) => (
+                 <Box
+                   key={collection.id}
+                   borderWidth="1px"
+                   borderRadius="lg"
+                   p={4}
+                   cursor="pointer"
+                   textAlign="center"
+                   _hover={{ boxShadow: "lg" }}
+                   transition="box-shadow 0.2s"
+                 >
+                   {collection.imageUrl && (
+                     <Box
+                       width="100%"
+                       height="150px"
+                       overflow="hidden"
+                       borderRadius="md"
+                       bg="gray.100"
+                     >
+                       <img
+                         src={collection.imageUrl}
+                         alt={collection.name}
+                         style={{
+                           width: "100%",
+                           height: "100%",
+                           objectFit: "cover",
+                           display: "block",
+                         }}
+                       />
+                     </Box>
+                   )}
+                   <Box mt={2} textAlign="center">
+                     <Text fontWeight="semibold">{collection.name}</Text>
+                   </Box>
+                 </Box>
+               ))}
+             </Grid>
+
+             {visibleCount < collections.length && (
+               <Box mt={6} textAlign="center">
+                 <Button colorScheme="purple" onClick={handleLoadMore}>
+                   Charger plus
+                 </Button>
+               </Box>
+             )}
+           </>
+         )}
+
+
+
+       </Box>
+     </TabPanel>
+
       </TabPanels>
     </Tabs>
   </Box>

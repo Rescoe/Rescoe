@@ -80,17 +80,18 @@ const Header = () => {
   <Box
     ref={headerRef}
     borderBottom="1px"
-    borderBottomColor="chakra-border-color"
+    borderBottomColor="purple.300"
     bg="gray.900"
     color="gray.100"
     role="banner"
     aria-label="En-tête du site"
     shadow="md"
-    position="sticky"
     top={0}
     zIndex={1000}
   >
-    <Container maxW="container.xl" p="20px">
+    <Container
+    maxW="container.xl" p="20px"
+    >
       <Flex
         align="center"
         justify="space-between"
