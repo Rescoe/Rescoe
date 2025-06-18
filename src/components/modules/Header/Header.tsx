@@ -145,7 +145,6 @@ const Header = () => {
             <Menu>
               <MenuButton
                 as={Button}
-                rightIcon={<ChevronDownIcon />}
                 px={10}
                 py={6}
                 fontSize="sm"
@@ -172,39 +171,58 @@ const Header = () => {
                 <NextLink href="/u/dashboard" passHref>
                   <MenuItem as="a">Dashboard</MenuItem>
                 </NextLink>
+                <NextLink href="/u/createCollection" passHref>
+                  <MenuItem as="a">Créer une collection</MenuItem>
+                </NextLink>
+                <NextLink href="/mint/mintart" passHref>
+                  <MenuItem as="a">Ajouter des oeuvres</MenuItem>
+                </NextLink>
               </MenuList>
             </Menu>
           )}
 
           {isContributor && (
-            <NextLink href="/u/dashboard" passHref>
-              <Button
-                px={10}
-                py={6}
-                fontSize="sm"
-                fontWeight="bold"
-                borderRadius="full"
-                bgGradient="linear(to-r, purple.700, teal.600)"
-                color="white"
-                boxShadow="lg"
-                _hover={{
-                  transform: "scale(1.05)",
-                  boxShadow: "2xl",
-                }}
-                _active={{
-                  transform: "scale(0.98)",
-                }}
-                transition="all 0.25s ease"
-                as="a"
-              >
-                Contributeur
-              </Button>
-            </NextLink>
-          )}
+            <Menu>
+            <MenuButton
+              as={Button}
+              px={10}
+              py={6}
+              fontSize="sm"
+              fontWeight="bold"
+              borderRadius="full"
+              bgGradient="linear(to-r, purple.700, teal.600)"
+              color="white"
+              boxShadow="lg"
+              _hover={{
+                transform: "scale(1.05)",
+                boxShadow: "2xl",
+              }}
+              _active={{
+                transform: "scale(0.98)",
+              }}
+              transition="all 0.25s ease"
+            >
+              Contributeur
+              </MenuButton>
+
+              <MenuList bg="gray.800" borderColor="purple.600">
+                <NextLink href="/u/dashboard" passHref>
+                  <MenuItem as="a">Dashboard</MenuItem>
+                </NextLink>
+                <NextLink href="/u/createCollection" passHref>
+                  <MenuItem as="a">Créer une collection</MenuItem>
+                </NextLink>
+                <NextLink href="/mint/mintart" passHref>
+                  <MenuItem as="a">Ajouter des oeuvres</MenuItem>
+                </NextLink>
+              </MenuList>
+            </Menu>
+            )}
 
           {isPoet && (
-            <NextLink href="/u/dashboard" passHref>
-              <Button
+            <Menu>
+            <MenuButton
+                as={Button}
                 px={10}
                 py={6}
                 fontSize="sm"
@@ -221,16 +239,26 @@ const Header = () => {
                   transform: "scale(0.98)",
                 }}
                 transition="all 0.25s ease"
-                as="a"
               >
                 Poète
-              </Button>
-            </NextLink>
-          )}
+                </MenuButton>
+              <MenuList bg="gray.800" borderColor="purple.600">
+                <NextLink href="/u/dashboard" passHref>
+                  <MenuItem as="a">Dashboard</MenuItem>
+                </NextLink>
+                <NextLink href="/u/createCollection" passHref>
+                  <MenuItem as="a">Créer une collection</MenuItem>
+                </NextLink>
+                <NextLink href="/mint/poesie" passHref>
+                  <MenuItem as="a">Ajouter des poèmes</MenuItem>
+                </NextLink>
+              </MenuList>
+            </Menu>          )}
 
           {isArtist && (
-            <NextLink href="/u/dashboard" passHref>
-              <Button
+            <Menu>
+            <MenuButton
+                as={Button}
                 px={10}
                 py={6}
                 fontSize="sm"
@@ -247,16 +275,28 @@ const Header = () => {
                   transform: "scale(0.98)",
                 }}
                 transition="all 0.25s ease"
-                as="a"
               >
                 Artiste
-              </Button>
-            </NextLink>
+                </MenuButton>
+
+              <MenuList bg="gray.800" borderColor="purple.600">
+                <NextLink href="/u/dashboard" passHref>
+                  <MenuItem as="a">Dashboard</MenuItem>
+                </NextLink>
+                <NextLink href="/u/createCollection" passHref>
+                  <MenuItem as="a"> Créer une collection</MenuItem>
+                </NextLink>
+                <NextLink href="/mint/mintart" passHref>
+                  <MenuItem as="a">Ajouter des oeuvres</MenuItem>
+                </NextLink>
+              </MenuList>
+            </Menu>
           )}
 
           {isTrainee && (
-            <NextLink href="/u/dashboard" passHref>
-              <Button
+            <Menu>
+            <MenuButton
+                as={Button}
                 px={10}
                 py={6}
                 fontSize="sm"
@@ -273,11 +313,24 @@ const Header = () => {
                   transform: "scale(0.98)",
                 }}
                 transition="all 0.25s ease"
-                as="a"
               >
                 Apprenti
-              </Button>
-            </NextLink>
+                </MenuButton>
+                <MenuList bg="gray.800" borderColor="purple.600">
+                  <NextLink href="/u/dashboard" passHref>
+                    <MenuItem as="a">Dashboard</MenuItem>
+                  </NextLink>
+                  <NextLink href="/u/createCollection" passHref>
+                    <MenuItem as="a"> Créer une collection</MenuItem>
+                  </NextLink>
+                  <NextLink href="/mint/mintart" passHref>
+                    <MenuItem as="a">Ajouter des oeuvres</MenuItem>
+                  </NextLink>
+                  <NextLink href="/association/formations" passHref>
+                    <MenuItem as="a">Accéder aux formations</MenuItem>
+                  </NextLink>
+                </MenuList>
+              </Menu>
           )}
 
           {isAuthenticated && (
@@ -315,12 +368,26 @@ const Header = () => {
             <Tooltip label="Veuillez d'abord connecter votre wallet pour adhérer" aria-label="Aide Adhésion">
               <span>
                 <NextLink href="/adhesion" passHref>
-                  <Button
-                    colorScheme="yellow"
-                    size="sm"
-                    isDisabled={!isAuthenticated}
-                    as="a"
-                    aria-disabled={!isAuthenticated}
+                <Button
+                  px={4}
+                  py={6}
+                  fontSize="sm"
+                  borderRadius="full"
+                  bgGradient="yellow"
+                  color="white"
+                  boxShadow="lg"
+                  _hover={{
+                    transform: "scale(0.8)",
+                    boxShadow: "2xl",
+                  }}
+                  _active={{
+                    transform: "scale(0.9)",
+                    bgGradient : "linear(to-r, purple.700, pink.600)"
+
+                  }}
+                  transition="all 0.25s ease"
+                  isDisabled={!isAuthenticated}
+                  aria-disabled={!isAuthenticated}
                   >
                     Adhérer
                   </Button>

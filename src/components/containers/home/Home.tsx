@@ -207,15 +207,15 @@ const fetchNFTs = async (collectionId: string, associatedAddress: string) => {
     setIsLoading(true);
     try {
         const collectionContract = new Contract(associatedAddress, nftContractABI, provider);
-        console.log(collectionContract);
-        /*let max = await collectionContract.getLastMintedTokenId();  //Penser a ajouter cette fonction ou un similaire
-
+        let max = await collectionContract.getLastMintedTokenId();  //Penser a ajouter cette fonction ou un similaire
+        console.log(max);
+/*
 
         if(max > 10){
           max = 10;
         }
         */
-        const max = 10;
+        //const max = 10;
         const tokenIds = await collectionContract.getTokenPaginated(0, max);
 
         const nftsData = await Promise.all(

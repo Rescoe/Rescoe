@@ -310,7 +310,7 @@ const MintArt: React.FC = () => {
       return;
     }
     try {
-      fetchLastTokenId();
+      //fetchLastTokenId();
 
       const userAddress: string | null = address;
 
@@ -383,6 +383,7 @@ const MintArt: React.FC = () => {
       const lastTokenIdStr: string = await mintContract.methods.getLastMintedTokenId().call();
       const currentTokenId: number = Number(lastTokenIdStr);
 
+//Peut être mettre en commentaire ca si ca ne marche pas
       if (isNaN(currentTokenId) || currentTokenId <= 0) {
         console.warn("TokenId invalide, tentative de re-fetch...");
         setTimeout(fetchLastTokenId, 1000);

@@ -134,12 +134,27 @@ const ConnectBouton: React.FC = () => {
                                             handleAuth(account.address, selectedChainId); // Tenter la vérification automatiquement
                                         }
                                     }}
-                                    colorScheme="blue"
+                                    px={4}
+                                    py={6}
+                                    fontSize="lg"
+                                    fontWeight="bold"
+                                    borderRadius="full"
+                                    bgGradient="linear(to-r, purple.700, pink.600)"
+                                    color="white"
+                                    boxShadow="lg"
+                                    _hover={{
+                                      transform: "scale(1.05)",
+                                      boxShadow: "2xl",
+                                    }}
+                                    _active={{
+                                      transform: "scale(0.98)",
+                                    }}
+                                    transition="all 0.25s ease"
                                     size="sm"
                                     isLoading={isConnecting}
                                     loadingText="Vérification..."
                                 >
-                                    Connect Wallet
+                                    Se connecter
                                 </Button>
                             )}
 
@@ -160,8 +175,6 @@ const ConnectBouton: React.FC = () => {
                                             <MenuItem onClick={() => handleChainSelect(84531)}>Base</MenuItem>
                                             <MenuItem onClick={handleDisconnect}>Se déconnecter</MenuItem>
 
-                                            <MenuItem onClick={() => window.location.href = '/u/dashboard'}> Aller au Dashboard</MenuItem>
-                                            {/* Ajouter l'option de vérification d'adhésion dans le menu */}
                                             {account && chain && (
                                                 <MenuItem onClick={() => handleAuth(account.address, selectedChainId)}>Vérifier l'adhésion</MenuItem>
                                             )}

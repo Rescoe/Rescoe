@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Box, Heading, VStack, HStack, Input, Button, Text, FormLabel, useToast, Spinner, Tab, TabList, TabPanels, TabPanel, Tabs, Image, Grid, FormControl, Select } from "@chakra-ui/react";
+import { Box, Heading, VStack, Divider, Flex, HStack, Input, Button, Text, FormLabel, useToast, Spinner, Tab, TabList, TabPanels, TabPanel, Tabs, Image, Grid, FormControl, Select } from "@chakra-ui/react";
 import { JsonRpcProvider, Contract, ethers } from "ethers";
 import { useAuth } from '../../../utils/authContext';
 import ABIRESCOLLECTION from '../../ABI/ABI_Collections.json';
@@ -248,79 +248,194 @@ const [account, setAccount] = useState<string | null>(null);
 
 
 
-    return (
-      <Box p={6} display="flex" flexDirection="column" alignItems="center" justifyContent="center">
-        <Heading mb={4}>Gestion des collections</Heading>
-        <Tabs variant='enclosed'>
-          <TabList>
-            <Tab>Gérer vos collections</Tab>
-          </TabList>
-          <TabPanels>
-            <TabPanel>
-            <HStack>
-            <Text mt={4}>
-              Vous avez {userCollections} collections créées.
-            </Text>
-            <Text mt={4}>
-              Vous pouvez créer jusqu'à {remainingCollections} collections restantes.
-            </Text>
-            </HStack>
+  return (
+    <Box
+      maxW="700px"
+      mx="auto"
+      mt={10}
+      p={10}
+      borderRadius="3xl"
+      boxShadow="dark-lg"
+      border="1px solid"
+      borderColor="purple.300"
+    >
+      <Heading
+        size="2xl"
+        mb={6}
+        textAlign="center"
+        fontWeight="black"
+        bgGradient="linear(to-r, purple.400, pink.400)"
+        bgClip="text"
+        letterSpacing="tight"
+      >
+        Créez une collection
+      </Heading>
 
-              <FormLabel>Upload File</FormLabel>
-              <Input type="file" onChange={handleFileChange} mb={3} />
-              {previewUrl && <Image src={previewUrl} alt="Preview" mb={3} boxSize="200px" objectFit="cover" />}
+      <HStack
+              mx="auto"
+              mb={6}
+              textAlign="center"
+              fontWeight="black"
+              bgGradient="linear(to-r, purple.400, pink.400)"
+              bgClip="text"
+              letterSpacing="tight">
+                 <Text mt={4}>
+                   Collections crées : {userCollections} -
+                 </Text>
+                 <Text mt={4}>
+                   Collections restantes : {remainingCollections}
+                 </Text>
+      </HStack>
 
-              <VStack spacing={3} align="stretch">
-                <Input
-                  placeholder="Name"
-                  name="name"
-                  value={metadata.name}
-                  onChange={handleMetadataChange}
-                />
-                <Input
-                  placeholder="Description"
-                  name="description"
-                  value={metadata.description}
-                  onChange={handleMetadataChange}
-                />
-                <Input
-                  placeholder="Tags (comma-separated)"
-                  name="tags"
-                  value={metadata.tags}
-                  onChange={handleMetadataChange}
-                />
-              </VStack>
+      <FormLabel fontWeight="bold" color="gray.200">
+        Image de la collection
+      </FormLabel>
+      <Input
+        type="file"
+        onChange={handleFileChange}
+        mb={5}
+        border="2px dashed"
+        borderColor="purple.400"
+        bg="blackAlpha.300"
+        color="white"
+        _hover={{ bg: "blackAlpha.400" }}
+        _focus={{
+          borderColor: "pink.400",
+          boxShadow: "0 0 0 2px rgba(236, 72, 153, 0.4)",
+        }}
+        py={2}
+      />
 
-              <FormControl mb="4">
-                <FormLabel htmlFor="collectionType">Type de collection</FormLabel>
-                <Select
-                  id="collectionType"
-                  value={collectionType}
-                  onChange={(e) => setCollectionType(e.target.value)}
-                >
-                  <option value="">Sélectionner un type</option>
-                  <option value="Art">Art</option>
-                  <option value="Poesie">Poésie</option>
-                  <option value="Generative">Art Génératif</option>
-                </Select>
-              </FormControl>
+      {previewUrl && (
+        <Box
+          borderRadius="xl"
+          overflow="hidden"
+          boxShadow="md"
+          mb={6}
+          border="1px solid"
+          borderColor="purple.300"
+        >
+          <Image
+            src={previewUrl}
+            alt="Preview"
+            boxSize="300px"
+            objectFit="cover"
+            mx="auto"
+            transition="transform 0.3s ease"
+            _hover={{ transform: "scale(1.05)" }}
+          />
+        </Box>
+      )}
 
-              <Button mt={4} colorScheme="teal" onClick={uploadFileToIPFS} isLoading={isUploading}>
-                Upload to IPFS
-              </Button>
+      <VStack spacing={4} align="stretch">
+        <Input
+          placeholder="Nom de la collection"
+          name="name"
+          value={metadata.name}
+          onChange={handleMetadataChange}
+          bg="blackAlpha.300"
+          color="white"
+          _placeholder={{ color: "gray.400" }}
+          borderColor="purple.300"
+        />
+        <Input
+          placeholder="Description"
+          name="description"
+          value={metadata.description}
+          onChange={handleMetadataChange}
+          bg="blackAlpha.300"
+          color="white"
+          _placeholder={{ color: "gray.400" }}
+          borderColor="purple.300"
+        />
+        <Input
+          placeholder="Tags (séparés par des virgules)"
+          name="tags"
+          value={metadata.tags}
+          onChange={handleMetadataChange}
+          bg="blackAlpha.300"
+          color="white"
+          _placeholder={{ color: "gray.400" }}
+          borderColor="purple.300"
+        />
+      </VStack>
 
-              {ipfsUrl && (
-                <Text mt={3} wordBreak="break-word">IPFS URL: {ipfsUrl}</Text>
-              )}
+      <FormLabel mt={6} color="gray.300" fontWeight="bold">
+        Type de collection
+      </FormLabel>
+      <Select
+        placeholder="Sélectionnez un type"
+        value={collectionType}
+        onChange={(e) => setCollectionType(e.target.value)}
+        bg="blackAlpha.300"
+        color="white"
+        borderColor="purple.300"
+        mb={4}
+      >
+        <option style={{ backgroundColor: "#1A202C" }} value="Art">
+          Art
+        </option>
+        <option style={{ backgroundColor: "#1A202C" }} value="Poesie">
+          Poésie
+        </option>
+        <option style={{ backgroundColor: "#1A202C" }} value="Generative">
+          Génératif
+        </option>
+        <option style={{ backgroundColor: "#1A202C" }} value="autre">
+          Autre
+        </option>
 
-              <Button colorScheme="blue" onClick={handleCreateCollection} mt={2}>
-                Créer une Collection
-              </Button>
-            </TabPanel>
-          </TabPanels>
-        </Tabs>
-      </Box>
-    );
-  };
+      </Select>
+
+      <Button
+        mt={4}
+        w="full"
+        bgGradient="linear(to-r, teal.500, green.400)"
+        color="white"
+        fontWeight="bold"
+        _hover={{ transform: "scale(1.03)" }}
+        _active={{ transform: "scale(0.97)" }}
+        transition="all 0.2s ease"
+        onClick={uploadFileToIPFS}
+        isLoading={isUploading}
+      >
+        🚀 Enregistrez votre collection
+      </Button>
+
+      {ipfsUrl && (
+        <Text mt={3} wordBreak="break-word">IPFS URL: {ipfsUrl}</Text>
+      )}
+
+      <Divider my={10} borderColor="purple.300" />
+
+      <Flex justify="center">
+        <Button
+          onClick={handleCreateCollection}
+          px={10}
+          py={6}
+          fontSize="lg"
+          fontWeight="bold"
+          borderRadius="full"
+          bgGradient="linear(to-r, purple.700, pink.600)"
+          color="white"
+          boxShadow="lg"
+          _hover={{
+            transform: "scale(1.05)",
+            boxShadow: "2xl",
+          }}
+          _active={{
+            transform: "scale(0.98)",
+          }}
+          transition="all 0.25s ease"
+          isDisabled={!collectionType || !metadata.name || !file}
+        >
+          🎨 Créer la collection
+        </Button>
+
+
+      </Flex>
+    </Box>
+  );
+};
 
   export default CreateCollection;

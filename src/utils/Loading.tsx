@@ -1,92 +1,121 @@
-import React, { useEffect, useState } from 'react';
-import dynamic from 'next/dynamic';
+import React, { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 
-// Dynamically import HeroSection and Carousel
-const HeroSection = dynamic(() => import('./HeroSection'), { ssr: false });
-const DynamicCarousel = dynamic(() => import('./DynamicCarousel'), { ssr: false });
+// Dynamically import components
+const HeroSection = dynamic(() => import("./HeroSection"), { ssr: false });
+const DynamicCarousel = dynamic(() => import("./DynamicCarousel"), { ssr: false });
 
 const Loading = ({ onFinish }: { onFinish?: () => void }) => {
-    const [visible, setVisible] = useState(true);
-    const [componentsLoaded, setComponentsLoaded] = useState(false);
+  const [visible, setVisible] = useState(true);
+  const insectCount = 40;
 
-    const insectCount = 30; // Increase the count for more fireflies
-    const insectStyle = {
-        position: 'absolute' as const,
-        width: '8px',
-        height: '8px',
-        borderRadius: '50%',
-        backgroundColor: 'rgba(255, 255, 200, 0.8)', // Color of the fireflies
-        boxShadow: '0 0 20px rgba(255, 255, 200, 1)', // Glow effect
-        pointerEvents: 'none' as const, // Ensure they don't block user interactions
+  useEffect(() => {
+    const timeout = setTimeout(async () => {
+      await Promise.all([HeroSection, DynamicCarousel]);
+      setVisible(false);
+      if (onFinish) onFinish();
+    }, 4000);
+
+    for (let i = 0; i < insectCount; i++) {
+      createFirefly();
+    }
+
+    return () => clearTimeout(timeout);
+  }, []);
+
+  const createFirefly = () => {
+    const firefly = document.createElement("div");
+    firefly.className = "firefly";
+    document.body.appendChild(firefly);
+    animateFirefly(firefly);
+  };
+
+  const animateFirefly = (firefly: HTMLDivElement) => {
+    const move = () => {
+      const x = Math.random() * window.innerWidth;
+      const y = Math.random() * window.innerHeight;
+      const scale = 0.5 + Math.random() * 1.2;
+
+      firefly.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+      firefly.style.opacity = `${0.4 + Math.random() * 0.5}`;
     };
 
-    const containerStyle = {
-        position: 'fixed' as const,
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        display: visible ? 'flex' : 'none',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.2)', // Fond légèrement transparent
-        overflow: 'hidden',
-        zIndex: 9999,
-    };
+    move();
+    const interval = setInterval(move, 1000 + Math.random() * 1500);
 
-    useEffect(() => {
-        const timeout = setTimeout(async () => {
-            // Load components dynamically
-            await Promise.all([HeroSection, DynamicCarousel]); // Wait for both components to load
-            setComponentsLoaded(true); // Mark components as loaded
+    setTimeout(() => {
+      clearInterval(interval);
+      firefly.remove();
+    }, 4000);
+  };
 
-            setVisible(false); // Hide loading after components are loaded
-            if (onFinish) onFinish();
-        }, 4000); // Set a timeout for ~4 seconds
+  if (!visible) return null;
 
-        // Create fireflies
-        for (let i = 0; i < insectCount; i++) {
-            createFirefly();
+  return (
+    <div className="loader-overlay">
+      <div className="loader-text">Les insectes s'activent...</div>
+      <style jsx>{`
+        .loader-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          z-index: 9999;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(160deg, #0f0f23, #1a1a2f, #0d0d1b);
+          animation: pulseBG 6s ease-in-out infinite;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
         }
 
-        return () => clearTimeout(timeout); // Clean up timeout
-    }, []); // Empty dependency array to run only once on mount
+        .loader-text {
+          position: absolute;
+          bottom: 8%;
+          font-size: 1.5rem;
+          color: #f0e6ff;
+          font-weight: bold;
+          font-family: 'Courier New', monospace;
+          animation: waveText 3s ease-in-out infinite;
+          text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+        }
 
-    const createFirefly = () => {
-        const firefly = document.createElement('div');
-        Object.assign(firefly.style, insectStyle);
-        document.body.appendChild(firefly); // Add to body, not the container
-        animateFirefly(firefly);
-    };
+        @keyframes pulseBG {
+          0% {
+            background-position: 0% 50%;
+          }
+          50% {
+            background-position: 100% 50%;
+          }
+          100% {
+            background-position: 0% 50%;
+          }
+        }
 
-    const animateFirefly = (firefly: HTMLDivElement) => {
-        const move = () => {
-            const x = Math.random() * window.innerWidth;
-            const y = Math.random() * window.innerHeight;
-            const size = Math.random() * 12 + 8; // Vary the size of the fireflies
-            firefly.style.width = `${size}px`;
-            firefly.style.height = `${size}px`;
-            firefly.style.transition = `transform ${1 + Math.random()}s ease-in-out, opacity ${1 + Math.random()}s ease-in-out`;
-            firefly.style.transform = `translate(${x}px, ${y}px)`; // Random movement
-            firefly.style.opacity = Math.random() > 0.5 ? '0.5' : '1'; // Pulsating effect
-        };
+        @keyframes waveText {
+          0%, 100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-6px);
+          }
+        }
 
-        move();
-        const interval = setInterval(move, 1500 + Math.random() * 2000);
-
-        setTimeout(() => {
-            clearInterval(interval);
-            firefly.remove(); // Remove firefly when done
-        }, 4000); // Remove after some time
-    };
-
-    return (
-        <div style={containerStyle}>
-            <p style={{ position: 'absolute', bottom: '10%', fontSize: '1.2rem', color: '#FFF', textShadow: '1px 1px 5px rgba(0, 0, 0, 0.7)' }}>
-                Les insectes s'activent...
-            </p>
-        </div>
-    );
+        .firefly {
+          position: absolute;
+          width: 8px;
+          height: 8px;
+          background: rgba(255, 255, 200, 0.85);
+          border-radius: 50%;
+          pointer-events: none;
+          filter: blur(1px);
+          box-shadow: 0 0 12px rgba(255, 255, 150, 0.9), 0 0 20px rgba(255, 255, 150, 0.7);
+          transition: transform 1.8s ease-in-out, opacity 1.8s ease-in-out;
+        }
+      `}</style>
+    </div>
+  );
 };
 
 export default Loading;
