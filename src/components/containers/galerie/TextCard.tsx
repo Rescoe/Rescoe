@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { VStack, Text, Button, Divider } from '@chakra-ui/react';
+import React from 'react';
+import { VStack, Text, Button, Divider, Grid } from '@chakra-ui/react';
 import { useAuth } from '../../../utils/authContext';
 
 interface TextCardProps {
@@ -16,27 +16,23 @@ interface TextCardProps {
     isForSale: boolean;
   };
   showBuyButton?: boolean;
-  onBuy?: () => void;
+  onBuy: (tokenId: string) => void;
+  tokenIdsForSale: number[]; // inclure cette prop
+
 }
 
-const TextCard: React.FC<TextCardProps> = ({ nft, showBuyButton = false, onBuy }) => {
-  const [showDetails, setShowDetails] = useState(false);
+const TextCard: React.FC<TextCardProps> = ({ nft, showBuyButton = false, onBuy, tokenIdsForSale }) => {
+  const { address: authAddress, connectWallet } = useAuth();
+  const isOwner = authAddress?.toLowerCase() === nft.creatorAddress.toLowerCase();
   const priceInEth = nft?.price ? parseFloat(nft.price) / 1e18 : 0;
 
-  const { address: authAddress, connectWallet } = useAuth();
-
-  const isOwner = authAddress?.toLowerCase() === nft.creatorAddress.toLowerCase();
-
-  const canPurchase =
-    showBuyButton && !isOwner && nft.isForSale && parseInt(nft.availableEditions || '0') > 0;
-
-  const handleBuy = async (e: React.MouseEvent) => {
+  const handleBuy = async (tokenId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!authAddress) {
       await connectWallet();
     }
-    if (authAddress && onBuy) {
-      onBuy();
+    if (authAddress) {
+      onBuy(tokenId);
     }
   };
 
@@ -72,49 +68,41 @@ const TextCard: React.FC<TextCardProps> = ({ nft, showBuyButton = false, onBuy }
         <strong>Disponibilité :</strong> {nft.availableEditions || 0} / {nft.totalEditions} éditions
       </p>
 
-      {canPurchase ? (
-        <Button onClick={handleBuy} colorScheme="teal" mt={2} size="sm">
-          Acheter {priceInEth} ETH
-        </Button>
-      ) : showBuyButton && isOwner ? (
-        <Text fontSize="sm" color="gray.400">
-          Vous êtes le créateur de ce poème
-        </Text>
-      ) : showBuyButton ? (
-        <Text fontSize="sm" color="gray.400">
-          Non disponible à la vente
-        </Text>
-      ) : null}
+      {showBuyButton && tokenIdsForSale && (
+        <Grid templateColumns="repeat(auto-fit, minmax(100px, 1fr))" gap={2}>
+          {tokenIdsForSale.map((tokenId) => (
+            <Button key={tokenId} onClick={(e) => handleBuy(tokenId.toString(), e)} colorScheme="teal" size="sm">
+              Acheter #{tokenId}
+            </Button>
+          ))}
+        </Grid>
+      )}
+
+
 
       <Divider mt={3} />
 
-      <button onClick={() => setShowDetails(!showDetails)} style={{ marginTop: '10px' }}>
-        {showDetails ? 'Moins' : 'Plus'}
-      </button>
-
-      {showDetails && (
-        <div style={{ marginTop: '10px' }}>
-          <p style={{ fontSize: '1rem', color: '#aaa', marginBottom: '10px' }}>
-            <strong>Créateur :</strong> {nft.creatorAddress}
-          </p>
-          <p style={{ fontSize: '1rem', color: '#aaa', marginBottom: '10px' }}>
-            <strong>Contrat de Mint :</strong> {nft.mintContractAddress}
-          </p>
-          {nft.image && (
-            <img
-              src={nft.image}
-              alt="Poème"
-              style={{
-                width: '100%',
-                marginTop: '10px',
-                borderRadius: '8px',
-                maxHeight: '200px',
-                objectFit: 'cover',
-              }}
-            />
-          )}
-        </div>
-      )}
+      <div style={{ marginTop: '10px' }}>
+        <p style={{ fontSize: '1rem', color: '#aaa', marginBottom: '10px' }}>
+          <strong>Créateur :</strong> {nft.creatorAddress}
+        </p>
+        <p style={{ fontSize: '1rem', color: '#aaa', marginBottom: '10px' }}>
+          <strong>Contrat de Mint :</strong> {nft.mintContractAddress}
+        </p>
+        {nft.image && (
+          <img
+            src={nft.image}
+            alt="Poème"
+            style={{
+              width: '100%',
+              marginTop: '10px',
+              borderRadius: '8px',
+              maxHeight: '200px',
+              objectFit: 'cover',
+            }}
+          />
+        )}
+      </div>
     </div>
   );
 };
