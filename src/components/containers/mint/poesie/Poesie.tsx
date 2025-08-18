@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { Box, Button, Input, Select, FormLabel, Textarea, useToast } from "@chakra-ui/react";
+import { Box, Button, Input, Select, FormLabel, Textarea, useToast, Alert, AlertIcon } from "@chakra-ui/react";
 import Web3 from "web3";
 import ABIRESCOLLECTION from "../../../ABI/ABI_Collections.json";
-import ABI from '../../../ABI/HaikuEditions.json';
+import ABI from "../../../ABI/HaikuEditions.json";
 
 interface Collection {
   id: string;
@@ -17,17 +17,15 @@ const PoemMintingPage: React.FC = () => {
 
   const [collections, setCollections] = useState<Collection[]>([]);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>("");
-  const [line1, setLine1] = useState<string>("");
-  const [line2, setLine2] = useState<string>("");
-  const [line3, setLine3] = useState<string>("");
+  const [poemText, setPoemText] = useState<string>(""); // ← un seul champ
   const [editions, setEditions] = useState<number>(1);
-  const [editionsForSale, setEditionsForSale] = useState<number>(0); // État pour le nombre d'éditions à mettre en vente
-  const [salePrice, setSalePrice] = useState<number>(0); // Prix de vente en Wei
+  const [editionsForSale, setEditionsForSale] = useState<number>(0);
+  const [salePrice, setSalePrice] = useState<string>(""); // ← string pour éviter les floats JS
   const [isMinting, setIsMinting] = useState<boolean>(false);
   const [contractAddress, setContractAddress] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [web3, setWeb3] = useState<Web3 | null>(null); // Créez un état pour web3
+  const [web3, setWeb3] = useState<Web3 | null>(null);
 
   const toast = useToast();
 
@@ -45,7 +43,7 @@ const PoemMintingPage: React.FC = () => {
       const accounts = await web3Instance.eth.getAccounts();
       const userAddress = accounts[0];
 
-      const contract = new web3Instance.eth.Contract(ABIRESCOLLECTION, contractRESCOLLECTION);
+      const contract = new web3Instance.eth.Contract(ABIRESCOLLECTION as any, contractRESCOLLECTION);
       const result: any = await contract.methods.getCollectionsByUser(userAddress).call();
 
       if (Array.isArray(result)) {
@@ -71,9 +69,9 @@ const PoemMintingPage: React.FC = () => {
   };
 
   const fetchMintingContractAddress = async (collectionId: string) => {
-    if (!web3) return; // Ne pas exécuter si web3 n'est pas disponible
+    if (!web3) return;
     try {
-      const contractResCollection = new web3.eth.Contract(ABIRESCOLLECTION, contractRESCOLLECTION);
+      const contractResCollection = new web3.eth.Contract(ABIRESCOLLECTION as any, contractRESCOLLECTION);
       const collectionDetails: any = await contractResCollection.methods.getCollection(collectionId).call();
       const collectionMintAddress: string = collectionDetails.collectionAddress;
       setContractAddress(collectionMintAddress || "");
@@ -88,21 +86,63 @@ const PoemMintingPage: React.FC = () => {
     }
   };
 
+  // Conversion robuste (string décimale → wei). Accepte "0,001" et "0.001".
+  const toWeiSafe = (value: string): string => {
+    const normalized = String(value).trim().replace(",", ".");
+    if (normalized === "") return "0";
+    // autoriser 0 / nombre décimal simple
+    if (!/^\d+(\.\d+)?$/.test(normalized)) {
+      throw new Error("Invalid price format");
+    }
+    return Web3.utils.toWei(normalized, "ether");
+  };
+
   const mintPoem = async () => {
-    if (
-      !line1 ||
-      !line2 ||
-      !line3 ||
-      !selectedCollectionId ||
-      !contractAddress ||
-      !web3 ||
-      !editions ||
-      !editionsForSale ||
-      salePrice <= 0
-    ) {
+    // validations minimales
+    if (!poemText.trim()) {
       toast({
-        title: "Missing Information",
-        description: "Please provide all fields to mint the haiku.",
+        title: "Missing poem",
+        description: "Le poème ne peut pas être vide.",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+    if (!selectedCollectionId) {
+      toast({
+        title: "Select a collection",
+        description: "Veuillez choisir une collection de poésie.",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+    if (!contractAddress || !web3) {
+      toast({
+        title: "Wallet/Contract not ready",
+        description: "Contrat introuvable ou web3 non initialisé.",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+    if (editions < 1) {
+      toast({
+        title: "Invalid editions",
+        description: "Le nombre d’éditions doit être au moins 1.",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+    if (editionsForSale < 0 || editionsForSale > editions) {
+      toast({
+        title: "Invalid editions for sale",
+        description: "Les éditions en vente doivent être entre 0 et le total.",
         status: "error",
         duration: 3000,
         isClosable: true,
@@ -113,36 +153,56 @@ const PoemMintingPage: React.FC = () => {
     try {
       setIsMinting(true);
 
-      const contract = new web3.eth.Contract(ABI, contractAddress);
+      const contract = new web3.eth.Contract(ABI as any, contractAddress);
       const accounts = await web3.eth.getAccounts();
       const userAddress = accounts[0];
 
-      const fullHaiku = `${line1}\n${line2}\n${line3}`;
-      const salePriceInWei = Web3.utils.toWei(salePrice.toString(), "ether"); // Convertir le prix en Wei
+      // Prix optionnel : vide → 0
+      let salePriceInWei = "0";
+      try {
+        salePriceInWei = toWeiSafe(salePrice);
+      } catch (err) {
+        toast({
+          title: "Invalid price",
+          description: "Format de prix invalide. Exemple : 0.001",
+          status: "error",
+          duration: 3000,
+          isClosable: true,
+        });
+        setIsMinting(false);
+        return;
+      }
 
-      // Mint le haiku
+      // Mint le haïku
       await contract.methods
-        .mint(editions, fullHaiku, salePriceInWei, editionsForSale)
+        .mint(editions, poemText, salePriceInWei, editionsForSale)
         .send({ from: userAddress });
 
-      toast({
-        title: "Haiku Minted!",
-        description: "Your haiku has been successfully minted.",
-        status: "success",
-        duration: 3000,
-        isClosable: true,
-      });
+      if (salePriceInWei === "0" && editionsForSale > 0) {
+        toast({
+          title: "Minted (0 ETH)",
+          description: "Poème listé à 0 ETH (gratuit).",
+          status: "info",
+          duration: 3500,
+          isClosable: true,
+        });
+      } else {
+        toast({
+          title: "Haiku Minted!",
+          description: "Your haiku has been successfully minted.",
+          status: "success",
+          duration: 3000,
+          isClosable: true,
+        });
+      }
 
-      // Réinitialisation des champs
-      setLine1("");
-      setLine2("");
-      setLine3("");
+      // Reset
+      setPoemText("");
       setEditions(1);
       setEditionsForSale(0);
-      setSalePrice(0); // Reset to zero
+      setSalePrice("");
       setSelectedCollectionId("");
       setContractAddress("");
-
     } catch (error) {
       console.error("Minting error:", error);
       toast({
@@ -157,38 +217,33 @@ const PoemMintingPage: React.FC = () => {
     }
   };
 
+  const isMintDisabled =
+    !poemText.trim() ||
+    !selectedCollectionId ||
+    !contractAddress ||
+    !web3 ||
+    editions < 1 ||
+    editionsForSale < 0 ||
+    editionsForSale > editions;
+
   return (
-    <Box p={5} maxWidth="600px" mx="auto">
-      <FormLabel>Haiku Text</FormLabel>
-      <FormLabel mt={5}>Line 1</FormLabel>
+    <Box p={5} maxWidth="640px" mx="auto">
+      <FormLabel>Poem</FormLabel>
       <Textarea
-        value={line1}
-        onChange={(e) => setLine1(e.target.value)}
-        placeholder="Enter the first line of your haiku"
-        rows={2}
-      />
-      <FormLabel mt={5}>Line 2</FormLabel>
-      <Textarea
-        value={line2}
-        onChange={(e) => setLine2(e.target.value)}
-        placeholder="Enter the second line of your haiku"
-        rows={2}
-      />
-      <FormLabel mt={5}>Line 3</FormLabel>
-      <Textarea
-        value={line3}
-        onChange={(e) => setLine3(e.target.value)}
-        placeholder="Enter the third line of your haiku"
-        rows={2}
+        value={poemText}
+        onChange={(e) => setPoemText(e.target.value)}
+        placeholder={"Écris ton poème ici (tu peux utiliser des retours à la ligne)."}
+        rows={6}
       />
 
       <FormLabel mt={5}>Select Collection</FormLabel>
       <Select
+        value={selectedCollectionId}
         onChange={(e) => {
           setSelectedCollectionId(e.target.value);
           fetchMintingContractAddress(e.target.value);
         }}
-        placeholder="Select a Poetry Collection"
+        placeholder={loading ? "Loading..." : "Select a Poetry Collection"}
       >
         {collections.map((collection) => (
           <option key={collection.id} value={collection.id}>
@@ -210,7 +265,7 @@ const PoemMintingPage: React.FC = () => {
       <Input
         type="number"
         min="0"
-        max={editions} // Limiter l'entrée à ne pas dépasser le nombre total d'éditions
+        max={editions}
         value={editionsForSale}
         onChange={(e) => setEditionsForSale(Number(e.target.value))}
         placeholder="Editions to Sell (0 to total editions)"
@@ -218,20 +273,26 @@ const PoemMintingPage: React.FC = () => {
 
       <FormLabel mt={5}>Sale Price (in ETH)</FormLabel>
       <Input
-        type="number"
-        min="0"
-        step="0.0001"
+        type="text" // ← string pour éviter la notation scientifique des floats
+        inputMode="decimal"
         value={salePrice}
-        onChange={(e) => setSalePrice(Number(e.target.value))}
-        placeholder="Prix de vente par édition (en ETH)"
+        onChange={(e) => setSalePrice(e.target.value)}
+        placeholder="ex: 0.001 (laisser vide = gratuit)"
       />
+
+      {salePrice.trim() === "" && editionsForSale > 0 && (
+        <Alert status="warning" mt={3} borderRadius="md">
+          <AlertIcon />
+          Attention : ce poème sera listé pour <strong>0 ETH</strong> si vous laissez le prix vide.
+        </Alert>
+      )}
 
       <Button
         mt={4}
         colorScheme="teal"
         onClick={mintPoem}
         isLoading={isMinting}
-        isDisabled={!line1 || !line2 || !line3 || !selectedCollectionId || !editions || !editionsForSale || salePrice <= 0 || !contractAddress}
+        isDisabled={isMintDisabled}
       >
         Mint Haiku
       </Button>

@@ -388,19 +388,6 @@
 		"type": "event"
 	},
 	{
-		"inputs": [],
-		"name": "OWNER_FEE_PERCENTAGE",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [
 			{
 				"internalType": "address",
@@ -416,19 +403,6 @@
 		"name": "approve",
 		"outputs": [],
 		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "associationAddress",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -811,9 +785,9 @@
 	{
 		"inputs": [
 			{
-				"internalType": "uint256[]",
-				"name": "tokenIds",
-				"type": "uint256[]"
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",

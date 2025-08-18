@@ -26,6 +26,11 @@ const TextCard: React.FC<TextCardProps> = ({
   onBuy,
 }) => {
   const { address: authAddress, connectWallet } = useAuth();
+
+  if (!nft) {
+    return <Text>Chargement du NFT...</Text>;
+  }
+
   const priceInEth = nft.price ? parseFloat(nft.price) / 1e18 : 0;
   const isOwner = authAddress?.toLowerCase() === nft.creatorAddress.toLowerCase();
   const router = useRouter();
@@ -54,7 +59,8 @@ const TextCard: React.FC<TextCardProps> = ({
         backgroundColor: "#1a202c",
       }}
     >
-      {/* Texte du poème */}
+
+      {/* Texte du poème 1 */}
       <VStack textAlign="center" color="white" maxWidth="120%">
         {nft.poemText
           ? nft.poemText.split("\n").map((line, i) => (
