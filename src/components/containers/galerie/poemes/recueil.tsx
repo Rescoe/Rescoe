@@ -10,6 +10,7 @@ import {
   TabList,
   TabPanels,
   TabPanel,
+  Divider,
   useMediaQuery
 } from "@chakra-ui/react";
 import { JsonRpcProvider, Contract, BigNumberish } from "ethers";
@@ -36,7 +37,7 @@ interface Poem {
   mintContractAddress: string;
   price: string;
   totalMinted: string;
-  availableEditions?: string;
+  availableEditions: string;
   isForSale: boolean;
   tokenIdsForSale: number[];
 
@@ -53,7 +54,7 @@ const PoetryGallery: React.FC = () => {
   const [isMobile] = useMediaQuery('(max-width: 768px)');
   const { web3, address } = useAuth();
   const [tokenIdsForSale, setTokenIdsForSale] = useState<number[]>([]);
-
+  const [isOwner, setIsOwner] = useState<boolean>(false);
 
   const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
   const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
@@ -64,7 +65,6 @@ const PoetryGallery: React.FC = () => {
       const total: BigNumberish = await contract.getTotalCollectionsMinted();
       const totalNumber = total.toString();
       const collectionsPaginated = await contract.getCollectionsPaginated(7, Number(totalNumber));
-
       const collectionsData: Collection[] = await Promise.all(
         collectionsPaginated.map(async (tuple: any) => {
           const [id, name, collectionType, , associatedAddresses, , isFeatured] = tuple;
@@ -107,68 +107,53 @@ const PoetryGallery: React.FC = () => {
     }
   };
 
+  // --- Fonction utilitaire pour récupérer les IDs en vente ---
+  const fetchTokenIdsForSale = async (
+    collectionContract: Contract,
+    premierIDDeLaSerie: number,
+    nombreHaikusParSerie: number
+  ): Promise<number[]> => {
+    const tokenIdsForSale: number[] = [];
+
+    for (let id = premierIDDeLaSerie; id < premierIDDeLaSerie + nombreHaikusParSerie; id++) {
+      const forSale: boolean = await collectionContract.isNFTForSale(id);
+      if (forSale) {
+        tokenIdsForSale.push(id);
+      }
+    }
+
+    return tokenIdsForSale;
+  };
+
+  // --- Fonction principale ---
   const fetchPoems = async (collectionId: string, associatedAddress: string) => {
     setIsLoading(true);
-    console.log("Début de fetchPoems pour collectionId:", collectionId, "et adresse:", associatedAddress);
 
     try {
       const collectionContract = new Contract(associatedAddress, ABI, provider);
       const uniqueHaikuCount: BigNumberish = await collectionContract.getLastUniqueHaikusMinted();
-      console.log("Nombre total de haikus uniques mintés :", uniqueHaikuCount.toString());
 
       const poemsData: Poem[] = await Promise.all(
         Array.from({ length: Number(uniqueHaikuCount) }, (_, i) => i).map(async (uniqueHaikuId) => {
-          console.log(`Haiku unique : ${uniqueHaikuId}`);
-
-          //On va chercher l'ID du pemier haikus d'une meme série
           const premierToDernier = await collectionContract.getHaikuInfoUnique(uniqueHaikuId);
           const premierIDDeLaSerie = Number(premierToDernier[0]);
           const nombreHaikusParSerie = Number(premierToDernier[1]);
 
-          console.log(`prmeier haikus ID : ${premierIDDeLaSerie}`);
-          console.log(`nombre dans la série : ${nombreHaikusParSerie}`);
-
-          //On récupère les Haikus qui n'ont jamais été vendu:
           const availableEditions = await collectionContract.getRemainingEditions(uniqueHaikuId);
-          console.log(`Éditions disponibles pour haiku #${uniqueHaikuId}:`, availableEditions.toString());
-
-          //On récupère le nombre total d'editions minté dans le recueil (contrat)
           let totalEditions = await collectionContract.getLastMintedTokenId();
           totalEditions = Number(totalEditions) + 1;
-          console.log(`Nombre total de haikus minté dans cette série :`, totalEditions.toString());
 
-          //On cherche ensuite les hakus qui sont en vente reellement
-          let AV = 0
-          const tokenIdsForSale: number[] = []; // Tableau pour garder les IDs des tokens à vendre
-
-          for (let id = premierIDDeLaSerie; id < (premierIDDeLaSerie+nombreHaikusParSerie); id++) {
-
-            const forSale: boolean = await collectionContract.isNFTForSale(id);
-            console.log(`Jeton ${id}:`, forSale);
-              if (forSale) {
-                    AV = AV +1 ;
-                    tokenIdsForSale.push(id); // Ajoute l'ID à la liste s'il est à vendre
-
-               }
-          }
-          console.log(tokenIdsForSale);
-          setTokenIdsForSale(tokenIdsForSale);
-
-          const nbAVendre = AV;
-          console.log("nbAVendre");
-          console.log(AV);
-
+          // 📌 On récupère d'abord toutes les infos "immédiates"
           const [firstTokenId] = await collectionContract.getHaikuInfoUnique(uniqueHaikuId);
-          console.log(`firstTokenId pour haiku #${uniqueHaikuId}:`, firstTokenId.toString());
-
-
           const tokenDetails = await collectionContract.getTokenFullDetails(firstTokenId);
-          console.log(`Détails du token ${firstTokenId.toString()}:`, tokenDetails);
 
           const creatorAddress = await collectionContract.owner();
           const totalMinted = totalEditions - Number(availableEditions);
+          setIsOwner(address?.toLowerCase() === creatorAddress.toLowerCase());
 
-          const poem = {
+
+          // 📌 On construit un poème avec `tokenIdsForSale` et `availableEditions` en "pending"
+          const poem: Poem = {
             tokenId: Number(firstTokenId).toString(),
             poemText: tokenDetails.haiku_,
             creatorAddress: creatorAddress.toString(),
@@ -176,28 +161,38 @@ const PoetryGallery: React.FC = () => {
             mintContractAddress: associatedAddress,
             price: tokenDetails.currentPrice.toString(),
             totalMinted: totalMinted.toString(),
-            availableEditions: nbAVendre.toString(),
+            availableEditions: "...", // ⏳ placeholder
             isForSale: tokenDetails.forSale,
-            tokenIdsForSale: tokenIdsForSale,
+            tokenIdsForSale: [], // ⏳ placeholder
           };
 
-          console.log(`Poème construit pour haiku #${uniqueHaikuId}:`, poem);
+          // 🔹 On lance la récupération "asynchrone" après coup
+          fetchTokenIdsForSale(collectionContract, premierIDDeLaSerie, nombreHaikusParSerie)
+            .then((tokenIdsForSale) => {
+              const nbAVendre = tokenIdsForSale.length;
 
-          return poem;
+              // Mise à jour en remplaçant uniquement les champs dépendants
+              setPoems((prevPoems) =>
+                prevPoems.map((p) =>
+                  p.tokenId === poem.tokenId
+                    ? { ...p, availableEditions: nbAVendre.toString(), tokenIdsForSale }
+                    : p
+                )
+              );
+            });
+
+          return poem; // On renvoie déjà la version "incomplète"
         })
       );
 
-      console.log("Tableau complet des poèmes récupérés :", poemsData);
-      setPoems(poemsData);
+      setPoems(poemsData); // Première maj de l'état avec les données directes
     } catch (error) {
       console.error("Erreur lors de la récupération des poèmes :", error);
       alert("Une erreur est survenue lors de la récupération des poèmes.");
     } finally {
       setIsLoading(false);
-      console.log("fetchPoems terminé");
     }
   };
-
 
 
   const handleBuy = async (nft: Poem, tokenId: number) => {
@@ -237,6 +232,25 @@ const PoetryGallery: React.FC = () => {
         console.error("Erreur lors de l'achat :", error);
         alert("Erreur lors de l'achat : " + (error.message || "inconnue"));
     }
+};
+
+const handleBurn = async (nft: Poem, tokenId: number) => {
+  if (!web3 || !address) {
+      alert("Connectez votre wallet pour acheter un haiku.");
+      return;
+  }
+
+  try {
+    if (!contract) return;
+
+    const tx = await contract.burn(tokenId);
+    await tx.wait();
+    alert(`Poème ${tokenId} brûlé avec succès !`);
+    // Optionnel : rafraîchir la liste des poèmes ici
+  } catch (error) {
+    console.error("Erreur lors du burn :", error);
+    alert("Erreur lors du burn du poème.");
+  }
 };
 
 
@@ -295,20 +309,49 @@ const PoetryGallery: React.FC = () => {
           </TabPanel>
 
           <TabPanel>
-            <Grid templateColumns={{ base: 'repeat(1, 1fr)', md: 'repeat(2, 1fr)' }} gap={6}>
-            {poems.map((poem) => (
-              <TextCard
-                key={poem.tokenId}
-                nft={poem}
-                showBuyButton={true}
-                tokenIdsForSale={poem.tokenIdsForSale} // tu passes la liste ici
-                onBuy={(tokenId) => handleBuy(poem, Number(tokenId))}
-              />
-            ))}
+            {isLoading && <Spinner />}
 
+            {poems.length > 0 ? (
+              <>
+                {/* Bloc Infos du premier poème */}
+                <Box p={4} border="1px solid #ccc" borderRadius="10px" mb={4}>
+                  {isOwner && (
+                    <Text color="orange.300" fontSize="sm" mb={2}>
+                      Vous êtes le créateur de ce recueil
+                    </Text>
+                  )}
 
-            </Grid>
+                  <Box>
+                    <Text fontSize="1rem" color="#aaa" mb={1}>
+                      <strong>Créateur :</strong> {poems[0].creatorAddress}
+                    </Text>
+                    <Text fontSize="1rem" color="#aaa" mb={1}>
+                      <strong>Contrat de Mint :</strong> {poems[0].mintContractAddress}
+                    </Text>
+                  </Box>
+                </Box>
+
+                <Divider mb={3} />
+
+                {/* Cartes d'achat pour tous les poèmes */}
+                <Grid templateColumns={{ base: 'repeat(1, 1fr)', md: 'repeat(2, 1fr)' }} gap={6}>
+                  {poems.map((poem) => (
+                    <TextCard
+                      key={poem.tokenId}
+                      nft={poem}
+                      showBuyButton={true}
+                      onBuy={(tokenId) => handleBuy(poem, Number(tokenId))}
+                    />
+                  ))}
+                </Grid>
+
+              </>
+            ) : (
+              <Text>Aucun poème disponible pour cette collection.</Text>
+            )}
           </TabPanel>
+
+
         </TabPanels>
       </Tabs>
     </Box>

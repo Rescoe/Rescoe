@@ -1,6 +1,7 @@
-import React from 'react';
-import { VStack, Text, Button, Divider, Grid } from '@chakra-ui/react';
-import { useAuth } from '../../../utils/authContext';
+import React from "react";
+import { VStack, Text, Button } from "@chakra-ui/react";
+import { useAuth } from "../../../utils/authContext";
+import { useRouter } from 'next/router';
 
 interface TextCardProps {
   nft: {
@@ -10,21 +11,24 @@ interface TextCardProps {
     totalEditions: string;
     price: string;
     mintContractAddress: string;
-    image?: string;
     totalMinted: string;
-    availableEditions?: string;
+    availableEditions: string;
     isForSale: boolean;
+    tokenIdsForSale?: number[]; // Optionnel
   };
   showBuyButton?: boolean;
   onBuy: (tokenId: string) => void;
-  tokenIdsForSale: number[]; // inclure cette prop
-
 }
 
-const TextCard: React.FC<TextCardProps> = ({ nft, showBuyButton = false, onBuy, tokenIdsForSale }) => {
+const TextCard: React.FC<TextCardProps> = ({
+  nft,
+  showBuyButton = false,
+  onBuy,
+}) => {
   const { address: authAddress, connectWallet } = useAuth();
+  const priceInEth = nft.price ? parseFloat(nft.price) / 1e18 : 0;
   const isOwner = authAddress?.toLowerCase() === nft.creatorAddress.toLowerCase();
-  const priceInEth = nft?.price ? parseFloat(nft.price) / 1e18 : 0;
+  const router = useRouter();
 
   const handleBuy = async (tokenId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -39,70 +43,74 @@ const TextCard: React.FC<TextCardProps> = ({ nft, showBuyButton = false, onBuy, 
   return (
     <div
       style={{
-        border: '1px solid #ccc',
-        borderRadius: '10px',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
-        padding: '10px',
-        backgroundColor: '#1a202c',
+        border: "1px solid #ccc",
+        borderRadius: "10px",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
+        padding: "10px",
+        backgroundColor: "#1a202c",
       }}
     >
+      {/* Texte du poème */}
       <VStack textAlign="center" color="white" maxWidth="120%">
         {nft.poemText
-          ? nft.poemText.split('\n').map((line, i) => (
+          ? nft.poemText.split("\n").map((line, i) => (
               <Text key={i} fontStyle="italic" fontSize="sm">
                 {line}
               </Text>
             ))
-          : 'Pas de poème disponible'}
+          : "Pas de poème disponible"}
       </VStack>
 
-      <p style={{ fontSize: '1rem', color: '#ccc', marginTop: '10px' }}>
+      {/* Prix */}
+      <p style={{ fontSize: "1rem", color: "#ccc", marginTop: "10px" }}>
         <strong>Prix :</strong> {priceInEth} ETH
       </p>
 
-      <p style={{ fontSize: '1rem', color: '#ccc', marginBottom: '10px' }}>
-        <strong>Disponibilité :</strong> {nft.availableEditions || 0} / {nft.totalEditions} éditions
+      {/* Disponibilité */}
+      <p style={{ fontSize: "1rem", color: "#ccc", marginBottom: "10px" }}>
+        <strong>Disponibilité :</strong>{" "}
+        {nft.availableEditions !== undefined
+          ? `${nft.availableEditions} / ${nft.totalEditions} éditions`
+          : "loading..."}
       </p>
 
-      {showBuyButton && tokenIdsForSale && (
-        <Grid templateColumns="repeat(auto-fit, minmax(100px, 1fr))" gap={2}>
-          {tokenIdsForSale.map((tokenId) => (
-            <Button key={tokenId} onClick={(e) => handleBuy(tokenId.toString(), e)} colorScheme="teal" size="sm">
-              Acheter #{tokenId}
-            </Button>
-          ))}
-        </Grid>
+      {/* Bouton achat */}
+      {showBuyButton && nft.tokenIdsForSale && nft.tokenIdsForSale.length > 0 ? (
+  <Button
+    onClick={(e) => handleBuy(nft.tokenIdsForSale![0].toString(), e)} // Utilisation du "non-null assertion operator" !
+    colorScheme="teal"
+    size="sm"
+  >
+    Acheter
+  </Button>
+) : (
+  showBuyButton && nft.availableEditions && nft.tokenIdsForSale?.length === 0 && (
+    <Text color="red.300" fontSize="sm">
+      Plus aucune édition en vente
+    </Text>
+  )
+)}
+
+      {isOwner && (
+        <Text color="orange.300" fontSize="sm">
+          Vous êtes le créateur de ce poème
+        </Text>
       )}
 
+      <Button
+        onClick={() => router.push(`/poemsId/${nft.mintContractAddress}/${nft.tokenId}`)}
+        border="1px solid gray"
+        borderRadius="md"
+        p={4}
+        colorScheme="gray" // optionnel pour style
+      >
+        Aller au poème
+      </Button>
 
-
-      <Divider mt={3} />
-
-      <div style={{ marginTop: '10px' }}>
-        <p style={{ fontSize: '1rem', color: '#aaa', marginBottom: '10px' }}>
-          <strong>Créateur :</strong> {nft.creatorAddress}
-        </p>
-        <p style={{ fontSize: '1rem', color: '#aaa', marginBottom: '10px' }}>
-          <strong>Contrat de Mint :</strong> {nft.mintContractAddress}
-        </p>
-        {nft.image && (
-          <img
-            src={nft.image}
-            alt="Poème"
-            style={{
-              width: '100%',
-              marginTop: '10px',
-              borderRadius: '8px',
-              maxHeight: '200px',
-              objectFit: 'cover',
-            }}
-          />
-        )}
-      </div>
     </div>
   );
 };
