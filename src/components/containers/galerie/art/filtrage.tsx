@@ -7,261 +7,236 @@ import {
   IconButton,
   Flex,
   useColorModeValue,
-  useBreakpointValue,
-  Link,
+  useMediaQuery,
 } from "@chakra-ui/react";
 import { JsonRpcProvider, Contract } from "ethers";
 import ABIRESCOLLECTION from "../../../ABI/ABI_Collections.json";
 import CollectionCard from "../CollectionCard";
-
 import { useKeenSlider } from "keen-slider/react";
 import "keen-slider/keen-slider.min.css";
-
 import { ChevronLeftIcon, ChevronRightIcon } from "@chakra-ui/icons";
+import NextLink from "next/link";
 
-interface Collection {
+type CollectionOnChain = {
   id: string;
   name: string;
-  imageUrl: string;
-  mintContractAddress: string;
-  creator: string;
   collectionType: string;
-}
+  creator: string;
+  mintContractAddress: string; // au lieu de collectionAddress
+  imageUrl?: string;
+  uri : string;
+};
 
-const LIMIT = 4;
+type HorizontalSliderProps = {
+  type: string;
+  collections: CollectionOnChain[];
+  startIndex: number;
+  children?: React.ReactNode; // <-- important !
+};
+
 
 const CollectionsByType: React.FC<{ creator: string }> = ({ creator }) => {
-  const [collections, setCollections] = useState<Collection[]>([]);
+  const [collections, setCollections] = useState<CollectionOnChain[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [startId, setStartId] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [typeRedirection, setTypeRedirection] = useState<string>('');
-  const [startIndexes, setStartIndexes] = useState<Record<string, number>>({});
-
-
+  const [startIndexes, setStartIndexes] = useState<{ [key: string]: number }>({});
+  const [LIMIT, setLIMIT] = useState<number>(4); // par exemple 5 par défaut
   const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
-  const contract = new Contract(
-    process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!,
-    ABIRESCOLLECTION,
-    provider
-  );
+  const contract = new Contract(process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!, ABIRESCOLLECTION, provider);
+
+  const btnBg = useColorModeValue("white", "gray.700");
+  const btnHoverBg = useColorModeValue("gray.100", "gray.600");
 
   const fetchUserCollections = async () => {
-  setIsLoading(true);
-  try {
-    const userCollectionsOnChain = await contract.getCollectionsByUser(creator);
+    setIsLoading(true);
+    try {
+      const userCollectionsOnChain: CollectionOnChain[] = await contract.getCollectionsByUser(creator);
+      const nbOfCollection = await contract.getNumberOfCollectionsByUser(creator);
+      setLIMIT(Number(nbOfCollection));
+      const collectionsData = await Promise.all(
+        userCollectionsOnChain.map(async (col) => {
+          const uri = col.uri || (await contract.getCollectionURI(col.id.toString()));
+          const ipfsHash = uri.split("/").pop();
+          const response = await fetch(`/api/proxyPinata?ipfsHash=${ipfsHash}`);
+          const metadata = await response.json();
 
-    // Selon la structure de Collection, récupérer le metadata IPFS si besoin
-    const collectionsData = await Promise.all(
-      userCollectionsOnChain.map(async (col: any) => {
-        const id = col.id.toString(); // ou col.collectionId selon ta struct
-        const name = col.name;
-        const collectionType = col.collectionType;
-        const collectionCreator = col.creator;
-        const collectionAddress = col.collectionAddress;
-        // Si l'URI est dans la struct, par ex col.uri
-        const uri = col.uri || (await contract.getCollectionURI(id));
+          return {
+            id: col.id.toString(),
+            name: col.name,
+            collectionType: col.collectionType,
+            creator: col.creator,
+            mintContractAddress: col.mintContractAddress,
+            imageUrl: metadata.image,
+          };
+        })
+      );
+      const collectionsDataFormatted: CollectionOnChain[] = collectionsData.map(c => ({
+        ...c,
+        collectionAddress: c.mintContractAddress, // si besoin selon ton type
+        uri: c.imageUrl || "", // on mappe imageUrl sur uri, ou une string vide par défaut
+      }));
 
-        const ipfsHash = uri.split("/").pop();
-        const response = await fetch(`/api/proxyPinata?ipfsHash=${ipfsHash}`);
-        const metadata = await response.json();
-
-        return {
-          id,
-          name,
-          collectionType,
-          creator: collectionCreator,
-          mintContractAddress: collectionAddress,
-          imageUrl: metadata.image,
-        };
-      })
-    );
-
-    setCollections(collectionsData);
-  } catch (error) {
-    console.error("Erreur fetchUserCollections", error);
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-useEffect(() => {
-  if (collections.length > 0 && Object.keys(startIndexes).length === 0) {
-    const initialIndexes: Record<string, number> = {};
-    collections.forEach((col) => {
-      if (!(col.collectionType in initialIndexes)) {
-        initialIndexes[col.collectionType] = 0;
-      }
-    });
-    setStartIndexes(initialIndexes);
-  }
-}, [collections, startIndexes]);
+      setCollections(collectionsDataFormatted);
 
 
-
-
-useEffect(() => {
-  if (creator) {
-    fetchUserCollections();
-  }
-}, [creator]);
-
-
-
-
-const updateStartIndex = (type: string) => {
-  setStartIndexes((prev) => {
-    const currentIndex = prev[type] || 0;
-    const total = collectionsGroupedByType[type]?.length || 0;
-    const nextIndex = currentIndex + LIMIT;
-
-    const newIndex = nextIndex >= total ? 0 : nextIndex; // boucle ou pas
-
-    return {
-      ...prev,
-      [type]: newIndex,
-    };
-  });
-};
-
-const decrementStartIndex = (type: string) => {
-  setStartIndexes((prev) => {
-    const currentIndex = prev[type] || 0;
-    const total = collectionsGroupedByType[type]?.length || 0;
-    const prevIndex = currentIndex - LIMIT;
-
-    // Option 1 : boucle en revenant à la fin
-    // const newIndex = prevIndex < 0 ? Math.max(total - LIMIT, 0) : prevIndex;
-
-    // Option 2 : bloque à 0 (pas de boucle)
-    const newIndex = prevIndex < 0 ? 0 : prevIndex;
-
-    return {
-      ...prev,
-      [type]: newIndex,
-    };
-  });
-};
-
-
-
-
-  const collectionsGroupedByType = collections.reduce<Record<string, Collection[]>>((acc, col) => {
-    if (!acc[col.collectionType]) acc[col.collectionType] = [];
-    acc[col.collectionType].push(col);
-    return acc;
-  }, {});
-
-  const btnBg = useColorModeValue("whiteAlpha.800", "blackAlpha.800");
-  const btnHoverBg = useColorModeValue("whiteAlpha.900", "blackAlpha.900");
-  const headingSize = useBreakpointValue({ base: "md", md: "lg" });
-
-  const HorizontalSlider: React.FC<{
-  collections: Collection[];
-  type: string;
-  fetchNext: () => void;
-  hasMore: boolean;
-  isLoading: boolean;
-  increaseVisibleCount: () => void;
-  decreaseVisibleCount: () => void;  // <== ajouté
-  startIndex: number;
-}> = ({ collections, type, fetchNext, hasMore, isLoading, increaseVisibleCount, decreaseVisibleCount, startIndex }) => {
-
-  const [sliderRef, instanceRef] = useKeenSlider<HTMLDivElement>({
-    slides: {
-      perView: LIMIT,
-      spacing: 10,
-    },
-    breakpoints: {
-      "(max-width: 768px)": {
-        slides: { perView: 1, spacing: 5 },
-      },
-      "(min-width: 769px) and (max-width: 1024px)": {
-        slides: { perView: 2, spacing: 5 },
-      },
-    },
-    slideChanged(slider) {
-      const lastIndex = slider.track.details.slides.length - 1;
-      const current = slider.track.details.rel;
-
-      if (current >= lastIndex - 2 && hasMore && !isLoading) {
-        increaseVisibleCount(); // 👈 ajouter cette ligne
-        fetchNext();
-      }
-    },
-  });
+    } catch (error) {
+      console.error("Erreur fetchUserCollections", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Quand la tranche change, on remet le slider au début (slide 0)
-    instanceRef.current?.moveToIdx(0);
-  }, [startIndex]);
+    if (creator) {
+      fetchUserCollections();
+    }
+  }, [creator]);
 
-  // La gestion de l'espacement se fait dans le collection map, dans le box
+  useEffect(() => {
+    const initialIndexes: Record<string, number> = {};
+collections.forEach(col => {
+  initialIndexes[col.collectionType] = 0;
+});
+setStartIndexes(initialIndexes);
 
+  }, [collections]);
 
-  return (
-    <Box position="relative" w="100%" overflow="hidden" mb={6}>
-      <Heading size="md" mb={3}>{type}</Heading>
-      <Box
-        ref={sliderRef}
-        className="keen-slider"
-        display="flex"
-        justifyContent="center"
-        gap="10px" // pour gérer l’espacement de 10px entre slides (plutôt que spacing dans Keen)
-        overflow="hidden"
-      >
-        {collections.map((collection) => (
-          <Box
-            key={collection.id}
-            className="keen-slider__slide"
-              minW="100px"
-              maxW="100px"
-            flexShrink={0}
-          >
-            <CollectionCard collection={collection} type={type} />
-          </Box>
-        ))}
-      </Box>
-
-      <Flex position="absolute" top="50%" transform="translateY(-50%)" width="100%" justifyContent="space-between" px={2} pointerEvents="none">
-      <IconButton
-        aria-label="Précédent"
-        icon={<ChevronLeftIcon />}
-        onClick={() => {
-          decreaseVisibleCount();
-          instanceRef.current?.moveToIdx(0); // Pour remettre le slider au début de la tranche
-        }}
-        pointerEvents="auto"
-        bg={btnBg}
-        _hover={{ bg: btnHoverBg }}
-        boxShadow="md"
-        borderRadius="full"
-        size="sm"
-      />
-      <IconButton
-        aria-label="Suivant"
-        icon={<ChevronRightIcon />}
-        onClick={() => {
-          increaseVisibleCount();
-          instanceRef.current?.moveToIdx(0);
-        }}
-        pointerEvents="auto"
-        bg={btnBg}
-        _hover={{ bg: btnHoverBg }}
-        boxShadow="md"
-        borderRadius="full"
-        size="sm"
-      />
-
-      </Flex>
-    </Box>
+  const collectionsGroupedByType = collections.reduce<Record<string, CollectionOnChain[]>>(
+    (acc, col) => {
+      if (!acc[col.collectionType]) acc[col.collectionType] = [];
+      acc[col.collectionType].push(col);
+      return acc;
+    },
+    {}
   );
-};
 
+
+  const HorizontalSlider = ({
+    type,
+    collections,
+    startIndex,
+    children,
+  }: {
+    type: string;
+    collections: any[];
+    startIndex: number;
+    children?: React.ReactNode; // <-- ajouter ça
+  }) => {
+    const [isMobile] = useMediaQuery("(max-width: 768px)");
+
+    const [sliderRef, instanceRef] = useKeenSlider({
+      slides: { perView: 2, spacing: 15 },
+      breakpoints: {
+        "(max-width: 768px)": {
+          slides: { perView: 1, spacing: 10 },
+        },
+        "(min-width: 769px) and (max-width: 1024px)": {
+          slides: { perView: 2, spacing: 10 },
+        },
+        "(min-width: 1025px)": {
+          slides: { perView: 3, spacing: 15 },
+        },
+      },
+    });
+
+    return (
+      <Box position="relative" mb={6}>
+        <Heading size="md" mb={3}>
+          {type}
+        </Heading>
+
+{/*Affichage mobile de mémors*/}
+
+        {isMobile ? (
+          <Box ref={sliderRef} className="keen-slider" overflow="hidden">
+          {collections.map((collection) => (
+            <NextLink
+              key={collection.id}
+              href={`/galerie/${collection.type}?search=${collection.collectionName}`} // page de destination
+              passHref
+            >
+              <Box
+                className="keen-slider__slide"
+                flex="0 0 auto"
+                width="100%"
+                cursor="pointer" // pour indiquer que c'est cliquable
+                _hover={{ opacity: 0.8 }} // petit effet au survol
+              >
+                <CollectionCard collection={collection} type={type} />
+              </Box>
+            </NextLink>
+          ))}
+          </Box>
+        ) : (
+
+          <Flex
+            className="keen-slider"
+            justify="center"
+            gap={6}
+            wrap="wrap"
+          >
+          {collections.map((collection) => (
+            <NextLink
+              key={collection.id}
+              href={`/galerie/${collection.collectionType.toLowerCase()}?search=${collection.name}`} // page de destination
+              passHref
+            >
+              <Box
+                className="keen-slider__slide"
+                flex="0 0 auto"
+                width="100%"
+                cursor="pointer" // pour indiquer que c'est cliquable
+                _hover={{ opacity: 0.8 }} // petit effet au survol
+              >
+                <CollectionCard collection={collection} type={type} />
+              </Box>
+            </NextLink>
+          ))}
+          </Flex>
+        )}
+
+
+{/*  Position des chevrons de mémors*/}
+        <Flex
+          position="absolute"
+          top="50%"
+          transform="translateY(-50%)"
+          width="100%"
+          justifyContent="space-between"
+          px={2}
+        >
+          <IconButton
+            aria-label="Précédent"
+            icon={<ChevronLeftIcon />}
+            onClick={() =>
+              isMobile ? instanceRef.current?.prev() : console.log("prev PC")
+            }
+            bg={btnBg}
+            _hover={{ bg: btnHoverBg }}
+            boxShadow="md"
+            borderRadius="full"
+            size="sm"
+          />
+          <IconButton
+            aria-label="Suivant"
+            icon={<ChevronRightIcon />}
+            onClick={() =>
+              isMobile ? instanceRef.current?.next() : console.log("next PC")
+            }
+            bg={btnBg}
+            _hover={{ bg: btnHoverBg }}
+            boxShadow="md"
+            borderRadius="full"
+            size="sm"
+          />
+        </Flex>
+
+      </Box>
+    );
+  };
 
   return (
     <Box>
-      {isLoading && collections.length === 0 ? (
+      {isLoading ? (
         <Spinner />
       ) : collections.length === 0 ? (
         <Text>Aucune collection trouvée.</Text>
@@ -274,15 +249,30 @@ const decrementStartIndex = (type: string) => {
               startIndexes[type] || 0,
               (startIndexes[type] || 0) + LIMIT
             )}
-            fetchNext={fetchUserCollections}
-            hasMore={hasMore}
-            isLoading={isLoading}
-            increaseVisibleCount={() => updateStartIndex(type)}
-            decreaseVisibleCount={() => decrementStartIndex(type)}  // <== ajouté
             startIndex={startIndexes[type] || 0}
-          />
-
-
+          >
+            {typeCollections.map((collection) => (
+              <NextLink
+                key={collection.id}
+                href={`/galerie/${collection.collectionType.toLowerCase()}?search=${encodeURIComponent(collection.name)}`}
+                passHref
+                legacyBehavior // important pour Next.js >= 13 si pas app router
+              >
+                <Box
+                  as="a" // important pour que NextLink fonctionne
+                  className="keen-slider__slide"
+                  flex="0 0 auto"
+                  width="200px"
+                  cursor="pointer"
+                  _hover={{ opacity: 0.8 }}
+                >
+                <CollectionCard
+                  collection={{ ...collection, imageUrl: collection.imageUrl || "" }}
+                  type={type}
+                />                </Box>
+              </NextLink>
+            ))}
+          </HorizontalSlider>
         ))
       )}
     </Box>
