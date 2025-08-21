@@ -344,7 +344,7 @@ const formatAddress = (address: string) => {
       });
 
       await tx.wait();
-      console.log(`Achat réussi: ${pointsToBuy} points achetés !`);
+      //console.log(`Achat réussi: ${pointsToBuy} points achetés !`);
       fetchAdhesionPoints(userAddress);
     } catch (error) {
       console.error("Erreur lors de l'achat des points:", error);

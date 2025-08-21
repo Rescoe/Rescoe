@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Box, Image, Text, useMediaQuery } from "@chakra-ui/react";
 import { useRouter } from "next/router";
+import { JsonRpcProvider } from 'ethers';
 
 interface Nft {
   id: string;
@@ -14,7 +15,7 @@ interface Nft {
 }
 
 interface Haiku {
-  poemText: string;
+  poemText: string; //PoemText récupère l'entièreté des infos du poeme
   poet?: string;
 }
 
@@ -39,7 +40,11 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
   const [hoveredItem, setHoveredItem] = useState<AlternatingItem | null>(null);
   const [isMobile] = useMediaQuery("(max-width: 768px)");
   const router = useRouter();
+  const [ensName, setEnsName] = useState<string>('');
+  const [ensMap, setEnsMap] = useState<Record<string, string>>({});
 
+
+// c4EST CE USE EFFECT QUI VA R2CUP2RER LES HAIKUS ET LES POEMES,
   useEffect(() => {
     const shuffledNfts = [...nfts].sort(() => Math.random() - 0.5).slice(0, maxNfts);
     const shuffledHaikus = [...haikus].sort(() => Math.random() - 0.5).slice(0, maxHaikus);
@@ -47,15 +52,43 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
     const combined: AlternatingItem[] = [];
     shuffledNfts.forEach((nft, i) => {
       const haiku = shuffledHaikus[i];
+
       if (haiku) {
         combined.push({ type: "nft", content: nft, associatedHaiku: haiku.poemText[6] });
         combined.push({ type: "haiku", content: haiku, associatedNft: nft });
-        //console.log(haiku.poemText[6]);
+        fetchENSForAddresses([haiku.poemText[7]]);
+        console.log("bazar");
+        console.log(haiku);
       }
+      fetchENSForAddresses([nft.artist].filter((addr): addr is string => !!addr));
+
     });
 
     setItems(combined);
   }, [nfts, haikus, maxNfts, maxHaikus]);
+
+
+  const getHaikuAuthor = (poemText: any) => {
+    const arr = Array.from(poemText);
+    return arr[7] || "Auteur inconnu";
+  };
+
+
+const fetchENSForAddresses = async (addresses: string[]) => {
+  const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
+  const newMap: Record<string, string> = {};
+
+  await Promise.all(addresses.map(async (addr) => {
+    try {
+      const name = await provider.lookupAddress(addr);
+      newMap[addr] = name || formatAddress(addr);
+    } catch {
+      newMap[addr] = formatAddress(addr);
+    }
+  }));
+
+  setEnsMap(newMap);
+};
 
   const moveToIndex = (offset: number) => {
     setIndex((prev) => (prev + offset + items.length) % items.length);
@@ -69,6 +102,8 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
       router.push(`/nfts/${mintContractAddress}/${tokenId}`);
     }
   };
+
+
   const renderContent = (item: AlternatingItem) => {
     if (item.type === "haiku") {
 
@@ -249,9 +284,10 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
               color="white"
             >
               {items[index].type === "haiku" ? (
+
                 <>
                   <Text fontWeight="bold" mb={2}>
-                    {"Poète inconnu"}
+                  {formatAddress((items[index].content as Haiku).poemText[7]) || "Poète Inconnu"}
                   </Text>
                   <Text fontStyle="italic">
                     {"Titre du haiku"}
@@ -263,7 +299,7 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
                     {(items[index].content as Nft).name || "Oeuvre sans nom"}
                   </Text>
                   <Text>
-                    {formatAddress((items[index].content as Nft).artist ?? "") || "Artiste inconnu"}
+                    {ensMap[(items[index].content as Nft).artist ?? ""] || formatAddress((items[index].content as Nft).artist ?? "") || "Artiste inconnu"}
                   </Text>
                 </>
               ) : (

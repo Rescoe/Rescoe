@@ -53,6 +53,8 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
   const getPoemText = (poemText: any) => {
     // Assurez-vous que poemText est accessible et contient le bon texte
     if (Array.isArray(poemText) && poemText.length > 6) {
+      //console.log("Herosection: ");
+      //console.log(poemText);
       return poemText[6]; // Accéder directement à la chaîne de caractères
     } else if (typeof poemText === "string") {
       return poemText; // Si c'est déjà une chaîne de caractères
@@ -143,7 +145,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
             </Box>
             <Box>
               <Text fontWeight="bold" fontSize="md">
-                Poème : <Text as="span" fontWeight="normal">{selectedHaiku.poet || "Poète inconnu"}</Text>
+                Poème : <Text as="span" fontWeight="normal">{formatAddress(selectedHaiku.poemText[7]) || "Poète inconnu"}</Text>
               </Text>
             </Box>
           </HStack>

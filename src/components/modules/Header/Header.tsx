@@ -107,6 +107,7 @@ const Header = () => {
           aria-label="Logo de l'association"
         >
           <GenerativeLogo />
+
         </Box>
 
         {/* Menu burger mobile */}
@@ -356,9 +357,15 @@ const Header = () => {
                       </>
                     )}
                   </MenuItem>
+
                   <Box as="div" p={2}>
                     <SelectInsect onSelect={handleSelectInsect} />
                   </Box>
+
+                  <Box mt={4} display="flex" justifyContent="center">
+                    <ColorModeButton />
+                  </Box>
+                  
                 </MenuList>
               </Menu>
             </HStack>
@@ -397,6 +404,7 @@ const Header = () => {
           )}
         </HStack>
       </Flex>
+
 
       {/* Affichage insecte */}
       {isAuthenticated && isInsectVisible && selectedInsect && (

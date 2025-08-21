@@ -1,7 +1,9 @@
 import React from "react";
-import { VStack, Text, Button } from "@chakra-ui/react";
+import { VStack, Text, Button, Box } from "@chakra-ui/react";
 import { useAuth } from "../../../utils/authContext";
 import { useRouter } from 'next/router';
+import { FramedText } from '../../../utils/Cadre';
+
 
 interface TextCardProps {
   nft: {
@@ -35,6 +37,7 @@ const TextCard: React.FC<TextCardProps> = ({
   const isOwner = authAddress?.toLowerCase() === nft.creatorAddress.toLowerCase();
   const router = useRouter();
 
+
   const handleBuy = async (tokenId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!authAddress) {
@@ -46,22 +49,22 @@ const TextCard: React.FC<TextCardProps> = ({
   };
 
   return (
-    <div
-      style={{
-        border: "1px solid #ccc",
-        borderRadius: "10px",
-        overflow: "hidden",
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-        boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
-        padding: "10px",
-        backgroundColor: "#1a202c",
-      }}
+    <Box // Peut-être optez pour un style flex si nécessaire
+      textAlign="center"
+      borderWidth="1px"
+      borderRadius="lg"
+      overflow="hidden"
+      position="relative"
+      display="inline-block" // largeur adaptée au contenu
+      maxWidth="90%" // pas trop large sur les grands écrans
+      margin="20px auto" // centrer le cadre
+      padding="4px"
+
     >
+    <FramedText>
 
       {/* Texte du poème 1 */}
-      <VStack textAlign="center" color="white" maxWidth="120%">
+      <VStack textAlign="center" color="black" maxWidth="120%">
         {nft.poemText
           ? nft.poemText.split("\n").map((line, i) => (
               <Text key={i} fontStyle="italic" fontSize="sm">
@@ -70,6 +73,9 @@ const TextCard: React.FC<TextCardProps> = ({
             ))
           : "Pas de poème disponible"}
       </VStack>
+
+
+      </FramedText>
 
       {/* Prix */}
       <p style={{ fontSize: "1rem", color: "#ccc", marginTop: "10px" }}>
@@ -117,7 +123,7 @@ const TextCard: React.FC<TextCardProps> = ({
         Aller au poème
       </Button>
 
-    </div>
+</Box>
   );
 };
 

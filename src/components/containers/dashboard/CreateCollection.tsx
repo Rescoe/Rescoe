@@ -131,7 +131,7 @@ const [account, setAccount] = useState<string | null>(null);
 
         setIpfsUrl(`https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`);
       } catch (error) {
-        console.error('Error uploading to IPFS:' );
+        console.error('Error uploading to IPFS:', error );
         alert('Error uploading to IPFS: ');
       } finally {
         setIsUploading(false);

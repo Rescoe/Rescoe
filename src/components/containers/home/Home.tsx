@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Box, Heading, Text, Button, VStack, Grid, GridItem, Divider, Icon, Flex, Input, FormLabel, Select, Checkbox, useColorModeValue, SimpleGrid, Stack,Collapse, HStack } from '@chakra-ui/react';
 import { FaBookOpen, FaUsers, FaLightbulb, FaHandsHelping, FaPaintBrush, FaGraduationCap, FaHandshake   } from 'react-icons/fa';
 //import useCheckMembership from '../../../utils/useCheckMembership';
@@ -89,7 +89,8 @@ function toggle(index: number) {
 const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
 const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
 
-// Récupérer les collections
+
+// Charger uniquement les collections FEATURED
 const fetchCollections = async () => {
   setIsLoading(true);
   try {
@@ -99,38 +100,34 @@ const fetchCollections = async () => {
     type CollectionTuple = [number, string, string, string, string[], boolean, boolean];
 
     const collectionsData = await Promise.all(
-      collectionsPaginated.map(async (tuple: CollectionTuple) => {
+      collectionsPaginated.map(async (tuple: CollectionTuple | null) => {
+        // ⚠️ Skip si le tuple est null/undefined
+        if (!tuple) return null;
+
         const [id, name, collectionType, creator, associatedAddresses, isActive, isFeatured] = tuple;
 
-        // 🔹 Vérifier si la collection est mise en avant
+        // ⚠️ Skip si pas featured
         if (!isFeatured) return null;
 
         const uri = await contract.getCollectionURI(id);
         const mintContractAddress = associatedAddresses;
 
+        let metadata;
         const cachedMetadata = localStorage.getItem(uri);
-        if (cachedMetadata) {
-          const metadata = JSON.parse(cachedMetadata);
-          return {
-            id: id.toString(),
-            name,
-            collectionType,
-            imageUrl: metadata.image,
-            mintContractAddress,
-            isFeatured,
-            creator,
-          };
-        }
 
-        const response = await fetch(`/api/proxyPinata?ipfsHash=${uri.split('/').pop()}`);
-        const metadata = await response.json();
-        localStorage.setItem(uri, JSON.stringify(metadata));
+        if (cachedMetadata) {
+          metadata = JSON.parse(cachedMetadata);
+        } else {
+          const response = await fetch(`/api/proxyPinata?ipfsHash=${uri.split('/').pop()}`);
+          metadata = await response.json();
+          localStorage.setItem(uri, JSON.stringify(metadata));
+        }
 
         return {
           id: id.toString(),
           name,
           collectionType,
-          imageUrl: metadata.image,
+          imageUrl: metadata?.image || "",
           mintContractAddress,
           isFeatured,
           creator,
@@ -138,25 +135,17 @@ const fetchCollections = async () => {
       })
     );
 
-    // 🔹 Filtrer les valeurs nulles après l'exécution des promesses
-    const filteredCollections = collectionsData.filter(
-      (collection): collection is Collection => collection !== null
-    );
+    // ⚠️ On ne garde que les objets valides
+    const featured = collectionsData.filter((col): col is Collection => col !== null);
 
-    // 🔹 Trier les collections mises en avant (même si elles le sont déjà)
-    const sortedCollections = filteredCollections.sort((a, b) => {
-      return Number(b.isFeatured) - Number(a.isFeatured);
-    });
-
-    setCollections(sortedCollections); // Mise à jour de l'état avec les collections filtrées
-    //console.log(collections)
-  } catch (error) {;
-    console.error('Error fetching collections:', error);
+    ////console.log("Collections FEATURED :", featured);
+    setCollections(featured);
+  } catch (error) {
+    console.error("Erreur lors du chargement des collections featured :", error);
   } finally {
     setIsLoading(false);
   }
 };
-
 
 
 // Récupérer les poèmes (haikus)
@@ -172,18 +161,19 @@ const fetchPoems = async (collectionId: string, associatedAddress: string) => {
       tokenIds.map(async (tokenId) => {
         const haikuText = await collectionContract.getTokenFullDetails(tokenId);
 
-        const creatorAddress = haikuText[7];
-        //console.log(creatorAddress);
 
+        const poemText = haikuText[6];
+        //console.log(poemText);
         const totalEditions = await collectionContract.getRemainingEditions(tokenId);
-        //console.log(totalEditions);
+        ////console.log(totalEditions);
         //const price = haikuText[4];
 
         return {
           tokenId: tokenId.toString(),
-          poemText: haikuText,
+          poemText: haikuText, // Ici on envoi toute les données du poemes, pas que le texte en fait
           /*}
-          creatorAddress,
+          creatorAddress: creatorAddress,
+
           totalEditions: totalEditions.toString(),
           mintContractAddress: associatedAddress,
           price: price.toString(),
@@ -193,7 +183,7 @@ const fetchPoems = async (collectionId: string, associatedAddress: string) => {
     );
 
     setHaikus(poemsData);
-    //console.log(poemsData);
+    ////console.log(poemsData);
 
   } catch (error) {
     console.error('Error fetching poems:', error);
@@ -202,67 +192,65 @@ const fetchPoems = async (collectionId: string, associatedAddress: string) => {
   }
 };
 
-// Récupérer les NFTs
 const fetchNFTs = async (collectionId: string, associatedAddress: string) => {
-    setIsLoading(true);
-    try {
-        const collectionContract = new Contract(associatedAddress, nftContractABI, provider);
-        let max = await collectionContract.getLastMintedTokenId();  //Penser a ajouter cette fonction ou un similaire
-        console.log(max);
-/*
+  setIsLoading(true);
 
-        if(max > 10){
-          max = 10;
+  try {
+    const collectionContract = new Contract(associatedAddress, nftContractABI, provider);
+
+    // Récupère le max et limite à 10
+    let max = await collectionContract.getLastMintedTokenId();
+    if (max > 9) max = 9;
+    const pagination = Number(max) + 1;
+    const tokenIds = await collectionContract.getTokenPaginated(0, pagination);
+    //console.log("Token IDs récupérés:", tokenIds);
+
+    const nftsData = await Promise.all(
+      tokenIds.map(async (tokenId: string) => { // ou : tokenId: number
+        try {
+          // 🔍 Vérifie si le token est encore vivant
+          const owner = await collectionContract.ownerOf(tokenId).catch(() => null);
+          if (!owner || owner === "0x0000000000000000000000000000000000000000") {
+            //console.log(`⛔ Token ${tokenId} est burn → skip`);
+            return null;
+          }
+
+          // Si le token existe encore → on récupère son URI
+          let tokenURI = await collectionContract.tokenURI(tokenId);
+          //console.log(`Récupération du tokenURI pour ${tokenId}: ${tokenURI}`);
+
+          // Gestion du cache local
+          const cachedMetadata = localStorage.getItem(tokenURI);
+          const metadata = cachedMetadata
+            ? JSON.parse(cachedMetadata)
+            : await (await fetch(`/api/proxyPinata?ipfsHash=${tokenURI.split('/').pop()}`)).json();
+
+          // Retourne un objet NFT normalisé
+          return {
+            tokenId: tokenId.toString(),
+            image: metadata.image,
+            name: metadata.name,
+            description: metadata.description,
+            price: metadata.price || 'Non défini',
+            tags: metadata.tags || [],
+            mintContractAddress: associatedAddress,
+            artist: metadata.artist || "Inconnu",
+          };
+        } catch (error) {
+          console.warn(`⚠️ Erreur pour le tokenId ${tokenId}:`);
+          return null;
         }
-        */
-        //const max = 10;
-        const tokenIds = await collectionContract.getTokenPaginated(0, max);
+      })
+    );
 
-        const nftsData = await Promise.all(
-            tokenIds.map(async (tokenId: string) => {
-                try {
-                    // Essayer d'accéder à tokenURI tout en gérant l'erreur si le token a été brûlé
-                    let tokenURI: string;
-                    try {
-                        tokenURI = await collectionContract.tokenURI(tokenId);
-                    } catch (tokenError) {
-                        // Si le token n'existe pas, loguer un avertissement et passer au suivant
-                        console.warn(`Le token avec le tokenId ${tokenId} n'existe pas.`);
-                        return null; // Retourner null pour cet NFT
-                    }
-
-                    const cachedMetadata = localStorage.getItem(tokenURI);
-                    const metadata = cachedMetadata ? JSON.parse(cachedMetadata) : await (await fetch(`/api/proxyPinata?ipfsHash=${tokenURI.split('/').pop()}`)).json();
-
-                    if (!cachedMetadata) {
-                        localStorage.setItem(tokenURI, JSON.stringify(metadata));
-                    }
-
-                    return {
-                        tokenId: tokenId.toString(),
-                        image: metadata.image,
-                        name: metadata.name,
-                        description: metadata.description,
-                        price: metadata.price || 'Non défini',
-                        tags: metadata.tags || [],
-                        mintContractAddress: associatedAddress,
-                        artist: metadata.artist,
-                    };
-                } catch (error) {
-                    console.error(`Erreur lors de la récupération des métadonnées pour le tokenId ${tokenId}:`, error);
-                    return null; // Ignorez les tokens dont les métadonnées ne peuvent pas être récupérées
-                }
-            })
-        );
-
-        // Filtrer les résultats null pour éviter d'afficher les NFTs inexistants
-        setNfts(nftsData.filter(nft => nft !== null));
-    } catch (error) {
-        console.error('Erreur lors de la récupération des NFTs :', error);
-    } finally {
-        setIsLoading(false);
-    }
+    setNfts(nftsData.filter(nft => nft !== null));
+  } catch (error) {
+    console.error('Erreur lors de la récupération des NFTs:', error);
+  } finally {
+    setIsLoading(false);
+  }
 };
+
 
 
 // Charger les collections et les NFTs / Poèmes
@@ -270,52 +258,66 @@ useEffect(() => {
   fetchCollections();
 }, []);
 
+// Fonction pour obtenir des éléments aléatoires
+function getRandomItems<T>(array: T[], count: number): T[] {
+  return array.length > 0
+    ? array.sort(() => 0.5 - Math.random()).slice(0, Math.min(count, array.length))
+    : [];
+}
 
+const fetchedCollections = useRef(new Set()); // Utilisation de useRef pour garder les collections déjà récupérées
+const fetchAllNFTsAndPoems = async () => {
+  const artCollections = collections.filter(col => col.collectionType === 'Art');
+  const poetryCollections = collections.filter(col => col.collectionType === 'Poesie');
+
+  const randomArtCollections = getRandomItems(artCollections, 5);
+  const randomPoetryCollections = getRandomItems(poetryCollections, 5);
+
+  // Récupérer les NFTs pour les collections d'art
+  for (const collection of randomArtCollections) {
+    if (collection && !fetchedCollections.current.has(collection.id)) {
+      // On prend le premier mintContractAddress si c'est un tableau
+      const associatedAddress = collection.mintContractAddress[0];
+      const nftsBefore = nfts.length;
+
+      // Vérification des types avant l'appel
+      if (typeof collection.id === 'string' && typeof associatedAddress === 'string') {
+        await fetchNFTs(collection.id, associatedAddress);
+      } else {
+        console.error('Invalid collection data:', collection);
+      }
+
+      const nftsAfter = nfts.length;
+      fetchedCollections.current.add(collection.id); // Marquez comme récupérée
+    }
+  }
+
+  // Récupérer les poèmes pour les collections de poésie
+  for (const collection of randomPoetryCollections) {
+    if (collection && !fetchedCollections.current.has(collection.id)) {
+      const associatedAddress = collection.mintContractAddress[0];
+      const poemsBefore = haikus.length;
+
+      // Vérification des types avant l'appel
+      if (typeof collection.id === 'string' && typeof associatedAddress === 'string') {
+        await fetchPoems(collection.id, associatedAddress);
+      } else {
+        console.error('Invalid collection data:', collection);
+      }
+
+      const poemsAfter = haikus.length;
+      fetchedCollections.current.add(collection.id); // Marquez comme récupérée
+    }
+  }
+};
+
+// Appel de la fonction dans useEffect
 useEffect(() => {
   if (collections.length > 0) {
-    const artCollections = collections.filter((collection: Collection) => collection.collectionType === 'Art');
-    const poetryCollections = collections.filter((collection: Collection) => collection.collectionType === 'Poesie');
-
-    if (artCollections.length > 0) {
-      const randomArtCollection = artCollections[Math.floor(Math.random() * artCollections.length)];
-
-      if (
-        typeof randomArtCollection.id === 'string' &&
-        typeof randomArtCollection.mintContractAddress === 'string' // On vérifie que c'est bien une string
-      ) {
-        const artCollectionId = randomArtCollection.id;
-        const artCollectionMintContractAddress = randomArtCollection.mintContractAddress; // On récupère directement la string
-        fetchNFTs(artCollectionId, artCollectionMintContractAddress);
-      } else {
-        console.error('Propriétés id et/ou mintContractAddress manquantes ou de type invalide dans l\'objet randomArtCollection');
-      }
-    }
-
-    if (poetryCollections.length > 0) {
-      const randomPoetryCollection = poetryCollections[Math.floor(Math.random() * poetryCollections.length)];
-      if (
-        typeof randomPoetryCollection.id === 'string' &&
-        typeof randomPoetryCollection.mintContractAddress === 'string'
-      ) {
-        const poetryCollectionId = randomPoetryCollection.id;
-        const poetryCollectionMintContractAddress = randomPoetryCollection.mintContractAddress;
-
-        fetchPoems(poetryCollectionId, poetryCollectionMintContractAddress);
-      } else {
-        console.error('Propriétés id et/ou mintContractAddress manquantes ou de type invalide dans l\'objet randomPoetryCollection');
-      }
-    }
+    fetchAllNFTsAndPoems();
   }
 }, [collections]);
 
-
-
-
-
-// Vérifie la longueur des données pour éviter d'essayer d'afficher des éléments vides
-const getRandomItems = (array: Collection[], count: number): Collection[] => {
-  return array.length > 0 ? array.sort(() => 0.5 - Math.random()).slice(0, Math.min(count, array.length)) : [];
-};
 
     const maxBoxHeight = "150px"; // Hauteur max pour toutes les boîtes
 
