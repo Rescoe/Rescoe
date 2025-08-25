@@ -69,7 +69,7 @@ interface Nft {
       collectionType: string;
       artist?: string;
       imageUrl: string;
-      mintContractAddress: string[];
+      mintContractAddress: string;
       isFeatured: boolean;
 
     }
@@ -149,7 +149,7 @@ const fetchCollections = async () => {
 
 
 // Récupérer les poèmes (haikus)
-const fetchPoems = async (collectionId: string, associatedAddress: string) => {
+const fetchPoems = async (collectionId: string, associatedAddress: string): Promise<void> => {
   setIsLoading(true);
   try {
     const collectionContract = new Contract(associatedAddress, haikuContractABI, provider);
@@ -165,7 +165,7 @@ const fetchPoems = async (collectionId: string, associatedAddress: string) => {
         const poemText = haikuText[6];
         //console.log(poemText);
         const totalEditions = await collectionContract.getRemainingEditions(tokenId);
-        ////console.log(totalEditions);
+        //console.log(totalEditions);
         //const price = haikuText[4];
 
         return {
@@ -183,7 +183,7 @@ const fetchPoems = async (collectionId: string, associatedAddress: string) => {
     );
 
     setHaikus(poemsData);
-    ////console.log(poemsData);
+    //console.log(poemsData);
 
   } catch (error) {
     console.error('Error fetching poems:', error);
@@ -192,7 +192,7 @@ const fetchPoems = async (collectionId: string, associatedAddress: string) => {
   }
 };
 
-const fetchNFTs = async (collectionId: string, associatedAddress: string) => {
+const fetchNFTs = async (collectionId: string, associatedAddress: string): Promise<void> => {
   setIsLoading(true);
 
   try {
@@ -206,7 +206,7 @@ const fetchNFTs = async (collectionId: string, associatedAddress: string) => {
     //console.log("Token IDs récupérés:", tokenIds);
 
     const nftsData = await Promise.all(
-      tokenIds.map(async (tokenId: string) => { // ou : tokenId: number
+      tokenIds.map(async (tokenId: string) => {
         try {
           // 🔍 Vérifie si le token est encore vivant
           const owner = await collectionContract.ownerOf(tokenId).catch(() => null);
@@ -252,42 +252,45 @@ const fetchNFTs = async (collectionId: string, associatedAddress: string) => {
 };
 
 
-
-// Charger les collections et les NFTs / Poèmes
+//Use effetc appelé deux fois, probleme récurrent. On Evite les doublons ici :
+const hasFetched = useRef(false);
 useEffect(() => {
-  fetchCollections();
+  if (!hasFetched.current) {
+    fetchCollections();
+    hasFetched.current = true;
+  }
 }, []);
 
+
 // Fonction pour obtenir des éléments aléatoires
-function getRandomItems<T>(array: T[], count: number): T[] {
+const getRandomItems = <T,>(array: T[], count: number): T[] => {
   return array.length > 0
     ? array.sort(() => 0.5 - Math.random()).slice(0, Math.min(count, array.length))
     : [];
-}
+};
+
 
 const fetchedCollections = useRef(new Set()); // Utilisation de useRef pour garder les collections déjà récupérées
+
 const fetchAllNFTsAndPoems = async () => {
   const artCollections = collections.filter(col => col.collectionType === 'Art');
   const poetryCollections = collections.filter(col => col.collectionType === 'Poesie');
 
+  // Récupérez 5 collections randomisées pour art et poésie
   const randomArtCollections = getRandomItems(artCollections, 5);
   const randomPoetryCollections = getRandomItems(poetryCollections, 5);
+
+  //console.log("Collections d'art sélectionnées :", randomArtCollections.map(c => c.id));
+  //console.log("Collections de poésie sélectionnées :", randomPoetryCollections.map(c => c.id));
 
   // Récupérer les NFTs pour les collections d'art
   for (const collection of randomArtCollections) {
     if (collection && !fetchedCollections.current.has(collection.id)) {
-      // On prend le premier mintContractAddress si c'est un tableau
-      const associatedAddress = collection.mintContractAddress[0];
+      //console.log(`Récupération des NFTs pour la collection d'art ${collection.id}...`);
       const nftsBefore = nfts.length;
-
-      // Vérification des types avant l'appel
-      if (typeof collection.id === 'string' && typeof associatedAddress === 'string') {
-        await fetchNFTs(collection.id, associatedAddress);
-      } else {
-        console.error('Invalid collection data:', collection);
-      }
-
+      await fetchNFTs(collection.id, collection.mintContractAddress);
       const nftsAfter = nfts.length;
+      //console.log(`Collection ${collection.id} récupérée : ${nftsAfter - nftsBefore} NFTs ajoutés`);
       fetchedCollections.current.add(collection.id); // Marquez comme récupérée
     }
   }
@@ -295,20 +298,17 @@ const fetchAllNFTsAndPoems = async () => {
   // Récupérer les poèmes pour les collections de poésie
   for (const collection of randomPoetryCollections) {
     if (collection && !fetchedCollections.current.has(collection.id)) {
-      const associatedAddress = collection.mintContractAddress[0];
-      const poemsBefore = haikus.length;
-
-      // Vérification des types avant l'appel
-      if (typeof collection.id === 'string' && typeof associatedAddress === 'string') {
-        await fetchPoems(collection.id, associatedAddress);
-      } else {
-        console.error('Invalid collection data:', collection);
-      }
-
+      //console.log(`Récupération des poèmes pour la collection ${collection.id}...`);
+      const poemsBefore = haikus.length; // si tu as un state "poems"
+      await fetchPoems(collection.id, collection.mintContractAddress);
       const poemsAfter = haikus.length;
+      //console.log(`Collection ${collection.id} récupérée : ${poemsAfter - poemsBefore} poèmes ajoutés`);
       fetchedCollections.current.add(collection.id); // Marquez comme récupérée
     }
   }
+
+  //console.log("Récupération terminée. NFTs totaux :", nfts.length);
+  //console.log("Poèmes totaux :", haikus.length);
 };
 
 // Appel de la fonction dans useEffect
@@ -461,7 +461,6 @@ useEffect(() => {
           <Flex justify="center" mt={8}>
             <NextLink href="/adhesion" passHref>
               <Button
-                as="a"
                 px={{ base: 8, md: 10 }}
                 py={{ base: 5, md: 6 }}
                 fontSize={{ base: "md", md: "lg" }}
@@ -597,7 +596,6 @@ useEffect(() => {
       >
         <NextLink href="/collections" passHref>
           <Button
-            as="a"
             flex="1 1 180px"
             py={5}
             fontSize="md"
@@ -622,7 +620,6 @@ useEffect(() => {
 
         <NextLink href="/ateliers" passHref>
           <Button
-            as="a"
             flex="1 1 180px"
             py={5}
             fontSize="md"
@@ -648,7 +645,6 @@ useEffect(() => {
 
         <NextLink href="/evenements" passHref>
           <Button
-            as="a"
             flex="1 1 180px"
             py={5}
             fontSize="md"
