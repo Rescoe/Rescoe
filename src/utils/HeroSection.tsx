@@ -106,18 +106,19 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
   const handleOverlayClick = () => setShowOverlay(prev => !prev);
 
   return (
-      <Box
-        display="flex"
-        flexDirection="column"
-        alignItems="center"
-        justifyContent="center"
-        w="50vw"
-        h="100vh"
-        bg="transparent"
-        color="white"
-        pb={100}
-        mx="auto"
-      >
+    <Box
+      display="flex"
+      flexDirection="column"
+      alignItems="center"
+      justifyContent="center"
+      w="100%"
+      maxW="100%"
+      minH="100vh"
+      bg="transparent"
+      color="white"
+      pb="6rem" // plus responsive que 100px
+      overflow="hidden"
+    >
         {selectedNft && selectedHaiku && (
           <>
             <Box
@@ -174,7 +175,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
               {showOverlay && (
                 <Box
                   position="absolute" // Overlay positionné au-dessus de tout dans le composant
-                  top="75%" // Position verticale de l'overlay
+                  top="85%" // Position verticale de l'overlay
                   left="50%"
                   transform="translate(-50%, -50%)" // Centrage de l'overlay
                   w="80%" // Largeur de l'overlay
@@ -184,7 +185,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
                   boxShadow="md"
                   zIndex={2} // Plus élevé que l'overlay du poème
                 >
-                  <Text fontSize="xl" mb={4}>
+                  <Text fontSize="l" mb={4}>
                     Que voulez-vous faire ?
                   </Text>
 
