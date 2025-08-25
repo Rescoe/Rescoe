@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from "react";
-import { Box, Image, Text, VStack, HStack } from "@chakra-ui/react";
+import React, { useEffect, useState } from "react";
+import { Box, Image, Text, VStack, HStack, Button, Divider, Stack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
+import { JsonRpcProvider } from 'ethers';
 
+// ---------------------- Types ----------------------
 interface Nft {
   image: string;
   name?: string;
-  artist?: string;
+  artist?: string; // address 0x...
   content: {
     tokenId: string;
     mintContractAddress: string;
@@ -13,8 +15,10 @@ interface Nft {
 }
 
 interface Haiku {
-  poemText: any; // Modifié pour accepter tout type (pour gérer le Proxy)
+  poemText: any; // proxy/array, adresse du poète attendu en [7]
   poet?: string;
+  mintContractAddress: string;   // ajouté pour navigation
+  uniqueIdAssociated: string;    // ajouté pour navigation
 }
 
 interface HeroSectionProps {
@@ -22,137 +26,221 @@ interface HeroSectionProps {
   haikus: Haiku[];
 }
 
+// ---------------------- Composant ----------------------
 const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
   const [selectedNft, setSelectedNft] = useState<Nft | null>(null);
   const [selectedHaiku, setSelectedHaiku] = useState<Haiku | null>(null);
+  const [ensMap, setEnsMap] = useState<Record<string, string>>({});
+  const [showOverlay, setShowOverlay] = useState(true);
   const router = useRouter();
 
-  useEffect(() => {
-    if (nfts.length > 0 && haikus.length > 0) {
-      const randomNft = nfts[Math.floor(Math.random() * nfts.length)];
-      const randomHaiku = haikus[Math.floor(Math.random() * haikus.length)];
-      setSelectedNft(randomNft);
-      setSelectedHaiku(randomHaiku);
-    } else {
-      console.warn(`Haiku manquant`);
-    }
-  }, [nfts, haikus]);
-
+  // ---------------------- Helpers ----------------------
   const formatAddress = (address?: string) => {
     if (!address) return "Adresse inconnue";
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
-  const handleClick = (item: Nft) => {
-    const nftId = item.content.tokenId;
-    const collectionAddress = item.content.mintContractAddress;
-    router.push(`/tokenId/${collectionAddress}/${nftId}`);
+  const resolveName = (address?: string, unknownLabel = "Inconnu") => {
+    if (!address) return unknownLabel;
+    const key = address.toLowerCase();
+    return ensMap[key] ?? formatAddress(address);
   };
 
-  // Fonction pour extraire le poème du Proxy
-  const getPoemText = (poemText: any) => {
-    // Assurez-vous que poemText est accessible et contient le bon texte
-    if (Array.isArray(poemText) && poemText.length > 6) {
-      //console.log("Herosection: ");
-      //console.log(poemText);
-      return poemText[6]; // Accéder directement à la chaîne de caractères
-    } else if (typeof poemText === "string") {
-      return poemText; // Si c'est déjà une chaîne de caractères
-    } else {
-      return "Texte introuvable"; // Gestion de l'erreur
-    }
+  const fetchENSForAddresses = async (addresses: string[]) => {
+    const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
+    const newMap: Record<string, string> = {};
+
+    await Promise.all(addresses.map(async (addr) => {
+      try {
+        const name = await provider.lookupAddress(addr);
+        newMap[addr.toLowerCase()] = name || formatAddress(addr);
+      } catch {
+        newMap[addr.toLowerCase()] = formatAddress(addr);
+      }
+    }));
+
+    setEnsMap(prev => ({ ...prev, ...newMap }));
   };
+
+  const getPoemText = (poemText: any) => {
+    if (Array.isArray(poemText) && poemText.length > 6) return poemText[6];
+    if (typeof poemText === "string") return poemText;
+    return "Texte introuvable";
+  };
+
+  // ---------------------- Sélection aléatoire ----------------------
+  useEffect(() => {
+    if (nfts.length === 0 || haikus.length === 0) return;
+
+    const randomNft = nfts[Math.floor(Math.random() * nfts.length)];
+    const randomHaiku = haikus[Math.floor(Math.random() * haikus.length)];
+
+    setSelectedNft(randomNft);
+    setSelectedHaiku(randomHaiku);
+
+    const addrs: string[] = [];
+    if (randomNft.artist) addrs.push(randomNft.artist);
+    const poetAddr = randomHaiku?.poemText?.[7];
+    if (typeof poetAddr === "string" && poetAddr.startsWith("0x")) addrs.push(poetAddr);
+
+    fetchENSForAddresses(addrs);
+  }, [nfts, haikus]);
+
+  // ---------------------- Navigation ----------------------
+  const handleNavigatePoem = () => {
+    if (selectedHaiku) {
+      router.push(`/poemsId/${selectedHaiku.mintContractAddress}/${selectedHaiku.uniqueIdAssociated}`);
+    }
+    setShowOverlay(false);
+  };
+
+  const handleNavigateNft = () => {
+    console.log(selectedNft);
+
+    if (selectedNft) {
+      router.push(`/oeuvresId/${selectedNft.content.mintContractAddress}/${selectedNft.content.tokenId}`);
+    }
+    setShowOverlay(false);
+  };
+
+  const handleOverlayClick = () => setShowOverlay(prev => !prev);
 
   return (
-    <Box
-      display="flex"
-      flexDirection="column"
-      alignItems="center"
-      justifyContent="center"
-      w="50vw"
-      h="100vh"
-      bg="transparent"
-      color="white"
-      pb={100}
-      mx="auto" // ✅ centrage horizontal
-
-    >
-      {selectedNft && selectedHaiku && (
-        <>
-          <Box
-            position="relative"
-            w="100%"
-            h="100%"
-            borderRadius="md"
-            cursor="pointer"
-            onClick={() => handleClick(selectedNft)}
-          >
-            <Image
-              src={selectedNft.image}
-              alt={selectedNft.name || "NFT"}
-              objectFit="cover"
+      <Box
+        display="flex"
+        flexDirection="column"
+        alignItems="center"
+        justifyContent="center"
+        w="50vw"
+        h="100vh"
+        bg="transparent"
+        color="white"
+        pb={100}
+        mx="auto"
+      >
+        {selectedNft && selectedHaiku && (
+          <>
+            <Box
+              position="relative"
               w="100%"
               h="100%"
               borderRadius="md"
-            />
-            <Box
-              position="absolute"
-              top="0"
-              left="0"
-              w="100%"
-              h="100%"
-              bg="rgba(0, 0, 0, 0.5)"
-              display="flex"
-              justifyContent="center"
-              alignItems="center"
-              zIndex={2}
+              cursor="pointer"
+              onClick={handleOverlayClick} // Afficher l'overlay au clic
+
             >
-            <VStack
-              spacing={2}
-              textAlign="center"
-              color="white"
-              maxW="80%"
-              mx="auto"
-              px={2}
-            >
-              {getPoemText(selectedHaiku.poemText)
-                ?.split("\n")
-                .map((line: string, i: number) => (
-                  <Text
-                    key={i}
-                    fontStyle="italic"
-                    fontSize={{ base: "md", md: "lg" }}
-                    lineHeight="1.6"
-                    fontWeight="medium"
-                    whiteSpace="pre-wrap"
-                    wordBreak="break-word"
-                  >
-                    {line}
+              <Image
+                src={selectedNft.image}
+                alt={selectedNft.name || "NFT"}
+                objectFit="cover"
+                w="100%"
+                h="100%"
+                borderRadius="md"
+              />
+
+              {/* Poème overlay */}
+              <Box
+                position="absolute"
+                top="0"
+                left="0"
+                w="100%"
+                h="100%"
+                bg="rgba(0, 0, 0, 0.5)" // Couleur de l'overlay pour le poème
+                display="flex"
+                justifyContent="center"
+                alignItems="center"
+                zIndex={1}
+              >
+                <VStack spacing={2} textAlign="center" color="white" maxW="80%" mx="auto" px={2}>
+                  {getPoemText(selectedHaiku.poemText)
+                    ?.split("\n")
+                    .map((line: string, i: number) => (
+                      <Text
+                        key={i}
+                        fontStyle="italic"
+                        fontSize={{ base: "md", md: "lg" }}
+                        lineHeight="1.6"
+                        fontWeight="medium"
+                        whiteSpace="pre-wrap"
+                        wordBreak="break-word"
+                      >
+                        {line}
+                      </Text>
+                  ))}
+                </VStack>
+              </Box>
+
+              {/* Overlay pour la sélection des actions */}
+              {showOverlay && (
+                <Box
+                  position="absolute" // Overlay positionné au-dessus de tout dans le composant
+                  top="75%" // Position verticale de l'overlay
+                  left="50%"
+                  transform="translate(-50%, -50%)" // Centrage de l'overlay
+                  w="80%" // Largeur de l'overlay
+                  bg="rgba(0, 0, 0, 0.3)" // Fond blanc semi-transparent
+                  p={4}
+                  borderRadius="md"
+                  boxShadow="md"
+                  zIndex={2} // Plus élevé que l'overlay du poème
+                >
+                  <Text fontSize="xl" mb={4}>
+                    Que voulez-vous faire ?
                   </Text>
-                ))}
-            </VStack>
 
-            </Box>
-          </Box>
-          <HStack spacing={4} mt={4} align="start" flexDirection="column">
-            <Box>
-              <Text fontWeight="bold" fontSize="md">
-                Œuvre : <Text as="span" fontWeight="normal">{selectedNft.name || "Sans nom"}</Text>
-              </Text>
-              <Text fontStyle="italic" fontSize="sm">
-                {formatAddress(selectedNft.artist)}
-              </Text>
-            </Box>
-            <Box>
-              <Text fontWeight="bold" fontSize="md">
-                Poème : <Text as="span" fontWeight="normal">{formatAddress(selectedHaiku.poemText[7]) || "Poète inconnu"}</Text>
-              </Text>
-            </Box>
-          </HStack>
-        </>
-      )}
-    </Box>
-  );
-};
+                  <HStack spacing={4} justifyContent="center">
+                    <Button
+                      colorScheme="white"
+                      bg="rgba(255, 255, 255, 0.9)"
+                      onClick={() => {
+                        handleNavigatePoem();
+                        handleOverlayClick();
+                      }}
+                    >
+                      Voir le poème
+                    </Button>
 
-export default HeroSection;
+                    <Button
+                      colorScheme="white"
+                      bg="rgba(255, 255, 255, 0.9)"
+                      onClick={() => {
+                        handleNavigateNft();
+                        handleOverlayClick();
+                      }}
+                    >
+                      Voir le NFT
+                    </Button>
+                  </HStack>
+                </Box>
+              )}
+            </Box>
+
+            <HStack spacing={4} mt={4} align="start" flexDirection="column">
+              <Box>
+                <Text fontWeight="bold" fontSize="md">
+                  Œuvre :{" "}
+                  <Text as="span" fontWeight="normal">
+                    {selectedNft.name || "Sans nom"}
+                  </Text>
+                </Text>
+                <Text fontStyle="italic" fontSize="sm">
+                  {resolveName(selectedNft.artist, "Artiste inconnu")}
+                </Text>
+              </Box>
+
+              <Box>
+                <Text fontWeight="bold" fontSize="md">
+                  Poème :{" "}
+                  <Text as="span" fontWeight="normal">
+                    {resolveName(selectedHaiku.poemText?.[7], "Poète inconnu")}
+                  </Text>
+                </Text>
+              </Box>
+            </HStack>
+          </>
+        )}
+      </Box>
+    );
+  };
+
+  export default HeroSection;

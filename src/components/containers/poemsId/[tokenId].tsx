@@ -94,14 +94,10 @@ const PoemPage: React.FC = () => {
 
 
             const tokenIdtoHaikuUnique = await contract.tokenIdToHaikuId(tokenId);
-            console.log("tokenIdtoHaikuUnique");
-
-            console.log(tokenIdtoHaikuUnique);
 
             const details = await contract.getTokenFullDetails(Number(tokenId));
 
             setIsOwner(details.owner);
-            console.log(isOwner);
 
             if (!details) throw new Error('Poème inexistant');
 
@@ -377,7 +373,7 @@ const handleBuy = async (tokenId: number) => { // Assurez-vous de recevoir token
    <Text>
      {isFeatured ? (
        <>
-       <strong>  ✅ Cette collection a été mise en avant par la communauté !</strong>
+       <strong>  ✅ Cette collection a été mise en avant par les adhérents !</strong>
        </>
      ) : null}
    </Text>

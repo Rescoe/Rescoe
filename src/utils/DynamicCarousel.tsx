@@ -1,3 +1,5 @@
+//PASSAGE EN PRODUCTION A PARTIR D4ICI
+
 import React, { useState, useEffect } from "react";
 import { Box, Image, Text, useMediaQuery } from "@chakra-ui/react";
 import { useRouter } from "next/router";
@@ -17,6 +19,8 @@ interface Nft {
 interface Haiku {
   poemText: string; //PoemText récupère l'entièreté des infos du poeme
   poet?: string;
+  mintContractAddress: string;
+  uniqueIdAssociated: string;
 }
 
 interface AlternatingItem {
@@ -57,8 +61,6 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
         combined.push({ type: "nft", content: nft, associatedHaiku: haiku.poemText[6] });
         combined.push({ type: "haiku", content: haiku, associatedNft: nft });
         fetchENSForAddresses([haiku.poemText[7]]);
-        console.log("bazar");
-        console.log(haiku);
       }
       fetchENSForAddresses([nft.artist].filter((addr): addr is string => !!addr));
 
@@ -97,11 +99,16 @@ const fetchENSForAddresses = async (addresses: string[]) => {
   const formatAddress = (addr?: string) => addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : "";
 
   const handleClick = (item: AlternatingItem) => {
-    if (item.type === "nft") {
-      const { tokenId, mintContractAddress } = (item.content as Nft).content;
-      router.push(`/nfts/${mintContractAddress}/${tokenId}`);
-    }
+      if (item.type === "nft") {
+        const nftItem = item.content as Nft; // ✅ cast sur content
+        router.push(`/oeuvresId/${nftItem.content.mintContractAddress}/${nftItem.content.tokenId}`);
+      }
+      if (item.type === "haiku") {
+        const haikuItem = item.content as Haiku; // ✅ cast sur content
+        router.push(`/poemsId/${haikuItem.mintContractAddress}/${haikuItem.uniqueIdAssociated}`);
+      }
   };
+
 
 
   const renderContent = (item: AlternatingItem) => {
@@ -213,104 +220,101 @@ const fetchENSForAddresses = async (addresses: string[]) => {
   };
 
 
-
   return (
-      <Box position="relative" p={4} w="100%" h="600px">
-        <Box
-          display="grid"
-          gridTemplateColumns={isMobile ? 'repeat(3, 1fr)' : 'repeat(3, 1fr)'}
-          gridTemplateRows="repeat(3, 1fr)"
-          gap={4}
-          h="100%"
-        >
-          {[{
-            column: "1 / span 3", row: "1", offset: -1
-          },
-          {
-            column: "4 / span 1", row: "1", offset: 1
-          },
-          {
-            column: "1 / span 1", row: "2 / span 2", offset: -2
-          },
-          {
-            column: "2 / span 2", row: "2", offset: 0
-          },
-          {
-            column: "2 / span 3", row: "3", offset: 2
-          }].map(({ column, row, offset }, i) => {
-            // Si mobile, enlever la dernière colonne
-            if (isMobile && column === "4 / span 1") return null;
+    <Box position="relative" p={4} w="100%" h="600px">
+      <Box
+        display="grid"
+        gridTemplateColumns={isMobile ? "repeat(3, 1fr)" : "repeat(4, 1fr)"}
+        gridTemplateRows="repeat(3, 1fr)"
+        gap={4}
+        h="100%"
+      >
+        {[
+          { column: "1 / span 3", row: "1", offset: -1 },
+          { column: "4 / span 1", row: "1", offset: 1 },
+          { column: "1 / span 1", row: "2 / span 2", offset: -2 },
+          { column: "2 / span 2", row: "2", offset: 0 },
+          { column: "2 / span 3", row: "3", offset: 2 },
+        ].map(({ column, row, offset }, i) => {
+          if (isMobile && column === "4 / span 1") return null;
+          if (isMobile && column === "2 / span 2" && row === "2") return null;
 
-            // Enlever le rendu pour la colonne 2 ligne 2
-            if (isMobile && column === "2 / span 2" && row === "2") return null;
-
-            return (
-              <Box
-                key={i}
-                gridColumn={column}
-                gridRow={row}
-                p={2}
-                alignItems="left"
-                cursor="pointer"
-                minWidth="150px"
-                minHeight="150px"
-                width="100%"
-                height="100%"
-                position="relative"
-                onClick={() => {
-                  moveToIndex((index + offset + items.length) % items.length);
-                  if (column === "2 / span 2" && row === "2") {
-                    handleClick(items[(index + offset + items.length) % items.length]);
-                  }
-                }}
-              >
-                {items.length > 0 && renderContent(items[(index + offset + items.length) % items.length])}
-              </Box>
-            );
-          })}
-
-          {items.length > 0 && items[index] && (
+          return (
             <Box
-              gridColumn={isMobile ? "2 / span 2" : "4 / span 1"}
-              gridRow="2"
+              key={i}
+              gridColumn={column}
+              gridRow={row}
+              p={2}
               display="flex"
-              flexDirection="column"
               alignItems="center"
               justifyContent="center"
-              p={2}
-              borderRadius="md"
-              boxShadow="md"
-              bg="rgba(0, 0, 0, 0.7)"
-              color="white"
+              cursor="pointer"
+              minW="150px"
+              minH="150px"
+              w="100%"
+              h="100%"
+              border="1px solid rgba(255,255,255,0.2)" // pour bien visualiser les cases
+              overflow="hidden" // ✅ évite que le contenu déborde
+              onClick={() => {
+                moveToIndex((index + offset + items.length) % items.length);
+                if (column === "2 / span 2" && row === "2") {
+                  handleClick(items[(index + offset + items.length) % items.length]);
+                }
+              }}
             >
-              {items[index].type === "haiku" ? (
-
-                <>
-                  <Text fontWeight="bold" mb={2}>
-                  {formatAddress((items[index].content as Haiku).poemText[7]) || "Poète Inconnu"}
-                  </Text>
-                  <Text fontStyle="italic">
-                    {"Titre du haiku"}
-                  </Text>
-                </>
-              ) : items[index].type === "nft" ? (
-                <>
-                  <Text fontWeight="bold" mb={2}>
-                    {(items[index].content as Nft).name || "Oeuvre sans nom"}
-                  </Text>
-                  <Text>
-                    {ensMap[(items[index].content as Nft).artist ?? ""] || formatAddress((items[index].content as Nft).artist ?? "") || "Artiste inconnu"}
-                  </Text>
-                </>
-              ) : (
-                <Text>{"Un poème, une œuvre."}</Text>
-              )}
+              {items.length > 0 &&
+                renderContent(items[(index + offset + items.length) % items.length])}
             </Box>
-          )}
+          );
+        })}
 
-        </Box>
+        {items.length > 0 && items[index] && (
+          <Box
+            gridColumn={isMobile ? "2 / span 2" : "4 / span 1"}
+            gridRow="2"
+            display="flex"
+            flexDirection="column"
+            alignItems="center"
+            justifyContent="center"
+            p={2}
+            borderRadius="md"
+            boxShadow="md"
+            bg="rgba(0, 0, 0, 0.7)"
+            color="white"
+            w="100%"
+            h="100%" // ✅ fixe la taille
+            overflow="hidden" // ✅ évite le recadrage
+          >
+            {items[index].type === "haiku" ? (
+              <>
+              <Text fontStyle="italic">{"Poème écrit par :"}</Text>
+
+                <Text fontWeight="bold" mb={2}>
+                  {formatAddress((items[index].content as Haiku).poemText[7]) ||
+                    "Poète Inconnu"}
+                </Text>
+              </>
+            ) : items[index].type === "nft" ? (
+              <>
+                <Text fontWeight="bold" mb={2}>
+                  {(items[index].content as Nft).name || "Oeuvre sans nom"}
+                </Text>
+                <Text>
+                -{" "}
+                  {ensMap[(items[index].content as Nft).artist ?? ""] ||
+                    formatAddress((items[index].content as Nft).artist ?? "") ||
+                    "Artiste inconnu"} -{" "}
+                </Text>
+              </>
+            ) : (
+              <Text>{"Un poème, une œuvre."}</Text>
+            )}
+          </Box>
+        )}
       </Box>
-    );
+    </Box>
+  );
+
 };
 
 export default GridLayout;

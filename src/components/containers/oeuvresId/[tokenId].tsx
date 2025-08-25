@@ -96,6 +96,8 @@ const TokenPage: React.FC = () => {
   //const [collectionId, setCollectionId] = useState<bigint>({});
   const [transacActivity, setTransacActivity] = useState<boolean>(false);
   const [tabIndex, setTabIndex] = useState(0); // Initialement l'onglet 0 (Détails)
+  const [ensName, setEnsName] = useState<string>('');
+
 
   const [isOwner, setIsOwner] = useState(false);
   const [canPurchase, setCanPurchase] = useState(false);
@@ -194,10 +196,13 @@ if (!address) return '';
 return `${address.slice(0, 6)}...${address.slice(-4)}`;
 };
 
+/*
 const formatAddress5lettres = (address: string) => {
 if (!address) return '';
 return `${address.slice(0, 8)}`;
 };
+*/
+
 
 const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<NFTData | null> => {
     const cacheKey = `${contractAddress}_${tokenId}`;
@@ -227,7 +232,12 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
                     return null;  // Si aucun détail n'est trouvé
                 }
 
-        const owner: string = fullDetails.owner;
+        const ownerCheck = Boolean(authAddress && fullDetails?.owner && authAddress.toLowerCase() === fullDetails.owner.toLowerCase());
+        setIsOwner(ownerCheck);
+
+        const resolvedOwner = await fetchENS(fullDetails.owner);
+
+        const owner: string = resolvedOwner;
         const mintDate: bigint = fullDetails.mintDate;
         const currentPrice: bigint = fullDetails.currentPrice;
         const forsale: boolean = fullDetails.forSale;
@@ -257,6 +267,9 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
 
         const data = await res.json();
 
+        const resolvedArtist = await fetchENS(data.artist);
+
+
         const nftData: NFTData = {
             owner,
             mintDate,
@@ -265,15 +278,16 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
             image: data.image,
             name: data.name,
             description: data.description,
-            artist: data.artist,
+            artist: resolvedArtist,
             forsale,
             price: priceInEther,
             collectionId: Number(collectionId),
         };
 
 
-        const ownerCheck = Boolean(authAddress && nftData?.owner && authAddress.toLowerCase() === nftData.owner.toLowerCase());
-        setIsOwner(ownerCheck);
+
+
+
         setCanPurchase(!ownerCheck && nftData.forsale);
 
 
@@ -284,6 +298,17 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
         console.error('Erreur lors de la récupération des détails du token :', error);
         return null; // Indiquez que l'opération a échoué sans lancer d'erreurs sur l'application
     }
+};
+
+const fetchENS = async (userAddress: string): Promise<string> => {
+  const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
+  try {
+    const resolvedEnsName = await provider.lookupAddress(userAddress);
+    return resolvedEnsName || formatAddress(userAddress);
+  } catch (error) {
+    console.error("Error fetching ENS:", error);
+    return formatAddress(userAddress);
+  }
 };
 
 
@@ -480,8 +505,8 @@ const handleCopy = () => {
                 <VStack spacing={4} alignItems="start" mb={6}>
                     <Text fontSize="lg"><strong>Nom :</strong> {nftData.name}</Text>
                     <Text fontSize="lg"><strong>Description :</strong> {nftData.description}</Text>
-                    <Text fontSize="lg" cursor="pointer" onClick={handleCopy}><strong>Artiste :</strong> {formatAddress(nftData.artist)}</Text>
-                    <Text fontSize="lg" cursor="pointer" onClick={handleCopy}><strong>Propriétaire :</strong> {formatAddress(nftData.owner)}</Text>
+                    <Text fontSize="lg" cursor="pointer" onClick={handleCopy}><strong>Artiste :</strong> {nftData.artist}</Text>
+                    <Text fontSize="lg" cursor="pointer" onClick={handleCopy}><strong>Propriétaire :</strong> {nftData.owner}</Text>
                     <Text fontSize="lg"><strong>Date de mint :</strong> {formatTimestamp(Number(nftData.mintDate))}</Text>
                     <Text fontSize="lg"><strong>Prix actuel :</strong> {nftData.price} ETH</Text>
                     <Text fontSize="lg"><strong>En vente :</strong> {nftData.forsale ? 'Oui' : 'Non'}</Text>
@@ -604,7 +629,7 @@ const handleCopy = () => {
       {/* Carrousels */}
       <Box mt={5} w="full">
         <Heading size="md" mb={3}>
-          Découvrez les autres collections de {formatAddress5lettres(nftData.artist)}
+          Découvrez les autres collections de {nftData.artist}
         </Heading>
         <Stack direction={{ base: "column", md: "row" }} spacing={2}>
           <FilteredCollectionsCarousel

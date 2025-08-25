@@ -47,6 +47,8 @@ const colorCard = useColorModeValue("gray.800", "white");
 interface Haiku {
   poemText: string;
   poet?: string;
+  mintContractAddress: string;
+  uniqueIdAssociated: string;
 }
 
 const [haikus, setHaikus] = useState<Haiku[]>([]); // Typage de l'état
@@ -167,10 +169,14 @@ const fetchPoems = async (collectionId: string, associatedAddress: string): Prom
         const totalEditions = await collectionContract.getRemainingEditions(tokenId);
         //console.log(totalEditions);
         //const price = haikuText[4];
+        const uniqueIdAssociated = await collectionContract.tokenIdToHaikuId(tokenId);
 
+        //console.log(uniqueIdAssociated);
         return {
           tokenId: tokenId.toString(),
           poemText: haikuText, // Ici on envoi toute les données du poemes, pas que le texte en fait
+          mintContractAddress: associatedAddress,
+          uniqueIdAssociated: Number(uniqueIdAssociated).toString(), // On converti le bingInt en number puis en string c'est plus simple de tput avoir en string
           /*}
           creatorAddress: creatorAddress,
 
@@ -355,20 +361,13 @@ useEffect(() => {
         mx="auto"
         >
 
+
+
           <HeroSection nfts={nfts} haikus={haikus} />
 
-          <Box
-          mt={5}
-          maxW="1200px"
-          w="100%"
-          px={4}
-          mx="auto"
 
-          >
-            <Text fontSize={{ base: "md", md: "lg" }} color="gray.300">
-              Pour une meilleure expérience sur smartphone, <br /> utilisez le navigateur intégré à votre wallet
-            </Text>
-          </Box>
+
+
         </Box>
 
         <VStack
