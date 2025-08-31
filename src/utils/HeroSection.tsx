@@ -31,7 +31,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
   const [selectedNft, setSelectedNft] = useState<Nft | null>(null);
   const [selectedHaiku, setSelectedHaiku] = useState<Haiku | null>(null);
   const [ensMap, setEnsMap] = useState<Record<string, string>>({});
-  const [showOverlay, setShowOverlay] = useState(true);
+  const [showOverlay, setShowOverlay] = useState(false);
   const router = useRouter();
 
   // ---------------------- Helpers ----------------------

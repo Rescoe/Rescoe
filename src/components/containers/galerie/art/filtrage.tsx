@@ -139,8 +139,21 @@ setStartIndexes(initialIndexes);
     });
 
     return (
-      <Box position="relative" mb={6}>
-        <Heading size="md" mb={3}>
+      <Box
+        display="flex"
+        flexDirection="column"
+        alignItems="center"
+        justifyContent="center"
+        w="100%"
+        maxW="100%"
+        minH="100vh"
+        bg="transparent"
+        color="white"
+        pb="6rem" // plus responsive que 100px
+        overflow="hidden"
+      >
+
+              <Heading size="md" mb={3}>
           {type}
         </Heading>
 
