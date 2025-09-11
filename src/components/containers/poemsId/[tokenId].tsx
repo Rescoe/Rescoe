@@ -8,7 +8,18 @@ import { ethers } from 'ethers';
 import ABI from '../../../components/ABI/HaikuEditions.json';
 import ABIRESCOLLECTION from '../../../components/ABI/ABI_Collections.json';
 import { useAuth } from '../../../utils/authContext';
-import { Box, Text, Heading, VStack, Spinner, useToast, Button, List, ListItem, Table, Thead, Tbody, Tr, Th, Td, Divider, Grid, Accordion, AccordionItem, AccordionButton, AccordionPanel, AccordionIcon } from '@chakra-ui/react';
+import { Box, Text, Heading, VStack, Spinner, Button, List, ListItem, Table, Thead, Tbody, Tr, Th, Td, Divider, Grid, Accordion, AccordionItem, AccordionButton, AccordionPanel, AccordionIcon,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  ModalCloseButton,
+  Input,
+  useDisclosure,
+  useToast
+ } from '@chakra-ui/react';
 import PoetryGallery from "./PoesieGalerieProps";
 import TextCard from "../galerie/TextCard";
 import { FramedText } from '../../../utils/Cadre';
@@ -47,7 +58,6 @@ const PoemPage: React.FC = () => {
   const router = useRouter();
   const { tokenId, contractAddress } = router.query as { tokenId?: string; contractAddress?: string };
   const { web3, address } = useAuth();
-  const toast = useToast();
 
   const [provider, setProvider] = useState<any>(null);
   const [accounts, setAccounts] = useState<string[]>([]);
@@ -63,6 +73,10 @@ const PoemPage: React.FC = () => {
   const [isOwner, setIsOwner] = useState('');
   const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!;
   const [editionsForSale, setEditionsForSale] = useState<Poem[]>([]);
+
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const toast = useToast();
+  const [price, setPrice] = useState('');
 
 
     useEffect(() => {
@@ -241,6 +255,8 @@ return Object.entries(balances).map(([owner, count]) => ({
   count,
 }));
 }
+
+
 const handleBuy = async (tokenId: number) => { // Assurez-vous de recevoir tokenId
     if (!web3 || !accounts.length) {
         alert("Connectez votre wallet pour acheter un haiku.");
@@ -290,6 +306,147 @@ const handleBuy = async (tokenId: number) => { // Assurez-vous de recevoir token
         console.error("Error while buying the haiku:", error);
     }
 };
+
+const onConfirmSale = async () => {
+  if (!tokenIdNumber) return;
+  try {
+    await handleListForSale(tokenIdNumber, price);
+    toast({
+      title: "Haiku mis en vente !",
+      description: `Le haiku est maintenant en vente pour ${price} ETH`,
+      status: "success",
+      duration: 5000,
+      isClosable: true,
+    });
+    onClose();
+  } catch (err) {
+    toast({
+      title: "Erreur",
+      description: "Impossible de mettre en vente le haiku.",
+      status: "error",
+      duration: 5000,
+      isClosable: true,
+    });
+  }
+};
+
+
+// Mettre en vente un token
+const handleListForSale = async (tokenId: number, price: string) => {
+    if (!web3 || !accounts.length) {
+        alert("Connectez votre wallet pour mettre en vente un haiku.");
+        return;
+    }
+
+    try {
+        if (!provider) {
+            throw new Error('Ethereum provider is not available. Veuillez installer MetaMask.');
+        }
+
+        if (!contractAddress) {
+            throw new Error('Contract address is not defined. Vérifiez vos variables d’environnement.');
+        }
+
+        // Vérifie que le prix est valide
+        const priceFloat = parseFloat(price);
+        if (isNaN(priceFloat) || priceFloat <= 0) {
+            alert("Le prix doit être un nombre supérieur à 0.");
+            return;
+        }
+
+        // Conversion en Wei
+        const priceInWei = web3.utils.toWei(price, "ether");
+
+        const contract = new web3.eth.Contract(ABI as any, contractAddress);
+
+        // Appel du smart contract
+        const tx = await contract.methods.listEditionForSale(tokenId, priceInWei).send({
+            from: accounts[0],
+        });
+
+        await tx;
+
+        alert(`Haiku #${tokenId} mis en vente pour ${price} ETH.`);
+    } catch (error) {
+        console.error("Erreur lors de la mise en vente du haiku:", error);
+    }
+};
+
+
+// Retirer de la vente
+const handleRemoveFromSale = async (tokenId: number) => {
+    if (!web3 || !accounts.length) {
+        alert("Connectez votre wallet pour retirer un haiku de la vente.");
+        return;
+    }
+
+    try {
+        if (!provider) {
+            throw new Error('Ethereum provider is not available. Veuillez installer MetaMask.');
+        }
+
+        if (!contractAddress) {
+            throw new Error('Contract address is not defined. Vérifiez vos variables d’environnement.');
+        }
+
+        const contract = new web3.eth.Contract(ABI as any, contractAddress);
+
+        const isForSale = await contract.methods.isNFTForSale(tokenId).call();
+        if (!isForSale) {
+            alert("Ce haiku n’est pas actuellement en vente.");
+            return;
+        }
+
+        const tx = await contract.methods.removeEditionFromSale(tokenId).send({
+            from: accounts[0],
+        });
+
+        await tx;
+
+        alert(`Haiku #${tokenId} retiré de la vente.`);
+    } catch (error) {
+        console.error("Erreur lors du retrait de la vente du haiku:", error);
+    }
+};
+
+
+// Brûler un token
+const handleBurn = async (tokenId: number) => {
+    if (!web3 || !accounts.length) {
+        alert("Connectez votre wallet pour brûler un haiku.");
+        return;
+    }
+
+    try {
+        if (!provider) {
+            throw new Error('Ethereum provider is not available. Veuillez installer MetaMask.');
+        }
+
+        if (!contractAddress) {
+            throw new Error('Contract address is not defined. Vérifiez vos variables d’environnement.');
+        }
+
+        const contract = new web3.eth.Contract(ABI as any, contractAddress);
+
+        // Vérifie que le token n’est pas en vente (contrat le fait aussi, mais utile côté front)
+        const isForSale = await contract.methods.isNFTForSale(tokenId).call();
+        if (isForSale) {
+            alert("Impossible de brûler un haiku en vente. Retirez-le d’abord de la vente.");
+            return;
+        }
+
+        const tx = await contract.methods.burnMultiple([tokenId]).send({
+            from: accounts[0],
+        });
+
+        await tx;
+
+        alert(`Haiku #${tokenId} brûlé avec succès.`);
+    } catch (error) {
+        console.error("Erreur lors du burn du haiku:", error);
+    }
+};
+
 
 
 
@@ -353,21 +510,64 @@ const handleBuy = async (tokenId: number) => { // Assurez-vous de recevoir token
    <Text fontWeight="bold">Prix : {poemData.price} ETH</Text>
 
    <Text>
-     {thisTokenforSale && address?.toLowerCase() !== isOwner?.toLowerCase() ? (
-       tokenId !== undefined ? (
-         <Button
-           onClick={() => tokenIdNumber !== undefined && handleBuy(tokenIdNumber)}
-         >
-           Acheter
-         </Button>       ) : (
-         <Text>Token ID est indisponible.</Text>
-       )
-     ) : (
-       <Text>
-         <strong>Vous êtes propriétaire de ce poème</strong>
-       </Text>
-     )}
-   </Text>
+       {thisTokenforSale && address?.toLowerCase() !== isOwner?.toLowerCase() ? (
+         tokenIdNumber !== undefined ? (
+           <Button onClick={() => tokenIdNumber && handleBuy(tokenIdNumber)}>
+             Acheter
+           </Button>
+         ) : (
+           <Text>Token ID est indisponible.</Text>
+         )
+       ) : (
+         <>
+           <Text>
+             <strong>Vous êtes propriétaire de ce poème</strong>
+           </Text>
+
+           {tokenIdNumber !== undefined ? (
+             <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+               {/* Bouton Mettre en vente */}
+               <Button onClick={onOpen}>Mettre en vente</Button>
+
+               {/* Modal pour saisir le prix */}
+               <Modal isOpen={isOpen} onClose={onClose}>
+                 <ModalOverlay />
+                 <ModalContent>
+                   <ModalHeader>Mettre en vente le haiku</ModalHeader>
+                   <ModalCloseButton />
+                   <ModalBody>
+                     <Input
+                       placeholder="Prix en ETH"
+                       value={price}
+                       onChange={(e) => setPrice(e.target.value)}
+                     />
+                   </ModalBody>
+                   <ModalFooter>
+                     <Button colorScheme="blue" mr={3} onClick={onConfirmSale}>
+                       Confirmer
+                     </Button>
+                     <Button onClick={onClose}>Annuler</Button>
+                   </ModalFooter>
+                 </ModalContent>
+               </Modal>
+
+               {/* Bouton retirer de la vente */}
+               <Button onClick={() => tokenIdNumber && handleRemoveFromSale(tokenIdNumber)}>
+                 Retirer de la vente
+               </Button>
+
+               {/* Bouton burn */}
+               <Button colorScheme="red" onClick={() => tokenIdNumber && handleBurn(tokenIdNumber)}>
+                 Brûler
+               </Button>
+             </div>
+           ) : (
+             <Text>Token ID est indisponible.</Text>
+           )}
+         </>
+       )}
+     </Text>
+
 
 
    <Text>

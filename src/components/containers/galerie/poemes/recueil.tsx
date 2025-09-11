@@ -11,7 +11,8 @@ import {
   TabPanels,
   TabPanel,
   Divider,
-  useMediaQuery
+  useMediaQuery,
+  Button
 } from "@chakra-ui/react";
 import { JsonRpcProvider, Contract, BigNumberish } from "ethers";
 import { useRouter } from "next/router";
@@ -55,40 +56,37 @@ const PoetryGallery: React.FC = () => {
   const { web3, address } = useAuth();
   const [tokenIdsForSale, setTokenIdsForSale] = useState<number[]>([]);
   const [isOwner, setIsOwner] = useState<boolean>(false);
+  const [currentPage, setCurrentPage] = useState<number>(0);
+  const pageSize = 20; // 20 collections par page
+  const [totalCollections, setTotalCollections] = useState<number>(0);
 
   const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
   const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
 
-  const fetchPoetryCollections = async () => {
-    setIsLoading(true);
-    try {
-      const total: BigNumberish = await contract.getTotalCollectionsMinted();
-      const totalNumber = total.toString();
-      const collectionsPaginated = await contract.getCollectionsPaginated(7, Number(totalNumber));
-      const collectionsData: Collection[] = await Promise.all(
-        collectionsPaginated.map(async (tuple: any) => {
-          const [id, name, collectionType, , associatedAddresses, , isFeatured] = tuple;
-          if (collectionType !== "Poesie") return null;
+  const fetchPoetryCollections = async (page: number) => {
+  setIsLoading(true);
+  try {
+    const total: BigNumberish = await contract.getTotalCollectionsMinted();
+    const totalNumber = Number(total);
+    setTotalCollections(totalNumber);
 
-          const uri: string = await contract.getCollectionURI(id);
-          const mintContractAddress: string = associatedAddresses;
+    // Calcule les bornes startId et endId
+    const startId = page * pageSize;
+    let endId = startId + pageSize - 1;
+    if (endId >= totalNumber) endId = totalNumber - 1;
 
-          const cachedMetadata = localStorage.getItem(uri);
-          if (cachedMetadata) {
-            const metadata = JSON.parse(cachedMetadata);
-            return {
-              id: id.toString(),
-              name,
-              imageUrl: metadata.image,
-              mintContractAddress,
-              isFeatured,
-            };
-          }
+    // Appel à ta fonction Solidity
+    const collectionsPaginated = await contract.getCollectionsByType("Poesie", startId, endId);
 
-          const response = await fetch(`/api/proxyPinata?ipfsHash=${uri.split("/").pop()}`);
-          const metadata = await response.json();
-          localStorage.setItem(uri, JSON.stringify(metadata));
+    const collectionsData: Collection[] = await Promise.all(
+      collectionsPaginated.map(async (tuple: any) => {
+        const [id, name, collectionType, , associatedAddresses, , isFeatured] = tuple;
+        const uri: string = await contract.getCollectionURI(id);
+        const mintContractAddress: string = associatedAddresses;
 
+        const cachedMetadata = localStorage.getItem(uri);
+        if (cachedMetadata) {
+          const metadata = JSON.parse(cachedMetadata);
           return {
             id: id.toString(),
             name,
@@ -96,16 +94,30 @@ const PoetryGallery: React.FC = () => {
             mintContractAddress,
             isFeatured,
           };
-        })
-      );
+        }
 
-      setCollections(collectionsData.filter(Boolean).sort((a, b) => Number(b!.isFeatured) - Number(a!.isFeatured)));
-    } catch (error) {
-      console.error("Erreur lors de la récupération des collections :", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        const response = await fetch(`/api/proxyPinata?ipfsHash=${uri.split("/").pop()}`);
+        const metadata = await response.json();
+        localStorage.setItem(uri, JSON.stringify(metadata));
+
+        return {
+          id: id.toString(),
+          name,
+          imageUrl: metadata.image,
+          mintContractAddress,
+          isFeatured,
+        };
+      })
+    );
+
+    setCollections(collectionsData.filter(Boolean).sort((a, b) => Number(b!.isFeatured) - Number(a!.isFeatured)));
+  } catch (error) {
+    console.error("Erreur lors de la récupération des collections :", error);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   // --- Fonction utilitaire pour récupérer les IDs en vente ---
   const fetchTokenIdsForSale = async (
@@ -262,8 +274,9 @@ const handleBurn = async (nft: Poem, tokenId: number) => {
   };
 
   useEffect(() => {
-    fetchPoetryCollections();
-  }, []);
+    fetchPoetryCollections(currentPage);
+  }, [currentPage]);
+
 
   return (
     <Box p={6}>
@@ -307,6 +320,32 @@ const handleBurn = async (nft: Poem, tokenId: number) => {
                 </Box>
               ))}
             </Grid>
+
+            <Box mt={4} display="flex" justifyContent="center" gap={4}>
+              <Button
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 0))}
+                isDisabled={currentPage === 0}
+              >
+                Précédent
+              </Button>
+
+              <Text>
+                Page {currentPage + 1} / {Math.ceil(totalCollections / pageSize)}
+              </Text>
+
+              <Button
+                onClick={() =>
+                  setCurrentPage((prev) =>
+                    prev + 1 < Math.ceil(totalCollections / pageSize) ? prev + 1 : prev
+                  )
+                }
+                isDisabled={currentPage + 1 >= Math.ceil(totalCollections / pageSize)}
+              >
+                Suivant
+              </Button>
+            </Box>
+
+
           </TabPanel>
 
           <TabPanel>
