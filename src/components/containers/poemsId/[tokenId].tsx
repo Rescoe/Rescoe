@@ -18,11 +18,21 @@ import { Box, Text, Heading, VStack, Spinner, Button, List, ListItem, Table, The
   ModalCloseButton,
   Input,
   useDisclosure,
-  useToast
+  useToast,
+  Stack
  } from '@chakra-ui/react';
 import PoetryGallery from "./PoesieGalerieProps";
 import TextCard from "../galerie/TextCard";
 import { FramedText } from '../../../utils/Cadre';
+
+//UseUsercollection ne sert a rien dans ce FaCode
+//il fauut l'améliorer pour qu'il face mieux que le FilteredCollectionsCarousel
+
+import { useUserCollections } from "../../../hooks/useUserCollections";
+import {FilteredCollectionsCarousel} from '../galerie/art';
+
+import { BrowserProvider, Eip1193Provider } from "ethers";
+
 
 interface Poem {
   tokenId: string;
@@ -70,13 +80,18 @@ const PoemPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [isFeatured, setIsFeatured] = useState<boolean>(false);
 
-  const [isOwner, setIsOwner] = useState('');
+  const [isCreator, setIsCreator] = useState('');
+  const [Owner, setOwner] = useState<{ owner: string; count: number }[]>([]);
+
+
   const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!;
   const [editionsForSale, setEditionsForSale] = useState<Poem[]>([]);
 
   const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
   const [price, setPrice] = useState('');
+
+
 
 
     useEffect(() => {
@@ -111,7 +126,8 @@ const PoemPage: React.FC = () => {
 
             const details = await contract.getTokenFullDetails(Number(tokenId));
 
-            setIsOwner(details.owner);
+            setIsCreator(details[7]);
+            console.log(details);
 
             if (!details) throw new Error('Poème inexistant');
 
@@ -130,7 +146,7 @@ const PoemPage: React.FC = () => {
 
             const editionsRestantes = Number(haikuData[2]-haikuData[4]).toString(); // Éditions restantes = TotalMinted - TotalSold
 
-            setThisTokenforSale(details[3]);
+            setThisTokenforSale(Number(availableEditions) > 0);
 
             // Récupération et mapping de l’historique
             // Récupération de l’historique (et on sécurise si pas de résultat)
@@ -142,8 +158,7 @@ const PoemPage: React.FC = () => {
               date: new Date(Number(tx[3] ?? 0) * 1000).toLocaleString()
             }));
 
-            const owners = computeOwnersFromHistory(txHistory);
-
+              setOwner(computeOwnersFromHistory(txHistory));
 
             const collection = await contract.collectionId();
 
@@ -156,11 +171,11 @@ const PoemPage: React.FC = () => {
                     mintDate: details.mintDate,
                     title: collectionDatas[1],
                     text: details[6],
-                    author: details.artist,
+                    author: isCreator,
                     forsale: thisTokenforSale,
                     price: formatUnits(details.currentPrice, 18),
                     collectionId: Number(collection),
-                    owners: owners,
+                    owners: Owner,
                     priceHistory: (haikuData.priceHistory || []).map((p: bigint) => formatUnits(p, 18)),
                     totalEditions: nombreHaikusParSerie,
                     remainingEditions: editionsRestantes,
@@ -180,6 +195,7 @@ const PoemPage: React.FC = () => {
                     isForSale: details[3],
                     tokenIdsForSale: [], // ⏳ placeholder
                   };
+
 
                 //setPoemPrice(haikuData[3]);
                   setPoems([poem]);
@@ -212,6 +228,11 @@ const PoemPage: React.FC = () => {
         fetchPoemData();
 
       }, [router.isReady, contractAddress, tokenId]);
+
+      // Utilisation du hooks de récupération des collections d'artistes
+      const { collections: poetryCollections, isLoading: isLoadingCollections } =
+      useUserCollections(poemData?.author);
+      console.log(poemData?.author);
 
 /*
       // --- Fonction utilitaire pour récupérer tous les IDs en vente ---
@@ -257,54 +278,58 @@ return Object.entries(balances).map(([owner, count]) => ({
 }
 
 
-const handleBuy = async (tokenId: number) => { // Assurez-vous de recevoir tokenId
-    if (!web3 || !accounts.length) {
-        alert("Connectez votre wallet pour acheter un haiku.");
-        return;
+const handleBuy = async (tokenId: number) => {
+  if (!window.ethereum) {
+    alert("Wallet non détecté. Veuillez installer MetaMask.");
+    return;
+  }
+
+  const ethereum = window.ethereum as Eip1193Provider;
+  await ethereum.request({ method: "eth_requestAccounts" });
+
+  const provider = new BrowserProvider(ethereum);
+  const signer = await provider.getSigner();
+
+  if (!contractAddress) {
+    alert("Adresse du contrat non définie.");
+    return;
+  }
+
+  if (!poemData) {
+    alert("Données du poème non disponibles.");
+    return;
+  }
+
+  // Vérification du prix
+  const normalizedPrice = poemData.price.replace(",", ".");
+  if (isNaN(Number(normalizedPrice))) {
+    alert("Le prix du poème est invalide.");
+    return;
+  }
+
+  try {
+    // On crée le contrat avec ethers.js et le signer
+    const contract = new ethers.Contract(contractAddress, ABI, signer);
+
+    // Vérifie si le token est en vente
+    const isForSale: boolean = await contract.isNFTForSale(tokenId);
+    if (!isForSale) {
+      alert("Ce haiku n'est pas en vente.");
+      return;
     }
 
-    try {
-        if (!provider) {
-            throw new Error('Ethereum provider is not available. Please install MetaMask or another Ethereum wallet.');
-        }
+    // Convertir le prix en wei
+    const priceInWei = ethers.parseEther(normalizedPrice); // BigInt, compatible ethers.js
 
-        // Assurez-vous que contractAddress est défini
-        if (!contractAddress) {
-            throw new Error('Contract address is not defined. Please check your environment variables.');
-        }
+    // Acheter le token
+    const tx = await contract.buyEdition(tokenId, { value: priceInWei });
+    await tx.wait(); // attendre la confirmation de la transaction
 
-        // Vérifiez si poemData est défini
-        if (!poemData) {
-            alert("Données du poème non disponibles.");
-            return; // Ou gérer le cas d'une manière appropriée
-        }
-
-        // Vérifiez que poemData.price est un nombre valide
-        const price = parseFloat(poemData.price); // Convertir en nombre flottant
-        if (isNaN(price)) {
-            alert("Le prix du poème est invalide.");
-            return;
-        }
-
-        const signer = provider.getSigner(); // Utilise le provider configuré
-        const contract = new web3.eth.Contract(ABI as any, contractAddress);
-
-        const isForSale = await contract.methods.isNFTForSale(tokenId).call(); // Récupérer la valeur avec call
-        if (!isForSale) {
-            alert("Ce haiku n'est pas en vente.");
-            return;
-        }
-
-        // Calculez le prix en Wei
-        const priceInWei = web3.utils.toWei(price, "ether");
-        const tx = await contract.methods.buyEdition(tokenId).send({ value: priceInWei });
-
-        await tx;
-
-        alert("Haiku acheté avec succès !");
-    } catch (error) {
-        console.error("Error while buying the haiku:", error);
-    }
+    alert("Haiku acheté avec succès !");
+  } catch (error: any) {
+    console.error("Erreur lors de l'achat du haiku:", error);
+    alert(error?.message || "Une erreur est survenue.");
+  }
 };
 
 const onConfirmSale = async () => {
@@ -458,10 +483,14 @@ const handleBurn = async (tokenId: number) => {
   const formatAddress = (addr: string) =>
     addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : "N/A";
 
+//Owners est la liste des ^roprietaires de l'oeurve, on regarde qui est dans la liste
+const isUserOwner = Owner.some(
+  o => o.owner.toLowerCase() === address?.toLowerCase());
+
   // fonction pour transformer ton historique brut en quelque chose de lisible
   const formattedTransactions = poemData?.transactionHistory?.map((tx: any) => ({
-    oldOwner: tx.from,      // ou tx.seller selon ton mapping
-    newOwner: tx.to,        // ou tx.buyer
+    oldOwner: tx.to,      // ou tx.seller selon ton mapping
+    newOwner: tx.from,        // ou tx.buyer
     price: tx.price,
     date: tx.date,
   })) || [];
@@ -503,70 +532,72 @@ const handleBurn = async (tokenId: number) => {
 
    <Divider/>
 
-
-
-    <Text fontSize="lg">Auteur : {poemData.owner}</Text>
+   <Text fontSize="lg">Auteur : {poemData.author}</Text>
 
    <Text fontWeight="bold">Prix : {poemData.price} ETH</Text>
 
    <Text>
-       {thisTokenforSale && address?.toLowerCase() !== isOwner?.toLowerCase() ? (
-         tokenIdNumber !== undefined ? (
-           <Button onClick={() => tokenIdNumber && handleBuy(tokenIdNumber)}>
-             Acheter
-           </Button>
+     {/* Cas où le poème est en vente et qu'il reste des éditions */}
+     {thisTokenforSale && poemData?.remainingEditions !== "0" ? (
+       tokenIdNumber !== undefined ? (
+         <Button onClick={() => tokenIdNumber && handleBuy(tokenIdNumber)}>
+           Acheter
+         </Button>
+       ) : (
+         <Text>Token ID est indisponible.</Text>
+       )
+     ) : isUserOwner ? (
+       <>
+         <Text>
+           <strong>Vous êtes propriétaire de ce poème</strong>
+         </Text>
+
+         {tokenIdNumber !== undefined ? (
+           <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+             {/* Bouton Mettre en vente */}
+             <Button onClick={onOpen}>Mettre en vente</Button>
+
+             {/* Modal pour saisir le prix */}
+             <Modal isOpen={isOpen} onClose={onClose}>
+               <ModalOverlay />
+               <ModalContent>
+                 <ModalHeader>Mettre en vente le haiku</ModalHeader>
+                 <ModalCloseButton />
+                 <ModalBody>
+                   <Input
+                     placeholder="Prix en ETH"
+                     value={price}
+                     onChange={(e) => setPrice(e.target.value)}
+                   />
+                 </ModalBody>
+                 <ModalFooter>
+                   <Button colorScheme="blue" mr={3} onClick={onConfirmSale}>
+                     Confirmer
+                   </Button>
+                   <Button onClick={onClose}>Annuler</Button>
+                 </ModalFooter>
+               </ModalContent>
+             </Modal>
+
+             {/* Bouton retirer de la vente */}
+             <Button onClick={() => tokenIdNumber && handleRemoveFromSale(tokenIdNumber)}>
+               Retirer de la vente
+             </Button>
+
+             {/* Bouton burn */}
+             <Button colorScheme="red" onClick={() => tokenIdNumber && handleBurn(tokenIdNumber)}>
+               Brûler
+             </Button>
+           </div>
          ) : (
            <Text>Token ID est indisponible.</Text>
-         )
-       ) : (
-         <>
-           <Text>
-             <strong>Vous êtes propriétaire de ce poème</strong>
-           </Text>
+         )}
+       </>
+     ) : (
+       <Text>Ce poème n’est pas en vente actuellement.</Text>
+     )}
+   </Text>
 
-           {tokenIdNumber !== undefined ? (
-             <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
-               {/* Bouton Mettre en vente */}
-               <Button onClick={onOpen}>Mettre en vente</Button>
-
-               {/* Modal pour saisir le prix */}
-               <Modal isOpen={isOpen} onClose={onClose}>
-                 <ModalOverlay />
-                 <ModalContent>
-                   <ModalHeader>Mettre en vente le haiku</ModalHeader>
-                   <ModalCloseButton />
-                   <ModalBody>
-                     <Input
-                       placeholder="Prix en ETH"
-                       value={price}
-                       onChange={(e) => setPrice(e.target.value)}
-                     />
-                   </ModalBody>
-                   <ModalFooter>
-                     <Button colorScheme="blue" mr={3} onClick={onConfirmSale}>
-                       Confirmer
-                     </Button>
-                     <Button onClick={onClose}>Annuler</Button>
-                   </ModalFooter>
-                 </ModalContent>
-               </Modal>
-
-               {/* Bouton retirer de la vente */}
-               <Button onClick={() => tokenIdNumber && handleRemoveFromSale(tokenIdNumber)}>
-                 Retirer de la vente
-               </Button>
-
-               {/* Bouton burn */}
-               <Button colorScheme="red" onClick={() => tokenIdNumber && handleBurn(tokenIdNumber)}>
-                 Brûler
-               </Button>
-             </div>
-           ) : (
-             <Text>Token ID est indisponible.</Text>
-           )}
-         </>
-       )}
-     </Text>
 
 
 
@@ -689,6 +720,53 @@ const handleBurn = async (tokenId: number) => {
         </Grid>
 */}
         <PoetryGallery collectionAddress={contractAddress!} />
+
+{/* ICI ON utilise le hooks créer useUserCollection */}
+        <Divider mt={8} />
+
+<Heading size="md" mt={6}>
+  Collections du poète
+</Heading>
+
+{isLoadingCollections ? (
+  <Spinner />
+) : poetryCollections.length > 0 ? (
+  <Grid
+    templateColumns={{ base: "repeat(2, 1fr)", md: "repeat(3, 1fr)" }}
+    gap={6}
+    mt={4}
+  >
+    {poetryCollections.map((col) => (
+      <Box key={col.id} borderWidth="1px" borderRadius="lg" p={4}>
+        {col.imageUrl && (
+          <Box width="100%" height="150px" overflow="hidden" borderRadius="md">
+            <img
+              src={col.imageUrl}
+              alt={col.name}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          </Box>
+        )}
+        <Text mt={2}>{col.name}</Text>
+      </Box>
+    ))}
+  </Grid>
+) : (
+  <Text mt={4}>Ce poète n’a pas encore de collections.</Text>
+)}
+
+<Divider mt={8} />
+
+<Divider mt={8} />
+
+
+<Box mt={5} w="full">
+  <Stack direction={{ base: "column", md: "row" }} spacing={2}>
+  {address && <FilteredCollectionsCarousel creator={address} />}
+  </Stack>
+</Box>
+
+
       </Box>
     );
   };
