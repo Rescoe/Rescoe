@@ -30,6 +30,9 @@ import { FramedText } from '../../../utils/Cadre';
 
 import { useUserCollections } from "../../../hooks/useUserCollections";
 import {FilteredCollectionsCarousel} from '../galerie/art';
+import UserEditionsManager from '../../../hooks/userEditionsManager';
+
+
 
 import { BrowserProvider, Eip1193Provider } from "ethers";
 
@@ -80,7 +83,6 @@ const PoemPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [isFeatured, setIsFeatured] = useState<boolean>(false);
 
-  const [isCreator, setIsCreator] = useState('');
   const [Owner, setOwner] = useState<{ owner: string; count: number }[]>([]);
 
 
@@ -116,123 +118,102 @@ const PoemPage: React.FC = () => {
     if (!router.isReady || !contractAddress || !tokenId) return;
 
     const fetchPoemData = async () => {
-          try {
-            const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
-            const contract = new Contract(contractAddress, ABI, provider);
-            const contractCollection = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
+  try {
+    const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+    const contract = new Contract(contractAddress, ABI, provider);
+    const contractCollection = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
 
+    // On mappe le tokenId courant à son haiku unique
+    const haikuUniqueId = await contract.tokenIdToHaikuId(tokenId);
 
-            const tokenIdtoHaikuUnique = await contract.tokenIdToHaikuId(tokenId);
+    // Infos série
+    const premierToDernier = await contract.getHaikuInfoUnique(haikuUniqueId);
+    const premierIDDeLaSerie = Number(premierToDernier[0]);
+    const nombreHaikusParSerie = Number(premierToDernier[1]);
 
-            const details = await contract.getTokenFullDetails(Number(tokenId));
+    // ✅ Balayer tous les tokenIds de la série
+    const tokensDetails = await Promise.all(
+      Array.from({ length: nombreHaikusParSerie }, async (_, i) => {
+        const currentTokenId = premierIDDeLaSerie + i;
+        try {
+          const details = await contract.getTokenFullDetails(currentTokenId);
 
-            setIsCreator(details[7]);
-            console.log(details);
+          return {
+            tokenId: currentTokenId,
+            owner: details.owner,
+            author: details[7]?.toString() ?? "",
+            text: details[6],
+            price: formatUnits(details.currentPrice, 18),
+            mintDate: details.mintDate,
+            isForSale: details[3],
+          };
+        } catch (err) {
+          console.warn(`Impossible de récupérer le token ${currentTokenId}`, err);
+          return null;
+        }
+      })
+    );
 
-            if (!details) throw new Error('Poème inexistant');
+    const validTokens = tokensDetails.filter(Boolean);
 
-            // Obtention des détails supplémentaires
-            const haikuId = tokenId; // Récupérer l'ID du haiku
-            const haikuData = await contract.haikus(tokenIdtoHaikuUnique); // Récupérer les détails de l'haiku
+    // Récupération d’un seul haikuData (les infos sont partagées par la série)
+    const haikuData = await contract.haikus(haikuUniqueId);
 
+    const availableEditions = await contract.getRemainingEditions(haikuUniqueId);
+    const totalMinted = nombreHaikusParSerie - Number(availableEditions);
+    const editionsRestantes = Number(haikuData[2] - haikuData[4]).toString();
 
+    // Historique (tu peux décider si c’est par tokenId unique ou global à la série)
+    const txHistory = await contract.getTransactionHistory(Number(tokenId));
+    const formattedTxHistory = (txHistory || []).map((tx: any) => ({
+      from: tx[0],
+      to: tx[1],
+      price: formatUnits(tx[2] ?? BigInt(0), 18),
+      date: new Date(Number(tx[3] ?? 0) * 1000).toLocaleString(),
+    }));
 
-            const premierToDernier = await contract.getHaikuInfoUnique(tokenIdtoHaikuUnique);
-            const premierIDDeLaSerie = Number(premierToDernier[0]);
-            const nombreHaikusParSerie = Number(premierToDernier[1]);
+    const owners = computeOwnersFromHistory(txHistory);
 
-            const availableEditions = await contract.getRemainingEditions(tokenIdtoHaikuUnique);
-            const totalMinted = nombreHaikusParSerie - Number(availableEditions);
+    // Collection
+    const collection = await contract.collectionId();
+    const collectionDatas = await contractCollection.collections(collection);
 
-            const editionsRestantes = Number(haikuData[2]-haikuData[4]).toString(); // Éditions restantes = TotalMinted - TotalSold
+    setPoemData({
+      contrat: contractAddress,
+      owner: validTokens[0]?.owner || "",
+      mintDate: validTokens[0]?.mintDate || BigInt(0),
+      title: collectionDatas[1],
+      text: validTokens[0]?.text || "",
+      author: validTokens[0]?.author || "",
+      forsale: Number(availableEditions) > 0,
+      price: validTokens[0]?.price || "0",
+      collectionId: Number(collection),
+      owners,
+      priceHistory: (haikuData.priceHistory || []).map((p: bigint) =>
+        parseFloat(formatUnits(p, 18))
+      ),
+      totalEditions: nombreHaikusParSerie,
+      remainingEditions: editionsRestantes,
+      transactionHistory: formattedTxHistory,
+    });
 
-            setThisTokenforSale(Number(availableEditions) > 0);
+    // ✅ Stocker toutes les éditions
+    setPoems(validTokens as any[]);
+  } catch (err: any) {
+    setErrorMessage(err.message || "Erreur lors de la récupération des poèmes");
+  } finally {
+    setIsLoading(false);
+  }
+};
 
-            // Récupération et mapping de l’historique
-            // Récupération de l’historique (et on sécurise si pas de résultat)
-            const txHistory = await contract.getTransactionHistory(haikuId);
-            const formattedTxHistory = (txHistory || []).map((tx: any) => ({
-              from: tx[0],
-              to: tx[1],
-              price: formatUnits(tx[2] ?? BigInt(0), 18),
-              date: new Date(Number(tx[3] ?? 0) * 1000).toLocaleString()
-            }));
-
-              setOwner(computeOwnersFromHistory(txHistory));
-
-            const collection = await contract.collectionId();
-
-            const collectionDatas = await contractCollection.collections(collection);
-            setIsFeatured(collectionDatas[6]);
-
-            setPoemData({
-                    contrat:contractAddress,
-                    owner: details.owner,
-                    mintDate: details.mintDate,
-                    title: collectionDatas[1],
-                    text: details[6],
-                    author: isCreator,
-                    forsale: thisTokenforSale,
-                    price: formatUnits(details.currentPrice, 18),
-                    collectionId: Number(collection),
-                    owners: Owner,
-                    priceHistory: (haikuData.priceHistory || []).map((p: bigint) => formatUnits(p, 18)),
-                    totalEditions: nombreHaikusParSerie,
-                    remainingEditions: editionsRestantes,
-                    transactionHistory: formattedTxHistory
-                  });
-
-
-                  const poem: Poem = {
-                    tokenId: tokenId,
-                    poemText: details[6],
-                    creatorAddress: details.artist.toString(),
-                    totalEditions: nombreHaikusParSerie.toString(),
-                    mintContractAddress: contractAddress,
-                    price: formatUnits(details.currentPrice, 18),
-                    totalMinted: totalMinted.toString(),
-                    availableEditions: editionsRestantes, // ⏳ placeholder
-                    isForSale: details[3],
-                    tokenIdsForSale: [], // ⏳ placeholder
-                  };
-
-
-                //setPoemPrice(haikuData[3]);
-                  setPoems([poem]);
-
-/*
-                  // 🔹 On lance la récupération "asynchrone" après coup
-                  fetchTokenIdsForSale(contractAddress, premierIDDeLaSerie, nombreHaikusParSerie)
-                    .then((tokenIdsForSale) => {
-                      const nbAVendre = tokenIdsForSale.length;
-
-                      // Mise à jour en remplaçant uniquement les champs dépendants
-                      setPoems((prevPoems) =>
-                        prevPoems.map((p) =>
-                          p.tokenId === poem.tokenId
-                            ? { ...p, availableEditions: nbAVendre.toString(), tokenIdsForSale }
-                            : p
-                        )
-                      );
-                    });
-
-*/
-
-          } catch (err: any) {
-            setErrorMessage(err.message || 'Erreur lors de la récupération du poème');
-          } finally {
-            setIsLoading(false);
-          }
-        };
 
         fetchPoemData();
 
-      }, [router.isReady, contractAddress, tokenId]);
+      }, [router.isReady, contractAddress, tokenId, address]);
 
       // Utilisation du hooks de récupération des collections d'artistes
       const { collections: poetryCollections, isLoading: isLoadingCollections } =
       useUserCollections(poemData?.author);
-      console.log(poemData?.author);
 
 /*
       // --- Fonction utilitaire pour récupérer tous les IDs en vente ---
@@ -484,8 +465,10 @@ const handleBurn = async (tokenId: number) => {
     addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : "N/A";
 
 //Owners est la liste des ^roprietaires de l'oeurve, on regarde qui est dans la liste
-const isUserOwner = Owner.some(
-  o => o.owner.toLowerCase() === address?.toLowerCase());
+const isUserOwner =
+  Owner.some(o => o.owner.toLowerCase() === address?.toLowerCase()) ||
+  poemData?.author?.toLowerCase() === address?.toLowerCase();
+
 
   // fonction pour transformer ton historique brut en quelque chose de lisible
   const formattedTransactions = poemData?.transactionHistory?.map((tx: any) => ({
@@ -597,6 +580,20 @@ const isUserOwner = Owner.some(
        <Text>Ce poème n’est pas en vente actuellement.</Text>
      )}
    </Text>
+
+
+{address && (
+  <UserEditionsManager
+    mintContractAddress={String(contractAddress)} // contrat de mint (HaikuEditions)
+    userAddress={address}
+    onListForSale={handleListForSale} // ta fonction existante
+    onRemoveFromSale={handleRemoveFromSale}
+    onBurn={handleBurn}
+    onBuy={handleBuy}
+    pageSize={20} // optionnel
+  />
+)}
+
 
 
 
