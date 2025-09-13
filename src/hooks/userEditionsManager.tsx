@@ -1,29 +1,68 @@
 // src/components/UserEditionsManager.tsx
 import React, { useEffect, useState } from "react";
-import { Box, Button, Grid, Heading, Spinner, Text, VStack, HStack, useToast } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Grid,
+  Heading,
+  Spinner,
+  Text,
+  VStack,
+  HStack,
+  useToast,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalFooter,
+  ModalBody,
+  ModalCloseButton,
+  Input,
+  useDisclosure,
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogContent,
+  AlertDialogOverlay,
+  Accordion,
+  AccordionItem,
+  AccordionButton,
+  AccordionPanel,
+  AccordionIcon,
+  List,
+  ListItem,
+  Divider,
+} from "@chakra-ui/react";
 import { JsonRpcProvider, Contract } from "ethers";
-import ABI from '../components/ABI/HaikuEditions.json';
+import ABI from "../components/ABI/HaikuEditions.json";
 
 type Edition = {
   tokenId: number;
   haikuUniqueId: number;
-  owner: string;
-  author?: string;
+  owner: string;          // adresse (string)
+  author?: string;        // adresse (string) — on résout ENS séparément
   text?: string;
   price?: string;
   mintDate?: any;
   isForSale?: boolean;
 };
 
+type GroupedEdition = {
+  haikuUniqueId: number;
+  text?: string;
+  author?: string; // adresse
+  editions: Edition[];
+};
+
 type Props = {
-  mintContractAddress: string; // contrat HaikuEditions
-  userAddress: string | null | undefined; // adresse à scanner (peut être address du wallet ou d'un profil)
-  // handlers (tu peux passer tes fonctions existantes)
+  mintContractAddress: string;
+  userAddress: string | null | undefined;
   onListForSale?: (tokenId: number, price: string) => Promise<any>;
   onRemoveFromSale?: (tokenId: number) => Promise<any>;
   onBurn?: (tokenId: number) => Promise<any>;
   onBuy?: (tokenId: number) => Promise<any>;
-  pageSize?: number; // optionnel : batch size pour le scanning (par défaut 20)
+  pageSize?: number;
 };
 
 export default function UserEditionsManager({
@@ -39,6 +78,22 @@ export default function UserEditionsManager({
   const [loading, setLoading] = useState<boolean>(false);
   const [editions, setEditions] = useState<Edition[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [ensMap, setEnsMap] = useState<Record<string, string>>({});
+
+  // state pour modals
+  const [selectedToken, setSelectedToken] = useState<number | null>(null);
+  const [priceInput, setPriceInput] = useState("");
+  const {
+    isOpen: isListOpen,
+    onOpen: onListOpen,
+    onClose: onListClose,
+  } = useDisclosure();
+  const {
+    isOpen: isBurnOpen,
+    onOpen: onBurnOpen,
+    onClose: onBurnClose,
+  } = useDisclosure();
+  const cancelRef = React.useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!mintContractAddress || !userAddress) {
@@ -52,35 +107,28 @@ export default function UserEditionsManager({
       setLoading(true);
       setError(null);
       try {
-        const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+        const provider = new JsonRpcProvider(
+          process.env.NEXT_PUBLIC_URL_SERVER_MORALIS
+        );
         const contract = new Contract(mintContractAddress, ABI, provider);
 
-        // 1) nombre de haiku uniques (ex: _HaikusUnique)
-        const lastUnique = await contract.getLastUniqueHaikusMinted(); // retourne uint256
+        const lastUnique = await contract.getLastUniqueHaikusMinted();
         const lastUniqueNumber = Number(lastUnique || 0);
 
         const foundEditions: Edition[] = [];
 
-        // 2) pour chaque haiku unique, récupérer intervalle [firstTokenId, firstTokenId + editionsCount - 1]
-        // puis parcourir les tokenIds et appeler ownerOf (en batch pour limiter la charge)
         for (let uniqueId = 0; uniqueId < lastUniqueNumber; uniqueId++) {
-          // getHaikuInfoUnique(uniqueId) => [firstTokenId, editionsCount]
           const info = await contract.getHaikuInfoUnique(uniqueId);
           const firstTokenId = Number(info[0]);
           const editionsCount = Number(info[1]);
 
-          // parcours en batch des tokenIds de cette série
-          // on itère par "pages" de pageSize (ex: 20)
           for (let offset = 0; offset < editionsCount; offset += pageSize) {
-            const batchIds = [];
+            const batchIds: number[] = [];
             const upper = Math.min(offset + pageSize, editionsCount);
             for (let k = offset; k < upper; k++) {
-              const tokenId = firstTokenId + k;
-              batchIds.push(tokenId);
+              batchIds.push(firstTokenId + k);
             }
 
-            // pour chaque tokenId du batch on vérifie ownerOf
-            // on utilise Promise.allSettled pour que les erreurs ponctuelles n'annulent pas tout
             const ownersResp = await Promise.allSettled(
               batchIds.map((tid) => contract.ownerOf(tid))
             );
@@ -89,20 +137,21 @@ export default function UserEditionsManager({
               const tid = batchIds[i];
               const resp = ownersResp[i];
               if (resp.status === "fulfilled") {
+                // owner returned as address string
                 const ownerAddress = String(resp.value).toLowerCase();
                 if (ownerAddress === userAddress.toLowerCase()) {
-                  // on récupère quelques infos utiles (getTokenFullDetails) mais attention coût RPC
-                  // tu peux commenter pour éviter coûts si tu n'en as pas besoin
                   try {
                     const details = await contract.getTokenFullDetails(tid);
-                    // details layout depends on your contract — on suppose le même que tu utilises ailleurs
+                    // détails : on garde l'adresse auteur (string), on ne met PAS l'objet ensMap
+                    const authorAddress = details[7] ? String(details[7]).toLowerCase() : undefined;
+
                     const edition: Edition = {
                       tokenId: tid,
                       haikuUniqueId: uniqueId,
                       owner: ownerAddress,
-                      author: details[7]?.toString() ?? undefined,
+                      author: authorAddress, // adresse — ENS resolved later
                       text: details[6] ?? undefined,
-                      price: String(details.currentPrice ? formatIfBN(details.currentPrice) : ""), // helper
+                      price: String(details.currentPrice ? formatIfBN(details.currentPrice) : ""),
                       mintDate: details.mintDate ?? undefined,
                       isForSale: Boolean(details[3]),
                     };
@@ -117,8 +166,7 @@ export default function UserEditionsManager({
                   }
                 }
               } else {
-                // ownerOf may revert for non minted token; ignore silently
-                // console.warn(`ownerOf failed for ${tid}`, resp.reason);
+                // ownerOf may revert for non minted tokens — ignore
               }
             }
 
@@ -128,8 +176,21 @@ export default function UserEditionsManager({
         } // end unique loop
 
         if (!mounted) return;
-        // tri par tokenId asc
+
+        // Tri et set
         foundEditions.sort((a, b) => a.tokenId - b.tokenId);
+
+        // --- RÉSOLVE ENS EN LOT pour les adresses rencontrées (owners + authors) ---
+        const addressesToResolve = new Set<string>();
+        foundEditions.forEach((fe) => {
+          if (fe.owner) addressesToResolve.add(fe.owner.toLowerCase());
+          if (fe.author) addressesToResolve.add(fe.author.toLowerCase());
+        });
+
+        if (addressesToResolve.size > 0) {
+          await fetchENSForAddresses(Array.from(addressesToResolve));
+        }
+
         setEditions(foundEditions);
       } catch (err: any) {
         console.error("Erreur fetchOwnedEditions:", err);
@@ -140,16 +201,13 @@ export default function UserEditionsManager({
     };
 
     fetchOwnedEditions();
-
     return () => {
       mounted = false;
     };
   }, [mintContractAddress, userAddress, pageSize]);
 
-  // petit helper pour normaliser BN -> string (évite imports lourds)
   function formatIfBN(val: any) {
     try {
-      // ethers BigNumber -> toString()
       if (val && typeof val.toString === "function") return val.toString();
       return String(val);
     } catch {
@@ -157,102 +215,239 @@ export default function UserEditionsManager({
     }
   }
 
-  const handleList = async (tid: number) => {
-    if (!onListForSale) return toast({ title: "Handler manquant", status: "warning" });
+  const openListModal = (tid: number) => {
+    setSelectedToken(tid);
+    setPriceInput("");
+    onListOpen();
+  };
+
+  const confirmList = async () => {
+    if (!onListForSale || selectedToken == null) return;
     try {
-      const price = prompt("Prix en ETH pour mettre en vente (ex: 0.1)");
-      if (!price) return;
-      await onListForSale(tid, price);
-      toast({ title: `Token #${tid} mis en vente`, status: "success" });
+      await onListForSale(selectedToken, priceInput);
+      toast({ title: `Token #${selectedToken} mis en vente`, status: "success" });
     } catch (err: any) {
-      console.error(err);
       toast({ title: "Erreur", description: err?.message || "Erreur", status: "error" });
+    } finally {
+      onListClose();
+    }
+  };
+
+  const openBurnDialog = (tid: number) => {
+    setSelectedToken(tid);
+    onBurnOpen();
+  };
+
+  const confirmBurn = async () => {
+    if (!onBurn || selectedToken == null) return;
+    try {
+      await onBurn(selectedToken);
+      toast({ title: `Token #${selectedToken} brûlé`, status: "success" });
+      setEditions((prev) => prev.filter((e) => e.tokenId !== selectedToken));
+    } catch (err: any) {
+      toast({ title: "Erreur", description: err?.message || "Erreur", status: "error" });
+    } finally {
+      onBurnClose();
     }
   };
 
   const handleRemove = async (tid: number) => {
-    if (!onRemoveFromSale) return toast({ title: "Handler manquant", status: "warning" });
+    if (!onRemoveFromSale) return;
     try {
       await onRemoveFromSale(tid);
       toast({ title: `Token #${tid} retiré de la vente`, status: "success" });
     } catch (err: any) {
-      console.error(err);
-      toast({ title: "Erreur", description: err?.message || "Erreur", status: "error" });
-    }
-  };
-
-  const handleBurnLocal = async (tid: number) => {
-    if (!onBurn) return toast({ title: "Handler manquant", status: "warning" });
-    if (!confirm(`Confirmer la destruction du token #${tid} ? Action irréversible.`)) return;
-    try {
-      await onBurn(tid);
-      toast({ title: `Token #${tid} brûlé`, status: "success" });
-      // retirer localement
-      setEditions((prev) => prev.filter((e) => e.tokenId !== tid));
-    } catch (err: any) {
-      console.error(err);
       toast({ title: "Erreur", description: err?.message || "Erreur", status: "error" });
     }
   };
 
   const handleBuyLocal = async (tid: number) => {
-    if (!onBuy) return toast({ title: "Handler manquant", status: "warning" });
+    if (!onBuy) return;
     try {
       await onBuy(tid);
       toast({ title: `Token #${tid} acheté`, status: "success" });
-      // retirer localement
       setEditions((prev) => prev.filter((e) => e.tokenId !== tid));
     } catch (err: any) {
-      console.error(err);
       toast({ title: "Erreur", description: err?.message || "Erreur", status: "error" });
+    }
+  };
+
+  const fetchENSForAddresses = async (addresses: string[]) => {
+    try {
+      const provider = new JsonRpcProvider(
+        process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string
+      );
+      const newMap: Record<string, string> = {};
+      await Promise.all(
+        addresses.map(async (addrRaw) => {
+          if (!addrRaw) return;
+          const addr = addrRaw.toLowerCase();
+          // skip if already present
+          if (ensMap[addr]) {
+            newMap[addr] = ensMap[addr];
+            return;
+          }
+          try {
+            const name = await provider.lookupAddress(addr);
+            newMap[addr] = name || formatAddress(addr);
+          } catch {
+            newMap[addr] = formatAddress(addr);
+          }
+        })
+      );
+      setEnsMap((prev) => ({ ...prev, ...newMap })); // merge
+    } catch (err) {
+      console.error("fetchENSForAddresses error:", err);
     }
   };
 
   if (loading) return <Spinner />;
 
+  const formatAddress = (addr?: string) =>
+    addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : "";
+
+  // regroupement par haikuUniqueId
+  const grouped: GroupedEdition[] = editions.reduce((acc, ed) => {
+    let group = acc.find((g) => g.haikuUniqueId === ed.haikuUniqueId);
+    if (!group) {
+      group = {
+        haikuUniqueId: ed.haikuUniqueId,
+        text: ed.text,
+        author: ed.author,
+        editions: [],
+      };
+      acc.push(group);
+    }
+    group.editions.push(ed);
+    return acc;
+  }, [] as GroupedEdition[]);
+
   return (
     <Box w="full" p={4} borderWidth="1px" borderRadius="md">
       <Heading size="sm" mb={3}>
-        Vos éditions dans cette collection
+Vos poèmes dans cette colection :
       </Heading>
 
       {error && <Text color="red.500">{error}</Text>}
 
-      {editions.length === 0 ? (
-        <Text>Aucune édition possédée trouvée pour cette adresse.</Text>
+      {grouped.length === 0 ? (
+        <Text>Aucune édition possédée trouvée.</Text>
       ) : (
-        <Grid templateColumns={{ base: "repeat(1, 1fr)", md: "repeat(2, 1fr)" }} gap={3}>
-          {editions.map((ed) => (
-            <Box key={ed.tokenId} p={3} borderWidth="1px" borderRadius="md">
-              <VStack align="start" spacing={1}>
-                <Text fontWeight="bold">Token #{ed.tokenId}</Text>
-                {ed.author && <Text fontSize="sm">Auteur: {ed.author}</Text>}
-                {ed.text && <Text fontSize="sm" noOfLines={2}>{ed.text}</Text>}
-                <Text fontSize="sm">Owner: {ed.owner}</Text>
-                {ed.price && <Text fontSize="sm">Prix: {ed.price} wei</Text>}
-                <HStack spacing={2} mt={2}>
-                  {/* Achetable si isForSale (pour tout le monde) */}
-                  <Button size="sm" onClick={() => handleBuyLocal(ed.tokenId)} isDisabled={!ed.isForSale}>
-                    Acheter
-                  </Button>
+        <Accordion allowMultiple>
+          {grouped.map((group) => (
+            <AccordionItem key={group.haikuUniqueId}>
+              <h2>
+                <AccordionButton>
+                  <Box flex="1" textAlign="left">
+                    <Text fontWeight="bold">Haiku #{group.haikuUniqueId}</Text>
+                    {group.author && (
+                      <Text fontSize="sm">
+                        Auteur: {ensMap[group.author.toLowerCase()] || formatAddress(group.author)}
+                      </Text>
+                    )}
 
-                  <Button size="sm" onClick={() => handleList(ed.tokenId)}>
-                    Mettre en vente
-                  </Button>
+                    <Divider mt={2} />
 
-                  <Button size="sm" onClick={() => handleRemove(ed.tokenId)}>
-                    Retirer de la vente
-                  </Button>
+                    {group.text && (
+                      <Text fontSize="sm" noOfLines={3} whiteSpace="pre-line">
+                        {group.text}
+                      </Text>
+                    )}
 
-                  <Button size="sm" colorScheme="red" onClick={() => handleBurnLocal(ed.tokenId)}>
-                    Brûler
-                  </Button>
-                </HStack>
-              </VStack>
-            </Box>
+
+                    <Divider mt={2} />
+
+
+                    <Text fontSize="xs" color="gray.500">
+                      {group.editions.length} édition(s) possédée(s)
+                    </Text>
+                  </Box>
+                  <AccordionIcon />
+                </AccordionButton>
+              </h2>
+              <AccordionPanel>
+                <List spacing={2}>
+                  {group.editions.map((ed) => (
+                    <ListItem key={ed.tokenId}>
+                      <HStack spacing={3} align="center">
+                        <Text>Edition #{ed.tokenId}</Text>
+                        <Button
+                          size="xs"
+                          onClick={() => handleBuyLocal(ed.tokenId)}
+                          isDisabled={!ed.isForSale}
+                        >
+                          Acheter
+                        </Button>
+                        <Button size="xs" onClick={() => openListModal(ed.tokenId)}>
+                          Mettre en vente
+                        </Button>
+                        <Button size="xs" onClick={() => handleRemove(ed.tokenId)}>
+                          Retirer
+                        </Button>
+                        <Button size="xs" colorScheme="red" onClick={() => openBurnDialog(ed.tokenId)}>
+                          Brûler
+                        </Button>
+
+                        <Text fontSize="xs" ml={6}>
+                          Owner: {ensMap[ed.owner.toLowerCase()] || formatAddress(ed.owner)}{" "}
+                          {ed.price ? `• Prix : ${ed.price} wei` : null}
+                        </Text>
+
+                      </HStack>
+
+                      <Divider mt={2} />
+                    </ListItem>
+                  ))}
+                </List>
+              </AccordionPanel>
+            </AccordionItem>
           ))}
-        </Grid>
+        </Accordion>
       )}
+
+      {/* Modal mise en vente */}
+      <Modal isOpen={isListOpen} onClose={onListClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Mettre en vente</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <Input
+              placeholder="Prix en ETH (ex: 0.1)"
+              value={priceInput}
+              onChange={(e) => setPriceInput(e.target.value)}
+            />
+          </ModalBody>
+          <ModalFooter>
+            <Button onClick={onListClose} mr={3}>
+              Annuler
+            </Button>
+            <Button colorScheme="blue" onClick={confirmList}>
+              Confirmer
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Dialog burn */}
+      <AlertDialog isOpen={isBurnOpen} leastDestructiveRef={cancelRef} onClose={onBurnClose}>
+        <AlertDialogOverlay>
+          <AlertDialogContent>
+            <AlertDialogHeader>Confirmation</AlertDialogHeader>
+            <AlertDialogBody>
+              Êtes-vous sûr de vouloir brûler le token #{selectedToken} ? Cette action est irréversible.
+            </AlertDialogBody>
+            <AlertDialogFooter>
+              <Button ref={cancelRef} onClick={onBurnClose}>
+                Annuler
+              </Button>
+              <Button colorScheme="red" onClick={confirmBurn} ml={3}>
+                Brûler
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
     </Box>
   );
 }

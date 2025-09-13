@@ -19,7 +19,10 @@ import { Box, Text, Heading, VStack, Spinner, Button, List, ListItem, Table, The
   Input,
   useDisclosure,
   useToast,
-  Stack
+  Stack,
+  HStack,
+  Wrap,
+  WrapItem,
  } from '@chakra-ui/react';
 import PoetryGallery from "./PoesieGalerieProps";
 import TextCard from "../galerie/TextCard";
@@ -582,22 +585,6 @@ const isUserOwner =
    </Text>
 
 
-{address && (
-  <UserEditionsManager
-    mintContractAddress={String(contractAddress)} // contrat de mint (HaikuEditions)
-    userAddress={address}
-    onListForSale={handleListForSale} // ta fonction existante
-    onRemoveFromSale={handleRemoveFromSale}
-    onBurn={handleBurn}
-    onBuy={handleBuy}
-    pageSize={20} // optionnel
-  />
-)}
-
-
-
-
-
    <Text>
      {isFeatured ? (
        <>
@@ -607,101 +594,130 @@ const isUserOwner =
    </Text>
          <Divider/>
 
-         <Text>
-           {poemData.remainingEditions ? (
-             <>
-             <VStack>
-               <strong>  Il reste des éditions : </strong>
-
-{/*
-               {poems.map((poem) => (
-                 <Box key={poem.tokenId}>
-                   <Button
-                     onClick={() => handleBuy(poem)} // Passer le poème entier
-                     colorScheme={Number(poem.availableEditions) === 0 ? 'gray' : 'teal'}
-                     size="sm"
-                     isDisabled={Number(poem.availableEditions) === 0}
-                   >
-                     {Number(poem.availableEditions) === 0 ? 'Épuisé' : 'Acheter'}
-                   </Button>
+         <Accordion allowToggle>
+           <AccordionItem border="1px solid" borderColor="black.200" borderRadius="md" mb={4}>
+             <h2>
+               <AccordionButton _expanded={{ bg: "black.50" }} py={4}>
+                 <Box flex="1" textAlign="center" fontWeight="bold" fontSize="lg">
+                   {/* ✅ Message principal en haut */}
+                   <Text>
+                     {poemData.remainingEditions ? (
+                       <strong>Il reste {poemData.remainingEditions} éditions disponibles</strong>
+                     ) : (
+                       <strong>Malheureusement, plus aucune édition n’est à vendre</strong>
+                     )}
+                   </Text>
                  </Box>
-               ))}
-*/}
+                 <AccordionIcon />
+               </AccordionButton>
+             </h2>
 
-
+             <AccordionPanel pb={6}>
+               {/* ✅ Infos générales avec un VStack bien espacé */}
+               <VStack align="start" spacing={3} mb={6}>
+                 <Text fontWeight="semibold">📜 Contrat : {poemData.contrat}</Text>
+                 <Text fontWeight="semibold">
+                   🗓 Mint Date :{" "}
+                   {new Date(Number(poemData.mintDate) * 1000).toLocaleDateString()}
+                 </Text>
+                 <Text fontWeight="semibold">
+                   🔢 Total des éditions créées : {poemData.totalEditions}
+                 </Text>
+                 <Text fontWeight="semibold">
+                   🎯 Nombre d’éditions restantes : {poemData.remainingEditions}
+                 </Text>
                </VStack>
-             </>
-           ) :
-          <strong>  Malheureusement plus aucune edition n'est à vendre </strong>
-        }
-         </Text>
 
+               {/* ✅ Liste des propriétaires */}
+               {poemData.owners && poemData.owners.length > 0 && (
+                 <Box mb={8}>
+                   <Heading size="sm" mb={3}>
+                     👥 Propriétaires
+                   </Heading>
+                   <List spacing={2} pl={4}>
+                     {poemData.owners.map((owner, index) => (
+                       <ListItem key={index}>
+                         {owner.owner} — <strong>{owner.count}</strong> édition(s)
+                       </ListItem>
+                     ))}
+                   </List>
+                 </Box>
+               )}
 
-   <Accordion allowToggle>
-    <AccordionItem>
-      <h2>
-        <AccordionButton>
-          <Box flex="1" textAlign="center" fontWeight="bold">
-            Plus de données
-          </Box>
-          <AccordionIcon />
-        </AccordionButton>
-      </h2>
-      <AccordionPanel pb={4}>
+               {/* ✅ Historique des transactions */}
+               {formattedTransactions.length > 0 && (
+                 <Box mb={8}>
+                   <Heading size="sm" mb={3}>
+                     📊 Historique des Transactions
+                   </Heading>
+                   <Box overflowX="auto" borderWidth="1px" borderRadius="md">
+                     <Table variant="striped" size="sm" minW="600px">
+                       <Thead bg="black.100">
+                         <Tr>
+                           <Th>Ancien</Th>
+                           <Th>Nouveau</Th>
+                           <Th>Date</Th>
+                           <Th>Prix</Th>
+                         </Tr>
+                       </Thead>
+                       <Tbody>
+                         {formattedTransactions.map((tx, i) => (
+                           <Tr key={i}>
+                             <Td>{formatAddress(tx.oldOwner)}</Td>
+                             <Td>{formatAddress(tx.newOwner)}</Td>
+                             <Td>{tx.date}</Td>
+                             <Td>{tx.price} ETH</Td>
+                           </Tr>
+                         ))}
+                       </Tbody>
+                     </Table>
+                   </Box>
+                 </Box>
+               )}
 
-      <Text fontWeight="bold">Contrat : {poemData.contrat}</Text>
+               {/* ✅ Section achat */}
+               <Box>
+                 <Heading size="sm" mb={3}>
+                   💎 Achetez des éditions
+                 </Heading>
+                 <Wrap spacing={4}>
+                   {poems.map((poem) => (
+                     <WrapItem key={poem.tokenId}>
+                     <Button
+                       onClick={() => handleBuy(Number(poem.tokenId))}
+                       colorScheme={Number(poem.availableEditions) === 0 ? "black" : "teal"}
+                       size="md"
+                       variant="outline"
+                     >
 
-        <List spacing={3}>
-          {poemData.owners && poemData.owners.length > 0 ? (
-            poemData.owners.map((owner, index) => (
-              <ListItem key={index}>
-                {owner.owner} - {owner.count} éditions
-              </ListItem>
-            ))
-          ) : null}
-        </List>
-        <Text fontWeight="bold">Mint Date : {new Date(Number(poemData.mintDate) * 1000).toLocaleDateString()}</Text>
-        <Text fontWeight="bold">Total des Éditions crées : {poemData.totalEditions}</Text>
-        <Text fontWeight="bold">Nombre d'éditions restantes : {poemData.remainingEditions}</Text>
+                         {Number(poem.availableEditions) === 0
+                           ? `Épuisé`
+                           : `Token #${poem.tokenId} — ${poem.price} ETH`}
+                       </Button>
+                     </WrapItem>
+                   ))}
+                 </Wrap>
+               </Box>
+             </AccordionPanel>
+           </AccordionItem>
+         </Accordion>
 
-        <VStack spacing={4} marginTop={6}>
-
-        {poemData.owners && poemData.owners.length > 0 ? (
-          <Box overflowX="auto" w="full">
-
-          <Heading size="md">Historique des Transactions</Heading>
-            <Table variant="simple" size="sm" minW="600px">
-              <Thead>
-                <Tr>
-                  <Th>Ancien</Th>
-                  <Th>Nouveau</Th>
-                  <Th>Date</Th>
-                  <Th>Prix</Th>
-                </Tr>
-              </Thead>
-
-              <Tbody>
-                {formattedTransactions.map((tx, i) => (
-                  <Tr key={i}>
-                    <Td>{formatAddress(tx.oldOwner)}</Td>
-                    <Td>{formatAddress(tx.newOwner)}</Td>
-                    <Td>{tx.date}</Td>
-                    <Td>{tx.price} ETH</Td>
-                  </Tr>
-                ))}
-              </Tbody>
-            </Table>
-            </Box>
-
-        ) :null }
-
-        </VStack>
-
-        </AccordionPanel>
-      </AccordionItem>
-    </Accordion>
 
   {/*Fin du menu déroulant*/}
+
+  {/*Début de menu déroulant Editions de l'utilisateur*/}
+
+  {address && (
+    <UserEditionsManager
+      mintContractAddress={String(contractAddress)} // contrat de mint (HaikuEditions)
+      userAddress={address}
+      onListForSale={handleListForSale} // ta fonction existante
+      onRemoveFromSale={handleRemoveFromSale}
+      onBurn={handleBurn}
+      onBuy={handleBuy}
+      pageSize={20} // optionnel
+    />
+  )}
 
         <Divider/>
 {/*
@@ -721,6 +737,7 @@ const isUserOwner =
 {/* ICI ON utilise le hooks créer useUserCollection */}
         <Divider mt={8} />
 
+{/*
 <Heading size="md" mt={6}>
   Collections du poète
 </Heading>
@@ -754,14 +771,14 @@ const isUserOwner =
 
 <Divider mt={8} />
 
+*/}
 <Divider mt={8} />
 
 
-<Box mt={5} w="full">
-  <Stack direction={{ base: "column", md: "row" }} spacing={2}>
+<Box mt={5} w="100%" overflow="hidden">
   {address && <FilteredCollectionsCarousel creator={address} />}
-  </Stack>
 </Box>
+
 
 
       </Box>

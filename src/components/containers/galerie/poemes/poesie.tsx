@@ -12,7 +12,8 @@ import {
   TabPanel,
   Divider,
   useMediaQuery,
-  Button
+  Button,
+  Input
 } from "@chakra-ui/react";
 import { JsonRpcProvider, Contract, BigNumberish } from "ethers";
 import { useRouter } from "next/router";
@@ -20,6 +21,8 @@ import ABIRESCOLLECTION from "../../../ABI/ABI_Collections.json";
 import ABI from "../../../ABI/HaikuEditions.json";
 
 import { useAuth } from '../../../../utils/authContext';
+import { useCollectionSearch } from '../../../../hooks/useCollectionSearch';
+
 import TextCard from "../TextCard";
 
 interface Collection {
@@ -62,6 +65,18 @@ const PoetryGallery: React.FC = () => {
 
   const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
   const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
+
+{/* Pn passe les information au composant */}
+  const {
+  searchTerm,
+  setSearchTerm,
+  searchResults,
+  showSearchResults,
+  handleSearch,
+  handleSearchSubmit,
+} = useCollectionSearch(collections);
+
+
 
   const fetchPoetryCollections = async (page: number) => {
   setIsLoading(true);
@@ -281,7 +296,51 @@ const handleBurn = async (nft: Poem, tokenId: number) => {
   return (
     <Box p={6}>
       <Heading mb={4}>Galerie de Poésie</Heading>
+
+      <form onSubmit={handleSearchSubmit}>
+  <Input
+    placeholder="Rechercher une collection..."
+    value={searchTerm}
+    onChange={(e) => setSearchTerm(e.target.value)}
+    mb={4}
+  />
+</form>
+
       {isLoading && <Spinner />}
+
+      {showSearchResults && (
+  <Box mt={4}>
+    {searchResults.length > 0 ? (
+      <Grid templateColumns={{ base: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }} gap={6}>
+        {searchResults.map((collection) => (
+          <Box
+            key={collection.id}
+            borderWidth="1px"
+            borderRadius="lg"
+            p={4}
+            cursor="pointer"
+            onClick={() => handleCollectionClick(collection.id, collection.mintContractAddress)}
+          >
+            {collection.imageUrl && (
+              <Box width="100%" height="150px" overflow="hidden" borderRadius="md">
+                <img
+                  src={collection.imageUrl}
+                  alt={collection.name}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              </Box>
+            )}
+            <Text fontWeight="bold">{collection.name}</Text>
+          </Box>
+        ))}
+      </Grid>
+    ) : (
+      <Text>Aucune collection trouvée.</Text>
+    )}
+  </Box>
+)}
+
+
 
       <Tabs index={currentTabIndex} onChange={(index) => {
         setCurrentTabIndex(index);
@@ -290,15 +349,111 @@ const handleBurn = async (nft: Poem, tokenId: number) => {
           setSelectedCollectionId(null);
         }
       }}>
-        <TabList>
-          <Tab>Collections</Tab>
-          {poems.length > 0 && <Tab>Poèmes</Tab>}
-        </TabList>
+      <TabList>
+        <Tab>Collections</Tab>
+        {poems.length > 0 && <Tab>Poèmes</Tab>}
+        {showSearchResults && <Tab>Résultats</Tab>} {/* Nouvel onglet pour la recherche */}
+      </TabList>
 
-        <TabPanels>
-          <TabPanel>
+      <TabPanels>
+        <TabPanel>
+          {/* Collections normales */}
+          <Grid templateColumns={{ base: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }} gap={6}>
+            {collections.map((collection) => (
+              <Box
+                key={collection.id}
+                borderWidth="1px"
+                borderRadius="lg"
+                p={4}
+                cursor="pointer"
+                onClick={() => handleCollectionClick(collection.id, collection.mintContractAddress)}
+              >
+                {collection.imageUrl && (
+                  <Box width="100%" height="150px" overflow="hidden" borderRadius="md">
+                    <img
+                      src={collection.imageUrl}
+                      alt={collection.name}
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                  </Box>
+                )}
+                <Text>{collection.name}</Text>
+              </Box>
+            ))}
+          </Grid>
+
+          {/* Pagination */}
+          <Box mt={4} display="flex" justifyContent="center" gap={4}>
+            <Button
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 0))}
+              isDisabled={currentPage === 0}
+            >
+              Précédent
+            </Button>
+
+            <Text>
+              Page {currentPage + 1} / {Math.ceil(totalCollections / pageSize)}
+            </Text>
+
+            <Button
+              onClick={() =>
+                setCurrentPage((prev) =>
+                  prev + 1 < Math.ceil(totalCollections / pageSize) ? prev + 1 : prev
+                )
+              }
+              isDisabled={currentPage + 1 >= Math.ceil(totalCollections / pageSize)}
+            >
+              Suivant
+            </Button>
+          </Box>
+        </TabPanel>
+
+        <TabPanel>
+          {/* Poèmes */}
+          {isLoading && <Spinner />}
+          {poems.length > 0 ? (
+            <>
+              {/* Bloc infos du premier poème */}
+              <Box p={4} border="1px solid #ccc" borderRadius="10px" mb={4}>
+                {isOwner && (
+                  <Text color="orange.300" fontSize="sm" mb={2}>
+                    Vous êtes le créateur de ce recueil
+                  </Text>
+                )}
+
+                <Box>
+                  <Text fontSize="1rem" color="#aaa" mb={1}>
+                    <strong>Créateur :</strong> {poems[0].creatorAddress}
+                  </Text>
+                  <Text fontSize="1rem" color="#aaa" mb={1}>
+                    <strong>Contrat de Mint :</strong> {poems[0].mintContractAddress}
+                  </Text>
+                </Box>
+              </Box>
+
+              <Divider mb={3} />
+
+              <Grid templateColumns={{ base: 'repeat(1, 1fr)', md: 'repeat(2, 1fr)' }} gap={6}>
+                {poems.map((poem) => (
+                  <TextCard
+                    key={poem.tokenId}
+                    nft={poem}
+                    showBuyButton={true}
+                    onBuy={(tokenId) => handleBuy(poem, Number(tokenId))}
+                  />
+                ))}
+              </Grid>
+            </>
+          ) : (
+            <Text>Aucun poème disponible pour cette collection.</Text>
+          )}
+        </TabPanel>
+
+        <TabPanel>
+          {/* Résultats de recherche */}
+          {searchResults.length > 0 ? (
             <Grid templateColumns={{ base: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }} gap={6}>
-              {collections.map((collection) => (
+              {searchResults.map((collection) => (
                 <Box
                   key={collection.id}
                   borderWidth="1px"
@@ -316,83 +471,16 @@ const handleBurn = async (nft: Poem, tokenId: number) => {
                       />
                     </Box>
                   )}
-                  <Text>{collection.name}</Text>
+                  <Text fontWeight="bold">{collection.name}</Text>
                 </Box>
               ))}
             </Grid>
+          ) : (
+            <Text>Aucune collection trouvée.</Text>
+          )}
+        </TabPanel>
+      </TabPanels>
 
-            <Box mt={4} display="flex" justifyContent="center" gap={4}>
-              <Button
-                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 0))}
-                isDisabled={currentPage === 0}
-              >
-                Précédent
-              </Button>
-
-              <Text>
-                Page {currentPage + 1} / {Math.ceil(totalCollections / pageSize)}
-              </Text>
-
-              <Button
-                onClick={() =>
-                  setCurrentPage((prev) =>
-                    prev + 1 < Math.ceil(totalCollections / pageSize) ? prev + 1 : prev
-                  )
-                }
-                isDisabled={currentPage + 1 >= Math.ceil(totalCollections / pageSize)}
-              >
-                Suivant
-              </Button>
-            </Box>
-
-
-          </TabPanel>
-
-          <TabPanel>
-            {isLoading && <Spinner />}
-
-            {poems.length > 0 ? (
-              <>
-                {/* Bloc Infos du premier poème */}
-                <Box p={4} border="1px solid #ccc" borderRadius="10px" mb={4}>
-                  {isOwner && (
-                    <Text color="orange.300" fontSize="sm" mb={2}>
-                      Vous êtes le créateur de ce recueil
-                    </Text>
-                  )}
-
-                  <Box>
-                    <Text fontSize="1rem" color="#aaa" mb={1}>
-                      <strong>Créateur :</strong> {poems[0].creatorAddress}
-                    </Text>
-                    <Text fontSize="1rem" color="#aaa" mb={1}>
-                      <strong>Contrat de Mint :</strong> {poems[0].mintContractAddress}
-                    </Text>
-                  </Box>
-                </Box>
-
-                <Divider mb={3} />
-
-                {/* Cartes d'achat pour tous les poèmes */}
-                <Grid templateColumns={{ base: 'repeat(1, 1fr)', md: 'repeat(2, 1fr)' }} gap={6}>
-                  {poems.map((poem) => (
-                    <TextCard
-                      key={poem.tokenId}
-                      nft={poem}
-                      showBuyButton={true}
-                      onBuy={(tokenId) => handleBuy(poem, Number(tokenId))}
-                    />
-                  ))}
-                </Grid>
-
-              </>
-            ) : (
-              <Text>Aucun poème disponible pour cette collection.</Text>
-            )}
-          </TabPanel>
-
-
-        </TabPanels>
       </Tabs>
     </Box>
   );

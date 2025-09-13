@@ -50,12 +50,15 @@ const NAV_LINKS: ISubNav[] = [
         href: '/mint/mintart',
         icon: FaPaintBrush,  // Icône livre pour l'association
       },
+      /*
       {
         label: 'Art génératif',
         subLabel: 'Mintez du code !',
         href: '/mint/art-generatif',
         icon: FaCode,  // Icône flèches pour les NFT
       },
+    */
+
       {
         label: 'Poesie',
         subLabel: 'Mintez vos poèmes',
@@ -73,20 +76,22 @@ const NAV_LINKS: ISubNav[] = [
     children: [
       {
         label: 'Digital Art',
-        subLabel: 'Unique art collection',
+        subLabel: 'Collection digitale',
         href: '/galerie/art',
         icon: FaImage ,  // Icône pinceau pour les collections
       },
+      /*
       {
         label: 'Generative Art',
         subLabel: 'Generative art collection',
         href: '/galerie/generative',
         icon: FaSketch,  // Icône pinceau pour les collections
       },
+      */
       {
         label: 'Poemes',
-        subLabel: 'Recueils de poésie',
-        href: '/galerie/recueil',
+        subLabel: 'Recueil de poèmes',
+        href: '/galerie/poesie',
         icon: FaBookOpen,  // Icône flèches pour les NFT
       },
     ],

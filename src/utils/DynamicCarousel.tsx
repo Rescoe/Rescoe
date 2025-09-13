@@ -44,7 +44,6 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
   const [hoveredItem, setHoveredItem] = useState<AlternatingItem | null>(null);
   const [isMobile] = useMediaQuery("(max-width: 768px)");
   const router = useRouter();
-  const [ensName, setEnsName] = useState<string>('');
   const [ensMap, setEnsMap] = useState<Record<string, string>>({});
 
 

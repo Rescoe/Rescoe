@@ -3,7 +3,7 @@ import { Recueil } from 'components/containers/galerie/poemes';
 
 const Poemes = () => {
   return (
-    <Default pageName="Generative Art Collection">
+    <Default pageName="Recueil de poèmes">
       <Recueil />
     </Default>
   );

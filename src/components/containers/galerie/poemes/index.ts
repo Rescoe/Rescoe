@@ -1,1 +1,1 @@
-export { default as Recueil } from './recueil';
+export { default as Recueil } from './poesie';
