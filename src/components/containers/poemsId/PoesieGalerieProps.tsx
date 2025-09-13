@@ -2,8 +2,8 @@ import React, { useState, useEffect } from "react";
 import { Box, Spinner } from "@chakra-ui/react";
 import { JsonRpcProvider, Contract, BigNumberish } from "ethers";
 import { useAuth } from "../../../utils/authContext";
-import TextCard from "../galerie/TextCard"; // adapte le chemin si besoin
-import ABI from '../../../components/ABI/HaikuEditions.json'; // Votre ABI pour les poèmes
+import TextCard from "../galerie/TextCard";
+import ABI from '../../../components/ABI/HaikuEditions.json';
 
 interface PoetryGalleryProps {
   collectionAddress: string;
@@ -40,6 +40,7 @@ const PoetryGallery: React.FC<PoetryGalleryProps> = ({ collectionAddress }) => {
             const [firstTokenId, nombreHaikusParSerie] = await contract.getHaikuInfoUnique(uniqueHaikuId);
             const availableEditions = await contract.getRemainingEditions(uniqueHaikuId);
             const tokenDetails = await contract.getTokenFullDetails(firstTokenId);
+
             return {
               tokenId: firstTokenId.toString(),
               poemText: tokenDetails.haiku_,
@@ -50,7 +51,7 @@ const PoetryGallery: React.FC<PoetryGalleryProps> = ({ collectionAddress }) => {
               totalMinted: (Number(nombreHaikusParSerie) - Number(availableEditions)).toString(),
               availableEditions: availableEditions.toString(),
               isForSale: tokenDetails.forSale,
-              tokenIdsForSale: [], // Optionnel : récupère avec fetchTokenIdsForSale si besoin
+              tokenIdsForSale: [], // Ce champ peut être rempli selon votre logique
             };
           })
         );
@@ -65,6 +66,23 @@ const PoetryGallery: React.FC<PoetryGalleryProps> = ({ collectionAddress }) => {
     loadPoems();
   }, [collectionAddress]);
 
+  // Fonction d'achat
+  const handleBuy = async (tokenId: string) => {
+    if (!web3 || !address) {
+      console.log("Utilisateur non connecté");
+      return;
+    }
+    try {
+      const tx = await contract.buyToken(tokenId, { from: address });
+      await tx.wait();
+      console.log("Token acheté avec succès !", tokenId);
+      // Optionnel: Recharger les poèmes ou mettre à jour l'état
+    } catch (error) {
+      console.error("Erreur lors de l'achat du token:", error);
+    }
+  };
+
+
   return (
     <Box>
       {isLoading ? (
@@ -73,14 +91,13 @@ const PoetryGallery: React.FC<PoetryGalleryProps> = ({ collectionAddress }) => {
         poems.map((poem) => (
           <TextCard
             key={poem.tokenId}
-            nft={poem}        // <-- ici on met "nft" au lieu de "poem"
-            showBuyButton={true} // optionnel si tu veux afficher le bouton achat
-            onBuy={(tokenId) => console.log("Acheter token", tokenId)} // fonction à adapter
+            nft={poem}
+            showBuyButton={poem.isForSale} // Affiche le bouton si le poème est en vente
+            onBuy={handleBuy} // Passer la nouvelle fonction handleBuy
           />
         ))
       )}
     </Box>
-
   );
 };
 

@@ -36,6 +36,8 @@ import {
 } from "@chakra-ui/react";
 import { JsonRpcProvider, Contract } from "ethers";
 import ABI from "../components/ABI/HaikuEditions.json";
+import CopyableAddress from "./useCopyableAddress"; // Assurez-vous que le chemin est correct
+
 
 type Edition = {
   tokenId: number;
@@ -325,7 +327,7 @@ export default function UserEditionsManager({
   return (
     <Box w="full" p={4} borderWidth="1px" borderRadius="md">
       <Heading size="sm" mb={3}>
-Vos poèmes dans cette colection :
+        Vos poèmes dans cette collection :
       </Heading>
 
       {error && <Text color="red.500">{error}</Text>}
@@ -342,7 +344,10 @@ Vos poèmes dans cette colection :
                     <Text fontWeight="bold">Haiku #{group.haikuUniqueId}</Text>
                     {group.author && (
                       <Text fontSize="sm">
-                        Auteur: {ensMap[group.author.toLowerCase()] || formatAddress(group.author)}
+                        Auteur:
+                        <CopyableAddress
+                          address={group.author}
+                        />
                       </Text>
                     )}
 
@@ -354,9 +359,7 @@ Vos poèmes dans cette colection :
                       </Text>
                     )}
 
-
                     <Divider mt={2} />
-
 
                     <Text fontSize="xs" color="gray.500">
                       {group.editions.length} édition(s) possédée(s)
@@ -371,31 +374,48 @@ Vos poèmes dans cette colection :
                     <ListItem key={ed.tokenId}>
                       <HStack spacing={3} align="center">
                         <Text>Edition #{ed.tokenId}</Text>
+                        <VStack>
+
                         <Button
-                          size="xs"
+                          size="xxs"
                           onClick={() => handleBuyLocal(ed.tokenId)}
                           isDisabled={!ed.isForSale}
                         >
                           Acheter
                         </Button>
-                        <Button size="xs" onClick={() => openListModal(ed.tokenId)}>
+
+                        <Button size="xxs" onClick={() => openListModal(ed.tokenId)}>
                           Mettre en vente
                         </Button>
-                        <Button size="xs" onClick={() => handleRemove(ed.tokenId)}>
+                        </VStack>
+
+
+                        <VStack>
+
+                        <Button size="xxs" onClick={() => handleRemove(ed.tokenId)}>
                           Retirer
                         </Button>
-                        <Button size="xs" colorScheme="red" onClick={() => openBurnDialog(ed.tokenId)}>
+                        <Button size="xxs" colorScheme="red" onClick={() => openBurnDialog(ed.tokenId)}>
                           Brûler
                         </Button>
+                        </VStack>
 
-                        <Text fontSize="xs" ml={6}>
-                          Owner: {ensMap[ed.owner.toLowerCase()] || formatAddress(ed.owner)}{" "}
-                          {ed.price ? `• Prix : ${ed.price} wei` : null}
-                        </Text>
 
                       </HStack>
+                      <VStack>
+
+                      <Text fontSize="xs" ml={6}>
+                        Owner:
+                        <CopyableAddress
+                          address={ed.owner}
+                        />{" "}
+                        {ed.price ? `• Prix : ${ed.price} wei` : null}
+                      </Text>
+                      </VStack>
 
                       <Divider mt={2} />
+
+
                     </ListItem>
                   ))}
                 </List>

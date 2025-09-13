@@ -34,6 +34,8 @@ import { FramedText } from '../../../utils/Cadre';
 import { useUserCollections } from "../../../hooks/useUserCollections";
 import {FilteredCollectionsCarousel} from '../galerie/art';
 import UserEditionsManager from '../../../hooks/userEditionsManager';
+import CopyableAddress from "../../../hooks/useCopyableAddress"; // Assurez-vous que le chemin est correct
+
 
 
 
@@ -464,8 +466,12 @@ const handleBurn = async (tokenId: number) => {
 
   const tokenIdNumber = tokenId ? parseInt(tokenId as string, 10) : undefined;
 
-  const formatAddress = (addr: string) =>
-    addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : "N/A";
+
+    // Fonction pour raccourcir l'adresse Ethereum
+  const formatAddress = (address: string) => {
+    if (!address) return '';
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  };
 
 //Owners est la liste des ^roprietaires de l'oeurve, on regarde qui est dans la liste
 const isUserOwner =
@@ -518,7 +524,14 @@ const isUserOwner =
 
    <Divider/>
 
-   <Text fontSize="lg">Auteur : {poemData.author}</Text>
+   <Text fontSize="lg">
+     Auteur : {' '}
+     <CopyableAddress
+       address={poemData.author}
+       size="md" // vous pouvez également contrôler la taille ici si nécessaire
+     />
+   </Text>
+
 
    <Text fontWeight="bold">Prix : {poemData.price} ETH</Text>
 
@@ -615,7 +628,16 @@ const isUserOwner =
              <AccordionPanel pb={6}>
                {/* ✅ Infos générales avec un VStack bien espacé */}
                <VStack align="start" spacing={3} mb={6}>
-                 <Text fontWeight="semibold">📜 Contrat : {poemData.contrat}</Text>
+
+                 <Text fontWeight="semibold">
+                 📜 Contrat : {' '}
+                 <CopyableAddress
+                   address={poemData.contrat}
+                   size="md" // vous pouvez également contrôler la taille ici si nécessaire
+                 />
+                 </Text>
+
+
                  <Text fontWeight="semibold">
                    🗓 Mint Date :{" "}
                    {new Date(Number(poemData.mintDate) * 1000).toLocaleDateString()}
@@ -631,16 +653,19 @@ const isUserOwner =
                {/* ✅ Liste des propriétaires */}
                {poemData.owners && poemData.owners.length > 0 && (
                  <Box mb={8}>
-                   <Heading size="sm" mb={3}>
-                     👥 Propriétaires
-                   </Heading>
-                   <List spacing={2} pl={4}>
-                     {poemData.owners.map((owner, index) => (
-                       <ListItem key={index}>
-                         {owner.owner} — <strong>{owner.count}</strong> édition(s)
-                       </ListItem>
-                     ))}
-                   </List>
+                 <Heading size="sm" mb={3}>
+                   👥 Propriétaires
+                  </Heading>
+                  <List spacing={2} pl={4}>
+                   {poemData.owners.map((owner, index) => (
+                     <ListItem key={index}>
+                       <CopyableAddress
+                         address={owner.owner} // Utilisez CopyableAddress pour afficher l'adresse
+                         size="md" // ajustez la taille si nécessaire
+                       /> — <strong>{owner.count}</strong> édition(s)
+                     </ListItem>
+                   ))}
+                  </List>
                  </Box>
                )}
 

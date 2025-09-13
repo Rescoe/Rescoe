@@ -375,17 +375,19 @@ const formatAddress = (address: string) => {
               <Text fontSize="xl">{biographies[0]}</Text>
               <Divider my={6} borderColor="gray.200" w="80%" mx="auto" />
               <Text fontWeight="bold">Adresse Ethereum:</Text>
-              <Text>{formatAddress(address)}</Text> {/* Affichage de l'adresse raccourcie */}
-              <Button
-                onClick={() => {
-                  navigator.clipboard.writeText(address); // Copier l'adresse dans le presse-papiers
-                  alert("Adresse Ethereum copiée !");
-                }}
-                size="sm"
-                mt={2}
-              >
-                Copier
-              </Button>
+              <Text
+                  cursor="pointer"
+                  color="blue.500"
+                  onClick={() => {
+                    if (address) {
+                      navigator.clipboard.writeText(address); // copie l'adresse complète
+                      alert("Adresse Ethereum copiée !");
+                    }
+                  }}
+                >
+                  {formatAddress(address)} {/* Affichage raccourci */}
+                </Text>
+
               {ensName && (
                 <Text fontWeight="bold" mt={2}>ENS: {ensName}</Text>
               )}
