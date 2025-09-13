@@ -37,6 +37,8 @@ import {
 import { JsonRpcProvider, Contract } from "ethers";
 import ABI from "../components/ABI/HaikuEditions.json";
 import CopyableAddress from "./useCopyableAddress"; // Assurez-vous que le chemin est correct
+import { ethers } from "ethers";
+
 
 
 type Edition = {
@@ -153,7 +155,7 @@ export default function UserEditionsManager({
                       owner: ownerAddress,
                       author: authorAddress, // adresse — ENS resolved later
                       text: details[6] ?? undefined,
-                      price: String(details.currentPrice ? formatIfBN(details.currentPrice) : ""),
+                      price: details.currentPrice ? ethers.formatEther(details.currentPrice) : "", // ETH directement
                       mintDate: details.mintDate ?? undefined,
                       isForSale: Boolean(details[3]),
                     };
@@ -325,7 +327,7 @@ export default function UserEditionsManager({
   }, [] as GroupedEdition[]);
 
   return (
-    <Box w="full" p={4} borderWidth="1px" borderRadius="md">
+    <Box w="full" p={4} borderWidth="1px" borderRadius="md" overflowX="hidden">
       <Heading size="sm" mb={3}>
         Vos poèmes dans cette collection :
       </Heading>
@@ -335,7 +337,7 @@ export default function UserEditionsManager({
       {grouped.length === 0 ? (
         <Text>Aucune édition possédée trouvée.</Text>
       ) : (
-        <Accordion allowMultiple>
+        <Accordion allowMultiple w="100%">
           {grouped.map((group) => (
             <AccordionItem key={group.haikuUniqueId}>
               <h2>
@@ -344,10 +346,7 @@ export default function UserEditionsManager({
                     <Text fontWeight="bold">Haiku #{group.haikuUniqueId}</Text>
                     {group.author && (
                       <Text fontSize="sm">
-                        Auteur:
-                        <CopyableAddress
-                          address={group.author}
-                        />
+                        Auteur: <CopyableAddress address={group.author} />
                       </Text>
                     )}
 
@@ -368,54 +367,53 @@ export default function UserEditionsManager({
                   <AccordionIcon />
                 </AccordionButton>
               </h2>
-              <AccordionPanel>
+
+              <AccordionPanel w="100%">
                 <List spacing={2}>
                   {group.editions.map((ed) => (
                     <ListItem key={ed.tokenId}>
-                      <HStack spacing={3} align="center">
-                        <Text>Edition #{ed.tokenId}</Text>
-                        <VStack>
-
-                        <Button
-                          size="xxs"
-                          onClick={() => handleBuyLocal(ed.tokenId)}
-                          isDisabled={!ed.isForSale}
+                      {/* ✅ conteneur scrollable si trop large */}
+                      <Box w="100%" overflowX="auto">
+                        <HStack
+                          spacing={3}
+                          align="center"
+                          w="max-content" // permet le scroll horizontal
+                          minW="100%" // occupe au moins la largeur de l’écran
+                          flexWrap={{ base: "wrap", md: "nowrap" }} // wrap sur mobile
                         >
-                          Acheter
-                        </Button>
+                          <Text>Edition #{ed.tokenId}</Text>
 
-                        <Button size="xxs" onClick={() => openListModal(ed.tokenId)}>
-                          Mettre en vente
-                        </Button>
-                        </VStack>
+                          <VStack spacing={1}>
+                            <Button
+                              size="xs"
+                              onClick={() => handleBuyLocal(ed.tokenId)}
+                              isDisabled={!ed.isForSale}
+                            >
+                              Acheter
+                            </Button>
+                            <Button size="xs" onClick={() => openListModal(ed.tokenId)}>
+                              Mettre en vente
+                            </Button>
 
+                            <Button size="xs" onClick={() => handleRemove(ed.tokenId)}>
+                              Retirer de la vente
+                            </Button>
+                            <Button
+                              size="xs"
+                              colorScheme="red"
+                              onClick={() => openBurnDialog(ed.tokenId)}
+                            >
+                              Brûler
+                            </Button>
+                          </VStack>
+                        </HStack>
+                      </Box>
 
-                        <VStack>
-
-                        <Button size="xxs" onClick={() => handleRemove(ed.tokenId)}>
-                          Retirer
-                        </Button>
-                        <Button size="xxs" colorScheme="red" onClick={() => openBurnDialog(ed.tokenId)}>
-                          Brûler
-                        </Button>
-                        </VStack>
-
-
-                      </HStack>
-                      <VStack>
-
-                      <Text fontSize="xs" ml={6}>
-                        Owner:
-                        <CopyableAddress
-                          address={ed.owner}
-                        />{" "}
-                        {ed.price ? `• Prix : ${ed.price} wei` : null}
+                        <Text>
+                        {ed.price ? `• Prix : ${ed.price} ETH` : null}
                       </Text>
-                      </VStack>
 
                       <Divider mt={2} />
-
-
                     </ListItem>
                   ))}
                 </List>
@@ -470,4 +468,6 @@ export default function UserEditionsManager({
       </AlertDialog>
     </Box>
   );
+
+
 }

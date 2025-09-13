@@ -499,8 +499,11 @@ const isUserOwner =
         textAlign="center"
         padding={10}
         margin="20px auto"
-        gap={6} // espace vertical constant
+        gap={6}
+        maxW="100%"          // 🔹 limite la largeur à 100% de l’écran
+        overflowX="hidden"   // 🔹 coupe tout ce qui dépasse horizontalement
       >
+
         <Heading>{poemData.title}</Heading>
 
         <FramedText>
@@ -554,7 +557,7 @@ const isUserOwner =
          {tokenIdNumber !== undefined ? (
            <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
              {/* Bouton Mettre en vente */}
-             <Button onClick={onOpen}>Mettre en vente</Button>
+             <Button size="sm" onClick={onOpen}>Mettre en vente</Button>
 
              {/* Modal pour saisir le prix */}
              <Modal isOpen={isOpen} onClose={onClose}>
@@ -570,7 +573,7 @@ const isUserOwner =
                    />
                  </ModalBody>
                  <ModalFooter>
-                   <Button colorScheme="blue" mr={3} onClick={onConfirmSale}>
+                   <Button  size="sm" colorScheme="blue" mr={3} onClick={onConfirmSale}>
                      Confirmer
                    </Button>
                    <Button onClick={onClose}>Annuler</Button>
@@ -579,12 +582,12 @@ const isUserOwner =
              </Modal>
 
              {/* Bouton retirer de la vente */}
-             <Button onClick={() => tokenIdNumber && handleRemoveFromSale(tokenIdNumber)}>
+             <Button size="sm" onClick={() => tokenIdNumber && handleRemoveFromSale(tokenIdNumber)}>
                Retirer de la vente
              </Button>
 
              {/* Bouton burn */}
-             <Button colorScheme="red" onClick={() => tokenIdNumber && handleBurn(tokenIdNumber)}>
+             <Button colorScheme="red" size="sm" onClick={() => tokenIdNumber && handleBurn(tokenIdNumber)}>
                Brûler
              </Button>
            </div>
@@ -607,128 +610,119 @@ const isUserOwner =
    </Text>
          <Divider/>
 
-         <Accordion allowToggle>
-           <AccordionItem border="1px solid" borderColor="black.200" borderRadius="md" mb={4}>
-             <h2>
-               <AccordionButton _expanded={{ bg: "black.50" }} py={4}>
-                 <Box flex="1" textAlign="center" fontWeight="bold" fontSize="lg">
-                   {/* ✅ Message principal en haut */}
-                   <Text>
-                     {poemData.remainingEditions ? (
-                       <strong>Il reste {poemData.remainingEditions} éditions disponibles</strong>
-                     ) : (
-                       <strong>Malheureusement, plus aucune édition n’est à vendre</strong>
-                     )}
-                   </Text>
-                 </Box>
-                 <AccordionIcon />
-               </AccordionButton>
-             </h2>
-
-             <AccordionPanel pb={6}>
-               {/* ✅ Infos générales avec un VStack bien espacé */}
-               <VStack align="start" spacing={3} mb={6}>
-
-                 <Text fontWeight="semibold">
-                 📜 Contrat : {' '}
-                 <CopyableAddress
-                   address={poemData.contrat}
-                   size="md" // vous pouvez également contrôler la taille ici si nécessaire
-                 />
-                 </Text>
-
-
-                 <Text fontWeight="semibold">
-                   🗓 Mint Date :{" "}
-                   {new Date(Number(poemData.mintDate) * 1000).toLocaleDateString()}
-                 </Text>
-                 <Text fontWeight="semibold">
-                   🔢 Total des éditions créées : {poemData.totalEditions}
-                 </Text>
-                 <Text fontWeight="semibold">
-                   🎯 Nombre d’éditions restantes : {poemData.remainingEditions}
-                 </Text>
-               </VStack>
-
-               {/* ✅ Liste des propriétaires */}
-               {poemData.owners && poemData.owners.length > 0 && (
-                 <Box mb={8}>
-                 <Heading size="sm" mb={3}>
-                   👥 Propriétaires
-                  </Heading>
-                  <List spacing={2} pl={4}>
-                   {poemData.owners.map((owner, index) => (
-                     <ListItem key={index}>
-                       <CopyableAddress
-                         address={owner.owner} // Utilisez CopyableAddress pour afficher l'adresse
-                         size="md" // ajustez la taille si nécessaire
-                       /> — <strong>{owner.count}</strong> édition(s)
-                     </ListItem>
-                   ))}
-                  </List>
-                 </Box>
+         <Accordion allowToggle w="100%">
+     <AccordionItem border="1px solid" borderColor="black.200" borderRadius="md" mb={4}>
+       <h2>
+         <AccordionButton _expanded={{ bg: "black.50" }} py={4}>
+           <Box flex="1" textAlign="center" fontWeight="bold" fontSize="lg">
+             <Text>
+               {poemData.remainingEditions ? (
+                 <strong>Il reste {poemData.remainingEditions} éditions disponibles</strong>
+               ) : (
+                 <strong>Malheureusement, plus aucune édition n’est à vendre</strong>
                )}
+             </Text>
+           </Box>
+           <AccordionIcon />
+         </AccordionButton>
+       </h2>
 
-               {/* ✅ Historique des transactions */}
-               {formattedTransactions.length > 0 && (
-                 <Box mb={8}>
-                   <Heading size="sm" mb={3}>
-                     📊 Historique des Transactions
-                   </Heading>
-                   <Box overflowX="auto" borderWidth="1px" borderRadius="md">
-                     <Table variant="striped" size="sm" minW="600px">
-                       <Thead bg="black.100">
-                         <Tr>
-                           <Th>Ancien</Th>
-                           <Th>Nouveau</Th>
-                           <Th>Date</Th>
-                           <Th>Prix</Th>
-                         </Tr>
-                       </Thead>
-                       <Tbody>
-                         {formattedTransactions.map((tx, i) => (
-                           <Tr key={i}>
-                             <Td>{formatAddress(tx.oldOwner)}</Td>
-                             <Td>{formatAddress(tx.newOwner)}</Td>
-                             <Td>{tx.date}</Td>
-                             <Td>{tx.price} ETH</Td>
-                           </Tr>
-                         ))}
-                       </Tbody>
-                     </Table>
-                   </Box>
-                 </Box>
-               )}
+       <AccordionPanel pb={6} w="100%" overflowX="hidden">
+         {/* ✅ Infos générales */}
+         <VStack align="start" spacing={3} mb={6} w="100%">
+           <Text fontWeight="semibold">
+             📜 Contrat :{" "}
+             <CopyableAddress address={poemData.contrat} size="md" />
+           </Text>
 
-               {/* ✅ Section achat */}
-               <Box>
-                 <Heading size="sm" mb={3}>
-                   💎 Achetez des éditions
-                 </Heading>
-                 <Wrap spacing={4}>
-                   {poems.map((poem) => (
-                     <WrapItem key={poem.tokenId}>
-                     <Button
-                       onClick={() => handleBuy(Number(poem.tokenId))}
-                       colorScheme={Number(poem.availableEditions) === 0 ? "black" : "teal"}
-                       size="md"
-                       variant="outline"
-                     >
+           <Text fontWeight="semibold">
+             🗓 Mint Date :{" "}
+             {new Date(Number(poemData.mintDate) * 1000).toLocaleDateString()}
+           </Text>
+           <Text fontWeight="semibold">
+             🔢 Total des éditions créées : {poemData.totalEditions}
+           </Text>
+           <Text fontWeight="semibold">
+             🎯 Nombre d’éditions restantes : {poemData.remainingEditions}
+           </Text>
+         </VStack>
 
-                         {Number(poem.availableEditions) === 0
-                           ? `Épuisé`
-                           : `Token #${poem.tokenId} — ${poem.price} ETH`}
-                       </Button>
-                     </WrapItem>
+         {/* ✅ Liste des propriétaires */}
+         {poemData.owners?.length > 0 && (
+           <Box mb={8} w="100%" overflowX="auto">
+             <Heading size="sm" mb={3}>
+               👥 Propriétaires
+             </Heading>
+             <List spacing={2} pl={4} minW="300px">
+               {poemData.owners.map((owner, index) => (
+                 <ListItem key={index}>
+                   <CopyableAddress address={owner.owner} size="md" /> —{" "}
+                   <strong>{owner.count}</strong> édition(s)
+                 </ListItem>
+               ))}
+             </List>
+           </Box>
+         )}
+
+         {/* ✅ Historique des transactions */}
+         {formattedTransactions.length > 0 && (
+           <Box mb={8} w="100%" overflowX="auto">
+             <Heading size="sm" mb={3}>
+               📊 Historique des Transactions
+             </Heading>
+             <Box overflowX="auto" borderWidth="1px" borderRadius="md">
+               <Table variant="striped" size="sm" minW="600px">
+                 <Thead bg="black.100">
+                   <Tr>
+                     <Th>Ancien</Th>
+                     <Th>Nouveau</Th>
+                     <Th>Date</Th>
+                     <Th>Prix</Th>
+                   </Tr>
+                 </Thead>
+                 <Tbody>
+                   {formattedTransactions.map((tx, i) => (
+                     <Tr key={i}>
+                       <Td>{formatAddress(tx.oldOwner)}</Td>
+                       <Td>{formatAddress(tx.newOwner)}</Td>
+                       <Td>{tx.date}</Td>
+                       <Td>{tx.price} ETH</Td>
+                     </Tr>
                    ))}
-                 </Wrap>
-               </Box>
-             </AccordionPanel>
-           </AccordionItem>
-         </Accordion>
+                 </Tbody>
+               </Table>
+             </Box>
+           </Box>
+         )}
 
+         {/* ✅ Section achat */}
+         <Box w="100%" overflowX="auto">
+           <Heading size="sm" mb={3}>
+             💎 Achetez des éditions
+           </Heading>
+           <Wrap spacing={4} justify="center">
+             {poems.map((poem) => (
+               <WrapItem key={poem.tokenId}>
+                 <Button
+                   onClick={() => handleBuy(Number(poem.tokenId))}
+                   colorScheme={
+                     Number(poem.availableEditions) === 0 ? "black" : "teal"
+                   }
+                   size="md"
+                   variant="outline"
+                 >
+                   {Number(poem.availableEditions) === 0
+                     ? `Épuisé`
+                     : `Token #${poem.tokenId} — ${poem.price} ETH`}
+                 </Button>
+               </WrapItem>
+             ))}
+           </Wrap>
+         </Box>
+       </AccordionPanel>
+     </AccordionItem>
+   </Accordion>
 
-  {/*Fin du menu déroulant*/}
 
   {/*Début de menu déroulant Editions de l'utilisateur*/}
 

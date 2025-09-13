@@ -392,7 +392,7 @@ const handleBurn = async (nft: Poem, tokenId: number) => {
             </Button>
 
             <Text>
-              Page {currentPage + 1} / {Math.ceil(totalCollections / pageSize)}
+              {currentPage + 1} / {Math.ceil(totalCollections / pageSize)}
             </Text>
 
             <Button
