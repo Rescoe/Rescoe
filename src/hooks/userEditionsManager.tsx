@@ -36,7 +36,9 @@ import {
 } from "@chakra-ui/react";
 import { JsonRpcProvider, Contract } from "ethers";
 import ABI from "../components/ABI/HaikuEditions.json";
-import CopyableAddress from "./useCopyableAddress"; // Assurez-vous que le chemin est correct
+import CopyableAddress from "./useCopyableAddress";
+import useEthToEur from "./useEuro";
+
 import { ethers } from "ethers";
 
 
@@ -48,6 +50,7 @@ type Edition = {
   author?: string;        // adresse (string) — on résout ENS séparément
   text?: string;
   price?: string;
+  priceEur?: string;   // EUR
   mintDate?: any;
   isForSale?: boolean;
 };
@@ -87,6 +90,10 @@ export default function UserEditionsManager({
   // state pour modals
   const [selectedToken, setSelectedToken] = useState<number | null>(null);
   const [priceInput, setPriceInput] = useState("");
+
+  const { convertEthToEur } = useEthToEur();
+
+
   const {
     isOpen: isListOpen,
     onOpen: onListOpen,
@@ -156,6 +163,9 @@ export default function UserEditionsManager({
                       author: authorAddress, // adresse — ENS resolved later
                       text: details[6] ?? undefined,
                       price: details.currentPrice ? ethers.formatEther(details.currentPrice) : "", // ETH directement
+                      priceEur: details.currentPrice
+  ? (convertEthToEur(Number(ethers.formatEther(details.currentPrice)))?.toFixed(2) ?? "")
+  : "",
                       mintDate: details.mintDate ?? undefined,
                       isForSale: Boolean(details[3]),
                     };
@@ -409,9 +419,11 @@ export default function UserEditionsManager({
                         </HStack>
                       </Box>
 
-                        <Text>
-                        {ed.price ? `• Prix : ${ed.price} ETH` : null}
-                      </Text>
+                      <Text>
+                        {ed.price
+                          ? `• Prix : ${ed.price} ETH ${ed.priceEur ? `(~${ed.priceEur} €)` : ""}`
+                          : null}
+                        </Text>
 
                       <Divider mt={2} />
                     </ListItem>

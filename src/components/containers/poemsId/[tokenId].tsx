@@ -34,7 +34,9 @@ import { FramedText } from '../../../utils/Cadre';
 import { useUserCollections } from "../../../hooks/useUserCollections";
 import {FilteredCollectionsCarousel} from '../galerie/art';
 import UserEditionsManager from '../../../hooks/userEditionsManager';
-import CopyableAddress from "../../../hooks/useCopyableAddress"; // Assurez-vous que le chemin est correct
+import CopyableAddress from "../../../hooks/useCopyableAddress";
+import useEthToEur from "../../../hooks/useEuro";
+
 
 
 
@@ -49,6 +51,7 @@ interface Poem {
   totalEditions: string;
   mintContractAddress: string;
   price: string;
+  priceEur?: string;  // <-- ajouté
   totalMinted: string;
   availableEditions: string;
   isForSale: boolean;
@@ -64,6 +67,7 @@ interface PoemData {
   author: string;
   forsale: boolean;
   price: string;
+  priceEur: string;   // prix en EUR
   collectionId: number;
   owners: { owner: string; count: number; }[];
   priceHistory: number[];
@@ -98,6 +102,9 @@ const PoemPage: React.FC = () => {
   const toast = useToast();
   const [price, setPrice] = useState('');
 
+  const { convertEthToEur, loading: loadingEthPrice, error: ethPriceError } = useEthToEur();
+
+
 
 
 
@@ -123,93 +130,99 @@ const PoemPage: React.FC = () => {
     if (!router.isReady || !contractAddress || !tokenId) return;
 
     const fetchPoemData = async () => {
-  try {
-    const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
-    const contract = new Contract(contractAddress, ABI, provider);
-    const contractCollection = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
+            try {
+              const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+              const contract = new Contract(contractAddress, ABI, provider);
+              const contractCollection = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
 
-    // On mappe le tokenId courant à son haiku unique
-    const haikuUniqueId = await contract.tokenIdToHaikuId(tokenId);
+              // On mappe le tokenId courant à son haiku unique
+              const haikuUniqueId = await contract.tokenIdToHaikuId(tokenId);
 
-    // Infos série
-    const premierToDernier = await contract.getHaikuInfoUnique(haikuUniqueId);
-    const premierIDDeLaSerie = Number(premierToDernier[0]);
-    const nombreHaikusParSerie = Number(premierToDernier[1]);
+              // Infos série
+              const premierToDernier = await contract.getHaikuInfoUnique(haikuUniqueId);
+              const premierIDDeLaSerie = Number(premierToDernier[0]);
+              const nombreHaikusParSerie = Number(premierToDernier[1]);
 
-    // ✅ Balayer tous les tokenIds de la série
-    const tokensDetails = await Promise.all(
-      Array.from({ length: nombreHaikusParSerie }, async (_, i) => {
-        const currentTokenId = premierIDDeLaSerie + i;
-        try {
-          const details = await contract.getTokenFullDetails(currentTokenId);
+              // ✅ Balayer tous les tokenIds de la série
+              const tokensDetails = await Promise.all(
+                Array.from({ length: nombreHaikusParSerie }, async (_, i) => {
+                  const currentTokenId = premierIDDeLaSerie + i;
+                  try {
+                    const details = await contract.getTokenFullDetails(currentTokenId);
+                    const priceEth = parseFloat(formatUnits(details.currentPrice, 18));
+                    const priceEur = convertEthToEur(priceEth);
 
-          return {
-            tokenId: currentTokenId,
-            owner: details.owner,
-            author: details[7]?.toString() ?? "",
-            text: details[6],
-            price: formatUnits(details.currentPrice, 18),
-            mintDate: details.mintDate,
-            isForSale: details[3],
+                    return {
+                      tokenId: currentTokenId,
+                      owner: details.owner,
+                      author: details[7]?.toString() ?? "",
+                      text: details[6],
+                      price: formatUnits(details.currentPrice, 18),
+                      priceEur: priceEur ? priceEur.toFixed(2) : "0", // €
+                      mintDate: details.mintDate,
+                      isForSale: details[3],
+                    };
+                  } catch (err) {
+                    console.warn(`Impossible de récupérer le token ${currentTokenId}`, err);
+                    return null;
+                  }
+                })
+              );
+
+              const validTokens = tokensDetails.filter(Boolean);
+
+              // Récupération d’un seul haikuData (les infos sont partagées par la série)
+              const haikuData = await contract.haikus(haikuUniqueId);
+
+              const availableEditions = await contract.getRemainingEditions(haikuUniqueId);
+              const totalMinted = nombreHaikusParSerie - Number(availableEditions);
+              const editionsRestantes = Number(haikuData[2] - haikuData[4]).toString();
+
+              // Historique (tu peux décider si c’est par tokenId unique ou global à la série)
+              const txHistory = await contract.getTransactionHistory(Number(tokenId));
+              const formattedTxHistory = (txHistory || []).map((tx: any) => ({
+                from: tx[0],
+                to: tx[1],
+                price: formatUnits(tx[2] ?? BigInt(0), 18),
+                date: new Date(Number(tx[3] ?? 0) * 1000).toLocaleString(),
+              }));
+
+              const owners = computeOwnersFromHistory(txHistory);
+
+              // Collection
+              const collection = await contract.collectionId();
+              const collectionDatas = await contractCollection.collections(collection);
+
+              const priceInEuro = convertEthToEur(validTokens[0]?.price) ?? 0;
+
+              setPoemData({
+                contrat: contractAddress,
+                owner: validTokens[0]?.owner || "",
+                mintDate: validTokens[0]?.mintDate || BigInt(0),
+                title: collectionDatas[1],
+                text: validTokens[0]?.text || "",
+                author: validTokens[0]?.author || "",
+                forsale: Number(availableEditions) > 0,
+                price: validTokens[0]?.price || "0",
+                priceEur: priceInEuro ? priceInEuro.toFixed(2) : "0",
+                collectionId: Number(collection),
+                owners,
+                priceHistory: (haikuData.priceHistory || []).map((p: bigint) =>
+                  parseFloat(formatUnits(p, 18))
+                ),
+                totalEditions: nombreHaikusParSerie,
+                remainingEditions: editionsRestantes,
+                transactionHistory: formattedTxHistory,
+              });
+
+              // ✅ Stocker toutes les éditions
+              setPoems(validTokens as any[]);
+            } catch (err: any) {
+              setErrorMessage(err.message || "Erreur lors de la récupération des poèmes");
+            } finally {
+              setIsLoading(false);
+            }
           };
-        } catch (err) {
-          console.warn(`Impossible de récupérer le token ${currentTokenId}`, err);
-          return null;
-        }
-      })
-    );
-
-    const validTokens = tokensDetails.filter(Boolean);
-
-    // Récupération d’un seul haikuData (les infos sont partagées par la série)
-    const haikuData = await contract.haikus(haikuUniqueId);
-
-    const availableEditions = await contract.getRemainingEditions(haikuUniqueId);
-    const totalMinted = nombreHaikusParSerie - Number(availableEditions);
-    const editionsRestantes = Number(haikuData[2] - haikuData[4]).toString();
-
-    // Historique (tu peux décider si c’est par tokenId unique ou global à la série)
-    const txHistory = await contract.getTransactionHistory(Number(tokenId));
-    const formattedTxHistory = (txHistory || []).map((tx: any) => ({
-      from: tx[0],
-      to: tx[1],
-      price: formatUnits(tx[2] ?? BigInt(0), 18),
-      date: new Date(Number(tx[3] ?? 0) * 1000).toLocaleString(),
-    }));
-
-    const owners = computeOwnersFromHistory(txHistory);
-
-    // Collection
-    const collection = await contract.collectionId();
-    const collectionDatas = await contractCollection.collections(collection);
-
-    setPoemData({
-      contrat: contractAddress,
-      owner: validTokens[0]?.owner || "",
-      mintDate: validTokens[0]?.mintDate || BigInt(0),
-      title: collectionDatas[1],
-      text: validTokens[0]?.text || "",
-      author: validTokens[0]?.author || "",
-      forsale: Number(availableEditions) > 0,
-      price: validTokens[0]?.price || "0",
-      collectionId: Number(collection),
-      owners,
-      priceHistory: (haikuData.priceHistory || []).map((p: bigint) =>
-        parseFloat(formatUnits(p, 18))
-      ),
-      totalEditions: nombreHaikusParSerie,
-      remainingEditions: editionsRestantes,
-      transactionHistory: formattedTxHistory,
-    });
-
-    // ✅ Stocker toutes les éditions
-    setPoems(validTokens as any[]);
-  } catch (err: any) {
-    setErrorMessage(err.message || "Erreur lors de la récupération des poèmes");
-  } finally {
-    setIsLoading(false);
-  }
-};
 
 
         fetchPoemData();
@@ -536,7 +549,11 @@ const isUserOwner =
    </Text>
 
 
-   <Text fontWeight="bold">Prix : {poemData.price} ETH</Text>
+
+   <Text fontWeight="bold">
+     Prix : {poemData.price} ETH
+     {poemData.priceEur !== "0" && ` (~${poemData.priceEur} €)`}
+   </Text>
 
    <Text>
      {/* Cas où le poème est en vente et qu'il reste des éditions */}
@@ -713,7 +730,7 @@ const isUserOwner =
                  >
                    {Number(poem.availableEditions) === 0
                      ? `Épuisé`
-                     : `Token #${poem.tokenId} — ${poem.price} ETH`}
+                     : `Token #${poem.tokenId} — ${poem.price} ETH (~${poem.priceEur} €)`}
                  </Button>
                </WrapItem>
              ))}
