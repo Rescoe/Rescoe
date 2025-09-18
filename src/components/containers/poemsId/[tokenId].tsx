@@ -51,7 +51,7 @@ interface Poem {
   totalEditions: string;
   mintContractAddress: string;
   price: string;
-  priceEur?: string;  // <-- ajouté
+  priceEur: string;
   totalMinted: string;
   availableEditions: string;
   isForSale: boolean;
@@ -127,7 +127,7 @@ const PoemPage: React.FC = () => {
     }, []);
 
   useEffect(() => {
-    if (!router.isReady || !contractAddress || !tokenId) return;
+    if (!router.isReady || !contractAddress || !tokenId || loadingEthPrice) return;
 
     const fetchPoemData = async () => {
             try {
@@ -150,7 +150,9 @@ const PoemPage: React.FC = () => {
                   try {
                     const details = await contract.getTokenFullDetails(currentTokenId);
                     const priceEth = parseFloat(formatUnits(details.currentPrice, 18));
-                    const priceEur = convertEthToEur(priceEth);
+                    const priceEur = await convertEthToEur(priceEth);
+
+
 
                     return {
                       tokenId: currentTokenId,
@@ -227,7 +229,7 @@ const PoemPage: React.FC = () => {
 
         fetchPoemData();
 
-      }, [router.isReady, contractAddress, tokenId, address]);
+      }, [router.isReady, contractAddress, tokenId, address, loadingEthPrice]);
 
       // Utilisation du hooks de récupération des collections d'artistes
       const { collections: poetryCollections, isLoading: isLoadingCollections } =

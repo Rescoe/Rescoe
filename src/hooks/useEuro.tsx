@@ -33,7 +33,8 @@ const useEthToEur = () => {
     if (ethPrice !== null && amountInEth !== undefined && amountInEth !== null) {
       const value = Number(amountInEth);
       if (!isNaN(value)) {
-        return value * ethPrice;
+        return Number((value * ethPrice).toFixed(2));
+
       }
     }
     return null;

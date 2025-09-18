@@ -89,7 +89,7 @@ const TextCard: React.FC<TextCardProps> = ({
       {/* Prix */}
       <p style={{ fontSize: "1rem", color: "#ccc", marginTop: "10px" }}>
         <strong>Prix :</strong> {priceInEth} ETH
-        {priceEur && priceEur > 0 && ` (~${priceEur} €)`}
+        {priceEur !== null && priceEur !== undefined && ` (~${priceEur} €)`}
 
       </p>
 

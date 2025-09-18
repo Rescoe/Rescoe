@@ -107,7 +107,6 @@ const RoleBasedNFTPage = () => {
 
                 const contract = new web3Instance.eth.Contract(ABI, contractAddress);
                 const totalMinted: number = await contract.methods.getTotalMinted().call();
-                console.log("totalminted : ", totalMinted.toString());
 
                 setNftId(Number(totalMinted).toString()); // Convertit BigNumber en nombre normal
             }
@@ -116,10 +115,10 @@ const RoleBasedNFTPage = () => {
     }, []);
 
     useEffect(() => {
-      if (address) {
+      if (address || !loadingEthPrice) {
           fetchMintPrice();
               }
-    }, [address]);
+    }, [address, loadingEthPrice]);
 
 
 const fetchMintPrice = async () => {
@@ -135,7 +134,6 @@ const fetchMintPrice = async () => {
     try {
         // Récupération du prix de mint en Wei depuis le contrat
         const price: BigNumberish = await contract.mintPrice(); // Le prix est en Wei
-        console.log("Prix de mint en Wei:", price);
 
         // Conversion manuelle du prix de Wei en Ether
         const ethPrice = Number(price) / 1e18; // Division par 10^18 pour convertir de Wei vers Ether
@@ -245,7 +243,6 @@ const fetchMintPrice = async () => {
                 // Minting NFT
                 const transaction = await contract.methods.safeMint(ipfsUrl, roleValue, name, bio).send({ from: account, value: priceInWei });
 
-                console.log('Transaction réussie:', transaction);
                 setShowBananas(true);
                 setIsMinting(true);
                 startLoadingAndRedirect();
@@ -334,13 +331,12 @@ const handleMint = async () => {
                     await switchToSepolia(); // Change le réseau uniquement si nécessaire
                 } else {
                     // Si déjà sur Sepolia, continuez à afficher les champs
-                    console.log("Champs de données pour l'adhésion en crypto affichés.");
+                    //console.log("Champs de données pour l'adhésion en crypto affichés.");
                     // Si vous voulez prouver que vous êtes sur le bon réseau ici, vous pouvez
                     // mettre à jour l'état directement également
                     setIsOnSepolia(true);
                 }
             }
-            console.log(isOnSepolia);
             localStorage.setItem('wantsCryptoAdhesion', String(true));
           }
           else{
