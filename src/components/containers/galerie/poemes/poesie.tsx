@@ -22,6 +22,8 @@ import ABI from "../../../ABI/HaikuEditions.json";
 
 import { useAuth } from '../../../../utils/authContext';
 import { useCollectionSearch } from '../../../../hooks/useCollectionSearch';
+import useEthToEur from "../../../../hooks/useEuro";
+
 
 import TextCard from "../TextCard";
 
@@ -40,6 +42,7 @@ interface Poem {
   totalEditions: string;
   mintContractAddress: string;
   price: string;
+  priceEur: string; // ← optionnel maintenant
   totalMinted: string;
   availableEditions: string;
   isForSale: boolean;
@@ -62,6 +65,8 @@ const PoetryGallery: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<number>(0);
   const pageSize = 20; // 20 collections par page
   const [totalCollections, setTotalCollections] = useState<number>(0);
+  const { convertEthToEur, loading: loadingEthPrice, error: ethPriceError } = useEthToEur();
+
 
   const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
   const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
@@ -178,6 +183,7 @@ const PoetryGallery: React.FC = () => {
           const totalMinted = totalEditions - Number(availableEditions);
           setIsOwner(address?.toLowerCase() === creatorAddress.toLowerCase());
 
+          const priceInEuro = convertEthToEur(tokenDetails.currentPrice.toString()) ?? 0;
 
 
           // 📌 On construit un poème avec `tokenIdsForSale` et `availableEditions` en "pending"
@@ -188,6 +194,7 @@ const PoetryGallery: React.FC = () => {
             totalEditions: nombreHaikusParSerie.toString(),
             mintContractAddress: associatedAddress,
             price: tokenDetails.currentPrice.toString(),
+            priceEur: priceInEuro ? priceInEuro.toFixed(2) : "0",
             totalMinted: totalMinted.toString(),
             availableEditions: "...", // ⏳ placeholder
             isForSale: tokenDetails.forSale,

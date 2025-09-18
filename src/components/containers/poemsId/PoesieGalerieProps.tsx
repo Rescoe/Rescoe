@@ -4,6 +4,7 @@ import { JsonRpcProvider, Contract, BigNumberish } from "ethers";
 import { useAuth } from "../../../utils/authContext";
 import TextCard from "../galerie/TextCard";
 import ABI from '../../../components/ABI/HaikuEditions.json';
+import useEthToEur from "../../../hooks/useEuro";
 
 interface PoetryGalleryProps {
   collectionAddress: string;
@@ -15,6 +16,7 @@ interface Poem {
   creatorAddress: string;
   totalEditions: string;
   price: string;
+  priceEur: string;  // <-- ajouté
   mintContractAddress: string;
   totalMinted: string;
   availableEditions: string;
@@ -30,6 +32,11 @@ const PoetryGallery: React.FC<PoetryGalleryProps> = ({ collectionAddress }) => {
   const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
   const contract = new Contract(collectionAddress, ABI, provider);
 
+  const { convertEthToEur, loading: loadingEthPrice, error: ethPriceError } = useEthToEur();
+
+
+
+
   useEffect(() => {
     const loadPoems = async () => {
       setIsLoading(true);
@@ -41,6 +48,9 @@ const PoetryGallery: React.FC<PoetryGalleryProps> = ({ collectionAddress }) => {
             const availableEditions = await contract.getRemainingEditions(uniqueHaikuId);
             const tokenDetails = await contract.getTokenFullDetails(firstTokenId);
 
+            const priceEur = convertEthToEur(tokenDetails.currentPrice.toString());
+
+
             return {
               tokenId: firstTokenId.toString(),
               poemText: tokenDetails.haiku_,
@@ -48,6 +58,7 @@ const PoetryGallery: React.FC<PoetryGalleryProps> = ({ collectionAddress }) => {
               totalEditions: nombreHaikusParSerie.toString(),
               mintContractAddress: collectionAddress,
               price: tokenDetails.currentPrice.toString(),
+              priceEur: priceEur ? priceEur.toFixed(2) : "0", // €
               totalMinted: (Number(nombreHaikusParSerie) - Number(availableEditions)).toString(),
               availableEditions: availableEditions.toString(),
               isForSale: tokenDetails.forSale,

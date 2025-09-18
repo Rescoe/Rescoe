@@ -29,12 +29,16 @@ const useEthToEur = () => {
   }, []);
 
   // convertEthToEur dans le hook
-  const convertEthToEur = (amountInEth: string | number | undefined): number | null => {
-    if (ethPrice !== null && amountInEth !== undefined) {
-      return Number(amountInEth) * ethPrice;
+  const convertEthToEur = (amountInEth?: string | number): number | null => {
+    if (ethPrice !== null && amountInEth !== undefined && amountInEth !== null) {
+      const value = Number(amountInEth);
+      if (!isNaN(value)) {
+        return value * ethPrice;
+      }
     }
     return null;
   };
+
 
 
   return { ethPrice, convertEthToEur, loading, error };

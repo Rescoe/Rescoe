@@ -3,6 +3,8 @@ import { VStack, Text, Button, Box } from "@chakra-ui/react";
 import { useAuth } from "../../../utils/authContext";
 import { useRouter } from 'next/router';
 import { FramedText } from '../../../utils/Cadre';
+import useEthToEur from "../../../hooks/useEuro";
+
 
 
 interface TextCardProps {
@@ -12,6 +14,7 @@ interface TextCardProps {
     creatorAddress: string;
     totalEditions: string;
     price: string;
+    priceEur: string;   // prix en EUR
     mintContractAddress: string;
     totalMinted: string;
     availableEditions: string;
@@ -33,9 +36,15 @@ const TextCard: React.FC<TextCardProps> = ({
     return <Text>Chargement du NFT...</Text>;
   }
 
+  const { convertEthToEur, loading: loadingEthPrice, error: ethPriceError } = useEthToEur();
+
   const priceInEth = nft.price ? parseFloat(nft.price) / 1e18 : 0;
+
+  const priceEur = convertEthToEur(priceInEth);
+
   const isOwner = authAddress?.toLowerCase() === nft.creatorAddress.toLowerCase();
   const router = useRouter();
+
 
 
   const handleBuy = async (tokenId: string, e: React.MouseEvent) => {
@@ -80,6 +89,8 @@ const TextCard: React.FC<TextCardProps> = ({
       {/* Prix */}
       <p style={{ fontSize: "1rem", color: "#ccc", marginTop: "10px" }}>
         <strong>Prix :</strong> {priceInEth} ETH
+        {priceEur && priceEur > 0 && ` (~${priceEur} €)`}
+
       </p>
 
       {/* Disponibilité */}

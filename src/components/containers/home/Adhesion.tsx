@@ -26,6 +26,8 @@ import {
 } from "@chakra-ui/react";
 import dynamic from 'next/dynamic';
 import { Canvas } from '@react-three/fiber';
+import useEthToEur from "../../../hooks/useEuro";
+
 import { useAuth } from '../../../utils/authContext';
 
 
@@ -38,7 +40,12 @@ const RoleBasedNFTPage = () => {
     const [isUploading, setIsUploading] = useState<boolean>(false);
     const [isMinting, setIsMinting] = useState<boolean>(false);
     const [roleConfirmed, setRoleConfirmed] = useState<boolean>(false);
+
     const [mintPrice, setMintPrice] = useState(0); // État pour le prix du mint
+    const [priceEur, setEuroPrice] = useState(0); // État pour le prix du mint
+
+
+
     const [showBananas, setShowBananas] = useState(false);  // Add state to control when to show Bananas
     const [name, setName] = useState(''); // Ajouter état pour le nom
     const [bio, setBio] = useState(''); // Ajouter état pour la biographie
@@ -54,6 +61,9 @@ const RoleBasedNFTPage = () => {
     const [countdown, setCountdown] = useState(5); // 5 secondes avant redirection
 
     const [isReadyToMint, setIsReadyToMint] = useState(false);
+
+    const { convertEthToEur, loading: loadingEthPrice, error: ethPriceError } = useEthToEur();
+
 
     const router = useRouter();
 
@@ -130,9 +140,12 @@ const fetchMintPrice = async () => {
         // Conversion manuelle du prix de Wei en Ether
         const ethPrice = Number(price) / 1e18; // Division par 10^18 pour convertir de Wei vers Ether
 
+        const priceEur = await convertEthToEur(ethPrice);
+
+
         // Stocker le prix dans l'état local
         setMintPrice(ethPrice);
-        console.log(`Prix de mint récupéré: ${ethPrice} ETH`);
+        setEuroPrice(priceEur ?? 0);
     } catch (error) {
         console.error("Erreur lors de la récupération du prix du mint :", error);
     }
@@ -393,7 +406,12 @@ const handleMint = async () => {
                               </Box>
                           )}
 
-                          <Text mt={4}>Prix de mint : {mintPrice} ETH</Text>
+                          <Text mt={4}>
+                            Prix de mint : {mintPrice} ETH
+                            {priceEur && priceEur !== 0 && ` (~${priceEur} €)`}
+                          </Text>
+
+
                           <Button
                               onClick={handleMint}
                               colorScheme="teal"
