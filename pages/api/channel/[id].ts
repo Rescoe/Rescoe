@@ -1,17 +1,15 @@
-// pages/api/news.ts
+// pages/api/channel/[id].ts
 import type { NextApiRequest, NextApiResponse } from "next";
 
 const UNIQUE_DISCORD_TOKEN = process.env.DISCORD_TOKEN;
-const CHANNEL_ID = process.env.DISCORD_CHANNEL_ID;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  try {
-    // récupère ?limit=10 (par défaut 10 si non fourni)
-    const limit = parseInt((req.query.limit as string) || "10", 10);
+  const { id } = req.query;
+  const limit = parseInt((req.query.limit as string) || "10", 10);
 
-    // appel à l’API Discord avec le limit demandé
+  try {
     const response = await fetch(
-      `https://discord.com/api/v10/channels/${CHANNEL_ID}/messages?limit=${limit}`,
+      `https://discord.com/api/v10/channels/${id}/messages?limit=${limit}`,
       {
         headers: { Authorization: `Bot ${UNIQUE_DISCORD_TOKEN}` },
       }
@@ -22,10 +20,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const messages = await response.json();
-
     res.status(200).json(messages);
   } catch (error) {
-    console.error(error);
     res.status(500).json({ error: "Erreur serveur" });
   }
 }
