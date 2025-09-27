@@ -232,8 +232,10 @@ const PoemPage: React.FC = () => {
       }, [router.isReady, contractAddress, tokenId, address, loadingEthPrice]);
 
       // Utilisation du hooks de récupération des collections d'artistes
+      /*
       const { collections: poetryCollections, isLoading: isLoadingCollections } =
       useUserCollections(poemData?.author);
+      */
 
 /*
       // --- Fonction utilitaire pour récupérer tous les IDs en vente ---
@@ -814,7 +816,7 @@ const isUserOwner =
 
 
 <Box mt={5} w="100%" overflow="hidden">
-  {address && <FilteredCollectionsCarousel creator={address} />}
+  {poemData.author && <FilteredCollectionsCarousel creator={poemData.author} />}
 </Box>
 
 
