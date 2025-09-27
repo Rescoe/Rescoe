@@ -1,7 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { Box, Image, Text, VStack, HStack, Button, Divider, Stack } from "@chakra-ui/react";
+import { Box, Image, Text, VStack, HStack, Button, Divider, Stack, Heading } from "@chakra-ui/react";
+import { ChevronDownIcon, ChevronUpIcon } from "@chakra-ui/icons";
+import { motion } from "framer-motion";
+
+
 import { useRouter } from "next/router";
 import { JsonRpcProvider } from 'ethers';
+import {FilteredCollectionsCarousel} from '../components/containers/galerie/art';
+
 
 // ---------------------- Types ----------------------
 interface Nft {
@@ -33,6 +39,10 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
   const [ensMap, setEnsMap] = useState<Record<string, string>>({});
   const [showOverlay, setShowOverlay] = useState(false);
   const router = useRouter();
+  const [showCollections, setShowCollections] = useState(false);
+
+  const MotionChevron = motion(ChevronDownIcon);
+
 
   // ---------------------- Helpers ----------------------
   const formatAddress = (address?: string) => {
@@ -121,15 +131,15 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
     >
         {selectedNft && selectedHaiku && (
           <>
-            <Box
-              position="relative"
-              w="100%"
-              h="100%"
-              borderRadius="md"
-              cursor="pointer"
-              onClick={handleOverlayClick} // Afficher l'overlay au clic
-
-            >
+          <Box
+            position="relative"
+            w={{ base: "95%", md: "80%", lg: "70%" }}  // largeur responsive
+            h={{ base: "350px", md: "450px", lg: "550px" }} // hauteur responsive
+            mx="auto" // centre horizontalement
+            borderRadius="md"
+            cursor="pointer"
+            onClick={handleOverlayClick}
+          >
               <Image
                 src={selectedNft.image}
                 alt={selectedNft.name || "NFT"}
@@ -238,6 +248,63 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
                 </Text>
               </Box>
             </HStack>
+
+
+            <Divider my={6} borderColor="purple.700" w="60%" mx="auto" />
+
+
+            <Button
+              variant="ghost"
+              size="lg"
+              fontSize="xl"
+              fontWeight="bold"
+              px={8}
+              py={6}
+              rightIcon={
+                !showCollections
+                  ? (
+                      <MotionChevron
+                        animate={{ y: [0, -5, 0] }}
+                        transition={{ repeat: Infinity, duration: 0.6 }}
+                        boxSize={6}
+                        color="purple.400"
+                      />
+                    )
+                  : undefined
+              }
+              color="purple.400"
+              onClick={() => setShowCollections(prev => !prev)}
+              _hover={{ bg: "purple.100" }}
+              textAlign="center"
+              whiteSpace="normal"
+            >
+              Voir les collections mises en avant
+            </Button>
+
+
+
+            <VStack spacing={5} w="full">
+
+                  {showCollections && (
+
+                    <Box w="full" maxW="900px" mx="auto" overflow="hidden">
+                    <Heading size="lg" mb={4} color="purple.700" textAlign="center">
+{resolveName(selectedNft.artist, "Artiste inconnu")}
+</Heading>
+
+                    {selectedNft.artist && <FilteredCollectionsCarousel creator={selectedNft.artist} />}
+
+                    <Divider my={8} borderColor="purple.300" />
+
+                    <Heading size="lg" mb={4} color="purple.700" textAlign="center">
+{resolveName(selectedHaiku.poemText?.[7], "Artiste inconnu")}
+</Heading>
+
+                    {<FilteredCollectionsCarousel creator={selectedHaiku.poemText?.[7]} />}
+                    </Box>
+                  )}
+                </VStack>
+
           </>
         )}
       </Box>
