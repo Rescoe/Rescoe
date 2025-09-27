@@ -129,7 +129,7 @@ const Dashboard = () => {
       fetchRolesAndImages(address);
       fetchENS(address);
       fetchStatsCollection(address);
-      fetchCollections(address);
+      //fetchCollections(address);
       fetchAdhesionPoints(address);
     } else {
       // Réinitialiser l'avatar si aucune adresse n'est disponible
@@ -213,6 +213,7 @@ const formatAddress = (address: string) => {
     }
   };
 
+/*
   const fetchCollections = async (userAddress: string) => {
     setIsLoading(true);
     const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
@@ -255,6 +256,7 @@ const formatAddress = (address: string) => {
       setIsLoading(false);
     }
   };
+  */
 
   const fetchNFTs = async () => {
     const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
@@ -358,45 +360,48 @@ const formatAddress = (address: string) => {
 
 
   return (
-  <Box p={6} maxW="100%" mx="auto">
+    <Box
+    mt={10}
+    textAlign="center"
+    w="100%"
+    maxW="1200px"
+    mx="auto"
+  >
+    <Box display="flex" justifyContent="center" alignItems="center">
+      <HStack spacing={4}>
+        <Box
+          w="100%"
+          dangerouslySetInnerHTML={{ __html: avatarSvg }}
+          boxSize="100px"
+          bg="gray.200"
+          borderRadius="full"
+          mb={2}
+        />
+        <Box textAlign="center" w="100%">
+          <Heading mb={2}>{usernames[0]}</Heading>
+          <Text fontSize="xl">{roles[0]}</Text>
+          <Text fontSize="xl">{biographies[0]}</Text>
+          <Divider my={6} borderColor="gray.200" w="80%" mx="auto" />
+          <Text fontWeight="bold">Adresse Ethereum:</Text>
+          <Text
+            cursor="pointer"
+            color="blue.500"
+            onClick={() => {
+              if (address) {
+                navigator.clipboard.writeText(address); // copie l'adresse complète
+                alert("Adresse Ethereum copiée !");
+              }
+            }}
+          >
+            {formatAddress(address)} {/* Affichage raccourci */}
+          </Text>
 
-      <Box display="flex" justifyContent="center" alignItems="center">
-          <HStack spacing={4}>
-            <Box
-              dangerouslySetInnerHTML={{ __html: avatarSvg }}
-              boxSize="100px"
-              bg="gray.200"
-              borderRadius="full"
-              mb={2}
-            />
-            <Box textAlign="center">
-              <Heading mb={2}>{usernames[0]}</Heading>
-              <Text fontSize="xl">{roles[0]}</Text>
-              <Text fontSize="xl">{biographies[0]}</Text>
-              <Divider my={6} borderColor="gray.200" w="80%" mx="auto" />
-              <Text fontWeight="bold">Adresse Ethereum:</Text>
-              <Text
-                  cursor="pointer"
-                  color="blue.500"
-                  onClick={() => {
-                    if (address) {
-                      navigator.clipboard.writeText(address); // copie l'adresse complète
-                      alert("Adresse Ethereum copiée !");
-                    }
-                  }}
-                >
-                  {formatAddress(address)} {/* Affichage raccourci */}
-                </Text>
-
-              {ensName && (
-                <Text fontWeight="bold" mt={2}>ENS: {ensName}</Text>
-              )}
-            </Box>
-          </HStack>
+          {ensName && <Text fontWeight="bold" mt={2}>ENS: {ensName}</Text>}
         </Box>
+      </HStack>
+    </Box>
 
-        <Divider my={4} />
-
+    <Divider my={4} />
 
     <Tabs variant="soft-rounded" colorScheme="purple" isFitted>
       <TabList mb={4}>
@@ -410,32 +415,46 @@ const formatAddress = (address: string) => {
         <TabPanel>
           <Grid templateColumns={{ base: "1fr", md: "1fr 1fr" }} gap={6}>
             {/* Jetons d'adhésion */}
-            <Box borderWidth="1px" borderRadius="xl" p={4} shadow="md">
+            <Box borderWidth="1px" borderRadius="xl" p={4} shadow="md" w="100%">
               <Heading size="md" mb={3}>Jetons d'Adhésion</Heading>
               <HStack spacing={4} flexWrap="wrap">
-                {images.length > 0 ? images.map((img, index) => (
-                  <Link
-                    href={`/AdhesionId/${contractAdhesion}/${tokensIdsAdherent[index]}`}
-                  >
-                  <Box key={index} textAlign="center">
-                    <Image src={img} alt={`Jeton ${index}`} borderRadius="md" boxSize="100px" objectFit="cover" />
-                    <Text fontSize="sm" mt={2}>#{tokensIdsAdherent[index]} - {usernames[index]} </Text>
-                    <Text fontSize="xs" color="gray.500">{roles[index]}</Text>
+                {images.length > 0 ? (
+                  images.map((img, index) => (
+                    <Link href={`/AdhesionId/${contractAdhesion}/${tokensIdsAdherent[index]}`}>
+                      <Box key={index} textAlign="center" w="100px">
+                        <Image
+                          src={img}
+                          alt={`Jeton ${index}`}
+                          borderRadius="md"
+                          boxSize="100px"
+                          objectFit="cover"
+                        />
+                        <Text fontSize="sm" mt={2}>
+                          #{tokensIdsAdherent[index]} - {usernames[index]}
+                        </Text>
+                        <Text fontSize="xs" color="gray.500">
+                          {roles[index]}
+                        </Text>
+                      </Box>
+                    </Link>
+                  ))
+                ) : (
+                  <Box>
+                    <Text color="gray.500">Aucun jeton trouvé.</Text>
+                    <Button onClick={() => fetchRolesAndImages(address)}>Rafraîchir mes jetons</Button>
                   </Box>
-                  </Link>
-                )) :
-                <Box>
-                  <Text color="gray.500">Aucun jeton trouvé.</Text>
-                  <Button onClick={() => fetchRolesAndImages(address)}>Rafraîchir mes jetons</Button>
-                </Box>
-              }
+                )}
               </HStack>
 
               <Divider my={4} />
 
               <FormLabel htmlFor="pointsToBuy" display="flex" alignItems="center">
                 Acheter des points :
-                <Tooltip label="La création d'une collection coute 5 points. Les points RESCOE sont attribués en vendant des oeuvres ou peuvent être achetées. Vous ne perdez jamais de points, même après les avoir utilisés.Cependant une fois comptabilisé dans la création d'une collection les points utilsiés ne sont plus réutilisables !" fontSize="sm" hasArrow>
+                <Tooltip
+                  label="La création d'une collection coute 5 points. Les points RESCOE sont attribués en vendant des oeuvres ou peuvent être achetées. Vous ne perdez jamais de points, même après les avoir utilisés.Cependant une fois comptabilisé dans la création d'une collection les points utilsiés ne sont plus réutilisables !"
+                  fontSize="sm"
+                  hasArrow
+                >
                   <span>
                     <Icon as={InfoOutlineIcon} ml={2} color="gray.500" cursor="pointer" />
                   </span>
@@ -449,7 +468,9 @@ const formatAddress = (address: string) => {
                   colorScheme="teal"
                   onClick={() => setPointsToBuy(pointsToBuy - 10)}
                   isDisabled={pointsToBuy <= 0}
-                >-</Button>
+                >
+                  -
+                </Button>
 
                 <Text>{pointsToBuy}</Text>
 
@@ -458,7 +479,9 @@ const formatAddress = (address: string) => {
                   variant="outline"
                   colorScheme="teal"
                   onClick={() => setPointsToBuy(pointsToBuy + 10)}
-                >+</Button>
+                >
+                  +
+                </Button>
 
                 <Button
                   size="sm"
@@ -472,30 +495,38 @@ const formatAddress = (address: string) => {
                   Acheter
                 </Button>
               </HStack>
-
-
             </Box>
 
             {/* Statistiques utilisateur */}
-            <Box borderWidth="1px" borderRadius="xl" p={4} shadow="md">
+            <Box borderWidth="1px" borderRadius="xl" p={4} shadow="md" w="100%">
               <Heading size="md" mb={3}>Statistiques</Heading>
               <VStack align="start" spacing={3}>
-                <Text><strong>Nom :</strong> {usernames[0] || 'Non défini'}</Text>
-                <Text><strong>ENS :</strong> {ensName}</Text>
-                <Text><strong>Adresse :</strong> {formatAddress(address)}</Text>
-                <Text><strong>Bio :</strong> {biographies[0]}</Text>
+                <Text>
+                  <strong>Nom :</strong> {usernames[0] || 'Non défini'}
+                </Text>
+                <Text>
+                  <strong>ENS :</strong> {ensName}
+                </Text>
+                <Text>
+                  <strong>Adresse :</strong> {formatAddress(address)}
+                </Text>
+                <Text>
+                  <strong>Bio :</strong> {biographies[0]}
+                </Text>
                 <Divider />
-                <Text><strong>Collections créées :</strong> {userCollections}</Text>
-                <Text><strong>Collections restantes :</strong> {remainingCollections}</Text>
+                <Text>
+                  <strong>Collections créées :</strong> {userCollections}
+                </Text>
+                <Text>
+                  <strong>Collections restantes :</strong> {remainingCollections}
+                </Text>
 
                 <Text mt={4}>Points d'Adhésion : </Text>
-                  {rewardPoints !== null ? (
-                    <Text>Vos points Rescoe : {rewardPoints} 🐝</Text>
-                  ) : (
-                    <Text>Chargement des points...</Text>
-                  )}
-
-
+                {rewardPoints !== null ? (
+                  <Text>Vos points Rescoe : {rewardPoints} 🐝</Text>
+                ) : (
+                  <Text>Chargement des points...</Text>
+                )}
               </VStack>
             </Box>
           </Grid>
@@ -503,90 +534,22 @@ const formatAddress = (address: string) => {
 
         {/* Création de Collection */}
         <TabPanel>
-
-
-        <CreateCollection/>
-
-
+          <CreateCollection />
         </TabPanel>
 
         {/* Placeholder pour collections utilisateur */}
-        (
-     <TabPanel>
-       <Box borderWidth="1px" borderRadius="xl" p={6} shadow="md">
-         <Heading size="md" mb={4}>
-           Mes Collections
-         </Heading>
+        <TabPanel>
+          <Box borderWidth="1px" borderRadius="xl" p={6} shadow="md" w="100%">
+            <Heading size="md" mb={4}>Mes Collections</Heading>
 
-         {/* Carrousels */}
-         <Box mt={5} w="full">
-           <Stack direction={{ base: "column", md: "row" }} spacing={2}>
-             <FilteredCollectionsCarousel creator={address} />
-           </Stack>
-         </Box>
+            {/* Carrousels */}
+            <Box mt={1} overflow="hidden" w="100%">
+              {address && <FilteredCollectionsCarousel creator={address} />}
+            </Box>
 
-         <Divider my={6} borderColor="purple.700" />
-
-         {isLoading ? (
-           <Spinner />
-         ) : collections.length === 0 ? (
-           <Text>Aucune collection trouvée.</Text>
-         ) : (
-           <>
-             <Grid templateColumns="repeat(auto-fill, minmax(200px, 1fr))" gap={6}>
-               {collections.slice(0, visibleCount).map((collection) => (
-                 <Box
-                   key={collection.id}
-                   borderWidth="1px"
-                   borderRadius="lg"
-                   p={4}
-                   cursor="pointer"
-                   textAlign="center"
-                   _hover={{ boxShadow: "lg" }}
-                   transition="box-shadow 0.2s"
-                 >
-                   {collection.imageUrl && (
-                     <Box
-                       width="100%"
-                       height="150px"
-                       overflow="hidden"
-                       borderRadius="md"
-                       bg="gray.100"
-                     >
-                       <img
-                         src={collection.imageUrl}
-                         alt={collection.name}
-                         style={{
-                           width: "100%",
-                           height: "100%",
-                           objectFit: "cover",
-                           display: "block",
-                         }}
-                       />
-                     </Box>
-                   )}
-                   <Box mt={2} textAlign="center">
-                     <Text fontWeight="semibold">{collection.name}</Text>
-                   </Box>
-                 </Box>
-               ))}
-             </Grid>
-
-             {visibleCount < collections.length && (
-               <Box mt={6} textAlign="center">
-                 <Button colorScheme="purple" onClick={handleLoadMore}>
-                   Charger plus
-                 </Button>
-               </Box>
-             )}
-           </>
-         )}
-
-
-
-       </Box>
-     </TabPanel>
-
+            <Divider my={6} borderColor="purple.700" />
+          </Box>
+        </TabPanel>
       </TabPanels>
     </Tabs>
   </Box>

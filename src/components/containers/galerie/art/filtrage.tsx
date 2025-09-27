@@ -29,11 +29,15 @@ type CollectionOnChain = {
 type HorizontalCarouselProps = {
   type: string;
   items: CollectionOnChain[];
-  currentPage: number;
-  setCurrentPage: React.Dispatch<React.SetStateAction<number>>;
+  onLoadMore: () => void;
 };
 
-const HorizontalCarousel: React.FC<HorizontalCarouselProps> = ({ type, items, currentPage, setCurrentPage }) => {
+const HorizontalCarousel: React.FC<HorizontalCarouselProps> = ({
+  type,
+  items,
+  onLoadMore,
+}) => {
+  // Keen Slider avec breakpoints responsive
   const [sliderRef, slider] = useKeenSlider<HTMLDivElement>({
     loop: false,
     slides: { perView: 1, spacing: 12 },
@@ -43,77 +47,52 @@ const HorizontalCarousel: React.FC<HorizontalCarouselProps> = ({ type, items, cu
       "(min-width: 1024px)": { slides: { perView: 3, spacing: 16 } },
       "(min-width: 1400px)": { slides: { perView: 4, spacing: 18 } },
     },
+    slideChanged: (s) => {
+      const details = (s as any).track?.details;
+      if (!details) return;
+
+      const currentIndex = Number(details.abs ?? 0);
+      const slidesPerView = Number(details.slides.length ?? 1);
+
+      if (currentIndex + slidesPerView >= items.length) {
+        onLoadMore();
+      }
+    },
   });
+
 
   const btnBg = useColorModeValue("white", "gray.700");
   const btnHoverBg = useColorModeValue("gray.100", "gray.600");
 
-
-
-
-  let slidesPerView = 1;
-
-  if (slider?.current?.options?.slides) {
-    const s = slider.current.options.slides;
-    // si c'est un objet avec perView, on l'utilise
-    if (typeof s === "object" && "perView" in s && typeof s.perView === "number") {
-      slidesPerView = s.perView;
-    }
-  }
-
-  const totalPages = Math.ceil(items.length / slidesPerView);
-  const isAtStart = currentPage <= 0;
-  const isAtEnd = currentPage >= totalPages - 1;
-
-
-  const handlePrevClick = () => {
-    if (!isAtStart) setCurrentPage(currentPage - 1);
-  };
-
-  const handleNextClick = () => {
-    if (!isAtEnd) setCurrentPage(currentPage + 1);
-  };
-
   return (
-    <Box display="flex" flexDirection="column" alignItems="center" w="100%" mb={8} position="relative">
-      <Heading size="md" mb={3}>
-        {type}
-      </Heading>
+    <Box
+      display="flex"
+      flexDirection="column"
+      alignItems="center"
+      justifyContent="center"
+      w="100%"
+      maxW="100%"
+      mb={8}
+      position="relative"
+    >
+      <Heading size="md" mb={3}>{type}</Heading>
 
-      <Box position="relative" w="100%">
-        {/* gradients latéraux */}
-        <Box
-          position="absolute"
-          left={0}
-          top={0}
-          bottom={0}
-          width="48px"
-          pointerEvents="none"
-          bg="linear-gradient(to right, rgba(0,0,0,0.25), transparent)"
-        />
-        <Box
-          position="absolute"
-          right={0}
-          top={0}
-          bottom={0}
-          width="48px"
-          pointerEvents="none"
-          bg="linear-gradient(to left, rgba(0,0,0,0.25), transparent)"
-        />
+      <Box position="relative" w="100%" display="flex" justifyContent="center" alignItems="center">
+
+        <Box position="absolute" left={0} top={0} bottom={0} width="48px" pointerEvents="none" bg="linear-gradient(to right, rgba(0,0,0,0.25), transparent)" />
+        <Box position="absolute" right={0} top={0} bottom={0} width="48px" pointerEvents="none" bg="linear-gradient(to left, rgba(0,0,0,0.25), transparent)" />
 
         <Box ref={sliderRef} className="keen-slider" overflow="hidden" borderRadius="md" bg="transparent">
           {items.map((collection) => (
             <NextLink
               key={collection.id}
-              href={`/galerie/${collection.collectionType.toLowerCase()}?search=${encodeURIComponent(
-                collection.name
-              )}`}
+              href={`/galerie/${collection.collectionType.toLowerCase()}?search=${encodeURIComponent(collection.name)}`}
               passHref
               legacyBehavior
             >
-              <Box className="keen-slider__slide" role="group">
-                <CollectionCard collection={{ ...collection, imageUrl: collection.imageUrl || "" }} type={type} />
-              </Box>
+            <Box className="keen-slider__slide" role="group" position="relative" w="100%" display="flex" justifyContent="center" alignItems="center">
+              <CollectionCard collection={{ ...collection, imageUrl: collection.imageUrl || "" }} type={type} />
+            </Box>
             </NextLink>
           ))}
         </Box>
@@ -123,7 +102,7 @@ const HorizontalCarousel: React.FC<HorizontalCarouselProps> = ({ type, items, cu
             <IconButton
               aria-label="Précédent"
               icon={<ChevronLeftIcon />}
-              onClick={handlePrevClick}
+              onClick={() => slider.current?.prev()}
               bg={btnBg}
               _hover={{ bg: btnHoverBg }}
               boxShadow="md"
@@ -133,12 +112,11 @@ const HorizontalCarousel: React.FC<HorizontalCarouselProps> = ({ type, items, cu
               left="6px"
               top="50%"
               transform="translateY(-50%)"
-              disabled={isAtStart}
             />
             <IconButton
               aria-label="Suivant"
               icon={<ChevronRightIcon />}
-              onClick={handleNextClick}
+              onClick={() => slider.current?.next()}
               bg={btnBg}
               _hover={{ bg: btnHoverBg }}
               boxShadow="md"
@@ -148,7 +126,6 @@ const HorizontalCarousel: React.FC<HorizontalCarouselProps> = ({ type, items, cu
               right="6px"
               top="50%"
               transform="translateY(-50%)"
-              disabled={isAtEnd}
             />
           </>
         )}
@@ -161,35 +138,32 @@ const CollectionsByType: React.FC<{ creator: string }> = ({ creator }) => {
   const [collections, setCollections] = useState<CollectionOnChain[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(0);
+  const [currentPage, setCurrentPage] = useState<Record<string, number>>({});
   const pageSize = 5;
-  const [totalCollectionsByType, setTotalCollectionsByType] = useState<Record<string, number>>({});
 
   const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
   const contract = new Contract(process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!, ABIRESCOLLECTION, provider);
 
-  const fetchUserCollections = async () => {
+  const fetchCollections = async (type?: string) => {
     setIsLoading(true);
     setError(null);
-
     try {
-      const userCollectionsOnChain: CollectionOnChain[] = await contract.getCollectionsByUser(creator);
-      const sortedCollections = [...userCollectionsOnChain].reverse();
+      const allCollections: CollectionOnChain[] = await contract.getCollectionsByUser(creator);
+      const sortedCollections = [...allCollections].reverse();
 
-      const totalCollectionsByTypeTemp: Record<string, number> = {};
+      const totalCollectionsByType: Record<string, number> = {};
       sortedCollections.forEach((col) => {
-        if (!totalCollectionsByTypeTemp[col.collectionType]) totalCollectionsByTypeTemp[col.collectionType] = 0;
-        totalCollectionsByTypeTemp[col.collectionType]++;
+        if (!totalCollectionsByType[col.collectionType]) totalCollectionsByType[col.collectionType] = 0;
+        totalCollectionsByType[col.collectionType]++;
       });
-      setTotalCollectionsByType(totalCollectionsByTypeTemp);
 
       const collectionsData: CollectionOnChain[] = [];
-      for (const [type] of Object.entries(totalCollectionsByTypeTemp)) {
-        const start = currentPage * pageSize;
+      for (const [t] of Object.entries(totalCollectionsByType)) {
+        if (type && t !== type) continue; // on charge seulement le type qui déclenche l'infinite scroll
+
+        const start = (currentPage[t] || 0) * pageSize;
         const end = start + pageSize;
-        const paginatedCollections = sortedCollections
-          .filter((col) => col.collectionType === type)
-          .slice(start, end);
+        const paginatedCollections = sortedCollections.filter(col => col.collectionType === t).slice(start, end);
         collectionsData.push(...paginatedCollections);
       }
 
@@ -214,7 +188,13 @@ const CollectionsByType: React.FC<{ creator: string }> = ({ creator }) => {
         })
       );
 
-      setCollections(collectionsWithMetadata);
+      setCollections(prev => {
+        const newCollections = collectionsWithMetadata.filter(
+          col => !prev.some(c => c.id === col.id)
+        );
+        return [...prev, ...newCollections];
+      });
+
     } catch (err) {
       console.error("Erreur fetchUserCollections", err);
       setError("Impossible de charger les collections.");
@@ -223,8 +203,12 @@ const CollectionsByType: React.FC<{ creator: string }> = ({ creator }) => {
     }
   };
 
+  const handleLoadMore = (type: string) => {
+    setCurrentPage(prev => ({ ...prev, [type]: (prev[type] || 0) + 1 }));
+  };
+
   useEffect(() => {
-    if (creator) fetchUserCollections();
+    if (creator) fetchCollections();
   }, [creator, currentPage]);
 
   const collectionsGroupedByType = useMemo(() => {
@@ -235,24 +219,39 @@ const CollectionsByType: React.FC<{ creator: string }> = ({ creator }) => {
     }, {});
   }, [collections]);
 
+  const [showSpinner, setShowSpinner] = useState(false);
+
+useEffect(() => {
+  let timeout: NodeJS.Timeout;
+
+  if (isLoading) {
+    timeout = setTimeout(() => setShowSpinner(true), 1000); // 400ms avant d'afficher
+  } else {
+    setShowSpinner(false);
+  }
+
+  return () => clearTimeout(timeout);
+}, [isLoading]);
+
+
   return (
     <Box>
-      {isLoading && (
+    {showSpinner && (
         <Flex justify="center" align="center" minH="40px">
           <Spinner />
         </Flex>
       )}
       {error && <Text color="red.500">{error}</Text>}
-      {collections.length === 0 && !isLoading && <Text>Aucune collection trouvée.</Text>}
+      {!isLoading && collections.length === 0 && <Text>Aucune collection trouvée.</Text>}
 
       {Object.entries(collectionsGroupedByType).map(([type, typeCollections]) => (
         <HorizontalCarousel
           key={type}
           type={type}
           items={typeCollections}
-          currentPage={currentPage}
-          setCurrentPage={setCurrentPage}
+          onLoadMore={() => handleLoadMore(type)}
         />
+
       ))}
     </Box>
   );
