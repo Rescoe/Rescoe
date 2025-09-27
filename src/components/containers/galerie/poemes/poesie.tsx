@@ -63,7 +63,7 @@ const PoetryGallery: React.FC = () => {
   const [tokenIdsForSale, setTokenIdsForSale] = useState<number[]>([]);
   const [isOwner, setIsOwner] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<number>(0);
-  const pageSize = 20; // 20 collections par page
+  const pageSize = 10; // 20 collections par page
   const [totalCollections, setTotalCollections] = useState<number>(0);
   const { convertEthToEur, loading: loadingEthPrice, error: ethPriceError } = useEthToEur();
 
@@ -83,43 +83,34 @@ const PoetryGallery: React.FC = () => {
 
 
 
-  const fetchPoetryCollections = async (page: number) => {
-  setIsLoading(true);
-  try {
-    const total: BigNumberish = await contract.getTotalCollectionsMinted();
-    const totalNumber = Number(total);
-    setTotalCollections(totalNumber);
+const fetchPoetryCollections = async (page: number) => {
+setIsLoading(true);
+try {
+  const total: BigNumberish = await contract.getTotalCollectionsMinted();
+  const totalNumber = Number(total);
+  setTotalCollections(totalNumber);
 
-    // Calcule les bornes startId et endId
-    const startId = page * pageSize;
-    let endId = startId + pageSize - 1;
-    if (endId >= totalNumber) endId = totalNumber - 1;
+  // Calcul des indices inversés
+  const startId = totalNumber - (page + 1) * pageSize;
+  const adjustedStartId = startId < 0 ? 0 : startId; // Si on dépasse 0
+  let endId = totalNumber - page * pageSize - 1;
+  if (endId >= totalNumber) endId = totalNumber - 1;
 
-    // Appel à ta fonction Solidity
-    const collectionsPaginated = await contract.getCollectionsByType("Poesie", startId, endId);
+  const collectionsPaginated = await contract.getCollectionsByType(
+    "Poesie",
+    adjustedStartId,
+    endId
+  );
 
-    const collectionsData: Collection[] = await Promise.all(
-      collectionsPaginated.map(async (tuple: any) => {
-        const [id, name, collectionType, , associatedAddresses, , isFeatured] = tuple;
-        const uri: string = await contract.getCollectionURI(id);
-        const mintContractAddress: string = associatedAddresses;
+  const collectionsData: Collection[] = await Promise.all(
+    collectionsPaginated.map(async (tuple: any) => {
+      const [id, name, collectionType, , associatedAddresses, , isFeatured] = tuple;
+      const uri: string = await contract.getCollectionURI(id);
+      const mintContractAddress: string = associatedAddresses;
 
-        const cachedMetadata = localStorage.getItem(uri);
-        if (cachedMetadata) {
-          const metadata = JSON.parse(cachedMetadata);
-          return {
-            id: id.toString(),
-            name,
-            imageUrl: metadata.image,
-            mintContractAddress,
-            isFeatured,
-          };
-        }
-
-        const response = await fetch(`/api/proxyPinata?ipfsHash=${uri.split("/").pop()}`);
-        const metadata = await response.json();
-        localStorage.setItem(uri, JSON.stringify(metadata));
-
+      const cachedMetadata = localStorage.getItem(uri);
+      if (cachedMetadata) {
+        const metadata = JSON.parse(cachedMetadata);
         return {
           id: id.toString(),
           name,
@@ -127,16 +118,35 @@ const PoetryGallery: React.FC = () => {
           mintContractAddress,
           isFeatured,
         };
-      })
-    );
+      }
 
-    setCollections(collectionsData.filter(Boolean).sort((a, b) => Number(b!.isFeatured) - Number(a!.isFeatured)));
-  } catch (error) {
-    console.error("Erreur lors de la récupération des collections :", error);
-  } finally {
-    setIsLoading(false);
-  }
+      const response = await fetch(`/api/proxyPinata?ipfsHash=${uri.split("/").pop()}`);
+      const metadata = await response.json();
+      localStorage.setItem(uri, JSON.stringify(metadata));
+
+      return {
+        id: id.toString(),
+        name,
+        imageUrl: metadata.image,
+        mintContractAddress,
+        isFeatured,
+      };
+    })
+  );
+
+  // Trier par ID décroissant pour avoir les plus récents en premier
+  setCollections(
+    collectionsData
+      .filter(Boolean)
+      .sort((a, b) => Number(b!.id) - Number(a!.id))
+  );
+} catch (error) {
+  console.error("Erreur lors de la récupération des collections :", error);
+} finally {
+  setIsLoading(false);
+}
 };
+
 
 
   // --- Fonction utilitaire pour récupérer les IDs en vente ---
