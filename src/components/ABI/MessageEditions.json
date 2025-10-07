@@ -866,11 +866,16 @@
 				"internalType": "address",
 				"name": "salonRoyaltyAddress",
 				"type": "address"
+			},
+			{
+				"internalType": "string",
+				"name": "imageUrl",
+				"type": "string"
 			}
 		],
 		"name": "mint",
 		"outputs": [],
-		"stateMutability": "nonpayable",
+		"stateMutability": "payable",
 		"type": "function"
 	},
 	{

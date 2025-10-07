@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { Box, Button, useToast } from "@chakra-ui/react";
 import { ethers } from "ethers";
 import MessageEditions from "../../ABI/MessageEditions.json";
+import axios from "axios";
+
 
 interface DiscordMessage {
   id: string;
@@ -19,7 +21,7 @@ interface ChannelFeedProps {
   channelId: string;
 }
 
-const CONTRACT_ADDRESS = "0x7f0398a2e6edd73e742e4eb2c481be684b44a4ad";
+const CONTRACT_ADDRESS = "0x1fb26054f49b137c1c80aa42c61f80a8694c7ac2";
 
 const ChannelFeed: React.FC<ChannelFeedProps> = ({ channelId }) => {
   const [messages, setMessages] = useState<DiscordMessage[]>([]);
@@ -40,41 +42,72 @@ const ChannelFeed: React.FC<ChannelFeedProps> = ({ channelId }) => {
   useEffect(() => {
     fetchMessages();
   }, [channelId, limit]);
-
   const mintMessage = async (msg: DiscordMessage) => {
-    if (!window.ethereum) {
-      toast({
-        title: "Wallet non détecté",
-        description: "Installez MetaMask pour mint vos messages.",
-        status: "error",
-        duration: 3000,
-        isClosable: true,
-      });
-      return;
-    }
+    if (!window.ethereum) return;
 
     try {
-      setMintingIds((prev) => [...prev, msg.id]);
+      setMintingIds(prev => [...prev, msg.id]);
 
-
-      const ethereum = window.ethereum as any; // simple
+      const ethereum = window.ethereum as any;
       await ethereum.request({ method: "eth_requestAccounts" });
-
-      const provider = new ethers.BrowserProvider(window.ethereum as any);
+      const provider = new ethers.BrowserProvider(ethereum);
       const signer = await provider.getSigner();
       const contract = new ethers.Contract(CONTRACT_ADDRESS, MessageEditions, signer);
 
+      // --- Récupérer les infos depuis le message Discord ---
+      let pricePerEdition = 0; // par défaut
+      let editionsForSale = 1; // par défaut
+      let salonRoyaltyAddress = "0xFa6d6E36Da4acA3e6aa3bf2b4939165C39d83879"; // par défaut
 
-      const pricePerEdition = 0; // gratuit
-      const editionsForSale = 1; // 1 édition par message
-      const salonRoyaltyAddress = "0xFa6d6E36Da4acA3e6aa3bf2b4939165C39d83879"; // adresse de royalties
+      // Parsing simple
+      const priceMatch = msg.content.match(/\/prix (\d+(\.\d+)?)/i);
+      if (priceMatch) pricePerEdition = parseFloat(priceMatch[1]);
 
+      const addressMatch = msg.content.match(/\/address (0x[a-fA-F0-9]{40})/i);
+      if (addressMatch) salonRoyaltyAddress = addressMatch[1];
+
+      // --- Upload image sur IPFS si présent ---
+      let imageUrl = "";
+      if (msg.attachments.length > 0 && msg.attachments[0].content_type?.startsWith("image/")) {
+        const file = await fetch(msg.attachments[0].url).then(r => r.blob());
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+          const imageResponse = await axios.post<{ IpfsHash: string }>(
+            "https://api.pinata.cloud/pinning/pinFileToIPFS",
+            formData,
+            {
+              headers: {
+                Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT}`,
+                "Content-Type": "multipart/form-data",
+              },
+            }
+          );
+
+          imageUrl = `https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${imageResponse.data.IpfsHash}`;
+        } catch (err) {
+          console.error("Erreur upload IPFS:", err);
+          toast({
+            title: "Upload IPFS échoué",
+            description: "Impossible d'uploader l'image sur Pinata. Le mint se fera sans image.",
+            status: "warning",
+            duration: 4000,
+            isClosable: true,
+          });
+          imageUrl = ""; // fallback SVG généré par le contrat
+        }
+      }
+
+      // --- Appel du smart contract ---
       const tx = await contract.mint(
         msg.content,
-        pricePerEdition,
+        ethers.parseEther(pricePerEdition.toString()), // convert en wei
         editionsForSale,
-        salonRoyaltyAddress
+        salonRoyaltyAddress,
+        imageUrl
       );
+
       await tx.wait();
 
       toast({
@@ -84,6 +117,7 @@ const ChannelFeed: React.FC<ChannelFeedProps> = ({ channelId }) => {
         duration: 3000,
         isClosable: true,
       });
+
     } catch (err: any) {
       console.error(err);
       toast({
@@ -94,9 +128,10 @@ const ChannelFeed: React.FC<ChannelFeedProps> = ({ channelId }) => {
         isClosable: true,
       });
     } finally {
-      setMintingIds((prev) => prev.filter((id) => id !== msg.id));
+      setMintingIds(prev => prev.filter(id => id !== msg.id));
     }
   };
+
 
   return (
     <Box maxWidth="700px" mx="auto" p={4}>
