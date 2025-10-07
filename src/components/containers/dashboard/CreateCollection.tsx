@@ -38,6 +38,7 @@ const [account, setAccount] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [collectionType, setCollectionType] = useState<string>('');
+  const [customCollectionType, setCustomCollectionType] = useState<string>('');
 
   const toast = useToast();
 
@@ -381,11 +382,25 @@ const [account, setAccount] = useState<string | null>(null);
         <option style={{ backgroundColor: "#1A202C" }} value="Generative">
           Génératif
         </option>
+        <option style={{ backgroundColor: "#1A202C" }} value="Social">
+          Social
+        </option>
         <option style={{ backgroundColor: "#1A202C" }} value="autre">
           Autre
         </option>
-
       </Select>
+
+      {/* Barre d'écriture conditionnelle */}
+      {collectionType === "autre" && (
+        <Input
+          placeholder="Entrez un type personnalisé"
+          value={customCollectionType}
+          onChange={(e) => setCustomCollectionType(e.target.value)}
+          bg="blackAlpha.300"
+          color="white"
+          mb={4}
+        />
+      )}
 
       <Button
         mt={4}
@@ -401,6 +416,7 @@ const [account, setAccount] = useState<string | null>(null);
       >
         🚀 Enregistrez votre collection
       </Button>
+
 
       {ipfsUrl && (
         <Text mt={3} wordBreak="break-word">IPFS URL: {ipfsUrl}</Text>
