@@ -121,21 +121,15 @@ const ChannelFeed: React.FC<ChannelFeedProps> = ({ channelId }) => {
 
       const mintDurationSecondsString = mintDurationSeconds.toString()
       // --- Paramètres de mint pour ce test ---
-      //const discordMessageId = "1425418191232041001"; // ID du message Discord
-      const discordMessageId = "123456789";// msg.id;  // ID du message Discord
-      const discordMessageIdVrai = msg.id;  // ID du message Discord
+      const discordMessageIdFix = "1425418191232041001"; // ID du message Discord
+// Pour que ca marche mieux il faudrait essayer de changer le type du messagediscord dans le contrta solidity en bytes32 plutot que uint256. le nombre récupérer du messahe ou meme du hash est trop grand et ne passe pas sur un uint256 visiblement...
+/*
+      const messageData = `${msg.author.id}-${msg.timestamp}-${msg.content}`;
+      const messageHash = keccak256(messageData);
+      const messageIdBigInt = BigInt("0x" + messageHash); // ok
 
-      //const hashedId = keccak256(discordMessageId); // Hachage de l'ID
-
-
-// Vérification de sécurité : transformer en BigInt pour s'assurer que c'est valide
-const messageIdBigInt = BigInt(discordMessageIdVrai);
-const messageIdString = messageIdBigInt.toString(); // décimal, prêt pour Solidity
-
-console.log("ID Discord converti :", messageIdString, typeof messageIdString);
-
-
-
+console.log("🔢 ID généré à partir du message :", messageIdBigInt.toString(10));
+*/
       const haiku = msg.content || " "; // jamais vide
       const priceInWei = web3.utils.toWei(pricePerEdition.toString(), "ether"); // string
       let imageUrl = msg.attachments[0]?.url || " ";
@@ -173,12 +167,12 @@ console.log("ID Discord converti :", messageIdString, typeof messageIdString);
       const chainTimestamp = Number(latestBlock.timestamp);
 
 
-      //if (chainTimestamp > messageTimestamp + mintDurationSecondsString) throw new Error("Période de mint expirée");
+      //if (chainTimestamp > messageTimestamp + durationMatch) throw new Error("Période de mint expirée");
 
       // --- Envoi de la TX ---
       await contract.methods
         .mint(
-          discordMessageId,
+          discordMessageIdFix,
           haiku,
           priceInWei,
           salonRoyaltyAddress,
