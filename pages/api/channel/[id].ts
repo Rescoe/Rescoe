@@ -17,23 +17,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const limitParsed = parseInt(Array.isArray(limit) ? limit[0] : limit || "10", 10);
 
   try {
-    const response = await fetch(
+    // --- Récupération des messages normaux ---
+    const messagesResponse = await fetch(
       `https://discord.com/api/v10/channels/${id}/messages?limit=${limitParsed}`,
       {
         headers: { Authorization: `Bot ${UNIQUE_DISCORD_TOKEN}` },
       }
     );
 
-    if (!response.ok) {
-      const text = await response.text(); // log de debug
-      console.error("Discord API error:", response.status, text);
+    if (!messagesResponse.ok) {
+      const text = await messagesResponse.text();
+      console.error("Discord API error:", messagesResponse.status, text);
       return res
-        .status(response.status)
+        .status(messagesResponse.status)
         .json({ error: "Impossible de récupérer les messages", details: text });
     }
 
-    const messages = await response.json();
-    res.status(200).json(messages);
+    const messages = await messagesResponse.json();
+
+    // --- Récupération du message épinglé ---
+    const pinnedResponse = await fetch(
+      `https://discord.com/api/v10/channels/${id}/pins`,
+      {
+        headers: { Authorization: `Bot ${UNIQUE_DISCORD_TOKEN}` },
+      }
+    );
+
+    let pinnedMessage = null;
+    if (pinnedResponse.ok) {
+      const pinnedMessages = await pinnedResponse.json();
+      pinnedMessage = pinnedMessages.length > 0 ? pinnedMessages[0] : null;
+    }
+
+    res.status(200).json({
+      pinnedMessage,
+      messages,
+    });
   } catch (error: any) {
     console.error("Erreur serveur API /channel/[id]:", error);
     res.status(500).json({ error: "Erreur serveur", details: error.message });
