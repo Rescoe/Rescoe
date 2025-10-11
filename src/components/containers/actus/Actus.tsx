@@ -23,7 +23,7 @@ interface ChannelFeedProps {
   channelId: string;
 }
 
-const CONTRACT_ADDRESS = "0xF050834a6cfdF20118B9f1e896739e7eD7FcF58c";
+const CONTRACT_ADDRESS = "0x93bDfC9d22E47BaFF14726F249603d844795dEE4";
 
 const ChannelFeed: React.FC<ChannelFeedProps> = ({ channelId }) => {
   const [messages, setMessages] = useState<DiscordMessage[]>([]);
@@ -73,16 +73,15 @@ const ChannelFeed: React.FC<ChannelFeedProps> = ({ channelId }) => {
   useEffect(() => {
     fetchMessages();
   }, [channelId, limit]);
+
+
   const mintMessage = async (msg: DiscordMessage) => {
     if (!(window as any).ethereum) {
-      toast({
-        title: "Wallet non détecté",
-        status: "error",
-        duration: 4000,
-        isClosable: true,
-      });
+      toast({ title: "Wallet non détecté", status: "error", duration: 4000, isClosable: true });
       return;
     }
+
+
 
     try {
       setMintingIds((prev) => [...prev, msg.id]);
@@ -93,120 +92,136 @@ const ChannelFeed: React.FC<ChannelFeedProps> = ({ channelId }) => {
       const accounts = await web3.eth.getAccounts();
       const account = accounts[0];
 
-      const contract = new web3.eth.Contract(MessageEditions as any, CONTRACT_ADDRESS);
+      const contract = new web3.eth.Contract((MessageEditions as any).abi ?? MessageEditions, CONTRACT_ADDRESS);
 
-      // --- Récupération des règles ---
-      let pricePerEdition = rules.price ?? 0.001;
-      let editionsForSale = rules.editions ?? 1;
-      let salonRoyaltyAddress = rules.splitAddress ?? account;
+      // --- Inspect ABI pour debug (trouve la signature de mint dans l'ABI) ---
+      const mintAbiEntry = ((MessageEditions as any).abi || []).find(
+        (a: any) => a.name === "mint" && a.type === "function"
+      );
+      //console.log("mint abi entry:", mintAbiEntry);
 
-      const priceMatch = msg.content.match(/\/prix (\d+(\.\d+)?)/i);
-      if (priceMatch) pricePerEdition = parseFloat(priceMatch[1]);
+      // --- Génération d'un vrai bytes32 via keccak/soliditySha3 ---
+      const keccak = web3.utils.soliditySha3({ type: "string", value: msg.id }) as string | null;
+      //console.log("keccak(msg.id) =>", keccak, "isHexStrict?", web3.utils.isHexStrict(keccak), "len:", keccak?.length);
 
-      const addressMatch = msg.content.match(/\/split (0x[a-fA-F0-9]{40})/i);
-      if (addressMatch) salonRoyaltyAddress = addressMatch[1];
+      if (!keccak) throw new Error("Impossible de calculer le keccak du message id");
 
-      const editionsMatch = msg.content.match(/\/editions (\d+)/i);
-      if (editionsMatch) editionsForSale = parseInt(editionsMatch[1]);
+      // --- Choix du type à envoyer selon l'ABI ---
+      const firstType = mintAbiEntry?.inputs?.[0]?.type;
+      let discordMessageParam: any;
+      if (!firstType || firstType === "bytes32") {
+        discordMessageParam = keccak; // 0x... (bytes32)
+      } else if (firstType === "uint256") {
+        // Convertit le hash en BN (uint256)
+        discordMessageParam = BigInt(keccak);
 
-      const durationMatch = rules.duration;
-      let mintDurationSeconds = 3600; // fallback 1h
-      if (durationMatch) {
-        const dur = durationMatch;
-        if (dur.endsWith("j")) mintDurationSeconds = parseInt(dur) * 24 * 3600;
-        else if (dur.endsWith("h")) mintDurationSeconds = parseInt(dur) * 3600;
-        else if (dur.endsWith("m")) mintDurationSeconds = parseInt(dur) * 60;
-        else mintDurationSeconds = parseInt(dur);
+      } else {
+        // fallback : envoie le hex (probablement bytes32 attendu)
+        discordMessageParam = keccak;
       }
+      //console.log("firstType:", firstType, "discordMessageParam:", discordMessageParam);
 
-      const mintDurationSecondsString = mintDurationSeconds.toString()
-      // --- Paramètres de mint pour ce test ---
-      const discordMessageIdFix = "1425418191232041001"; // ID du message Discord
-// Pour que ca marche mieux il faudrait essayer de changer le type du messagediscord dans le contrta solidity en bytes32 plutot que uint256. le nombre récupérer du messahe ou meme du hash est trop grand et ne passe pas sur un uint256 visiblement...
-/*
-      const messageData = `${msg.author.id}-${msg.timestamp}-${msg.content}`;
-      const messageHash = keccak256(messageData);
-      const messageIdBigInt = BigInt("0x" + messageHash); // ok
+      // --- Prépare les autres params proprement ---
+      const haiku = msg.content || " ";
+      const pricePerEdition = rules.price ?? 0.001;
+      const priceInWei = web3.utils.toWei(pricePerEdition.toString(), "ether");
+      const salonRoyaltyAddress = rules.splitAddress ?? account;
+      const editionsForSale = (() => {
+        const m = msg.content.match(/\/editions (\d+)/i);
+        return m ? parseInt(m[1], 10) : rules.editions ?? 1;
+      })();
+      const isOpenEdition = editionsForSale === 0;
+      const durationRule = rules.duration ?? "7j";
+      let mintDurationSeconds = 7 * 24 * 3600;
+      if (durationRule.endsWith("j")) mintDurationSeconds = parseInt(durationRule) * 24 * 3600;
+      else if (durationRule.endsWith("h")) mintDurationSeconds = parseInt(durationRule) * 3600;
+      else if (durationRule.endsWith("m")) mintDurationSeconds = parseInt(durationRule) * 60;
+      else mintDurationSeconds = parseInt(durationRule) || 7 * 24 * 3600;
 
-console.log("🔢 ID généré à partir du message :", messageIdBigInt.toString(10));
-*/
-      const haiku = msg.content || " "; // jamais vide
-      const priceInWei = web3.utils.toWei(pricePerEdition.toString(), "ether"); // string
-      let imageUrl = msg.attachments[0]?.url || " ";
+      const imageUrl = msg.attachments[0]?.url || "";
 
-      // --- Upload d’image sur IPFS (optionnel) ---
-      if (
-        msg.attachments.length > 0 &&
-        msg.attachments[0].content_type?.startsWith("image/")
-      ) {
-        try {
-          const file = await fetch(msg.attachments[0].url).then((r) => r.blob());
-          const formData = new FormData();
-          formData.append("file", file);
-          const imageResponse = await axios.post<{ IpfsHash: string }>(
-            "https://api.pinata.cloud/pinning/pinFileToIPFS",
-            formData,
-            {
-              headers: {
-                Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT}`,
-                "Content-Type": "multipart/form-data",
-              },
-            }
-          );
-          imageUrl = `https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${imageResponse.data.IpfsHash}`;
-        } catch (err) {
-          console.warn("IPFS upload échoué, mint sans image");
-        }
-      }
-
-      // Timestamp en secondes
       const messageTimestamp = Math.floor(new Date(msg.timestamp).getTime() / 1000);
+/*
+      console.log("params prepared:", {
+        discordMessageParam,
+        haiku,
+        priceInWei,
+        salonRoyaltyAddress,
+        imageUrl,
+        messageTimestamp,
+        mintDurationSeconds,
+        editionsForSale,
+        isOpenEdition,
+      });
+*/
+      // --- Tentative d'encodeABI pour voir si Web3 accepte les types ---
+      try {
+        const encoded = contract.methods
+          .mint(
+            discordMessageParam,
+            haiku,
+            priceInWei,
+            salonRoyaltyAddress,
+            imageUrl,
+            messageTimestamp,
+            mintDurationSeconds,
+            editionsForSale,
+            isOpenEdition
+          )
+          .encodeABI();
+        //console.log("encodeABI OK (preview):", encoded.slice(0, 140) + "...");
+      } catch (encErr) {
+        //console.error("encodeABI failed:", encErr);
+        throw encErr;
+      }
 
-      // --- Vérifications locales ---
-      const latestBlock = await web3.eth.getBlock("latest");
-      const chainTimestamp = Number(latestBlock.timestamp);
+      //console.log("msg.value (sent)", typeof priceInWei, priceInWei);
+      const valueToSend = BigInt(priceInWei);
 
 
-      //if (chainTimestamp > messageTimestamp + durationMatch) throw new Error("Période de mint expirée");
-
-      // --- Envoi de la TX ---
-      await contract.methods
+      // --- Estimation du gas (debug utile avant send) ---
+      const gasEstimate = await contract.methods
         .mint(
-          discordMessageIdFix,
+          discordMessageParam,
           haiku,
           priceInWei,
           salonRoyaltyAddress,
           imageUrl,
           messageTimestamp,
-          mintDurationSecondsString,
-          editionsForSale
+          mintDurationSeconds,
+          editionsForSale,
+          isOpenEdition
         )
-        .send({
-          from: account,
-          value: priceInWei,
-          gas: "500000",
-        });
+        .estimateGas({ from: account, value: priceInWei });
+      console.log("gasEstimate:", gasEstimate);
 
-      toast({
-        title: "Mint réussi",
-        description: `Message de ${msg.author.username} minté !`,
-        status: "success",
-        duration: 4000,
-        isClosable: true,
-      });
+      // --- Envoi de la TX ---
+      await contract.methods
+        .mint(
+          discordMessageParam,
+          haiku,
+          priceInWei,
+          salonRoyaltyAddress,
+          imageUrl,
+          messageTimestamp,
+          mintDurationSeconds,
+          editionsForSale,
+          isOpenEdition
+        )
+        .send({ from: account, value: valueToSend.toString(), gas: gasEstimate.toString() });
+
+      toast({ title: "Mint réussi", description: `Message de ${msg.author.username} minté !`, status: "success", duration: 4000, isClosable: true });
     } catch (err: any) {
       console.error("Mint échoué:", err);
-      toast({
-        title: "Mint échoué",
-        description: err?.message || "Erreur inconnue lors du mint.",
-        status: "error",
-        duration: 6000,
-        isClosable: true,
-      });
+      toast({ title: "Mint échoué", description: err?.message || "Erreur inconnue lors du mint.", status: "error", duration: 6000, isClosable: true });
     } finally {
       setMintingIds((prev) => prev.filter((id) => id !== msg.id));
     }
   };
+
+
+
+
 
   return (
     <Box maxWidth="700px" mx="auto" p={4}>
