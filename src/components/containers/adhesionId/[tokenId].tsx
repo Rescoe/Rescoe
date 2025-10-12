@@ -1,12 +1,11 @@
-import { useEffect, useState, useContext, createContext } from 'react';
-import { JsonRpcProvider, Contract, ethers, formatUnits  } from 'ethers';
-import detectEthereumProvider from '@metamask/detect-provider';
+// pages/.../TokenPage.tsx
+import { useEffect, useState } from 'react';
+import { JsonRpcProvider, Contract as EthersContract, formatUnits } from 'ethers';
 import Web3 from 'web3';
 
 import {
   Box,
   Button,
-  Divider,
   Heading,
   Image,
   Text,
@@ -20,115 +19,78 @@ import {
   Tab,
   TabPanels,
   TabPanel,
+  Divider,
 } from '@chakra-ui/react';
 import { useRouter } from 'next/router';
 import ABI from '../../../components/ABI/ABIAdhesion.json';
 import { useAuth } from '../../../utils/authContext';
-
 import ABI_Management from '../../../components/ABI/ABI_ADHESION_MANAGEMENT.json';
-
-
 
 interface NFTData {
   owner: string;
   role: number;
   mintTimestamp: string;
-  price: string;
+  price: string; // in ether (human readable)
   name: string;
   bio: string;
   remainingTime: string;
+  fin: string;
   forSale: boolean;
   membership: string;
-  image?: string;  // Ajouter une image optionnelle
+  image?: string;
 }
 
 const contractAdhesionManagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGER as string;
 const contractAdhesion = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS as string;
 
-
 const TokenPage = () => {
   const router = useRouter();
   const { tokenId } = router.query;
-  const { address: authAddress } = useAuth();
+
+  // USING THE AUTH PROVIDER FROM YOUR MINT PAGE
+  const { address: authAddress, web3: authWeb3, provider: authProvider } = useAuth();
 
   const [nftData, setNftData] = useState<NFTData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [membershipStatus, setMembershipStatus] = useState<string>('');
-  const [remainingTime, setRemainingTime] = useState<number>(0);
   const [name, setName] = useState<string>('');
   const [bio, setBio] = useState<string>('');
   const [price, setPrice] = useState<string>('');
-  const [provider, setProvider] = useState<any>(null);
-  const [web3, setWeb3] = useState<Web3 | null>(null);
-  const [isForSale, setIsForSale] = useState<boolean>(false); // Nouveau state
-  const [nftCache, setNFTCache] = useState<{ [key: string]: NFTData }>({}); // Cache typé
-  const [accounts, setAccounts] = useState<string[]>([]);
+  const [isForSale, setIsForSale] = useState<boolean>(false);
+  const [nftCache, setNFTCache] = useState<{ [key: string]: NFTData }>({});
 
-
+  // Helper formatters (tu avais déjà)
   function formatSeconds(seconds: number): string {
-      const days = Math.floor(seconds / (24 * 60 * 60));
-      const hours = Math.floor((seconds % (24 * 60 * 60)) / (60 * 60));
-      const minutes = Math.floor((seconds % (60 * 60)) / 60);
-      const remainingSeconds = seconds % 60;
+    const days = Math.floor(seconds / (24 * 60 * 60));
+    const hours = Math.floor((seconds % (24 * 60 * 60)) / (60 * 60));
+    const minutes = Math.floor((seconds % (60 * 60)) / 60);
+    const remainingSeconds = seconds % 60;
+    return `${days}j ${hours}h ${minutes}m ${remainingSeconds}s`;
+  }
+  function formatTimestamp(timestamp: number): string {
+    const date = new Date(timestamp * 1000);
+    return date.toLocaleString();
+  }
 
-      return `${days}j ${hours}h ${minutes}m ${remainingSeconds}s`;
-}
-
-function formatTimestamp(timestamp: number): string {
-  const date = new Date(timestamp * 1000); // Convertir en millisecondes
-  return date.toLocaleString(); // Format lisible selon les paramètres locaux
-}
-
-
-useEffect(() => {
-  const setupWeb3 = async () => {
-    try {
-      const detectedProvider = (await detectEthereumProvider()) as any;
-      if (detectedProvider) {
-        setProvider(detectedProvider);
-        const web3Instance = new Web3(detectedProvider);
-        setWeb3(web3Instance);
-        const userAccounts: string[] = await detectedProvider.request({ method: "eth_requestAccounts" });
-        setAccounts(userAccounts);
-      } else {
-        console.error("MetaMask not detected");
-      }
-    } catch (error) {
-      console.error("Error setting up Web3:");
-    }
-  };
-  setupWeb3();
-}, []);
-
-
-useEffect(() => {
-  console.log("router.isReady:", router.isReady);
-  console.log("contractAdhesion:", contractAdhesion);
-  console.log("tokenId:", tokenId);
-
-  if (!router.isReady || !contractAdhesion || !tokenId) return;
+  // WHEN ROUTER READY -> fetch NFT data (read-only)
+  useEffect(() => {
+    if (!router.isReady || !contractAdhesion || tokenId === undefined) return;
 
     setIsLoading(true);
 
     const fetchNFT = async () => {
       try {
-        // Assurez-vous que tokenId est bien un nombre
         const data = await fetchNFTData(contractAdhesion as string, Number(tokenId));
         setNftData(data);
-        setIsForSale(data.forSale); // Utilisez forSale au lieu de forsale
-
-        const remainingTimeInSeconds = Number(data.remainingTime); // Convertir le temps restant en nombre
-        setMembershipStatus(remainingTimeInSeconds > 0 ? 'actif' : 'expiré'); // Comparer en tant que nombre
-
+        setIsForSale(data.forSale);
+        const remainingTimeInSeconds = Number(data.remainingTime);
+        setMembershipStatus(remainingTimeInSeconds > 0 ? 'actif' : 'expiré');
         setName(data.name);
         setBio(data.bio);
         setPrice(data.price);
-        console.log(name);
-        console.log(bio);
-        console.log(price);
-      } catch (error) {
-        console.error('Erreur lors de la récupération du NFT:', error);
+      } catch (err) {
+        console.error('Erreur lors de la récupération du NFT:', err);
         setError('Erreur lors de la récupération des données.');
       } finally {
         setIsLoading(false);
@@ -138,137 +100,155 @@ useEffect(() => {
     fetchNFT();
   }, [router.isReady, contractAdhesion, tokenId]);
 
-  const fetchNFTData = async (contractAdhesion: string, tokenId: number) => {
-  const cacheKey = `${contractAdhesion}_${tokenId}`;
+  // READ function: utilise ethers.JsonRpcProvider pour lecture depuis Moralis (comme dans ton mint fetchUserCollections)
+  const fetchNFTData = async (contractAdhesionAddress: string, tokenIdNumber: number) => {
+    const cacheKey = `${contractAdhesionAddress}_${tokenIdNumber}`;
+    if (nftCache[cacheKey]) return nftCache[cacheKey];
 
-  if (nftCache[cacheKey]) {
-    return nftCache[cacheKey];
-  }
+    try {
+      const rpcProvider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+      const contract = new EthersContract(contractAdhesionAddress, ABI, rpcProvider);
+      const contractManagement = new EthersContract(contractAdhesionManagement, ABI_Management, rpcProvider);
 
-  try {
-    const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
-    const contract = new ethers.Contract(contractAdhesion, ABI, provider);
-    const contractmanagement = new ethers.Contract(contractAdhesionManagement, ABI_Management, provider);
+      // getTokenDetails retourne plusieurs champs (tu l'utilisais déjà)
+      const [
+        owner,
+        role,
+        mintTimestamp,
+        priceWei,
+        nameOnChain,
+        bioOnChain,
+        remainingTime,
+        forSale,
+      ] = await contract.getTokenDetails(tokenIdNumber);
 
+      // récupère infos utilisateurs dans le contract management
+      const [membership, realName, realBio] = await contractManagement.getUserInfo(owner);
 
-    const [
-      owner,
-      role,
-      mintTimestamp,
-      price,
-      name,
-      bio,
-      remainingTime,
-      forSale
-    ] = await contract.getTokenDetails(tokenId);
+      // tokenURI + fetch via ton proxy pinata
+      const uri = await contract.tokenURI(tokenIdNumber);
+      const ipfsHash = uri.split('/').pop();
+      const res = await fetch(`/api/proxyPinata?ipfsHash=${ipfsHash}`);
+      const metadata = await res.json();
+      const finAdhesion = new Date((Number(mintTimestamp) + 365 * 24 * 60 * 60) * 1000).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' });
 
-    const [
-      membership,
-      realName,
-      realBio
-    ] = await contractmanagement.getUserInfo(owner);
+      console.log(finAdhesion);
+      const nftData: NFTData = {
+        ...metadata,
+        owner,
+        role: Number(role),
+        mintTimestamp: formatTimestamp(Number(mintTimestamp)),
+        price: formatUnits(priceWei, 'ether'), // string (ether)
+        name: realName || nameOnChain,
+        bio: realBio || bioOnChain,
+        remainingTime: formatSeconds(Number(remainingTime)),
+        fin : finAdhesion,
+        forSale: Boolean(forSale),
+        membership,
+      };
 
-
-
-    const uri = await contract.tokenURI(tokenId);
-    const res = await fetch(`/api/proxyPinata?ipfsHash=${uri.split('/').pop()}`);
-    const data = await res.json();
-
-    const nftData = {
-      ...data,
-      owner,
-      role,
-      mintTimestamp: formatTimestamp(Number(mintTimestamp)), // Conversion et formatage
-      price: ethers.formatUnits(price, 'ether'),
-      name : realName,
-      bio : realBio,
-      remainingTime :formatSeconds(Number(remainingTime)), //: formatSeconds(Number(remainingTime)), // Conversion et formatage
-      forSale,
-      membership
-    };
-
-    console.log(nftData);
-
-    setNFTCache((prev) => ({ ...prev, [cacheKey]: nftData }));
-
-    return nftData;
-  } catch (error) {
-    console.error('Erreur lors de la récupération des données NFT:' );
-    throw new Error('Erreur lors de la récupération des données NFT.');
-  }
+      setNFTCache(prev => ({ ...prev, [cacheKey]: nftData }));
+      return nftData;
+    } catch (err) {
+      console.error('Erreur lors de la récupération des données NFT:', err);
+      throw new Error('Erreur lors de la récupération des données NFT.');
+    }
   };
+
+  // TRANSACTION helpers: on utilise authWeb3 (fourni par useAuth) pour les envois, comme dans ton mint
+  // Important: vérifier que authWeb3 et authAddress existent avant d'envoyer
 
   const handleRenewMembership = async () => {
-      // Vérifier que contractAdhesion est défini et est une chaîne
-      if (!contractAdhesion || Array.isArray(contractAdhesion)) {
-          console.error("Contract address is invalid");
-          return;
-      }
+    if (!contractAdhesion || Array.isArray(contractAdhesion)) {
+      console.error('Adresse de contrat invalide');
+      return;
+    }
+    if (!authWeb3 || !authAddress) {
+      alert('Veuillez vous connecter à MetaMask.');
+      return;
+    }
 
-      const contract = new ethers.Contract(contractAdhesion, ABI, provider); // Affirme que c'est un string
-      const price = await contract.mintPrice();
-      console.log(price);
-      // L'utilisateur peut renouveler son adhésion même si elle a expiré
-      try {
-
-          const tx = await contract.renewMembership(tokenId, { value: ethers.parseEther("0.005") });
-          await tx.wait();
-
-          alert('Adhésion renouvelée avec succès.');
-      } catch (error) {
-          console.error('Erreur lors du renouvellement de l\'adhésion:', error);
-      }
+    try {
+      const contract = new (authWeb3 as Web3).eth.Contract(ABI as any, contractAdhesion);
+      // obtenir mintPrice via call (en wei)
+      const mintPriceWei: string = await contract.methods.mintPrice().call();
+      // on envoie la tx en utilisant web3 (pattern identique à ton mint)
+      await contract.methods.renewMembership(Number(tokenId)).send({
+        from: authAddress,
+        value: mintPriceWei,
+      });
+      alert('Adhésion renouvelée avec succès.');
+    } catch (err) {
+      console.error('Erreur lors du renouvellement de l\'adhésion:', err);
+      alert('Erreur lors du renouvellement. Voir console.');
+    }
   };
 
-
   const handleUpdateInfo = async () => {
+    if (!contractAdhesion || !authWeb3 || !authAddress) {
+      alert('Veuillez vous connecter.');
+      return;
+    }
     try {
-      const contract = new ethers.Contract(contractAdhesion as string, ABI, provider); // Affirme que c'est un string
-      await contract.setNameAndBio(tokenId, name, bio); // Ajout du tokenId
-      alert("Informations mises à jour avec succès.");
-    } catch (error) {
-      console.error('Erreur lors de la mise à jour des informations:' );
+      const contract = new (authWeb3 as Web3).eth.Contract(ABI as any, contractAdhesion);
+      await contract.methods.setNameAndBio(Number(tokenId), name, bio).send({ from: authAddress });
+      alert('Informations mises à jour avec succès.');
+    } catch (err) {
+      console.error('Erreur lors de la mise à jour des informations:', err);
+      alert('Erreur lors de la mise à jour. Voir console.');
     }
   };
 
   const handleListForSale = async () => {
-    try {
-      const contract = new ethers.Contract(contractAdhesion as string, ABI, provider); // Affirme que c'est un string
-      await contract.listTokenForSale(tokenId, ethers.parseEther(price));
-      setIsForSale(true); // Ajoutez une variable locale si vous gérez l'état côté frontend
+    if (!contractAdhesion || !authWeb3 || !authAddress) {
+      alert('Veuillez vous connecter.');
+      return;
+    }
+    if (!price || isNaN(Number(price)) || Number(price) <= 0) {
+      alert('Prix invalide.');
+      return;
+    }
 
+    try {
+      const contract = new (authWeb3 as Web3).eth.Contract(ABI as any, contractAdhesion);
+      const priceWei = (authWeb3 as Web3).utils.toWei(price, 'ether');
+      await contract.methods.listTokenForSale(Number(tokenId), priceWei).send({ from: authAddress });
+
+      setIsForSale(true);
       alert('NFT mis en vente avec succès.');
-    } catch (error) {
-      console.error('Erreur lors de la mise en vente du NFT:' );
+    } catch (err) {
+      console.error('Erreur lors de la mise en vente du NFT:', err);
+      alert('Erreur lors de la mise en vente. Voir console.');
     }
   };
 
   const handlePurchase = async () => {
-    // Vérifiez que nftData n'est pas null avant de l'utiliser
     if (!nftData) {
-      console.error("nftData is not available.");
+      console.error('nftData is not available.');
+      return;
+    }
+    if (!contractAdhesion || !authWeb3 || !authAddress) {
+      alert('Veuillez vous connecter.');
       return;
     }
 
-    if (!web3) {
-        throw new Error('Web3 not initialized');
-    }
-
     try {
-      const contract = new ethers.Contract(contractAdhesion as string, ABI, provider);
-
-      const priceInEther: string = web3.utils.fromWei(nftData.price, 'ether')
-
-      const tx = await contract.buyNFT(tokenId, { value: priceInEther }); // Utilisez nftData ici
-      await tx.wait();
+      const contract = new (authWeb3 as Web3).eth.Contract(ABI as any, contractAdhesion);
+      // nftData.price est en ETH (string), on convertit en wei
+      const valueWei = (authWeb3 as Web3).utils.toWei(nftData.price, 'ether');
+      await contract.methods.buyNFT(Number(tokenId)).send({ from: authAddress, value: valueWei });
       alert('NFT acheté avec succès.');
-    } catch (error) {
-      console.error('Erreur lors de l\'achat du NFT:');
+      // Optionnel : rafraîchir les données
+      const updated = await fetchNFTData(contractAdhesion, Number(tokenId));
+      setNftData(updated);
+      setIsForSale(updated.forSale);
+    } catch (err) {
+      console.error('Erreur lors de l\'achat du NFT:', err);
+      alert('Erreur lors de l\'achat. Voir console.');
     }
   };
 
-
-  // UI Handling
+  // UI
   if (isLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
@@ -280,7 +260,7 @@ useEffect(() => {
   if (error) {
     return (
       <Box textAlign="center" mt={10}>
-        <Text fontSize="2xl" color="red.500">Une erreur est survenue</Text>
+        <Text fontSize="2xl" color="red.500">Une erreur est survenue... Tentez de recharger la page</Text>
       </Box>
     );
   }
@@ -294,12 +274,14 @@ useEffect(() => {
   }
 
   const isOwner = authAddress && authAddress.toLowerCase() === nftData.owner.toLowerCase();
-  const canPurchase = !isOwner && isForSale; // L'utilisateur ne doit pas être le propriétaire et le NFT doit être en vente
-
+  const isVendable = Number(nftData.remainingTime) === 0;
+  const canPurchase = !isOwner && isForSale;
 
   return (
     <Box textAlign="center" mt={10} p={6}>
-      <Heading as="h1" fontSize="3xl" mb={6}>Détails du NFT #{tokenId}</Heading>
+      <Heading as="h1" fontSize="3xl" mb={6}>
+        Carte d'adhesion de {nftData.name}
+      </Heading>
 
       <Image
         src={nftData.image || '/fallback-image.png'}
@@ -309,112 +291,99 @@ useEffect(() => {
         mb={6}
       />
 
-
       <Tabs variant="enclosed" colorScheme="teal">
         <TabList>
           <Tab>Détails</Tab>
-          {isOwner && <Tab>Mise en vente</Tab>} {/* Afficher si propriétaire */}
-          {isOwner && <Tab>Mise à jour</Tab>} {/* Afficher si propriétaire */}
-          {/* Optionnel : Historique */}
-          {isOwner && <Tab>Actions</Tab>}
-          {!isOwner && <Tab>Achat</Tab>} {/* Afficher si pas propriétaire */}
+          {isOwner && isVendable && <Tab>Mise en vente</Tab>}
+          {isOwner && <Tab>Mise à jour</Tab>}
+          {!isOwner && canPurchase && <Tab>Achat</Tab>}
         </TabList>
 
-
         <TabPanels>
+          {/* --- Onglet Détails --- */}
           <TabPanel>
             <VStack spacing={4} alignItems="start" mb={6}>
               <Text fontSize="lg"><strong>Nom :</strong> {nftData.name}</Text>
-              <Text fontSize="lg"><strong>Propriétaire actuel :</strong> {nftData.owner}</Text>
+              <Text fontSize="lg"><strong>Addresse dy propriétaire :</strong> {nftData.owner}</Text>
               <Text fontSize="lg"><strong>Rôle :</strong> {nftData.role === 1 ? 'Artiste' : 'Poète'}</Text>
               <Text fontSize="lg"><strong>Bio :</strong> {nftData.bio}</Text>
-              <Text fontSize="lg"><strong>Prix :</strong> {nftData.price} ETH</Text>
-              <Text fontSize="lg"><strong>Fin de l'adhésion dans :</strong> {nftData.remainingTime}</Text>
-              <Text fontSize="lg"><strong>Date de mint :</strong> {nftData.mintTimestamp}</Text>
-            </VStack>
-          </TabPanel>
+              {isForSale && (
+                <Text fontSize="lg">
+                  <strong>Prix :</strong> {nftData.price} ETH
+                </Text>
+              )}
+              <Text fontSize="lg"><strong>Durée restante d'adhésion :</strong> {nftData.remainingTime}</Text>
+              <Text fontSize="lg"><strong>Soit le </strong> {nftData.fin}</Text>
 
-
-                    <TabPanel>
-                    {isOwner && (
-                      <FormControl mt={4}>
-                        <FormLabel htmlFor="price">Prix pour mise en vente</FormLabel>
-                        <Input
-                          id="price"
-                          type="text"
-                          value={price}
-                          onChange={(e) => setPrice(e.target.value)}
-                          placeholder="Ex: 0.01"
-                        />
-                        <Button colorScheme="teal" mt={4} onClick={handleListForSale}>Mettre en vente</Button>
-                      </FormControl>
-                    )}
-
-                    {canPurchase ? (
-                            <Button colorScheme="green" mt={4} onClick={handlePurchase}>
-                              Acheter ce NFT
-                            </Button>
-                          ) : (
-                            <Text mt={4} color="red">
-                              Ce NFT n'est pas à vendre
-                            </Text>
-                          )}
-                    </TabPanel>
-
-          <TabPanel>
-            <FormControl mt={4}>
-              <FormLabel htmlFor="name">Nom</FormLabel>
-              <Input
-                id="name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Entrez votre nom"
-              />
-
-              <FormLabel htmlFor="bio">Biographie</FormLabel>
-              <Input
-                id="bio"
-                type="text"
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                placeholder="Entrez votre biographie"
-              />
-              <Button colorScheme="blue" mt={4} onClick={handleUpdateInfo}>Mettre à jour</Button>
-            </FormControl>
-          </TabPanel>
-
-
-{/* // TOute la partie historique pose problème, il faudra résoudre ca plus tard
-          <TabPanel>
-            <VStack spacing={2} alignItems="start">
-              <Text fontSize="lg"><strong>Historique des Événements</strong></Text>
-              {transactionHistory.length === 0 ? (
-                <Text>Aucun historique trouvé.</Text>
-              ) : (
-                transactionHistory.map((event, index) => (
-                  <Box key={index} p={4} borderWidth={1} borderRadius={10} width="full">
-                    <Text><strong>Type d'événement :</strong> {event.eventType}</Text>
-                    <Text><strong>Date :</strong> {new Date(event.timestamp * 1000).toLocaleString()}</Text>
-                    {event.details && <Text><strong>Détails :</strong> {event.details}</Text>}
-                  </Box>
-                ))
+              {/*<Text fontSize="lg"><strong>Adhésion en cours : </strong> {nftData.mintTimestamp}</Text>*/}
+              <Divider />
+              {isOwner && (
+                <Button colorScheme="blue" mt={4} onClick={handleRenewMembership}>
+                  Renouveler adhésion
+                </Button>
               )}
             </VStack>
           </TabPanel>
-*/}
 
-          <TabPanel>
-          {isOwner && (
-            <Button colorScheme="blue" mt={4} onClick={handleRenewMembership}>Renouveler adhesion</Button>
+          {/* --- Onglet Mise en vente (seulement si propriétaire et vendable) --- */}
+          {isOwner && isVendable && (
+            <TabPanel>
+              <FormControl mt={4}>
+                <FormLabel htmlFor="price">Prix pour mise en vente</FormLabel>
+                <Input
+                  id="price"
+                  type="text"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="Ex: 0.01"
+                />
+                <Button colorScheme="teal" mt={4} onClick={handleListForSale}>
+                  Mettre en vente
+                </Button>
+              </FormControl>
+            </TabPanel>
           )}
-          </TabPanel>
 
+          {/* --- Onglet Mise à jour (seulement si propriétaire) --- */}
+          {isOwner && (
+            <TabPanel>
+              <FormControl mt={4}>
+                <FormLabel htmlFor="name">Nom</FormLabel>
+                <Input
+                  id="name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Entrez votre nom"
+                />
+                <FormLabel htmlFor="bio">Biographie</FormLabel>
+                <Input
+                  id="bio"
+                  type="text"
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  placeholder="Entrez votre biographie"
+                />
+                <Button colorScheme="blue" mt={4} onClick={handleUpdateInfo}>
+                  Mettre à jour
+                </Button>
+              </FormControl>
+            </TabPanel>
+          )}
+
+          {/* --- Onglet Achat (si non propriétaire et à vendre) --- */}
+          {!isOwner && canPurchase && (
+            <TabPanel>
+              <Button colorScheme="green" mt={4} onClick={handlePurchase}>
+                Acheter ce NFT
+              </Button>
+            </TabPanel>
+          )}
         </TabPanels>
       </Tabs>
     </Box>
   );
-};
 
+};
 
 export default TokenPage;

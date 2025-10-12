@@ -41,6 +41,7 @@ interface RoleImageData {
   role: string;
   image: string;
   tokenId: number;
+  finAdhesion: string;
 }
 
 const Dashboard = () => {
@@ -52,6 +53,8 @@ const Dashboard = () => {
   const [name, setName] = useState<string>('');
   const [roles, setRoles] = useState<string[]>([]);
   const [biographies, setBiographies] = useState<string[]>([]);
+  const [finAdhesion, setFinAdhesion] = useState<string>('');
+
   const [usernames, setUserName] = useState<string[]>([]);
   const [images, setImages] = useState<string[]>([]);
   const [isCreatingCollection, setIsCreatingCollection] = useState<boolean>(false);
@@ -142,7 +145,7 @@ const Dashboard = () => {
     const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
     try {
       const resolvedEnsName = await provider.lookupAddress(userAddress);
-      setEnsName(resolvedEnsName || 'Pas d\'ENS associé');
+      setEnsName(resolvedEnsName || '');
     } catch (error) {
       console.error("Error fetching ENS:", error);
       setEnsName('Erreur lors de la récupération de l\'ENS');
@@ -170,6 +173,13 @@ const formatAddress = (address: string) => {
 
       const fetchedRolesAndImages: RoleImageData[] = await Promise.all(
         tokenIds.map(async (tokenId: number) => {
+          const fullDatas = await contractadhesion.getTokenDetails(tokenId); // On récupère toutes les données du 1er jeton possédé par l'utilisateur
+          const mintTimestamp = Number(fullDatas[2]);
+          // Calcul de la date de fin d'adhésion = 1 an après mint
+          const finAdhesion = new Date((mintTimestamp + 365 * 24 * 60 * 60) * 1000).toLocaleDateString('fr-FR', {
+            dateStyle: 'full',
+          });
+
           const tokenURI = await contractadhesion.tokenURI(tokenId);
           const response = await fetch(tokenURI);
           const metadata = await response.json();
@@ -178,6 +188,7 @@ const formatAddress = (address: string) => {
             role: metadata.role,
             image: metadata.image,
             tokenId: Number(tokenId),
+            finAdhesion,
           };
         })
       );
@@ -186,15 +197,25 @@ const formatAddress = (address: string) => {
       const roles = fetchedRolesAndImages.map((item) => item.role);
       const images = fetchedRolesAndImages.map((item) => item.image);
 
+
       setTokenIdAdherent(tokensIdsAdherents);
       setUserName([username]);
       setRoles(roles);
       setImages(images);
       setBiographies([bio]);
+
+      // Tu peux choisir d’afficher les infos du premier token par exemple :
+      if (fetchedRolesAndImages.length > 0) {
+        const first = fetchedRolesAndImages[0];
+
+        setFinAdhesion(first.finAdhesion);
+      }
     } catch (error) {
       console.error("Error fetching roles and images:", error);
     }
   };
+
+
 
   const fetchStatsCollection = async (userAddress: string) => {
     const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
@@ -317,6 +338,8 @@ const formatAddress = (address: string) => {
   }, [contratAdhesionManagement]);
 
 
+
+
   const buyAdhesionPoints = async (userAddress: string) => {
     if (!window.ethereum) {
       throw new Error("Wallet non détecté.");
@@ -381,22 +404,27 @@ const formatAddress = (address: string) => {
           <Heading mb={2}>{usernames[0]}</Heading>
           <Text fontSize="xl">{roles[0]}</Text>
           <Text fontSize="xl">{biographies[0]}</Text>
-          <Divider my={6} borderColor="gray.200" w="80%" mx="auto" />
-          <Text fontWeight="bold">Adresse Ethereum:</Text>
-          <Text
-            cursor="pointer"
-            color="blue.500"
-            onClick={() => {
-              if (address) {
-                navigator.clipboard.writeText(address); // copie l'adresse complète
-                alert("Adresse Ethereum copiée !");
-              }
-            }}
-          >
-            {formatAddress(address)} {/* Affichage raccourci */}
-          </Text>
 
-          {ensName && <Text fontWeight="bold" mt={2}>ENS: {ensName}</Text>}
+          <Divider my={6} borderColor="gray.200" w="80%" mx="auto" />
+
+          <Text fontSize="s"><strong>Fin de l'adhésion </strong> le {finAdhesion}</Text>
+
+          {ensName !== '' ? (
+            <Text fontWeight="bold" mt={2}>ENS: {ensName}</Text>
+          ) : (
+            <Text
+              cursor="pointer"
+              onClick={() => {
+                if (address) {
+                  navigator.clipboard.writeText(address); // copie l'adresse complète
+                  alert("Adresse Ethereum copiée !");
+                }
+              }}
+            >
+              <strong>Adresse Ethereum: </strong> {formatAddress(address)} {/* Affichage raccourci */}
+            </Text>
+            )}
+
         </Box>
       </HStack>
     </Box>
@@ -483,6 +511,8 @@ const formatAddress = (address: string) => {
                   +
                 </Button>
 
+                <Divider/>
+
                 <Button
                   size="sm"
                   colorScheme="purple"
@@ -494,6 +524,8 @@ const formatAddress = (address: string) => {
                 >
                   Acheter
                 </Button>
+
+
               </HStack>
             </Box>
 
@@ -504,15 +536,25 @@ const formatAddress = (address: string) => {
                 <Text>
                   <strong>Nom :</strong> {usernames[0] || 'Non défini'}
                 </Text>
-                <Text>
-                  <strong>ENS :</strong> {ensName}
-                </Text>
-                <Text>
-                  <strong>Adresse :</strong> {formatAddress(address)}
-                </Text>
+                {ensName !== '' ? (
+                  <Text fontWeight="bold" mt={2}>ENS: {ensName}</Text>
+                ) : (
+                  <Text
+                    cursor="pointer"
+                    onClick={() => {
+                      if (address) {
+                        navigator.clipboard.writeText(address); // copie l'adresse complète
+                        alert("Adresse Ethereum copiée !");
+                      }
+                    }}
+                  >
+                    <strong>Adresse Ethereum: </strong> {formatAddress(address)} {/* Affichage raccourci */}
+                  </Text>
+                  )}
                 <Text>
                   <strong>Bio :</strong> {biographies[0]}
                 </Text>
+
                 <Divider />
                 <Text>
                   <strong>Collections créées :</strong> {userCollections}
@@ -521,7 +563,6 @@ const formatAddress = (address: string) => {
                   <strong>Collections restantes :</strong> {remainingCollections}
                 </Text>
 
-                <Text mt={4}>Points d'Adhésion : </Text>
                 {rewardPoints !== null ? (
                   <Text>Vos points Rescoe : {rewardPoints} 🐝</Text>
                 ) : (
