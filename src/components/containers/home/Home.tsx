@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Box, Heading, Text, Button, VStack, Grid, GridItem, Divider, Icon, Flex, Input, FormLabel, Select, Checkbox, useColorModeValue, SimpleGrid, Stack,Collapse, HStack } from '@chakra-ui/react';
+import { Box, Heading, Text, Button, VStack, Grid, GridItem, Divider, Icon, Flex, Input, FormLabel, Select, Checkbox, useColorModeValue, SimpleGrid, Stack,Collapse, HStack, Image } from '@chakra-ui/react';
 import { FaBookOpen, FaUsers, FaLightbulb, FaHandsHelping, FaPaintBrush, FaGraduationCap, FaHandshake   } from 'react-icons/fa';
 //import useCheckMembership from '../../../utils/useCheckMembership';
 import NextLink from 'next/link';
@@ -10,6 +10,8 @@ import DynamicCarousel from '../../../utils/DynamicCarousel'; // Assurez-vous d'
 import HeroSection from '../../../utils/HeroSection'; // Assurez-vous d'importer le bon chemin
 import ABIRESCOLLECTION from '../../ABI/ABI_Collections.json';
 import { useRouter } from 'next/router';
+import { motion } from "framer-motion";
+
 
 const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!;
 
@@ -327,367 +329,255 @@ useEffect(() => {
 
     const maxBoxHeight = "150px"; // Hauteur max pour toutes les boîtes
 
-
     return (
 
-
       <Box
-    mt={5}
-    textAlign="center"
-    w="100vw"
-    maxW="100%"
+      as={motion.div}
+      w="100%"
+      textAlign="center"
+      position="relative"
+      overflow="hidden"
   >
-
-        <Heading
-          size={{ base: "lg", md: "xl" }}
-          bgGradient="linear(to-r, purple.400, pink.400)"
-          bgClip="text"
-          mb={{ base: 4, md: 6 }}
-          fontWeight="extrabold"
-          letterSpacing="wide"
-          transition="transform 0.3s ease"
-          _hover={{ transform: "scale(1.05)" }}
-          tabIndex={0}
+        {/* SECTION INTRO / PRESENTATION */}
+        <motion.div
+          initial={{ opacity: 0, y: -30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.9, ease: "easeOut" }}
         >
-          Bienvenue sur le premier réseau solidaire expérimental <br /> d'art digital en France
-        </Heading>
-
-        <Box
-        py={{ base: 8, md: 12 }}
-        mt={{ base: 6, md: 10 }}
-        px={{ base: 4, md: 8 }}
-        maxW="1200px"
-        w="100%"
-        mx="auto"
-        >
-
-
-
-          <HeroSection nfts={nfts} haikus={haikus} />
-
-
-
-
-        </Box>
-
-        <VStack
-        boxShadow="dark-lg"
-        borderWidth={1}
-        borderRadius="lg"
-        border="1px solid"
-        borderColor="purple.300"
-        maxWidth="95%" // Limite la largeur de la box
-        mx="auto"
-        >
-
-        <Box mt={8}>
-
-        <Heading
-          size={{ base: "lg", md: "xl" }}
-          bgGradient="linear(to-r, purple.400, pink.400)"
-          bgClip="text"
-          mb={{ base: 4, md: 6 }}
-          fontWeight="extrabold"
-          letterSpacing="wide"
-          transition="transform 0.3s ease"
-          _hover={{ transform: "scale(1.05)" }}
-          tabIndex={0}
-        >
-        Découvrez, soutenez, participez.
-        </Heading>
-
-
-
-          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={12} mb={12}>
-            {benefits.map((benefit, index) => (
-              <Box
-                key={index}
-                as="button"
-                onClick={() => toggle(index)}
-                role="group"
-                px={{ base: 8, md: 10 }}
-                py={{ base: 6, md: 8 }}
-                borderRadius="lg"
-                bg="dark-lg"
-                boxShadow="md"
-                cursor="pointer"
-                transition="all 0.3s ease"
-                _hover={{
-                  bgGradient: "linear(to-r, purple.900, pink.800)",
-                  color: "white",
-                  boxShadow: "xl",
-                  transform: "scale(1.05)",
-                }}
-                _focus={{
-                  boxShadow: "outline",
-                }}
-                aria-label={`Avantage: ${benefit.title}`}
-                tabIndex={0}
-              >
-                <Stack align="center" spacing={4}>
-                  <Icon
-                    as={benefit.icon}
-                    boxSize={12}
-                    color="purple.600"
-                    _groupHover={{ color: "white" }}
-                    transition="color 0.3s ease"
-                  />
-                  <Text
-                    fontWeight="bold"
-                    fontSize={{ base: "lg", md: "xl" }}
-                    _groupHover={{ color: "white" }}
-                    transition="color 0.3s ease"
-                    textAlign="center"
-                  >
-                    {benefit.title}
-                  </Text>
-                  <Collapse in={openIndex === index} animateOpacity>
-                    <Text
-                      mt={4}
-                      fontSize="md"
-                      color={openIndex === index ? "whiteAlpha.900" : "gray.600"}
-                      maxW="320px"
-                      mx="auto"
-                    >
-                      {benefit.description}
-                    </Text>
-                  </Collapse>
-                </Stack>
-              </Box>
-            ))}
-          </SimpleGrid>
-
-          <Flex justify="center" mt={8}>
-            <NextLink href="/adhesion" passHref>
-              <Button
-                px={{ base: 8, md: 10 }}
-                py={{ base: 5, md: 6 }}
-                fontSize={{ base: "md", md: "lg" }}
-                fontWeight="bold"
-                borderRadius="full"
-                bgGradient="linear(to-r, purple.700, pink.600)"
-                color="white"
-                boxShadow="lg"
-                _hover={{
-                  transform: "scale(1.07)",
-                  boxShadow: "2xl",
-                }}
-                _active={{
-                  transform: "scale(0.97)",
-                }}
-                transition="all 0.25s ease"
-                aria-label="Bouton adhésion"
-              >
-                Adhérez Maintenant
-              </Button>
-            </NextLink>
-          </Flex>
-        </Box>
-
-        <Heading
-          size={{ base: "lg", md: "xl" }}
-          mb={6}
-          mt={12}
-          color="gray.100"
-          fontWeight="extrabold"
-        >
-          Rejoignez un réseau d'art numérique et de poésie solidaire
-        </Heading>
-
-
-          <Heading
-            as="h2"
-            size={{ base: "md", md: "lg" }}
-            mb={5}
-            color="purple.300"
-            fontWeight="semibold"
-            letterSpacing="wider"
-          >
-            Nos missions :
-          </Heading>
-          <Text
-            fontSize={{ base: "sm", md: "md" }}
-            maxW="700px"
+          <Box
+            py={{ base: 12, md: 20 }}
+            px={{ base: 6, md: 10 }}
+            textAlign="center"
+            maxW="1100px"
             mx="auto"
-            color="gray.300"
-            lineHeight="tall"
           >
-            RESCOE soutient les artistes émergents en leur offrant un accès privilégié à des outils numériques innovants, permettant de développer leur art à travers l'art génératif, la blockchain et l'art digital. <br /> Notre mission est de favoriser l'émergence de ce nouveau courant artistique en organisant des ateliers d'initiation au crypto-art, où chacun peut créer et minter ses premières œuvres sur notre plateforme décentralisée, tout en assurant la vente et la protection de ses droits.
-          </Text>
+            <Heading
+              size={{ base: "xl", md: "2xl" }}
+              bgGradient="linear(to-r, purple.300, pink.400)"
+              bgClip="text"
+              fontWeight="extrabold"
+              mb={6}
+            >
+              RESCOE — Réseau Expérimental Solidaire de Crypto Œuvres Émergentes
+            </Heading>
 
-          <Divider my={6} borderColor="purple.700" w="80%" mx="auto" />
+            <Text
+              color="gray.300"
+              fontSize={{ base: "md", md: "lg" }}
+              maxW="800px"
+              mx="auto"
+              lineHeight="tall"
+            >
+              Une association Web3 dédiée à la création, la formation et la
+              valorisation de l’art numérique et poétique. Rejoignez une nouvelle
+              génération d’artistes connectés, solidaires et décentralisés.
+            </Text>
 
-          <Grid
-          py={{ base: 8, md: 12 }}
-          px={{ base: 4, md: 8 }}
-            templateColumns={{ base: "1fr", md: "repeat(3, 1fr)" }}
-            gap={6}
-            w="100%"
-            role="list"
-            aria-label="Liste des missions"
-          >
-            {[
-              {
-                icon: FaLightbulb,
-                title: "Un réseau solidaire",
-                description:
-                  "Faites partie d'un réseau unique, dédié à la création d'oeuvres digitales et à l'intégration de la blockchain dans l'art'.",
-              },
-              {
-                icon: FaHandsHelping,
-                title: "Engagé pour l'art",
-                description:
-                  "Vous soutenez directement des artistes émergents et contribuez à un projet artistique innovant.",
-              },
-              {
-                icon: FaBookOpen,
-                title: "Poétique et technologique",
-                description:
-                  "Créez, vendez et protégez vos droits, tout en explorant les potentialités des technologies numériques.",
-              },
-            ].map(({ icon, title, description }) => (
-              <GridItem
-                key={title}
-                role="listitem"
-                aria-label={title}
-                tabIndex={0}
-              >
-                <Box
-                  textAlign="center"
-                  p={6}
-                  bg="blackAlpha.400"
-                  borderRadius="lg"
-                  boxShadow="md"
-                  transition="transform 0.3s ease, box-shadow 0.3s ease"
-                  _hover={{ transform: "scale(1.05)", boxShadow: "xl" }}
-                  cursor="pointer"
+            <SimpleGrid
+              columns={{ base: 1, md: 3 }}
+              spacing={10}
+              mt={10}
+              textAlign="center"
+            >
+              {[
+                {
+                  title: "Art & Blockchain",
+                  icon: "/visuels/icon-blockchain.svg",
+                  desc: "Minez vos œuvres, protégez vos droits et exposez vos créations sur la blockchain.",
+                },
+                {
+                  title: "Formation & Transmission",
+                  icon: "/visuels/icon-community.svg",
+                  desc: "Initiez-vous à l’art génératif et au Web3 à travers nos ateliers et résidences.",
+                },
+                {
+                  title: "Communauté Solidaire",
+                  icon: "/visuels/icon-reseau.svg",
+                  desc: "Soutenez, échangez, collaborez avec d’autres artistes et poètes du réseau.",
+                },
+              ].map((item, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.7, delay: i * 0.2 }}
+                  viewport={{ once: true }}
                 >
-                  <Icon as={icon} boxSize={12} mb={4} color="purple.400" />
-                  <Heading
-                    as="h3"
-                    size="md"
-                    mb={3}
-                    color="purple.300"
-                    fontWeight="semibold"
+                  <VStack
+                    bg="whiteAlpha.50"
+                    borderRadius="2xl"
+                    boxShadow="0 4px 30px rgba(0,0,0,0.2)"
+                    backdropFilter="blur(6px)"
+                    p={6}
+                    h="100%"
                   >
-                    {title}
-                  </Heading>
-                  <Text fontSize="md" color="gray.300" lineHeight="tall">
-                    {description}
-                  </Text>
-                </Box>
-              </GridItem>
-            ))}
-          </Grid>
+                    <Image
+                      src={item.icon}
+                      alt={item.title}
+                      boxSize="60px"
+                      mb={3}
+                      mx="auto"
+                    />
+                    <Heading
+                      size="md"
+                      color="purple.300"
+                      fontWeight="bold"
+                      mb={2}
+                    >
+                      {item.title}
+                    </Heading>
+                    <Text color="gray.400" fontSize="sm">
+                      {item.desc}
+                    </Text>
+                  </VStack>
+                </motion.div>
+              ))}
+            </SimpleGrid>
+          </Box>
+        </motion.div>
 
+        {/* HERO SECTION */}
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1.1, ease: "easeOut" }}
+          viewport={{ once: true }}
+        >
+
+        <Box py={{ base: 10, md: 16 }} w="100%">
+        <HeroSection nfts={nfts} haikus={haikus} />
+      </Box>
+
+
+        </motion.div>
+
+        {/* SECTION BENEFICES */}
+        <motion.div
+          initial={{ opacity: 0, x: -50 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.9 }}
+          viewport={{ once: true }}
+        >
+          <VStack
+            boxShadow="xl"
+            borderRadius="2xl"
+            bg="blackAlpha.600"
+            p={{ base: 8, md: 12 }}
+            maxW="95%"
+            mx="auto"
+          >
+            <Heading
+              size={{ base: "lg", md: "xl" }}
+              bgGradient="linear(to-r, purple.400, pink.400)"
+              bgClip="text"
+              mb={6}
+              fontWeight="extrabold"
+            >
+              Découvrez, soutenez, participez.
+            </Heading>
+
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={10}>
+              {benefits.map((benefit, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: index * 0.1 }}
+                  viewport={{ once: true }}
+                >
+                  <Box
+                    as="button"
+                    onClick={() => toggle(index)}
+                    role="group"
+                    px={10}
+                    py={8}
+                    borderRadius="xl"
+                    bg="whiteAlpha.50"
+                    boxShadow="md"
+                    cursor="pointer"
+                    transition="all 0.3s ease"
+                    _hover={{
+                      bgGradient: "linear(to-r, purple.900, pink.800)",
+                      transform: "scale(1.05)",
+                    }}
+                  >
+                    <Stack align="center" spacing={4}>
+                      <Icon
+                        as={benefit.icon}
+                        boxSize={12}
+                        color="purple.400"
+                        _groupHover={{ color: "white" }}
+                      />
+                      <Text
+                        fontWeight="bold"
+                        fontSize="xl"
+                        _groupHover={{ color: "white" }}
+                      >
+                        {benefit.title}
+                      </Text>
+                      <Collapse in={openIndex === index} animateOpacity>
+                        <Text mt={3} color="gray.300">
+                          {benefit.description}
+                        </Text>
+                      </Collapse>
+                    </Stack>
+                  </Box>
+                </motion.div>
+              ))}
+            </SimpleGrid>
+
+            <Button
+              mt={10}
+              px={10}
+              py={6}
+              fontWeight="bold"
+              borderRadius="full"
+              bgGradient="linear(to-r, purple.700, pink.600)"
+              color="white"
+              boxShadow="lg"
+              _hover={{ transform: "scale(1.07)" }}
+              as={NextLink}
+              href="/adhesion"
+            >
+              Adhérez Maintenant
+            </Button>
+          </VStack>
+        </motion.div>
+
+        {/* SECTION MISSIONS + CAROUSEL */}
+        <motion.div
+          initial={{ opacity: 0, y: 50 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1 }}
+          viewport={{ once: true }}
+        >
+          <VStack spacing={8} mt={12}>
+            <Heading size="xl" color="gray.100" fontWeight="extrabold">
+              Rejoignez un réseau d'art numérique et de poésie solidaire
+            </Heading>
+            <Text
+              fontSize={{ base: "sm", md: "md" }}
+              maxW="800px"
+              textAlign="center"
+              color="gray.300"
+            >
+              RESCOE soutient les artistes émergents en leur offrant un accès
+              privilégié à des outils numériques innovants et à des formations
+              accessibles. <br />
+              Explorez l’art génératif, le Web3 et l’expression poétique sous un
+              nouveau jour.
+            </Text>
           </VStack>
 
-          <Divider my={6} borderColor="purple.700" w="80%" mx="auto" />
+          <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
 
-          <VStack>
+          <Box w="100%" position="relative">
+            <DynamicCarousel nfts={nfts} haikus={haikus} />
+          </Box>
 
-
-          <Box mt={8} maxW="600px" mx="auto" px={4}>
-      <VStack
-        spacing={6}
-        wrap={{ base: "wrap", md: "nowrap" }}
-        justify="center"
-      >
-        <NextLink href="/collections" passHref>
-          <Button
-            flex="1 1 180px"
-            py={5}
-            fontSize="md"
-            fontWeight="semibold"
-            borderRadius="full"
-            bgGradient="linear(to-r, purple.700, pink.600)"
-            color="white"
-            boxShadow="0 4px 12px rgba(127, 86, 217, 0.4)"
-
-            _hover={{
-              bg: "white",
-              color: "purple.700",
-              boxShadow: "0 6px 16px rgba(127, 86, 217, 0.6)",
-              transform: "scale(1.05)",
-            }}
-            _active={{ transform: "scale(0.97)" }}
-            aria-label="Découvrez nos collections d'art"
-          >
-            Collections d'art
-          </Button>
-        </NextLink>
-
-        <NextLink href="/ateliers" passHref>
-          <Button
-            flex="1 1 180px"
-            py={5}
-            fontSize="md"
-            fontWeight="semibold"
-            borderRadius="full"
-            bgGradient="linear(to-r, purple.700, pink.600)"
-            color="white"
-            boxShadow="0 4px 12px rgba(127, 86, 217, 0.4)"
-
-            _hover={{
-              bg: "white",
-              color: "pink.600",
-
-              boxShadow: "0 6px 16px rgba(219, 39, 119, 0.6)",
-              transform: "scale(1.05)",
-            }}
-            _active={{ transform: "scale(0.97)" }}
-            aria-label="Rejoignez nos ateliers"
-          >
-            Ateliers Web3
-          </Button>
-        </NextLink>
-
-        <NextLink href="/evenements" passHref>
-          <Button
-            flex="1 1 180px"
-            py={5}
-            fontSize="md"
-            fontWeight="semibold"
-            borderRadius="full"
-            bgGradient="linear(to-r, purple.700, pink.600)"
-            color="white"
-            transition="all 0.3s ease"
-            boxShadow="0 4px 12px rgba(127, 86, 217, 0.4)"
-
-            _hover={{
-              bg: "white",
-              color: "red.500",
-
-              boxShadow: "0 6px 16px rgba(225, 29, 72, 0.6)",
-              transform: "scale(1.05)",
-            }}
-            _active={{ transform: "scale(0.97)" }}
-            aria-label="Participez à nos événements"
-          >
-            Événements
-          </Button>
-        </NextLink>
-      </VStack>
-    </Box>
-
-          <Divider my={6} borderColor="purple.700" w="100%" mx="auto" />
-
-          <Heading
-            as="h2"
-            size="lg"
-            mb={5}
-            color="purple.300"
-            fontWeight="semibold"
-          >
-            Quelques créations et poèmes associés aléatoirement :
-          </Heading>
-          <DynamicCarousel nfts={nfts} haikus={haikus} />
-        </VStack>
+        </motion.div>
       </Box>
     );
-
-  };
-
-
+};
 
 export default Home;

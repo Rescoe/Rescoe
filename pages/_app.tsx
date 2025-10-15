@@ -10,7 +10,6 @@ import { SessionProvider } from 'next-auth/react';
 import type { AppProps } from 'next/app';
 import { isMobile } from 'react-device-detect';
 
-import '../styles/globals.css'; // Assure-toi que le chemin est correct
 
 
 // Créer un client de requête
