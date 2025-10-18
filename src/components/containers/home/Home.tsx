@@ -11,6 +11,9 @@ import HeroSection from '../../../utils/HeroSection'; // Assurez-vous d'importer
 import ABIRESCOLLECTION from '../../ABI/ABI_Collections.json';
 import { useRouter } from 'next/router';
 import { motion } from "framer-motion";
+import RelatedFull from '../../../utils/RelatedFull'; // Assurez-vous d'importer le bon chemin
+
+
 
 
 const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!;
@@ -47,7 +50,7 @@ const bgCard = useColorModeValue("white", "gray.800");
 const colorCard = useColorModeValue("gray.800", "white");
 
 interface Haiku {
-  poemText: string;
+  poemText: string[];  // Change this to string[] if it's meant to be an array of strings.
   poet?: string;
   mintContractAddress: string;
   uniqueIdAssociated: string;
@@ -75,13 +78,17 @@ interface Nft {
       imageUrl: string;
       mintContractAddress: string;
       isFeatured: boolean;
-
     }
+
 
 // Typage de l'état `nfts` avec `Nft[]` (un tableau d'objets de type Nft)
 const [nfts, setNfts] = useState<Nft[]>([]);
 const [collections, setCollections] = useState<Collection[]>([]);
 const [openIndex, setOpenIndex] = useState<number | null>(null);
+
+const [nftsByCollection, setNftsByCollection] = useState<Record<string, Nft[]>>({});
+const [haikusByCollection, setHaikusByCollection] = useState<Record<string, Haiku[]>>({});
+
 
 function toggle(index: number) {
   setOpenIndex(openIndex === index ? null : index);
@@ -142,7 +149,7 @@ const fetchCollections = async () => {
     // ⚠️ On ne garde que les objets valides
     const featured = collectionsData.filter((col): col is Collection => col !== null);
 
-    ////console.log("Collections FEATURED :", featured);
+    //////console.log("Collections FEATURED :", featured);
     setCollections(featured);
   } catch (error) {
     console.error("Erreur lors du chargement des collections featured :", error);
@@ -151,47 +158,36 @@ const fetchCollections = async () => {
   }
 };
 
-
-// Récupérer les poèmes (haikus)
 const fetchPoems = async (collectionId: string, associatedAddress: string): Promise<void> => {
   setIsLoading(true);
   try {
     const collectionContract = new Contract(associatedAddress, haikuContractABI, provider);
-    const uniqueTokenCount = await collectionContract.getLastUniqueHaikusMinted();  //Nombre de poemes unique dans la collection (independant du nombre d'editions)
+    const uniqueTokenCount = await collectionContract.getLastUniqueHaikusMinted();
 
-    const tokenIds = Array.from({ length: Number(uniqueTokenCount) }, (_, i) => i + 2);
+    if (uniqueTokenCount === 0) {
+      setHaikusByCollection(prev => ({ ...prev, [collectionId]: [] }));
+      return;
+    }
+
+    const tokenIds = Array.from({ length: Number(uniqueTokenCount) }, (_, i) => i + 1);
 
     const poemsData = await Promise.all(
       tokenIds.map(async (tokenId) => {
         const haikuText = await collectionContract.getTokenFullDetails(tokenId);
+        if (!Array.isArray(haikuText) || haikuText.length < 7) return null;
 
-
-        const poemText = haikuText[6];
-        //console.log(poemText);
-        const totalEditions = await collectionContract.getRemainingEditions(tokenId);
-        //console.log(totalEditions);
-        //const price = haikuText[4];
         const uniqueIdAssociated = await collectionContract.tokenIdToHaikuId(tokenId);
 
-        //console.log(uniqueIdAssociated);
         return {
           tokenId: tokenId.toString(),
-          poemText: haikuText, // Ici on envoi toute les données du poemes, pas que le texte en fait
+          poemText: haikuText,
           mintContractAddress: associatedAddress,
-          uniqueIdAssociated: Number(uniqueIdAssociated).toString(), // On converti le bingInt en number puis en string c'est plus simple de tput avoir en string
-          /*}
-          creatorAddress: creatorAddress,
-
-          totalEditions: totalEditions.toString(),
-          mintContractAddress: associatedAddress,
-          price: price.toString(),
-          */
+          uniqueIdAssociated: Number(uniqueIdAssociated).toString(),
         };
       })
-    );
+    ).then(results => results.filter(result => result !== null));
 
-    setHaikus(poemsData);
-    //console.log(poemsData);
+    setHaikusByCollection(prev => ({ ...prev, [collectionId]: poemsData }));
 
   } catch (error) {
     console.error('Error fetching poems:', error);
@@ -200,14 +196,18 @@ const fetchPoems = async (collectionId: string, associatedAddress: string): Prom
   }
 };
 
+
+
 const fetchNFTs = async (collectionId: string, associatedAddress: string): Promise<void> => {
   setIsLoading(true);
 
   try {
     const collectionContract = new Contract(associatedAddress, nftContractABI, provider);
+    ////console.log(`Récupération des NFTs pour la collection : ${collectionId}`);
 
     // Récupère le max et limite à 10
     let max = await collectionContract.getLastMintedTokenId();
+    ////console.log(`Max tokens pour la collection ${collectionId}:`, max);
     if (max > 9) max = 9;
     const pagination = Number(max) + 1;
     const tokenIds = await collectionContract.getTokenPaginated(0, pagination);
@@ -235,29 +235,35 @@ const fetchNFTs = async (collectionId: string, associatedAddress: string): Promi
 
           // Retourne un objet NFT normalisé
           return {
-            tokenId: tokenId.toString(),
             image: metadata.image,
             name: metadata.name,
-            description: metadata.description,
-            price: metadata.price || 'Non défini',
-            tags: metadata.tags || [],
-            mintContractAddress: associatedAddress,
-            artist: metadata.artist || "Inconnu",
+            artist: metadata.artist || "her",
+            content: {
+              tokenId: tokenId.toString(),
+              mintContractAddress: associatedAddress,
+            }
           };
+
         } catch (error) {
-          console.warn(`⚠️ Erreur pour le tokenId ${tokenId}:`);
+          console.warn(`⚠️ Erreur pour le tokenId ${tokenId}:`, error);
           return null;
         }
       })
     );
 
-    setNfts(nftsData.filter(nft => nft !== null));
+    // Mettre à jour l'état pour cette collection
+    setNftsByCollection((prev) => ({
+      ...prev,
+      [collectionId]: nftsData.filter(nft => nft !== null),
+    }));
   } catch (error) {
     console.error('Erreur lors de la récupération des NFTs:', error);
   } finally {
     setIsLoading(false);
   }
 };
+
+
 
 
 //Use effetc appelé deux fois, probleme récurrent. On Evite les doublons ici :
@@ -288,17 +294,17 @@ const fetchAllNFTsAndPoems = async () => {
   const randomArtCollections = getRandomItems(artCollections, 5);
   const randomPoetryCollections = getRandomItems(poetryCollections, 5);
 
-  //console.log("Collections d'art sélectionnées :", randomArtCollections.map(c => c.id));
-  //console.log("Collections de poésie sélectionnées :", randomPoetryCollections.map(c => c.id));
+  ////console.log("Collections d'art sélectionnées :", randomArtCollections.map(c => c.id));
+  ////console.log("Collections de poésie sélectionnées :", randomPoetryCollections.map(c => c.id));
 
   // Récupérer les NFTs pour les collections d'art
   for (const collection of randomArtCollections) {
     if (collection && !fetchedCollections.current.has(collection.id)) {
-      //console.log(`Récupération des NFTs pour la collection d'art ${collection.id}...`);
+      ////console.log(`Récupération des NFTs pour la collection d'art ${collection.id}...`);
       const nftsBefore = nfts.length;
       await fetchNFTs(collection.id, collection.mintContractAddress);
       const nftsAfter = nfts.length;
-      //console.log(`Collection ${collection.id} récupérée : ${nftsAfter - nftsBefore} NFTs ajoutés`);
+      ////console.log(`Collection ${collection.id} récupérée : ${nftsAfter - nftsBefore} NFTs ajoutés`);
       fetchedCollections.current.add(collection.id); // Marquez comme récupérée
     }
   }
@@ -306,17 +312,17 @@ const fetchAllNFTsAndPoems = async () => {
   // Récupérer les poèmes pour les collections de poésie
   for (const collection of randomPoetryCollections) {
     if (collection && !fetchedCollections.current.has(collection.id)) {
-      //console.log(`Récupération des poèmes pour la collection ${collection.id}...`);
+      ////console.log(`Récupération des poèmes pour la collection ${collection.id}...`);
       const poemsBefore = haikus.length; // si tu as un state "poems"
       await fetchPoems(collection.id, collection.mintContractAddress);
       const poemsAfter = haikus.length;
-      //console.log(`Collection ${collection.id} récupérée : ${poemsAfter - poemsBefore} poèmes ajoutés`);
+      ////console.log(`Collection ${collection.id} récupérée : ${poemsAfter - poemsBefore} poèmes ajoutés`);
       fetchedCollections.current.add(collection.id); // Marquez comme récupérée
     }
   }
 
-  //console.log("Récupération terminée. NFTs totaux :", nfts.length);
-  //console.log("Poèmes totaux :", haikus.length);
+  ////console.log("Récupération terminée. NFTs totaux :", nfts.length);
+  ////console.log("Poèmes totaux :", haikus.length);
 };
 
 // Appel de la fonction dans useEffect
@@ -436,7 +442,6 @@ useEffect(() => {
           </Box>
         </motion.div>
 
-        {/* HERO SECTION */}
         <motion.div
           initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -444,9 +449,29 @@ useEffect(() => {
           viewport={{ once: true }}
         >
 
-        <Box py={{ base: 10, md: 16 }} w="100%">
-        <HeroSection nfts={nfts} haikus={haikus} />
-      </Box>
+        <Box py={10} w="100%">
+        <Heading
+          size="md"
+          color="purple.300"
+          fontWeight="bold"
+          mb={2}
+        >
+          Oeuvres mises en avant
+        </Heading>
+
+          {collections.map((collection) => {
+            const collectionNFTs = nftsByCollection[collection.id];
+            return collectionNFTs && collectionNFTs.length > 0 ? (
+              <RelatedFull
+                key={collection.id}
+                nft={collectionNFTs[0]}          // le NFT “vedette” (le premier de la collection)
+                allNFTs={collectionNFTs}         // tous les NFTs récupérés pour cette collection
+                title={collection.name}
+              />
+            ) : null;
+          })}
+        </Box>
+
 
 
         </motion.div>
@@ -551,6 +576,19 @@ useEffect(() => {
           transition={{ duration: 1 }}
           viewport={{ once: true }}
         >
+
+        <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
+
+
+
+        <HeroSection
+            nfts={collections.flatMap(col => nftsByCollection[col.id] || [])}
+            haikus={collections.flatMap(col => haikusByCollection[col.id] || [])}
+        />
+
+
+
+
           <VStack spacing={8} mt={12}>
             <Heading size="xl" color="gray.100" fontWeight="extrabold">
               Rejoignez un réseau d'art numérique et de poésie solidaire
@@ -571,9 +609,24 @@ useEffect(() => {
 
           <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
 
-          <Box w="100%" position="relative">
-            <DynamicCarousel nfts={nfts} haikus={haikus} />
+          <Box py={{ base: 10, md: 16 }} w="100%">
+            {collections.length > 0 ? (
+              <DynamicCarousel
+                nfts={collections.flatMap(
+                  (collection) => nftsByCollection[collection.id] || []
+                )}
+                haikus={collections.flatMap(
+                  (collection) => haikusByCollection[collection.id] || []
+                )}
+                maxNfts={20}    // tu peux ajuster
+                maxHaikus={20}  // tu peux ajuster
+              />
+            ) : (
+              <Text>Pas de collections disponibles.</Text>
+            )}
           </Box>
+
+
 
         </motion.div>
       </Box>

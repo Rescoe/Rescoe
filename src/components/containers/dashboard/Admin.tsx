@@ -793,12 +793,16 @@ const ManageFeaturedCollections = () => {
                 {activeNFTTab === 'ManageNFT' && (
                     <>
                         <Heading size="md">Gérer les NFTs</Heading>
+                        <Text>Id du NFT a gérer : </Text>
+
                         <Input
                             placeholder="ID du NFT à mettre en vente"
                             value={nftId}
                             onChange={(e) => setNftId(Number(e.target.value))}
                             type="number"
                         />
+                        <Text>Prix de vente : </Text>
+
                         <Input
                             placeholder="Prix de vente (ETH)"
                             value={salePrice}

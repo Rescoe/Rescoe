@@ -88,6 +88,10 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
     setSelectedNft(randomNft);
     setSelectedHaiku(randomHaiku);
 
+    console.log(randomNft);
+    console.log(randomHaiku);
+
+
     const addrs: string[] = [];
     if (randomNft.artist) addrs.push(randomNft.artist);
     const poetAddr = randomHaiku?.poemText?.[7];

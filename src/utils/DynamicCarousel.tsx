@@ -4,6 +4,10 @@ import React, { useState, useEffect } from "react";
 import { Box, Image, Text, useMediaQuery } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { JsonRpcProvider } from 'ethers';
+import RelatedNFTs from "./RelatedNFTs";
+//import RelatedNFTs from "@/components/modules/RelatedNFTs";
+
+
 
 interface Nft {
   id: string;
@@ -17,7 +21,7 @@ interface Nft {
 }
 
 interface Haiku {
-  poemText: string; //PoemText récupère l'entièreté des infos du poeme
+  poemText: string[];  // Change this to string[] if it's meant to be an array of strings.
   poet?: string;
   mintContractAddress: string;
   uniqueIdAssociated: string;
@@ -48,25 +52,38 @@ const GridLayout: React.FC<GridLayoutProps> = ({ nfts, haikus, delay = 2, maxNft
 
 
 // c4EST CE USE EFFECT QUI VA R2CUP2RER LES HAIKUS ET LES POEMES,
-  useEffect(() => {
-    const shuffledNfts = [...nfts].sort(() => Math.random() - 0.5).slice(0, maxNfts);
-    const shuffledHaikus = [...haikus].sort(() => Math.random() - 0.5).slice(0, maxHaikus);
+useEffect(() => {
+  if (!Array.isArray(nfts) || !Array.isArray(haikus)) return;
 
-    const combined: AlternatingItem[] = [];
-    shuffledNfts.forEach((nft, i) => {
-      const haiku = shuffledHaikus[i];
+  const shuffledNfts = [...nfts].sort(() => Math.random() - 0.5).slice(0, maxNfts);
+  const shuffledHaikus = [...haikus].sort(() => Math.random() - 0.5).slice(0, maxHaikus);
 
-      if (haiku) {
-        combined.push({ type: "nft", content: nft, associatedHaiku: haiku.poemText[6] });
-        combined.push({ type: "haiku", content: haiku, associatedNft: nft });
-        fetchENSForAddresses([haiku.poemText[7]]);
-      }
-      fetchENSForAddresses([nft.artist].filter((addr): addr is string => !!addr));
+  const combined: AlternatingItem[] = [];
 
-    });
+  const addressesToFetch: string[] = [];
 
-    setItems(combined);
-  }, [nfts, haikus, maxNfts, maxHaikus]);
+  shuffledNfts.forEach((nft, i) => {
+    const haiku = shuffledHaikus[i];
+
+    if (haiku) {
+      combined.push({ type: "nft", content: nft, associatedHaiku: haiku.poemText[6] });
+      combined.push({ type: "haiku", content: haiku, associatedNft: nft });
+
+      if (haiku.poet) addressesToFetch.push(haiku.poet);
+    }
+
+    if (nft.artist) addressesToFetch.push(nft.artist);
+  });
+
+  setItems(combined);
+
+  if (addressesToFetch.length > 0) {
+    fetchENSForAddresses(Array.from(new Set(addressesToFetch))); // Supprime les doublons
+  }
+
+}, [nfts, haikus, maxNfts, maxHaikus]);
+
+
 
 
   const getHaikuAuthor = (poemText: any) => {
@@ -136,9 +153,12 @@ const fetchENSForAddresses = async (addresses: string[]) => {
           >
 
 
-            <Text fontStyle="italic" textAlign="center">
-            {typeof haikuContent.poemText ? haikuContent.poemText[6] : "Contenu du haiku introuvable"}
-            </Text>
+          <Text fontStyle="italic" textAlign="center">
+            {Array.isArray(haikuContent.poemText)
+              ? haikuContent.poemText[6]  // concatène le tableau en string
+              : haikuContent.poemText || "Contenu du haiku introuvable"}
+          </Text>
+
           </Box>
           {hoveredItem?.type === "haiku" && hoveredItem.content === item.content && (
             <Box
@@ -201,15 +221,20 @@ const fetchENSForAddresses = async (addresses: string[]) => {
               alignItems="center"
               zIndex="2"
             >
-              <Text
-                fontStyle="italic"
-                fontSize="lg"
-                textAlign="center"
-                color="white"
-                maxWidth="80%"
-              >
-                {item.associatedHaiku || "Pas de haiku associé à ce NFT."}
-              </Text>
+            <Text
+              fontStyle="italic"
+              fontSize="lg"
+              textAlign="center"
+              color="white"
+              maxWidth="80%"
+            >
+              {item.associatedHaiku
+                ? Array.isArray(item.associatedHaiku)
+                  ? item.associatedHaiku.join(" ")
+                  : item.associatedHaiku
+                : "Pas de haiku associé à ce NFT <3."}
+            </Text>
+
             </Box>
           )}
         </Box>
@@ -311,6 +336,18 @@ const fetchENSForAddresses = async (addresses: string[]) => {
           </Box>
         )}
       </Box>
+
+
+      {/*
+{items[index]?.type === "nft" && (
+  <RelatedNFTs
+    nft={items[index].content as Nft}
+    allNFTs={nfts}
+  />
+)}
+
+*/}
+
     </Box>
   );
 
