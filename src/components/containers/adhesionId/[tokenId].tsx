@@ -25,6 +25,7 @@ import { useRouter } from 'next/router';
 import ABI from '../../../components/ABI/ABIAdhesion.json';
 import { useAuth } from '../../../utils/authContext';
 import ABI_Management from '../../../components/ABI/ABI_ADHESION_MANAGEMENT.json';
+import { PublicProfile } from "../../../components/containers/dashboard";
 
 interface NFTData {
   owner: string;
@@ -276,114 +277,120 @@ const TokenPage = () => {
   const isOwner = authAddress && authAddress.toLowerCase() === nftData.owner.toLowerCase();
   const isVendable = Number(nftData.remainingTime) === 0;
   const canPurchase = !isOwner && isForSale;
-
   return (
-    <Box textAlign="center" mt={10} p={6}>
-      <Heading as="h1" fontSize="3xl" mb={6}>
-        Carte d'adhesion de {nftData.name}
-      </Heading>
+      <Box textAlign="center" mt={10} p={6}>
 
-      <Image
-        src={nftData.image || '/fallback-image.png'}
-        alt={nftData.name}
-        maxWidth="400px"
-        mx="auto"
-        mb={6}
-      />
+        <Heading as="h1" fontSize="3xl" mb={6}>
+          Carte d'adhésion de {nftData.name}
+        </Heading>
 
-      <Tabs variant="enclosed" colorScheme="teal">
-        <TabList>
-          <Tab>Détails</Tab>
-          {isOwner && isVendable && <Tab>Mise en vente</Tab>}
-          {isOwner && <Tab>Mise à jour</Tab>}
-          {!isOwner && canPurchase && <Tab>Achat</Tab>}
-        </TabList>
+        <Image
+          src={nftData.image || '/fallback-image.png'}
+          alt={nftData.name}
+          maxWidth="400px"
+          mx="auto"
+          mb={6}
+        />
 
-        <TabPanels>
-          {/* --- Onglet Détails --- */}
-          <TabPanel>
-            <VStack spacing={4} alignItems="start" mb={6}>
-              <Text fontSize="lg"><strong>Nom :</strong> {nftData.name}</Text>
-              <Text fontSize="lg"><strong>Addresse dy propriétaire :</strong> {nftData.owner}</Text>
-              <Text fontSize="lg"><strong>Rôle :</strong> {nftData.role === 1 ? 'Artiste' : 'Poète'}</Text>
-              <Text fontSize="lg"><strong>Bio :</strong> {nftData.bio}</Text>
-              {isForSale && (
-                <Text fontSize="lg">
-                  <strong>Prix :</strong> {nftData.price} ETH
-                </Text>
-              )}
-              <Text fontSize="lg"><strong>Durée restante d'adhésion :</strong> {nftData.remainingTime}</Text>
-              <Text fontSize="lg"><strong>Soit le </strong> {nftData.fin}</Text>
+        <Tabs variant="enclosed" colorScheme="teal">
+          <TabList>
+            <Tab>Détails</Tab>
+            {isOwner && isVendable && <Tab>Mise en vente</Tab>}
+            {isOwner && <Tab>Mise à jour</Tab>}
+            {!isOwner && canPurchase && <Tab>Achat</Tab>}
+          </TabList>
 
-              {/*<Text fontSize="lg"><strong>Adhésion en cours : </strong> {nftData.mintTimestamp}</Text>*/}
-              <Divider />
-              {isOwner && (
-                <Button colorScheme="blue" mt={4} onClick={handleRenewMembership}>
-                  Renouveler adhésion
-                </Button>
-              )}
-            </VStack>
-          </TabPanel>
-
-          {/* --- Onglet Mise en vente (seulement si propriétaire et vendable) --- */}
-          {isOwner && isVendable && (
+          <TabPanels>
+            {/* --- Onglet Détails --- */}
             <TabPanel>
-              <FormControl mt={4}>
-                <FormLabel htmlFor="price">Prix pour mise en vente</FormLabel>
-                <Input
-                  id="price"
-                  type="text"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  placeholder="Ex: 0.01"
-                />
-                <Button colorScheme="teal" mt={4} onClick={handleListForSale}>
-                  Mettre en vente
+
+              <VStack spacing={4} alignItems="start" mb={6}>
+                <Text fontSize="lg"><strong>Nom :</strong> {nftData.name}</Text>
+                <Text fontSize="lg"><strong>Addresse du propriétaire :</strong> {nftData.owner}</Text>
+                <Text fontSize="lg"><strong>Rôle :</strong> {nftData.role === 1 ? 'Artiste' : 'Poète'}</Text>
+                <Text fontSize="lg"><strong>Bio :</strong> {nftData.bio}</Text>
+                {isForSale && (
+                  <Text fontSize="lg">
+                    <strong>Prix :</strong> {nftData.price} ETH
+                  </Text>
+                )}
+                <Text fontSize="lg"><strong>Durée restante d'adhésion :</strong> {nftData.remainingTime}</Text>
+                <Text fontSize="lg"><strong>Soit le:</strong> {nftData.fin}</Text>
+                {isOwner && (
+                  <Button colorScheme="blue" mt={4} onClick={handleRenewMembership}>
+                    Renouveler adhésion
+                  </Button>
+                )}
+
+                <Divider my={6} borderColor="purple.700" w="95%" mx="auto" />
+
+                {nftData && nftData.owner && <PublicProfile address={nftData.owner} />} {/* Passer l'adresse */}
+
+
+
+              </VStack>
+            </TabPanel>
+
+            {/* --- Autres onglets --- */}
+            {isOwner && isVendable && (
+              <TabPanel>
+                {/* Mise en vente */}
+                <FormControl mt={4}>
+                  <FormLabel htmlFor="price">Prix pour mise en vente</FormLabel>
+                  <Input
+                    id="price"
+                    type="text"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    placeholder="Ex: 0.01"
+                  />
+                  <Button colorScheme="teal" mt={4} onClick={handleListForSale}>
+                    Mettre en vente
+                  </Button>
+                </FormControl>
+              </TabPanel>
+            )}
+
+            {isOwner && (
+              <TabPanel>
+                {/* Mise à jour */}
+                <FormControl mt={4}>
+                  <FormLabel htmlFor="name">Nom</FormLabel>
+                  <Input
+                    id="name"
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Entrez votre nom"
+                  />
+                  <FormLabel htmlFor="bio">Biographie</FormLabel>
+                  <Input
+                    id="bio"
+                    type="text"
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                    placeholder="Entrez votre biographie"
+                  />
+                  <Button colorScheme="blue" mt={4} onClick={handleUpdateInfo}>
+                    Mettre à jour
+                  </Button>
+                </FormControl>
+              </TabPanel>
+            )}
+
+            {!isOwner && canPurchase && (
+              <TabPanel>
+                {/* Achat */}
+                <Button colorScheme="green" mt={4} onClick={handlePurchase}>
+                  Acheter ce NFT
                 </Button>
-              </FormControl>
-            </TabPanel>
-          )}
+              </TabPanel>
+            )}
 
-          {/* --- Onglet Mise à jour (seulement si propriétaire) --- */}
-          {isOwner && (
-            <TabPanel>
-              <FormControl mt={4}>
-                <FormLabel htmlFor="name">Nom</FormLabel>
-                <Input
-                  id="name"
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Entrez votre nom"
-                />
-                <FormLabel htmlFor="bio">Biographie</FormLabel>
-                <Input
-                  id="bio"
-                  type="text"
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                  placeholder="Entrez votre biographie"
-                />
-                <Button colorScheme="blue" mt={4} onClick={handleUpdateInfo}>
-                  Mettre à jour
-                </Button>
-              </FormControl>
-            </TabPanel>
-          )}
+          </TabPanels>
+        </Tabs>
+      </Box>
+    );
+  };
 
-          {/* --- Onglet Achat (si non propriétaire et à vendre) --- */}
-          {!isOwner && canPurchase && (
-            <TabPanel>
-              <Button colorScheme="green" mt={4} onClick={handlePurchase}>
-                Acheter ce NFT
-              </Button>
-            </TabPanel>
-          )}
-        </TabPanels>
-      </Tabs>
-    </Box>
-  );
-
-};
-
-export default TokenPage;
+  export default TokenPage;

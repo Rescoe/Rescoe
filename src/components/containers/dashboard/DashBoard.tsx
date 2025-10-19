@@ -286,7 +286,6 @@ const Dashboard = () => {
               borderRadius="full"
               overflow="hidden"
               mb={2}
-              bg="gray.200"
             >
               {userData.avatarSvg ? (
                 <Image
@@ -306,7 +305,8 @@ const Dashboard = () => {
                 <Text fontSize="xl">{userData.roles[0]}</Text>
                 <Text fontSize="xl">{userData.biography}</Text>
 
-                <Divider my={6} borderColor="gray.200" w="80%" mx="auto" />
+                <Divider my={6} borderColor="purple.700" w="80%" mx="auto" />
+
 
                 <Text fontSize="s"><strong>Fin de l'adhésion </strong> le {userData.finAdhesion}</Text>
 

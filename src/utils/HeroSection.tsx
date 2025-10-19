@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { Box, Image, Text, VStack, HStack, Button, Divider, Stack, Heading } from "@chakra-ui/react";
 import { ChevronDownIcon, ChevronUpIcon } from "@chakra-ui/icons";
 import { motion } from "framer-motion";
+import Link from 'next/link';
+
 
 
 import { useRouter } from "next/router";
@@ -238,16 +240,39 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
                     {selectedNft.name || "Sans nom"}
                   </Text>
                 </Text>
-                <Text fontStyle="italic" fontSize="sm">
-                  {resolveName(selectedNft.artist, "Artiste inconnu")}
-                </Text>
+                {selectedNft.artist && (
+                  <Link href={`/u/${selectedNft.artist}`} passHref>
+                    <Text
+                      as="a"
+                      fontStyle="italic"
+                      fontSize="sm"
+                      color="purple.300"
+                      _hover={{ textDecoration: "underline" }}
+                    >
+                      {resolveName(selectedNft.artist, "Artiste inconnu")}
+                    </Text>
+                  </Link>
+                )}
               </Box>
 
               <Box>
                 <Text fontWeight="bold" fontSize="md">
                   Poème :{" "}
                   <Text as="span" fontWeight="normal">
-                    {resolveName(selectedHaiku.poemText?.[7], "Poète inconnu")}
+                    {/* clickable pour le poète */}
+                    {selectedHaiku.poemText?.[7] && (
+                      <Link href={`/u/${selectedHaiku.poemText[7]}`} passHref>
+                        <Text
+                          as="a"
+                          fontStyle="italic"
+                          fontSize="sm"
+                          color="purple.300"
+                          _hover={{ textDecoration: "underline" }}
+                        >
+                          {resolveName(selectedHaiku.poemText[7], "Poète inconnu")}
+                        </Text>
+                      </Link>
+                    )}
                   </Text>
                 </Text>
               </Box>
