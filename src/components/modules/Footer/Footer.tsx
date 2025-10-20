@@ -2,6 +2,16 @@ import { Box, Link, Text, VStack, HStack, Button } from '@chakra-ui/react';
 import { FaInstagram } from 'react-icons/fa';
 import { SiBluesky } from 'react-icons/si';
 import NextLink from 'next/link';
+import { motion } from "framer-motion";
+import { keyframes } from "@emotion/react";
+
+// Animation pulsante pour le bouton "Adhérez"
+const pulse = keyframes`
+  0% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.6); }
+  70% { box-shadow: 0 0 0 15px rgba(236, 72, 153, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0); }
+`;
+
 
 const links = {
   adhesion: '/adhesion',
@@ -35,25 +45,33 @@ const Footer = () => {
             Rejoignez le réseau !
           </Text>
           <NextLink href="/adhesion" passHref>
-            <Button
-              px={10}
-              py={6}
-              fontSize="lg"
-              fontWeight="bold"
-              borderRadius="full"
-              bgGradient="linear(to-r, purple.700, pink.600)"
-              color="white"
-              boxShadow="lg"
-              _hover={{
-                transform: "scale(1.05)",
-                boxShadow: "2xl",
-              }}
-              _active={{
-                transform: "scale(0.98)",
-              }}
-              >
-              Adhérer Maintenant
-              </Button>
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1.1, ease: "easeOut" }}
+            viewport={{ once: true }}
+          >
+          <Button
+            mt={10}
+            px={12}
+            py={7}
+            fontWeight="bold"
+            fontSize="lg"
+            borderRadius="full"
+            bgGradient="linear(to-r, purple.700, pink.600)"
+            color="white"
+            animation={`${pulse} 2.5s infinite`}
+            transition="transform 0.3s ease"
+            _hover={{
+              transform: "scale(1.1)",
+              bgGradient: "linear(to-r, pink.600, purple.700)",
+            }}
+            as={NextLink}
+            href="/adhesion"
+          >
+            🚀 Adhérez Maintenant
+          </Button>
+          </motion.div>
 
           </NextLink>
         </Box>

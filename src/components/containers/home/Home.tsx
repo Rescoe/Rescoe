@@ -35,22 +35,22 @@ const benefits = [
   {
     icon: FaPaintBrush,
     title: "Crée des collections",
-    description: "Expose tes œuvres ou poèmes dans des collections décentralisées.",
+    description: "Expose tes œuvres ou poèmes dans des espaces décentralisés, vivants et partagés.",
   },
   {
     icon: FaGraduationCap,
     title: "Formations & ateliers",
-    description: "Apprends à créer dans le Web3 avec nos ateliers artistiques ouverts.",
+    description: "Des ateliers ouverts où la technique devient langage, et la création devient expérience.",
   },
   {
     icon: FaUsers,
     title: "Réseau phygital",
-    description: "Rejoins une communauté locale entre numérique et physique.",
+    description: "Entre réel et numérique, rejoins une communauté d’artistes, poètes et développeurs. Des rencontres, des expositions, des collaborations — au rythme de chacun.",
   },
   {
     icon: FaHandshake,
     title: "Démarche solidaire",
-    description: "Participe à un projet associatif engagé et expérimental.",
+    description: "RESCOE est une association expérimentale et ouverte. Chaque adhésion soutient la transmission, la recherche et l’accès libre aux outils créatifs.",
   },
 ];
 
@@ -363,21 +363,24 @@ useEffect(() => {
         transition={{ duration: 0.9, ease: "easeOut" }}
       >
         <Box
-          py={{ base: 14, md: 20 }}
           px={{ base: 6, md: 10 }}
           textAlign="center"
           maxW="1100px"
           mx="auto"
         >
-          <Heading
-            size={{ base: "xl", md: "2xl" }}
-            bgGradient="linear(to-r, purple.300, pink.400)"
-            bgClip="text"
-            fontWeight="extrabold"
-            mb={6}
-          >
+        <Heading
+          size={{ base: "xl", md: "2xl" }}
+          bgGradient="linear(to-r, purple.300, pink.400)"
+          bgClip="text"
+          fontWeight="extrabold"
+          mb={6}
+          lineHeight="1.2"  // <-- espace vertical correct
+          py={8}            // <-- évite la coupe du haut/bas
+        >
             RESCOE — Réseau Expérimental Solidaire de Crypto Œuvres Émergentes
           </Heading>
+
+          <Divider my={8} borderColor="purple.700" w="5%" mx="auto" />
 
           <Text
             color="gray.300"
@@ -387,7 +390,10 @@ useEffect(() => {
             lineHeight="tall"
             mb={8}
           >
-            Une association Web3 dédiée à la création, la formation et la valorisation de l’art numérique et poétique. Rejoignez une nouvelle génération d’artistes connectés, solidaires et décentralisés.
+
+          Participer à un réseau d’artistes et de poètes qui font dialoguer le numérique et le réel.
+          Créer des collections, exposer des œuvres, ou simplement soutenir la démarche.
+          Tout commence par une adhésion — symbolique et libre.
           </Text>
 
           {/* Premier bouton Adhésion visible dès l'intro */}
@@ -411,6 +417,8 @@ useEffect(() => {
             🚀 Adhérez Maintenant
           </Button>
 
+          <Divider my={8} borderColor="purple.700" w="15%" mx="auto" />
+
           <Heading
             mt={6}
             mb={2}
@@ -418,6 +426,7 @@ useEffect(() => {
             bgGradient="linear(to-r, pink.400, purple.400)"
             bgClip="text"
             textAlign="center"
+            py={2}            // <-- évite la coupe du haut/bas
           >
             Œuvre et poème du jour
           </Heading>
@@ -427,7 +436,30 @@ useEffect(() => {
             haikus={collections.flatMap(col => haikusByCollection[col.id] || [])}
           />
 
+
           <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
+
+          <Box
+          boxShadow="2xl"
+          borderRadius="2xl"
+          bg="blackAlpha.700"
+          p={{ base: 8, md: 12 }}
+          maxW="95%"
+          mx="auto"
+          mt={6}
+          >
+
+
+          <Heading
+            mt={6}
+            mb={2}
+            size="lg"
+            bgGradient="linear(to-r, pink.400, purple.400)"
+            bgClip="text"
+            textAlign="center"
+          >
+          Pour vous :
+          </Heading>
 
           {/* 3 bénéfices clés présentés proprement */}
           <SimpleGrid
@@ -437,19 +469,19 @@ useEffect(() => {
             textAlign="center"
           >
             {[            {
-                title: "Art & Blockchain",
+                title: "Art, Poésie & Blockchain",
                 icon: "/visuels/icon-blockchain.svg",
-                desc: "Minez vos œuvres, protégez vos droits et exposez vos créations sur la blockchain.",
+                desc: "Donner forme à des œuvres libres, signées et préservées dans le temps. Expérimenter une autre manière de créer, sans centre ni hiérarchie.",
               },
               {
                 title: "Formation & Transmission",
                 icon: "/visuels/icon-community.svg",
-                desc: "Initiez-vous à l’art génératif et au Web3 à travers nos ateliers et résidences.",
+                desc: "Partager des savoirs techniques et sensibles. Apprendre à coder, à poétiser, à relier — dans des ateliers ouverts à tous.",
               },
               {
                 title: "Communauté Solidaire",
                 icon: "/visuels/icon-reseau.svg",
-                desc: "Soutenez, échangez, collaborez avec d’autres artistes et poètes du réseau.",
+                desc: "Relier les artistes, poètes et développeurs qui œuvrent à une culture numérique commune. Chaque membre contribue à faire vivre le réseau, à son rythme.",
               },
             ].map((item, i) => (
               <motion.div
@@ -500,43 +532,81 @@ useEffect(() => {
             bgClip="text"
             textAlign="center"
           >
-            Ils ont rejoint l'aventure, et sont maintenant résidents de Rescoe
+          Artistes en résidence
           </Heading>
+          <Text>
+          Artistes, poètes et codeurs que nous accompagnons au fil des projets.
+          </Text>
           <FeaturedMembers addresses={featuredAddresses} />
         </Box>
+      </Box>
       </motion.div>
 
-      {/* ===== SECTION COLLECTIONS DU JOUR ===== */}
+
+      {/* ===== SECTION MISSIONS + CAROUSEL ===== */}
       <motion.div
-        initial={{ opacity: 0, y: 40 }}
+        initial={{ opacity: 0, y: 50 }}
         whileInView={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1.1, ease: "easeOut" }}
+        transition={{ duration: 1 }}
         viewport={{ once: true }}
       >
-        <Box py={10} w="100%" maxW="1100px" mx="auto" px={{ base: 6, md: 10 }}>
-          <Heading
-            size="md"
-            color="purple.300"
-            fontWeight="bold"
-            mb={6}
-            textAlign="center"
-          >
-            Œuvres des collections du jour
-          </Heading>
+        <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
 
-          {collections.map((collection) => {
-            const collectionNFTs = nftsByCollection[collection.id];
-            return collectionNFTs && collectionNFTs.length > 0 ? (
-              <RelatedFull
-                key={collection.id}
-                nft={collectionNFTs[0]}          // NFT “vedette” (le premier)
-                allNFTs={collectionNFTs}         // tous les NFTs
-                title={collection.name}
-              />
-            ) : null;
-          })}
+        <Heading
+          mt={6}
+          mb={2}
+          size="lg"
+          bgGradient="linear(to-r, pink.400, purple.400)"
+          bgClip="text"
+          textAlign="center"
+        >
+          Fusionnons des œuvres digitales et des poèmes on-chain
+        </Heading>
+
+        <Box py={{ base: 10, md: 16 }} w="100%" maxW="1100px" mx="auto" px={{ base: 6, md: 10 }}>
+          {collections.length > 0 ? (
+            <DynamicCarousel
+              nfts={collections.flatMap(
+                (collection) => nftsByCollection[collection.id] || []
+              )}
+              haikus={collections.flatMap(
+                (collection) => haikusByCollection[collection.id] || []
+              )}
+              maxNfts={20}    // réglable
+              maxHaikus={20}  // réglable
+            />
+          ) : (
+            <Text>Pas de collections disponibles.</Text>
+          )}
         </Box>
-      </motion.div>
+
+        {/* ===== SECTION COLLECTIONS DU JOUR ===== */}
+
+          <Box py={10} w="100%" maxW="1100px" mx="auto" px={{ base: 6, md: 10 }}>
+            <Heading
+              size="lg"
+              mb={6}
+              bgGradient="linear(to-r, purple.400, pink.400)"
+              bgClip="text"
+              textAlign="center"
+            >
+              Parmi les mêmes collections
+            </Heading>
+
+            {collections.map((collection) => {
+              const collectionNFTs = nftsByCollection[collection.id];
+              return collectionNFTs && collectionNFTs.length > 0 ? (
+                <RelatedFull
+                  key={collection.id}
+                  nft={collectionNFTs[0]}          // NFT “vedette” (le premier)
+                  allNFTs={collectionNFTs}         // tous les NFTs
+                  title={collection.name}
+                />
+              ) : null;
+            })}
+          </Box>
+        </motion.div>
+
 
       {/* ===== SECTION BENEFICES DETAILLES + APPEL A L'ADHESION ==== */}
       <motion.div
@@ -562,7 +632,7 @@ useEffect(() => {
             fontWeight="extrabold"
             textAlign="center"
           >
-            Découvrez, soutenez, participez.
+            Rejoignez le réseau RESCOE
           </Heading>
 
           <Text
@@ -572,7 +642,9 @@ useEffect(() => {
             maxW="700px"
             mx="auto"
           >
-            Rejoignez un réseau d’artistes, poètes et développeurs qui explorent le potentiel de la blockchain et de l’art génératif. Ensemble, nous créons l’avenir du phygital.
+          Un espace de recherche, de création et de transmission autour de l’art numérique et poétique.
+          Depuis 2018, nous explorons les liens entre code, geste, et communauté.
+          Nos outils s’appuient sur la blockchain pour donner à chaque œuvre — image, texte ou trace — une existence juste, traçable et partagée.
           </Text>
 
           {/* CARTES DE BENEFICES */}
@@ -657,72 +729,21 @@ useEffect(() => {
               Ils viennent de rejoindre l’aventure :
             </Heading>
             <Text color="gray.400" textAlign="center" mb={6} maxW="800px" mx="auto">
-              Découvrez quelques membres du réseau et leurs créations.
+              Découvrez les nouveaux membres du réseau et leurs créations.
             </Text>
 
             <DerniersAdherents />
           </motion.div>
-
-          {/* Bouton d'adhésion final */}
-          <Button
-            mt={10}
-            px={12}
-            py={7}
-            fontWeight="bold"
-            fontSize="lg"
-            borderRadius="full"
-            bgGradient="linear(to-r, purple.700, pink.600)"
-            color="white"
-            animation={`${pulse} 2.5s infinite`}
-            transition="transform 0.3s ease"
-            _hover={{
-              transform: "scale(1.1)",
-              bgGradient: "linear(to-r, pink.600, purple.700)",
-            }}
-            as={NextLink}
-            href="/adhesion"
-          >
-            🚀 Adhérez Maintenant
-          </Button>
         </VStack>
       </motion.div>
-
-      {/* ===== SECTION MISSIONS + CAROUSEL ===== */}
+{/*
       <motion.div
-        initial={{ opacity: 0, y: 50 }}
+        initial={{ opacity: 0, y: 40 }}
         whileInView={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1 }}
+        transition={{ duration: 1.1, ease: "easeOut" }}
         viewport={{ once: true }}
       >
-        <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
 
-        <Heading
-          mt={6}
-          mb={2}
-          size="lg"
-          bgGradient="linear(to-r, pink.400, purple.400)"
-          bgClip="text"
-          textAlign="center"
-        >
-          Œuvre et poème du jour :
-        </Heading>
-
-        <Box py={{ base: 10, md: 16 }} w="100%" maxW="1100px" mx="auto" px={{ base: 6, md: 10 }}>
-          {collections.length > 0 ? (
-            <DynamicCarousel
-              nfts={collections.flatMap(
-                (collection) => nftsByCollection[collection.id] || []
-              )}
-              haikus={collections.flatMap(
-                (collection) => haikusByCollection[collection.id] || []
-              )}
-              maxNfts={20}    // réglable
-              maxHaikus={20}  // réglable
-            />
-          ) : (
-            <Text>Pas de collections disponibles.</Text>
-          )}
-        </Box>
 
         <VStack spacing={8} mt={12} mb={20}>
           <Heading size="xl" color="gray.100" fontWeight="extrabold">
@@ -739,7 +760,11 @@ useEffect(() => {
             Explorez l’art génératif, le Web3 et l’expression poétique sous un nouveau jour.
           </Text>
         </VStack>
+
+
       </motion.div>
+      */}
+
     </Box>
   );
 

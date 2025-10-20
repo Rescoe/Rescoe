@@ -128,11 +128,21 @@ const FeaturedMembers: React.FC<FeaturedMembersProps> = ({ addresses }) => {
     <Box p={5}>
       <Box mt={5}>
         {featuredMembersInfo.length > 0 ? (
-          <Grid templateColumns="repeat(4, 1fr)" gap={6}>
+          <Grid
+            templateColumns={{
+              base: "1fr",          // 1 colonne (pleine largeur) sur mobile
+              sm: "repeat(2, 1fr)", // 2 colonnes sur petits écrans
+              md: "repeat(4, 1fr)"  // 4 colonnes sur moyens+ écrans
+            }}
+            gap={6}
+            justifyContent="center"
+          >
             {featuredMembersInfo.map((info, idx) => (
               <GridItem
                 key={idx}
-                width="200px"
+                w={{ base: "100%", md: "200px" }} // Pleine largeur mobile, fixe desktop
+                minW={{ md: "200px" }}            // Garantie minimum 200px même si peu d'items
+                maxW={{ base: "300px", md: "200px" }} // Limite largeur optionnelle (si besoin)
                 height="250px"
                 borderRadius="xl"
                 position="relative"
@@ -146,6 +156,8 @@ const FeaturedMembers: React.FC<FeaturedMembersProps> = ({ addresses }) => {
                   transform: "scale(1.05)",
                   boxShadow: "0 0 25px rgba(216, 112, 255, 0.6)",
                 }}
+                justifySelf="center" // Centre la carte horizontalement dans la colonne
+                mx="auto"            // Pour l'harmonisation sur mobile
               >
                 <Box
                   bg="gray.900"

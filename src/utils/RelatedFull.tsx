@@ -36,7 +36,7 @@ const RelatedFull: React.FC<Props> = ({ nft, allNFTs, title }) => {
   return (
     <Box py={10} px={6}>
       <Heading
-        size="lg"
+        size="l"
         mb={6}
         bgGradient="linear(to-r, purple.400, pink.400)"
         bgClip="text"

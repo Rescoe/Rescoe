@@ -81,114 +81,123 @@ const DerniersAdherents: React.FC = () => {
     };
 
     const getUserInfo = async (address: string, contract: any): Promise<UserInfo> => {
-  try {
-    const contractManagement = new web3!.eth.Contract(ABI_ADHESION_MANAGEMENT, contractAddressManagement);
+        try {
+            const contractManagement = new web3!.eth.Contract(ABI_ADHESION_MANAGEMENT, contractAddressManagement);
 
-    // Typage explicite du retour du contrat
-    const [membershipValid, name, bio] = await contractManagement.methods
-      .getUserInfo(address)
-      .call() as unknown as [boolean, string, string];
+            // <-- Typage minimal pour ne pas casser la logique runtime (on garde userInfo[0], [1], [2] tels quels)
+            const userInfo = await contractManagement.methods.getUserInfo(address).call() as any;
 
-    // Récupérer les tokens
-    const tokens: number[] = await contract.methods.getTokensByOwner(address).call();
+            const membershipValid = userInfo[0]; // Booléen pour la validité
+            const name = userInfo[1]; // Nom
+            const bio = userInfo[2]; // Bio
 
-    // Récupérer les images des insectes associés aux tokens
-    const insects = await Promise.all(tokens.map(async (tokenId: number) => {
-      try {
-        const tokenURI: string = await contract.methods.tokenURI(tokenId).call();
-        const response = await fetch(tokenURI);
-        if (!response.ok) throw new Error(`Erreur URI : ${response.statusText}`);
-        const metadata = await response.json();
-        return { id: tokenId.toString(), image: metadata.image, name: metadata.name };
-      } catch (error) {
-        console.error("Erreur lors de la récupération de l'insecte:", error);
-        return null;
-      }
-    }));
+            // Récupérer les tokens
+            const tokens = await contract.methods.getTokensByOwner(address).call();
 
-    return {
-      membershipValid,
-      name,
-      bio,
-      address,
-      tokens,
-      insects: (insects.filter(Boolean) as InsectURI[])
+            // Récupérer les images des insectes associés aux tokens
+            const insects = await Promise.all(tokens.map(async (tokenId: number) => {
+                try {
+                    const tokenURI: string = await contract.methods.tokenURI(tokenId).call();
+                    const response = await fetch(tokenURI);
+
+                    if (!response.ok) {
+                        throw new Error(`Erreur lors de la récupération de l'URI : ${response.statusText}`);
+                    }
+
+                    const metadata = await response.json();
+                    return { id: tokenId.toString(), image: metadata.image, name: metadata.name }; // Récupérer l'image
+                } catch (error) {
+                    console.error("Erreur lors de la récupération de l'insecte:", error);
+                    return null;
+                }
+            }));
+
+            // Filtrer les null et renvoyer un tableau vide si pas d'insectes
+            return {
+                membershipValid,
+                name,
+                bio,
+                address,  // Ajoutez l'adresse Ethereum ici
+                tokens,
+                insects: (insects.filter(Boolean) as InsectURI[])
+            };
+        } catch (error) {
+            console.error(`Erreur lors de la récupération des informations de l'utilisateur ${address}:`, error);
+            return { membershipValid: false, name: "", bio: "", address, tokens: [], insects: [] }; // Initialiser insects comme tableau vide
+        }
     };
 
-  } catch (error) {
-    console.error(`Erreur lors de la récupération des informations de l'utilisateur ${address}:`, error);
-    return { membershipValid: false, name: "", bio: "", address, tokens: [], insects: [] };
-  }
-};
-
-
-    return (
-      <Box p={5}>
-
-        <Box mt={5}>
-          {dernierAdherentsInfo.length > 0 ? (
-            <Grid templateColumns="repeat(4, 1fr)" gap={6}>
-              {dernierAdherentsInfo.map((info, idx) => (
-                <GridItem
-                  key={idx}
-                  width="200px"
-                  height="250px"
+      return (
+    <Box p={5}>
+      <Box mt={5}>
+        {dernierAdherentsInfo.length > 0 ? (
+          <Grid
+            templateColumns={{ base: "1fr", sm: "repeat(2, 1fr)", md: "repeat(4, 1fr)" }}
+            gap={6}
+            justifyContent="center"
+          >
+            {dernierAdherentsInfo.map((info, idx) => (
+              <GridItem
+                key={idx}
+                w={{ base: "100%", md: "200px" }}  // Pleine largeur mobile, fixe desktop
+                height="250px"
+                borderRadius="xl"
+                position="relative"
+                p="2px"
+                bgGradient="linear-gradient(90deg, pink.400, purple.700, pink.400)"
+                backgroundSize="300% 300%"
+                animation={`${borderAnimation} 6s linear infinite`}
+                transition="all 0.3s ease"
+                _hover={{
+                  animation: `${borderAnimation} 2s linear infinite`,
+                  transform: "scale(1.05)",
+                  boxShadow: "0 0 25px rgba(216, 112, 255, 0.6)",
+                }}
+              >
+                <Box
+                  bg="gray.900"
                   borderRadius="xl"
-                  position="relative"
-                  p="2px" // espace pour afficher le contour animé
-                  bgGradient="linear-gradient(90deg, pink.400, purple.700, pink.400)"
-                  backgroundSize="300% 300%"
-                  animation={`${borderAnimation} 6s linear infinite`}
-                  transition="all 0.3s ease"
-                  _hover={{
-                    animation: `${borderAnimation} 2s linear infinite`,
-                    transform: "scale(1.05)",
-                    boxShadow: "0 0 25px rgba(216, 112, 255, 0.6)",
-                  }}
+                  height="100%"
+                  p={4}
+                  textAlign="center"
                 >
-                  <Box
-                    bg="gray.900"
-                    borderRadius="xl"
-                    height="100%"
-                    p={4}
-                    textAlign="center"
-                  >
-                    <Link href={`/u/${info.address}`} passHref>
-                      <Tooltip label="Cliquez pour voir le profil" hasArrow>
-                        <Box as="a" display="block" height="100%">
-                          <Text fontWeight="bold" color="pink.200">{info.name}</Text>
-                          <Text fontSize="sm" color="gray.300">{info.bio}</Text>
-                          <Box display="flex" justifyContent="center" mt={3}>
-                            {info.insects && info.insects.length > 0 ? (
-                              info.insects.map((insect) => (
-                                <Box key={insect.id} mr={2} textAlign="center">
-                                  <Image
-                                    src={insect.image}
-                                    alt={insect.name}
-                                    boxSize="45px"
-                                    borderRadius="md"
-                                    objectFit="cover"
-                                  />
-                                  <Text fontSize="xs" color="gray.400" mt={1}>{insect.name}</Text>
-                                </Box>
-                              ))
-                            ) : (
-                              <Text fontSize="xs" color="gray.500">Aucun jeton d'adhésion</Text>
-                            )}
-                          </Box>
+                  <Link href={`/u/${info.address}`} passHref>
+                    <Tooltip label="Cliquez pour voir le profil" hasArrow>
+                      <Box as="a" display="block" height="100%">
+                        <Text fontWeight="bold" color="pink.200">{info.name}</Text>
+                        <Text fontSize="sm" color="gray.300">{info.bio}</Text>
+                        <Box display="flex" justifyContent="center" mt={3}>
+                          {info.insects && info.insects.length > 0 ? (
+                            info.insects.map((insect) => (
+                              <Box key={insect.id} mr={2} textAlign="center">
+                                <Image
+                                  src={insect.image}
+                                  alt={insect.name}
+                                  boxSize="45px"
+                                  borderRadius="md"
+                                  objectFit="cover"
+                                />
+                                <Text fontSize="xs" color="gray.400" mt={1}>{insect.name}</Text>
+                              </Box>
+                            ))
+                          ) : (
+                            <Text fontSize="xs" color="gray.500">Aucun jeton d'adhésion</Text>
+                          )}
                         </Box>
-                      </Tooltip>
-                    </Link>
-                  </Box>
-                </GridItem>
-              ))}
-            </Grid>
-          ) : (
-            <Text>Aucun adhérent trouvé.</Text>
-          )}
-        </Box>
+                      </Box>
+                    </Tooltip>
+                  </Link>
+                </Box>
+              </GridItem>
+            ))}
+          </Grid>
+        ) : (
+          <Text>Aucun adhérent trouvé.</Text>
+        )}
       </Box>
-    );
+    </Box>
+  );
+
 };
 
 export default DerniersAdherents;

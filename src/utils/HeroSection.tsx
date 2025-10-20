@@ -126,15 +126,13 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
       display="flex"
       flexDirection="column"
       alignItems="center"
-      justifyContent="center"
+      justifyContent="flex-start" // start au lieu de center
       w="100%"
       maxW="100%"
-      minH="100vh"
-      bg="transparent"
-      color="white"
-      pb="6rem" // plus responsive que 100px
+      pb={{ base: "2rem", md: "3rem" }} // padding plus raisonnable
       overflow="hidden"
     >
+
         {selectedNft && selectedHaiku && (
           <>
           <Box
@@ -278,7 +276,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
               </Box>
             </HStack>
 
-
+{/*
             <Divider my={6} borderColor="purple.700" w="60%" mx="auto" />
 
 
@@ -333,7 +331,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
                     </Box>
                   )}
                 </VStack>
-
+*/}
           </>
         )}
       </Box>
