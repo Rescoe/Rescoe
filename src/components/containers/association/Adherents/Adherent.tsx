@@ -16,6 +16,8 @@ import {
     SimpleGrid,
 } from "@chakra-ui/react";
 import NextLink from "next/link"; // Importer NextLink
+import DerniersAdherents from './DerniersAdherents'; // Votre ABI de contrat ici.
+
 
 interface InsectURI {
     id: string;
@@ -281,6 +283,15 @@ const Adherent: React.FC = () => {
                     </SimpleGrid>
                 </Box>
             )}
+
+            <Center>
+              <Heading mb={5}>Derniers Adhérents</Heading>
+            </Center>
+            <Box mt={5}>
+              <Text fontSize="md" mb={3}>Voici les quatre derniers adhérents :</Text>
+            <DerniersAdherents/>
+            </Box>
+
         </Box>
     );
 };
