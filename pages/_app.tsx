@@ -10,6 +10,9 @@ import { SessionProvider } from 'next-auth/react';
 import type { AppProps } from 'next/app';
 import { isMobile } from 'react-device-detect';
 
+import theme from '../styles/theme'; // ✅ adapte juste le chemin ici
+
+
 
 
 // Créer un client de requête
@@ -20,11 +23,6 @@ const wagmiConfig = getDefaultConfig({
   appName: 'Rescoe',
   projectId: 'c3c9b3085f93848af6fb534508261321', // ID WalletConnect
   chains: [mainnet, arbitrum, goerli, polygon, sepolia],
-});
-
-const theme = extendTheme({
-  initialColorMode: 'dark',
-  useSystemColorMode: false,
 });
 
 const MyApp = ({ Component, pageProps }: AppProps) => {

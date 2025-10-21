@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
 import Web3 from "web3";
-import detectEthereumProvider from '@metamask/detect-provider';
-import ABI from '../../../ABI/ABIAdhesion.json';
-import ABI_ADHESION_MANAGEMENT from '../../../ABI/ABI_ADHESION_MANAGEMENT.json';
 import { Box, Grid, GridItem, Text, Image, Tooltip } from "@chakra-ui/react";
 import Link from 'next/link';
-import { keyframes } from "@emotion/react"; // Importer l'animation
+import { keyframes } from "@emotion/react";
+import ABI from '../../../ABI/ABIAdhesion.json';
+import ABI_ADHESION_MANAGEMENT from '../../../ABI/ABI_ADHESION_MANAGEMENT.json';
 
 // ✅ Interfaces locales
 interface InsectURI {
@@ -24,17 +23,13 @@ interface UserInfo {
 }
 
 interface FeaturedMembersProps {
-  addresses: string[]; // liste des adresses Ethereum à afficher
+  addresses: string[];
 }
 
 // ✅ Animation d'une lueur autour du contour
 const borderAnimation = keyframes`
-  0% {
-    background-position: 0% 50%;
-  }
-  100% {
-    background-position: 400% 50%;
-  }
+  0% { background-position: 0% 50%; }
+  100% { background-position: 400% 50%; }
 `;
 
 const FeaturedMembers: React.FC<FeaturedMembersProps> = ({ addresses }) => {
@@ -43,22 +38,27 @@ const FeaturedMembers: React.FC<FeaturedMembersProps> = ({ addresses }) => {
 
   const contractAddressManagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGER!;
   const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS!;
+  const RPC_URL = process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string; // ✅ Fallback RPC public
 
-  // ✅ Initialisation de Web3
+  // ✅ Initialisation de Web3 : essaie MetaMask, sinon RPC public
   useEffect(() => {
     const initWeb3 = async () => {
-      const provider = await detectEthereumProvider();
-      if (provider) {
-        const web3Instance = new Web3(provider as any);
-        setWeb3(web3Instance);
+      let web3Instance;
+      if (typeof window !== "undefined" && (window as any).ethereum) {
+        // Si MetaMask est dispo, on l’utilise
+        web3Instance = new Web3((window as any).ethereum);
+        console.log("✅ Utilisation du provider MetaMask");
       } else {
-        alert('Veuillez installer MetaMask !');
+        // Sinon fallback sur le RPC Moralis
+        web3Instance = new Web3(new Web3.providers.HttpProvider(RPC_URL));
+        console.log("🌐 Utilisation du provider RPC public (lecture seule)");
       }
+      setWeb3(web3Instance);
     };
     initWeb3();
-  }, []);
+  }, [RPC_URL]);
 
-  // ✅ Récupération des membres quand web3 est prêt
+  // ✅ Récupération des membres quand Web3 est prêt
   useEffect(() => {
     if (web3) fetchFeaturedMembers();
   }, [web3]);
@@ -90,10 +90,8 @@ const FeaturedMembers: React.FC<FeaturedMembersProps> = ({ addresses }) => {
       const name = String(userInfo[1] || "");
       const bio = String(userInfo[2] || "");
 
-      // ✅ Récupération des tokens
       const tokens: number[] = await contract.methods.getTokensByOwner(address).call();
 
-      // ✅ Récupération des métadonnées
       const insects = await Promise.all(
         tokens.map(async (tokenId: number) => {
           try {
@@ -130,9 +128,9 @@ const FeaturedMembers: React.FC<FeaturedMembersProps> = ({ addresses }) => {
         {featuredMembersInfo.length > 0 ? (
           <Grid
             templateColumns={{
-              base: "1fr",          // 1 colonne (pleine largeur) sur mobile
-              sm: "repeat(2, 1fr)", // 2 colonnes sur petits écrans
-              md: "repeat(4, 1fr)"  // 4 colonnes sur moyens+ écrans
+              base: "1fr",
+              sm: "repeat(2, 1fr)",
+              md: "repeat(4, 1fr)",
             }}
             gap={6}
             justifyContent="center"
@@ -140,9 +138,7 @@ const FeaturedMembers: React.FC<FeaturedMembersProps> = ({ addresses }) => {
             {featuredMembersInfo.map((info, idx) => (
               <GridItem
                 key={idx}
-                w={{ base: "100%", md: "200px" }} // Pleine largeur mobile, fixe desktop
-                minW={{ md: "200px" }}            // Garantie minimum 200px même si peu d'items
-                maxW={{ base: "300px", md: "200px" }} // Limite largeur optionnelle (si besoin)
+                w={{ base: "100%", md: "200px" }}
                 height="250px"
                 borderRadius="xl"
                 position="relative"
@@ -156,16 +152,10 @@ const FeaturedMembers: React.FC<FeaturedMembersProps> = ({ addresses }) => {
                   transform: "scale(1.05)",
                   boxShadow: "0 0 25px rgba(216, 112, 255, 0.6)",
                 }}
-                justifySelf="center" // Centre la carte horizontalement dans la colonne
-                mx="auto"            // Pour l'harmonisation sur mobile
+                justifySelf="center"
+                mx="auto"
               >
-                <Box
-                  bg="gray.900"
-                  borderRadius="xl"
-                  height="100%"
-                  p={4}
-                  textAlign="center"
-                >
+                <Box bg="gray.900" borderRadius="xl" height="100%" p={4} textAlign="center">
                   <Link href={`/u/${info.address}`} passHref>
                     <Tooltip label="Cliquez pour voir le profil" hasArrow>
                       <Box as="a" display="block" height="100%">
@@ -189,7 +179,9 @@ const FeaturedMembers: React.FC<FeaturedMembersProps> = ({ addresses }) => {
                               </Box>
                             ))
                           ) : (
-                            <Text fontSize="xs" color="gray.500">Aucun jeton d'adhésion</Text>
+                            <Text fontSize="xs" color="gray.500">
+                              Aucun jeton d'adhésion
+                            </Text>
                           )}
                         </Box>
                       </Box>
@@ -200,7 +192,9 @@ const FeaturedMembers: React.FC<FeaturedMembersProps> = ({ addresses }) => {
             ))}
           </Grid>
         ) : (
-          <Text>Aucun adhérent trouvé.</Text>
+          <Text color="gray.400" textAlign="center">
+            Aucun adhérent trouvé.
+          </Text>
         )}
       </Box>
     </Box>

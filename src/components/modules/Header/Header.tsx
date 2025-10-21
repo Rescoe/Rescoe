@@ -1,5 +1,5 @@
 //Header :
-import { Box, Tooltip, Container, Button, Menu, MenuButton, MenuList, MenuItem, Drawer, DrawerBody, DrawerCloseButton, DrawerContent, DrawerHeader, DrawerOverlay, useDisclosure, HStack, VStack, Flex } from '@chakra-ui/react';
+import { Box, Tooltip, Container, Button, Menu, MenuButton, MenuList, MenuItem, Drawer, DrawerBody, DrawerCloseButton, DrawerContent, DrawerHeader, DrawerOverlay, useDisclosure, HStack, VStack, Flex, useColorModeValue, useTheme } from '@chakra-ui/react';
 import { FaBug, FaEye, FaEyeSlash, FaBars } from 'react-icons/fa';
 import { ChevronDownIcon } from '@chakra-ui/icons';
 import React, { useRef, useState, useEffect } from 'react';
@@ -33,12 +33,32 @@ interface AuthContextType {
 const Header = () => {
   const headerRef = useRef<HTMLDivElement>(null);
   const { isAuthenticated } = useAuth();
+  const theme = useTheme();
+
 
   const { isAdmin, isArtist, isPoet, isTrainee, isContributor, address, isMember } = useAuth();
   const [isInsectVisible, setIsInsectVisible] = useState(true);
   const [selectedInsect, setSelectedInsect] = useState<Insect | null>(null);
   const [insectImage, setInsectImage] = useState<string | null>(null);
   const { isOpen, onOpen, onClose } = useDisclosure();
+
+
+  const accentGradient = "linear(to-r, purple.500, pink.400)";
+
+  const bg = useColorModeValue("bg.light", "bg.dark");
+  const cardBg = useColorModeValue("card.light", "card.dark");
+  const textColor = useColorModeValue("text.light", "text.dark");
+  const borderColor = useColorModeValue("border.light", "border.dark");
+  const startColor = useColorModeValue(
+      theme.colors.brand.startLight,
+      theme.colors.brand.startDark
+    );
+  const endColor = useColorModeValue(
+      theme.colors.brand.endLight,
+      theme.colors.brand.endDark
+    );
+
+    const bgGradient = `linear(to-b, ${startColor}, ${endColor})`;
 
   const toggleInsectVisibility = () => {
     setIsInsectVisible((prev) => !prev);
@@ -81,14 +101,18 @@ const Header = () => {
     ref={headerRef}
     borderBottom="1px"
     borderBottomColor="purple.300"
-    bg="gray.900"
-    color="gray.100"
+    bgGradient={useColorModeValue(
+      "linear(to-b, bgGradientLight.start, bgGradientLight.end)",
+      "linear(to-b, bgGradientDark.start, bgGradientDark.end)"
+    )}
+    color={textColor}
     role="banner"
     aria-label="En-tête du site"
     shadow="md"
     top={0}
     zIndex={1000}
   >
+
     <Container
     maxW="container.xl" p="20px"
     >

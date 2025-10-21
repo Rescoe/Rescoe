@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Box, Heading, Text, Button, VStack, Grid, GridItem, Divider, Icon, Flex, Input, FormLabel, Select, Checkbox, useColorModeValue, SimpleGrid, Stack,Collapse, HStack, Image } from '@chakra-ui/react';
+import { Box, Heading, Text, Button, VStack, Grid, GridItem, Divider, Icon, Flex, Input, FormLabel, Select, Checkbox, useColorModeValue, SimpleGrid, Stack,Collapse, HStack, Image, useTheme } from '@chakra-ui/react';
 import { FaBookOpen, FaUsers, FaLightbulb, FaHandsHelping, FaPaintBrush, FaGraduationCap, FaHandshake   } from 'react-icons/fa';
 //import useCheckMembership from '../../../utils/useCheckMembership';
 import NextLink from 'next/link';
@@ -57,10 +57,25 @@ const benefits = [
 const Home = () => {
 const [isLoading, setIsLoading] = useState(false);
 const router = useRouter();
+const theme = useTheme();
+
 
 const accentGradient = "linear(to-r, purple.500, pink.400)";
-const bgCard = useColorModeValue("white", "gray.800");
-const colorCard = useColorModeValue("gray.800", "white");
+
+const bg = useColorModeValue("bg.light", "bg.dark");
+const cardBg = useColorModeValue("card.light", "card.dark");
+const textColor = useColorModeValue("text.light", "text.dark");
+const borderColor = useColorModeValue("border.light", "border.dark");
+const startColor = useColorModeValue(
+    theme.colors.brand.startLight,
+    theme.colors.brand.startDark
+  );
+const endColor = useColorModeValue(
+    theme.colors.brand.endLight,
+    theme.colors.brand.endDark
+  );
+
+  const bgGradient = `linear(to-b, ${startColor}, ${endColor})`;
 
 interface Haiku {
   poemText: string[];  // Change this to string[] if it's meant to be an array of strings.
@@ -349,13 +364,17 @@ useEffect(() => {
     const maxBoxHeight = "150px"; // Hauteur max pour toutes les boîtes
 
     return (
-    <Box
-      as={motion.div}
-      w="100%"
-      textAlign="center"
-      position="relative"
-      overflow="hidden"
-    >
+      <Box
+        as={motion.div}
+        w="100%"
+        textAlign="center"
+        position="relative"
+        overflow="hidden"
+        bgGradient={useColorModeValue(
+          "linear(to-b, bgGradientLight.start, bgGradientLight.end)",
+          "linear(to-b, bgGradientDark.start, bgGradientDark.end)"
+        )}
+        color={textColor}      >
       {/* ===== SECTION INTRO / PRÉSENTATION ===== */}
       <motion.div
         initial={{ opacity: 0, y: -30 }}
@@ -370,7 +389,7 @@ useEffect(() => {
         >
         <Heading
           size={{ base: "xl", md: "2xl" }}
-          bgGradient="linear(to-r, purple.300, pink.400)"
+          bgGradient={bgGradient}
           bgClip="text"
           fontWeight="extrabold"
           mb={6}
@@ -404,7 +423,7 @@ useEffect(() => {
             px={12}
             py={7}
             fontWeight="bold"
-            bgGradient="linear(to-r, purple.700, pink.600)"
+            bgGradient={bgGradient}
             color="white"
             borderRadius="full"
             animation={`${pulse} 2.5s infinite`}
@@ -423,7 +442,7 @@ useEffect(() => {
             mt={6}
             mb={2}
             size="lg"
-            bgGradient="linear(to-r, pink.400, purple.400)"
+bgGradient={bgGradient}
             bgClip="text"
             textAlign="center"
             py={2}            // <-- évite la coupe du haut/bas
@@ -440,24 +459,21 @@ useEffect(() => {
           <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
 
           <Box
-          boxShadow="2xl"
-          borderRadius="2xl"
-          bg="blackAlpha.700"
-          p={{ base: 8, md: 12 }}
-          maxW="95%"
-          mx="auto"
-          mt={6}
+            boxShadow="2xl"
+            borderRadius="2xl"
+            bg={cardBg}
+            p={{ base: 8, md: 12 }}
+            maxW="95%"
+            mx="auto"
+            mt={10}
           >
-
-
-          <Heading
-            mt={6}
-            mb={2}
-            size="lg"
-            bgGradient="linear(to-r, pink.400, purple.400)"
-            bgClip="text"
-            textAlign="center"
-          >
+            <Heading
+              mt={6}
+              mb={2}
+              size="lg"
+bgGradient={bgGradient}
+              bgClip="text"
+            >
           Pour vous :
           </Heading>
 
@@ -491,14 +507,20 @@ useEffect(() => {
                 transition={{ duration: 0.7, delay: i * 0.2 }}
                 viewport={{ once: true }}
               >
-                <VStack
-                  bg="whiteAlpha.50"
-                  borderRadius="2xl"
-                  boxShadow="0 4px 30px rgba(0,0,0,0.2)"
-                  backdropFilter="blur(6px)"
-                  p={6}
-                  h="100%"
-                >
+              <VStack
+                key={i}
+                bg={cardBg}
+                borderRadius="2xl"
+                boxShadow="xl"
+                p={6}
+                h="100%"
+                transition="all 0.3s ease"
+                _hover={{
+                  bgGradient: "linear(to-r, brand.start, brand.end)",
+                  color: "white",
+                  transform: "scale(1.03)",
+                }}
+              >
                   <Image
                     src={item.icon}
                     alt={item.title}
@@ -528,7 +550,7 @@ useEffect(() => {
             mt={6}
             mb={2}
             size="lg"
-            bgGradient="linear(to-r, pink.400, purple.400)"
+bgGradient={bgGradient}
             bgClip="text"
             textAlign="center"
           >
@@ -556,7 +578,7 @@ useEffect(() => {
           mt={6}
           mb={2}
           size="lg"
-          bgGradient="linear(to-r, pink.400, purple.400)"
+bgGradient={bgGradient}
           bgClip="text"
           textAlign="center"
         >
@@ -586,7 +608,7 @@ useEffect(() => {
             <Heading
               size="lg"
               mb={6}
-              bgGradient="linear(to-r, purple.400, pink.400)"
+bgGradient={bgGradient}
               bgClip="text"
               textAlign="center"
             >
@@ -618,7 +640,7 @@ useEffect(() => {
         <VStack
           boxShadow="2xl"
           borderRadius="2xl"
-          bg="blackAlpha.700"
+        bg={cardBg}
           p={{ base: 8, md: 12 }}
           maxW="95%"
           mx="auto"
@@ -627,7 +649,7 @@ useEffect(() => {
         >
           <Heading
             size={{ base: "lg", md: "xl" }}
-            bgGradient="linear(to-r, purple.400, pink.400)"
+bgGradient={bgGradient}
             bgClip="text"
             fontWeight="extrabold"
             textAlign="center"
@@ -664,7 +686,7 @@ useEffect(() => {
                   px={10}
                   py={8}
                   borderRadius="2xl"
-                  bgGradient="linear(to-r, blackAlpha.600, blackAlpha.400)"
+bgGradient={bgGradient}
                   border="1px solid"
                   borderColor="purple.700"
                   boxShadow="0 0 15px rgba(168, 85, 247, 0.25)"
@@ -722,7 +744,7 @@ useEffect(() => {
               mt={6}
               mb={2}
               size="lg"
-              bgGradient="linear(to-r, pink.400, purple.400)"
+              bgGradient={bgGradient}
               bgClip="text"
               textAlign="center"
             >

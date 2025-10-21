@@ -39,25 +39,31 @@ const DerniersAdherents: React.FC = () => {
     const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS;
     const contractAddressManagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGER;
 
-    useEffect(() => {
-        const initWeb3 = async () => {
-            const provider = await detectEthereumProvider();
-            if (provider) {
-                const web3Instance = new Web3(provider);
-                setWeb3(web3Instance);
-            } else {
-                alert('Veuillez installer MetaMask !');
-            }
-        };
+    const RPC_URL = process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string; // ✅ Fallback RPC public
 
-        initWeb3();
-    }, []);
-
+    // ✅ Initialisation de Web3 : essaie MetaMask, sinon RPC public
     useEffect(() => {
-        if (web3) {
-            fetchDerniersAdherents();
+      const initWeb3 = async () => {
+        let web3Instance;
+        if (typeof window !== "undefined" && (window as any).ethereum) {
+          // Si MetaMask est dispo, on l’utilise
+          web3Instance = new Web3((window as any).ethereum);
+          console.log("✅ Utilisation du provider MetaMask");
+        } else {
+          // Sinon fallback sur le RPC Moralis
+          web3Instance = new Web3(new Web3.providers.HttpProvider(RPC_URL));
+          console.log("🌐 Utilisation du provider RPC public (lecture seule)");
         }
-    }, [web3]);
+        setWeb3(web3Instance);
+      };
+      initWeb3();
+    }, [RPC_URL]);
+
+    useEffect(() => {
+   if (web3) {
+     fetchDerniersAdherents();
+   }
+ }, [web3]);
 
     const fetchDerniersAdherents = async () => {
         try {
