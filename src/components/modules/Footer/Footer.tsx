@@ -3,14 +3,11 @@ import { FaInstagram } from 'react-icons/fa';
 import { SiBluesky } from 'react-icons/si';
 import NextLink from 'next/link';
 import { motion } from "framer-motion";
-import { keyframes } from "@emotion/react";
 
 // Animation pulsante pour le bouton "Adhérez"
-const pulse = keyframes`
-  0% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.6); }
-  70% { box-shadow: 0 0 0 15px rgba(236, 72, 153, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0); }
-`;
+import { pulse } from "@styles/theme";
+import { brandHover, hoverStyles } from "@styles/theme"; //Style
+
 
 
 const links = {
@@ -19,7 +16,13 @@ const links = {
   bluesky: 'https://bsky.app/profile/rescoe.bsky.social', // Remplace par le bon lien
 };
 
+
+
+
 const Footer = () => {
+
+
+
   return (
 
     <Box
@@ -58,13 +61,11 @@ const Footer = () => {
             fontWeight="bold"
             fontSize="lg"
             borderRadius="full"
-            bgGradient="linear(to-r, purple.700, pink.600)"
-            color="white"
-            animation={`${pulse} 2.5s infinite`}
+            animation={`${pulse} 2s infinite`}
             transition="transform 0.3s ease"
             _hover={{
-              transform: "scale(1.1)",
-              bgGradient: "linear(to-r, pink.600, purple.700)",
+              ...hoverStyles.brandHover._hover,
+              ...brandHover,
             }}
             as={NextLink}
             href="/adhesion"

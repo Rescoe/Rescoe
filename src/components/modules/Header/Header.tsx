@@ -15,6 +15,9 @@ import SelectInsect from '../InsectSelector';
 
 import { Insect } from '../InsectSelector';
 
+import { brandHover, hoverStyles } from "@styles/theme"; //Style
+
+
 interface AuthContextType {
   address: string | null;
   role: 'admin' | 'artist' | 'poet' | 'trainee' | 'contributor' | null;
@@ -41,24 +44,6 @@ const Header = () => {
   const [selectedInsect, setSelectedInsect] = useState<Insect | null>(null);
   const [insectImage, setInsectImage] = useState<string | null>(null);
   const { isOpen, onOpen, onClose } = useDisclosure();
-
-
-  const accentGradient = "linear(to-r, purple.500, pink.400)";
-
-  const bg = useColorModeValue("bg.light", "bg.dark");
-  const cardBg = useColorModeValue("card.light", "card.dark");
-  const textColor = useColorModeValue("text.light", "text.dark");
-  const borderColor = useColorModeValue("border.light", "border.dark");
-  const startColor = useColorModeValue(
-      theme.colors.brand.startLight,
-      theme.colors.brand.startDark
-    );
-  const endColor = useColorModeValue(
-      theme.colors.brand.endLight,
-      theme.colors.brand.endDark
-    );
-
-    const bgGradient = `linear(to-b, ${startColor}, ${endColor})`;
 
   const toggleInsectVisibility = () => {
     setIsInsectVisible((prev) => !prev);
@@ -100,12 +85,6 @@ const Header = () => {
   <Box
     ref={headerRef}
     borderBottom="1px"
-    borderBottomColor="purple.300"
-    bgGradient={useColorModeValue(
-      "linear(to-b, bgGradientLight.start, bgGradientLight.end)",
-      "linear(to-b, bgGradientDark.start, bgGradientDark.end)"
-    )}
-    color={textColor}
     role="banner"
     aria-label="En-tête du site"
     shadow="md"
@@ -140,7 +119,10 @@ const Header = () => {
             onClick={onOpen}
             variant="ghost"
             aria-label="Ouvrir le menu de navigation"
-            _hover={{ bg: 'purple.700' }}
+            _hover={{
+              ...hoverStyles.brandHover._hover,
+              ...brandHover,
+            }}
             _focus={{ boxShadow: 'outline' }}
             fontSize="2xl"
           >
@@ -175,12 +157,10 @@ const Header = () => {
                 fontSize="sm"
                 fontWeight="bold"
                 borderRadius="full"
-                bgGradient="linear(to-r, teal.300, green.400)"
-                color="white"
                 boxShadow="lg"
                 _hover={{
-                  transform: "scale(1.05)",
-                  boxShadow: "2xl",
+                  ...hoverStyles.brandHover._hover,
+                  ...brandHover,
                 }}
                 _active={{
                   transform: "scale(0.98)",
@@ -215,12 +195,11 @@ const Header = () => {
               fontSize="sm"
               fontWeight="bold"
               borderRadius="full"
-              bgGradient="linear(to-r, purple.700, teal.600)"
               color="white"
               boxShadow="lg"
               _hover={{
-                transform: "scale(1.05)",
-                boxShadow: "2xl",
+                ...hoverStyles.brandHover._hover,
+                ...brandHover,
               }}
               _active={{
                 transform: "scale(0.98)",
@@ -253,12 +232,11 @@ const Header = () => {
                 fontSize="sm"
                 fontWeight="bold"
                 borderRadius="full"
-                bgGradient="linear(to-r, blue.400, blue.600)"
                 color="white"
                 boxShadow="lg"
                 _hover={{
-                  transform: "scale(1.05)",
-                  boxShadow: "2xl",
+                  ...hoverStyles.brandHover._hover,
+                  ...brandHover,
                 }}
                 _active={{
                   transform: "scale(0.98)",
@@ -289,12 +267,10 @@ const Header = () => {
                 fontSize="sm"
                 fontWeight="bold"
                 borderRadius="full"
-                bgGradient="linear(to-r, purple.500, purple.700)"
-                color="white"
                 boxShadow="lg"
                 _hover={{
-                  transform: "scale(1.05)",
-                  boxShadow: "2xl",
+                  ...hoverStyles.brandHover._hover,
+                  ...brandHover,
                 }}
                 _active={{
                   transform: "scale(0.98)",
@@ -327,12 +303,10 @@ const Header = () => {
                 fontSize="sm"
                 fontWeight="bold"
                 borderRadius="full"
-                bgGradient="linear(to-r, orange.400, orange.600)"
-                color="white"
                 boxShadow="lg"
                 _hover={{
-                  transform: "scale(1.05)",
-                  boxShadow: "2xl",
+                  ...hoverStyles.brandHover._hover,
+                  ...brandHover,
                 }}
                 _active={{
                   transform: "scale(0.98)",
@@ -386,10 +360,6 @@ const Header = () => {
                     <SelectInsect onSelect={handleSelectInsect} />
                   </Box>
 
-                  <Box mt={4} display="flex" justifyContent="center">
-                    <ColorModeButton />
-                  </Box>
-
                 </MenuList>
               </Menu>
             </HStack>
@@ -404,17 +374,13 @@ const Header = () => {
                   py={6}
                   fontSize="sm"
                   borderRadius="full"
-                  bgGradient="yellow"
-                  color="white"
                   boxShadow="lg"
                   _hover={{
-                    transform: "scale(0.8)",
-                    boxShadow: "2xl",
+                    ...hoverStyles.brandHover._hover,
+                    ...brandHover,
                   }}
                   _active={{
                     transform: "scale(0.9)",
-                    bgGradient : "linear(to-r, purple.700, pink.600)"
-
                   }}
                   transition="all 0.25s ease"
                   isDisabled={!isAuthenticated}
@@ -426,6 +392,18 @@ const Header = () => {
               </span>
             </Tooltip>
           )}
+
+          <Box
+          py={6}
+          fontSize="sm"
+          fontWeight="bold"
+          borderRadius="full"
+          boxShadow="lg"
+          >
+            <ColorModeButton />
+          </Box>
+
+
         </HStack>
       </Flex>
 

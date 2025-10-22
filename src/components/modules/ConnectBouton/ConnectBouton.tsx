@@ -8,6 +8,8 @@ import { getEllipsisTxt } from '../../../utils/format';
 import { useAuth } from '../../../utils/authContext';
 import { useAuthRequestChallengeEvm } from '@moralisweb3/next';
 import { ConnectButton as RainbowConnectButton } from '@rainbow-me/rainbowkit';
+import { brandHover, hoverStyles } from "@styles/theme"; //Style
+
 
 const ConnectBouton: React.FC = () => {
     const { disconnectAsync } = useDisconnect();
@@ -139,12 +141,10 @@ const ConnectBouton: React.FC = () => {
                                     fontSize="lg"
                                     fontWeight="bold"
                                     borderRadius="full"
-                                    bgGradient="linear(to-r, purple.700, pink.600)"
-                                    color="white"
                                     boxShadow="lg"
                                     _hover={{
-                                      transform: "scale(1.05)",
-                                      boxShadow: "2xl",
+                                      ...hoverStyles.brandHover._hover,
+                                      ...brandHover,
                                     }}
                                     _active={{
                                       transform: "scale(0.98)",

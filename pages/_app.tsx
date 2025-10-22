@@ -10,7 +10,7 @@ import { SessionProvider } from 'next-auth/react';
 import type { AppProps } from 'next/app';
 import { isMobile } from 'react-device-detect';
 
-import theme from '../styles/theme'; // ✅ adapte juste le chemin ici
+import theme from '@styles/theme'; // ✅ adapte juste le chemin ici
 
 
 

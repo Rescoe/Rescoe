@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { Box, Heading, Text, Button, VStack, Grid, GridItem, Divider, Icon, Flex, Input, FormLabel, Select, Checkbox, useColorModeValue, SimpleGrid, Stack,Collapse, HStack, Image, useTheme } from '@chakra-ui/react';
 import { FaBookOpen, FaUsers, FaLightbulb, FaHandsHelping, FaPaintBrush, FaGraduationCap, FaHandshake   } from 'react-icons/fa';
 //import useCheckMembership from '../../../utils/useCheckMembership';
@@ -130,7 +130,7 @@ const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider)
 
 
 // Charger uniquement les collections FEATURED
-const fetchCollections = async () => {
+const fetchCollections = useCallback(async () => {
   setIsLoading(true);
   try {
     const total = await contract.getTotalCollectionsMinted();
@@ -184,7 +184,8 @@ const fetchCollections = async () => {
   } finally {
     setIsLoading(false);
   }
-};
+
+}, [contract]);
 
 const fetchPoems = async (collectionId: string, associatedAddress: string): Promise<void> => {
   setIsLoading(true);
@@ -301,7 +302,7 @@ useEffect(() => {
     fetchCollections();
     hasFetched.current = true;
   }
-}, []);
+}, [fetchCollections]);
 
 
 // Fonction pour obtenir des éléments aléatoires
@@ -314,7 +315,7 @@ const getRandomItems = <T,>(array: T[], count: number): T[] => {
 
 const fetchedCollections = useRef(new Set()); // Utilisation de useRef pour garder les collections déjà récupérées
 
-const fetchAllNFTsAndPoems = async () => {
+const fetchAllNFTsAndPoems = useCallback(async () => {
   const artCollections = collections.filter(col => col.collectionType === 'Art');
   const poetryCollections = collections.filter(col => col.collectionType === 'Poesie');
 
@@ -351,7 +352,7 @@ const fetchAllNFTsAndPoems = async () => {
 
   ////console.log("Récupération terminée. NFTs totaux :", nfts.length);
   ////console.log("Poèmes totaux :", haikus.length);
-};
+}, [collections]);
 
 // Appel de la fonction dans useEffect
 useEffect(() => {
@@ -359,6 +360,17 @@ useEffect(() => {
     fetchAllNFTsAndPoems();
   }
 }, [collections]);
+
+const allNfts = useMemo(
+  () => collections.flatMap(col => nftsByCollection[col.id] || []),
+  [collections, nftsByCollection]
+);
+
+const allHaikus = useMemo(
+  () => collections.flatMap(col => haikusByCollection[col.id] || []),
+  [collections, haikusByCollection]
+);
+
 
 
     const maxBoxHeight = "150px"; // Hauteur max pour toutes les boîtes
@@ -402,7 +414,7 @@ useEffect(() => {
           <Divider my={8} borderColor="purple.700" w="5%" mx="auto" />
 
           <Text
-            color="gray.300"
+            color={textColor}
             fontSize={{ base: "md", md: "lg" }}
             maxW="800px"
             mx="auto"
@@ -450,10 +462,9 @@ bgGradient={bgGradient}
             Œuvre et poème du jour
           </Heading>
 
-          <HeroSection
-            nfts={collections.flatMap(col => nftsByCollection[col.id] || [])}
-            haikus={collections.flatMap(col => haikusByCollection[col.id] || [])}
-          />
+
+          <HeroSection nfts={allNfts} haikus={allHaikus} />
+
 
 
           <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
@@ -536,7 +547,7 @@ bgGradient={bgGradient}
                   >
                     {item.title}
                   </Heading>
-                  <Text color="gray.400" fontSize="sm">
+                  <Text color={textColor} fontSize="sm">
                     {item.desc}
                   </Text>
                 </VStack>
@@ -588,12 +599,8 @@ bgGradient={bgGradient}
         <Box py={{ base: 10, md: 16 }} w="100%" maxW="1100px" mx="auto" px={{ base: 6, md: 10 }}>
           {collections.length > 0 ? (
             <DynamicCarousel
-              nfts={collections.flatMap(
-                (collection) => nftsByCollection[collection.id] || []
-              )}
-              haikus={collections.flatMap(
-                (collection) => haikusByCollection[collection.id] || []
-              )}
+              nfts={allNfts}
+              haikus={allHaikus}
               maxNfts={20}    // réglable
               maxHaikus={20}  // réglable
             />
@@ -638,14 +645,14 @@ bgGradient={bgGradient}
         viewport={{ once: true }}
       >
         <VStack
-          boxShadow="2xl"
-          borderRadius="2xl"
+        borderRadius="2xl"
+        border="1px solid"
+        borderColor="purple.700"
         bg={cardBg}
-          p={{ base: 8, md: 12 }}
-          maxW="95%"
-          mx="auto"
-          spacing={8}
-          mt={16}
+        p={{ base: 8, md: 12 }}
+        maxW="95%"
+        mx="auto"
+        mt={10}
         >
           <Heading
             size={{ base: "lg", md: "xl" }}
@@ -659,7 +666,7 @@ bgGradient={bgGradient}
 
           <Text
             fontSize={{ base: "md", md: "lg" }}
-            color="gray.300"
+            color={textColor}
             textAlign="center"
             maxW="700px"
             mx="auto"
@@ -679,31 +686,40 @@ bgGradient={bgGradient}
                 transition={{ duration: 0.6, delay: index * 0.1 }}
                 viewport={{ once: true }}
               >
-                <Box
-                  as="button"
-                  onClick={() => toggle(index)}
-                  role="group"
-                  px={10}
-                  py={8}
-                  borderRadius="2xl"
-bgGradient={bgGradient}
-                  border="1px solid"
-                  borderColor="purple.700"
-                  boxShadow="0 0 15px rgba(168, 85, 247, 0.25)"
-                  transition="all 0.4s ease"
-                  _hover={{
-                    bgGradient: "linear(to-r, purple.900, pink.800)",
-                    transform: "scale(1.05)",
-                    boxShadow: "0 0 30px rgba(236, 72, 153, 0.45)",
-                  }}
-                  w="100%"
-                  h="100%"
-                >
+              <Box
+                as="button"
+                onClick={() => toggle(index)}
+                role="group"
+                px={10}
+                py={8}
+                borderRadius="2xl"
+                bgGradient={bgGradient}
+                border="1px solid"
+                borderColor={useColorModeValue("brand.mauve", "brand.gold")}
+                boxShadow={useColorModeValue(
+                  "0 0 15px rgba(180, 166, 213, 0.25)", // mauve clair en light
+                  "0 0 15px rgba(238, 212, 132, 0.25)"  // doré doux en dark
+                )}
+                transition="all 0.4s ease"
+                _hover={{
+                  bgGradient: useColorModeValue(
+                    `linear(to-r, ${theme.colors.brand.gold}, ${theme.colors.brand.mauve})`,
+                    `linear(to-r, ${theme.colors.brand.mauve}, ${theme.colors.brand.gold})`
+                  ),
+                  transform: "scale(1.05)",
+                  boxShadow: useColorModeValue(
+                    "0 0 30px rgba(180, 166, 213, 0.45)", // lumière mauve en light
+                    "0 0 30px rgba(238, 212, 132, 0.45)"  // halo doré en dark
+                  ),
+                }}
+                w="100%"
+                h="100%"
+              >
                   <Stack align="center" spacing={4}>
                     <Icon
                       as={benefit.icon}
                       boxSize={12}
-                      color="purple.400"
+                      color={textColor}
                       transition="color 0.3s ease"
                       _groupHover={{ color: "white" }}
                     />
@@ -717,7 +733,7 @@ bgGradient={bgGradient}
                     </Text>
                     <Text
                       mt={3}
-                      color="purple.200"
+                      color={textColor}
                       textAlign="center"
                       fontSize="md"
                       maxW="300px"
@@ -750,7 +766,7 @@ bgGradient={bgGradient}
             >
               Ils viennent de rejoindre l’aventure :
             </Heading>
-            <Text color="gray.400" textAlign="center" mb={6} maxW="800px" mx="auto">
+            <Text color={textColor}  textAlign="center" mb={6} maxW="800px" mx="auto">
               Découvrez les nouveaux membres du réseau et leurs créations.
             </Text>
 
