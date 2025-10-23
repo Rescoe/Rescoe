@@ -30,6 +30,16 @@
 				"internalType": "address",
 				"name": "_adhesionContractAddress",
 				"type": "address"
+			},
+			{
+				"internalType": "string",
+				"name": "_salonName",
+				"type": "string"
+			},
+			{
+				"internalType": "bool",
+				"name": "_requiresMembership",
+				"type": "bool"
 			}
 		],
 		"stateMutability": "nonpayable",
@@ -1068,6 +1078,19 @@
 		"type": "function"
 	},
 	{
+		"inputs": [],
+		"name": "requiresMembership",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
 		"inputs": [
 			{
 				"internalType": "address",
@@ -1116,6 +1139,19 @@
 		"name": "safeTransferFrom",
 		"outputs": [],
 		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "salonName",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{

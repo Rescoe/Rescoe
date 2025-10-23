@@ -23,7 +23,7 @@ interface ChannelFeedProps {
   channelId: string;
 }
 
-const CONTRACT_ADDRESS = "0x93bDfC9d22E47BaFF14726F249603d844795dEE4";
+const CONTRACT_ADDRESS = "0x2c4368bebb206f2b3765caa96e35c01487af5fbe";
 
 const ChannelFeed: React.FC<ChannelFeedProps> = ({ channelId }) => {
   const [messages, setMessages] = useState<DiscordMessage[]>([]);
@@ -141,7 +141,7 @@ const ChannelFeed: React.FC<ChannelFeedProps> = ({ channelId }) => {
       const imageUrl = msg.attachments[0]?.url || "";
 
       const messageTimestamp = Math.floor(new Date(msg.timestamp).getTime() / 1000);
-/*
+
       console.log("params prepared:", {
         discordMessageParam,
         haiku,
@@ -153,7 +153,7 @@ const ChannelFeed: React.FC<ChannelFeedProps> = ({ channelId }) => {
         editionsForSale,
         isOpenEdition,
       });
-*/
+
       // --- Tentative d'encodeABI pour voir si Web3 accepte les types ---
       try {
         const encoded = contract.methods

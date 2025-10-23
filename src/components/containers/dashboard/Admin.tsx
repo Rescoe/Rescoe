@@ -25,7 +25,7 @@ import {
     FormLabel,
 } from '@chakra-ui/react';
 import detectEthereumProvider from '@metamask/detect-provider';
-
+import ManageContracts from './ManageSolidity/MasterFactoryManagement'
 
 type Collection =  {
   id: string;
@@ -925,6 +925,12 @@ const ManageFeaturedCollections = () => {
                     >
                         Economie
                     </Button>
+                    <Button
+                        onClick={() => handleTabChange('Contrats')}
+                        variant={activeTab === 'Contrats' ? 'solid' : 'outline'}
+                    >
+                        Contrats
+                    </Button>
                 </HStack>
 
                 <Divider />
@@ -933,6 +939,8 @@ const ManageFeaturedCollections = () => {
                 {activeTab === 'Roles' && <ManageRoles />}
                 {activeTab === 'NFT' && <ManageNFT />}
                 {activeTab === 'Settings' && <Settings />}
+                {activeTab === 'Contrats' && <ManageContracts />}
+
                 </Box>
             </VStack>
         </Box>
