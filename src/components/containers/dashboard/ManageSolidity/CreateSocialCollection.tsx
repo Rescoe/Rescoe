@@ -18,7 +18,7 @@ import detectEthereumProvider from "@metamask/detect-provider";
 import axios from "axios";
 import { useAuth } from '../../../../utils/authContext';
 
-import ABI_MESSAGE_FACTORY from '../../../ABI/Factories/messageFactory.json';
+import ABI_MESSAGE_FACTORY from '../../../ABI/Factories/MessageFactory.json';
 import ABI_RESCOLLECTION from "../../../ABI/ABI_Collections.json";
 
 const CreateSocialCollection: React.FC = () => {
