@@ -16,6 +16,8 @@ import { keyframes } from "@emotion/react";
 import RelatedFull from '../../../utils/RelatedFull'; // Assurez-vous d'importer le bon chemin
 import DerniersAdherents from '../association/Adherents/DerniersAdherents'; // Votre ABI de contrat ici.
 import FeaturedMembers from '../association/Adherents/FeaturedMembers'; // Votre ABI de contrat ici.
+import AteliersCalendarView from '../association/Formations/AteliersCalendarView'; // Votre ABI de contrat ici.
+
 
 // Animation pulsante pour le bouton "Adhérez"
 const pulse = keyframes`
@@ -774,6 +776,8 @@ bgGradient={bgGradient}
           </motion.div>
         </VStack>
       </motion.div>
+
+      <AteliersCalendarView />
 {/*
       <motion.div
         initial={{ opacity: 0, y: 40 }}
