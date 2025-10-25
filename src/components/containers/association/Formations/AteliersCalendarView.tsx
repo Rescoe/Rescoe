@@ -13,11 +13,13 @@ import {
   Heading,
   Divider,
   HStack,
+  VStack,
   Checkbox,
   Stack,
   Image,
   Spinner,
   Badge,
+  SimpleGrid,
 } from "@chakra-ui/react";
 import { SlArrowRight, SlArrowLeft } from "react-icons/sl";
 import Web3 from "web3";
@@ -59,94 +61,120 @@ const {
 
   // ---------- UI render ----------
   return (
-    <Box maxW="1200px" mx="auto" p={4}>
-      <Flex mb={4} alignItems="center" justify="space-between">
-        <Heading fontSize="2xl">Ateliers & Formations</Heading>
-        <Box>
-          <Text as="span" mr={2}>Afficher ateliers passés</Text>
-          <Switch isChecked={showPast} onChange={(e) => setShowPast(e.target.checked)} />
-        </Box>
-      </Flex>
-
-      <Flex gap={6} alignItems="flex-start">
-        {/* calendar */}
-        <Box flex="2" border="1px solid #2c7a7b" borderRadius={8} p={3}>
-          <Flex justify="space-between" align="center" mb={2}>
-            <HStack>
-              <IconButton aria-label="prev" onClick={() => setMonthOffset((o) => o - 1)} size="sm">
-                <SlArrowLeft />
-              </IconButton>
-              <Text fontWeight="bold" fontSize="md">
-                {currentMonthBase.toLocaleString(undefined, { month: "long", year: "numeric" })}
-              </Text>
-              <IconButton aria-label="next" onClick={() => setMonthOffset((o) => o + 1)} size="sm">
-                <SlArrowRight />
-              </IconButton>
-            </HStack>
-
-            <Select size="sm" w="150px" value={filters.type} onChange={(e) => setFilters((f) => ({ ...f, type: e.target.value }))}>
-              <option value="all">Tous types</option>
-              {availableTypes.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </Select>
-          </Flex>
-
-          <Box display="grid" gridTemplateColumns="repeat(7,1fr)" gap={1} mb={3}>
-            {["D", "L", "M", "M", "J", "V", "S"].map((d) => (
-              <Box key={d} textAlign="center" fontWeight="bold" fontSize="xs">
-                {d}
-              </Box>
-            ))}
-
-            {(() => {
-              const startWeekday = new Date(currentMonthBase.getFullYear(), currentMonthBase.getMonth(), 1).getDay();
-              return new Array(startWeekday).fill(0).map((_, i) => <Box key={`b-${i}`} />);
-            })()}
-
-            {daysInMonthGrid.map((d) => {
-              const key = d.toISOString().slice(0, 10);
-              const events = calendarDays[key] || [];
-              return (
-                <Box
-                  key={key}
-                  textAlign="center"
-                  p={1}
-                  borderRadius={4}
-                  cursor="pointer"
-                  onClick={() => setSelectedDate(new Date(d))}
-                  _hover={{ bg: "#014241" }}
-                >
-                  <Text fontSize="xs">{d.getDate()}</Text>
-                  <Flex justify="center" flexWrap="wrap" gap={0.5} mt={1}>
-                    {events.slice(0, 4).map((ev: any, i: number) => {
-                      const color = ev.cfg?.color || (ev.rules.hashtag ? rulesCfg[ev.rules.hashtag]?.color : null) || "#3182ce";
-                      return <Box key={i} w={2} h={2} borderRadius="50%" bg={color} />;
-                    })}
-                  </Flex>
-                </Box>
-              );
-            })}
+      <Box maxW="1200px" mx="auto" p={4}>
+        <Flex mb={4} alignItems="center" justify="space-between">
+          <Heading fontSize="2xl">Ateliers & Formations</Heading>
+          <Box>
+            <Text as="span" mr={2}>Afficher ateliers passés</Text>
+            <Switch isChecked={showPast} onChange={(e) => setShowPast(e.target.checked)} />
           </Box>
+        </Flex>
 
-          <Divider my={3} />
-          <Stack direction="row" spacing={3} wrap="wrap">
-            {Object.entries(rulesCfg).map(([hashtag, cfg]: any) => (
-              <HStack key={hashtag} spacing={2}>
-                <Box w={3} h={3} borderRadius="50%" bg={cfg?.color || "#ccc"} />
-                <Text fontSize="xs" color="#cfecec">
-                  {cfg?.type || cfg?.label || hashtag}
+        {/* Conteneur principal responsive */}
+        <Flex
+          gap={6}
+          alignItems="flex-start"
+          flexDirection={['column', 'column', 'row']} // col on mobile, row on md+
+        >
+          {/* Calendrier */}
+          <Box
+            flex="2"
+            border="1px solid #2c7a7b"
+            borderRadius={8}
+            p={3}
+            width="100%" // s'assure prise pleine largeur sur mobile
+            maxW={['100%', '100%', '600px']} // max width sur desktop
+          >
+            <Flex justify="space-between" align="center" mb={2}>
+              <HStack>
+                <IconButton aria-label="prev" onClick={() => setMonthOffset((o) => o - 1)} size="sm">
+                  <SlArrowLeft />
+                </IconButton>
+                <Text fontWeight="bold" fontSize="md">
+                  {currentMonthBase.toLocaleString(undefined, { month: "long", year: "numeric" })}
                 </Text>
+                <IconButton aria-label="next" onClick={() => setMonthOffset((o) => o + 1)} size="sm">
+                  <SlArrowRight />
+                </IconButton>
               </HStack>
-            ))}
-          </Stack>
-        </Box>
+
+              <Select
+                size="sm"
+                w="150px"
+                value={filters.type}
+                onChange={(e) => setFilters((f) => ({ ...f, type: e.target.value }))}
+              >
+                <option value="all">Tous types</option>
+                {availableTypes.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </Select>
+            </Flex>
+
+            <Box
+              display="grid"
+              gridTemplateColumns="repeat(7,1fr)"
+              gap={1}
+              mb={3}
+              overflowX="auto" // pour éviter débordement horizontal sur mobile
+            >
+              {["D", "L", "M", "M", "J", "V", "S"].map((d) => (
+                <Box key={d} textAlign="center" fontWeight="bold" fontSize="xs">
+                  {d}
+                </Box>
+              ))}
+
+              {(() => {
+                const startWeekday = new Date(currentMonthBase.getFullYear(), currentMonthBase.getMonth(), 1).getDay();
+                return new Array(startWeekday).fill(0).map((_, i) => <Box key={`b-${i}`} />);
+              })()}
+
+              {daysInMonthGrid.map((d) => {
+                const key = d.toISOString().slice(0, 10);
+                const events = calendarDays[key] || [];
+                return (
+                  <Box
+                    key={key}
+                    textAlign="center"
+                    p={1}
+                    borderRadius={4}
+                    cursor="pointer"
+                    onClick={() => setSelectedDate(new Date(d))}
+                    _hover={{ bg: "#014241" }}
+                  >
+                    <Text fontSize="xs">{d.getDate()}</Text>
+                    <Flex justify="center" flexWrap="wrap" gap={0.5} mt={1}>
+                      {events.slice(0, 4).map((ev: any, i: number) => {
+                        const color = ev.cfg?.color || (ev.rules.hashtag ? rulesCfg[ev.rules.hashtag]?.color : null) || "#3182ce";
+                        return <Box key={i} w={2} h={2} borderRadius="50%" bg={color} />;
+                      })}
+                    </Flex>
+                  </Box>
+                );
+              })}
+            </Box>
+
+            <Divider my={3} />
+            <Stack direction="row" spacing={3} wrap="wrap">
+              {Object.entries(rulesCfg).map(([hashtag, cfg]: any) => (
+                <HStack key={hashtag} spacing={2}>
+                  <Box w={3} h={3} borderRadius="50%" bg={cfg?.color || "#ccc"} />
+                  <Text fontSize="xs" color="#cfecec">
+                    {cfg?.type || cfg?.label || hashtag}
+                  </Text>
+                </HStack>
+              ))}
+            </Stack>
+          </Box>
 
         {/* details / day list */}
         <Box flex="3">
+        <SimpleGrid minChildWidth="300px" gap={4}>
+
           <Flex mb={4} align="center" justify="space-between">
+          <VStack>
             <Box>
               <Text fontSize="lg" fontWeight="bold">
                 {selectedDate
@@ -177,6 +205,7 @@ const {
                 ))}
               </Select>
             </Box>
+            </VStack>
           </Flex>
 
           <Box>
@@ -198,7 +227,20 @@ const {
                   const { raw: msg, rules, cfg } = entry;
                   const isFuture = !!rules.datetime && (rules.datetime as Date).getTime() > Date.now();
                   const open = !!openPanels[msg.id];
-                  const leftColor = cfg?.color || (rules.hashtag ? rulesCfg[rules.hashtag]?.color : null) || "#2c7a7b";
+                  //const leftColor = cfg?.color || (rules.hashtag ? rulesCfg[rules.hashtag]?.color : null) || "#2c7a7b";
+                  const hashtagKey = rules.hashtag?.startsWith("#")
+                    ? rules.hashtag
+                    : `#${rules.hashtag ?? ""}`;
+
+                    const leftColor =
+                      cfg?.color ||
+                      (rulesCfg && Object.keys(rulesCfg).length > 0
+                        ? (hashtagKey && rulesCfg?.[hashtagKey]?.color)
+                        : null) ||
+                      "#2c7a7b";
+
+
+                  console.log("🎨 leftColor:", leftColor, "for", hashtagKey);
                   const onChain = onChainDataByMsgId[msg.id];
 
                   return (
@@ -278,7 +320,11 @@ const {
             ) : (
               <Text color="#777">Sélectionne une date dans le calendrier pour voir les ateliers du jour.</Text>
             )}
+
           </Box>
+
+          </SimpleGrid>
+
         </Box>
       </Flex>
 

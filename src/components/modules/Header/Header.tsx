@@ -395,10 +395,7 @@ const Header = () => {
 
           <Box
           py={6}
-          fontSize="sm"
-          fontWeight="bold"
           borderRadius="full"
-          boxShadow="lg"
           >
             <ColorModeButton />
           </Box>

@@ -12,9 +12,18 @@ const ColorModeButton = () => {
   }, [colorMode]);
 
   return (
-    <Button size="sm" onClick={toggleColorMode}>
+    <Button
+      size="sm"
+      onClick={toggleColorMode}
+      variant="ghost"       // enlève la bulle
+      bg="transparent"      // supprime tout fond
+      _hover={{ bg: 'transparent' }}
+      _active={{ bg: 'transparent' }}
+      _focus={{ boxShadow: 'none' }} // pas de contour
+    >
       {colorMode === 'light' ? <SunIcon /> : <MoonIcon />}
     </Button>
+
   );
 };
 
