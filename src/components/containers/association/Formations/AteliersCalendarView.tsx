@@ -410,9 +410,6 @@ const isMultiDay = (ev: any) => {
 
         </Box>
       </Flex>
-
-      <Divider my={8} />
-
     </Box>
   );
 };

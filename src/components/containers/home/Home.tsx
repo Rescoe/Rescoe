@@ -396,7 +396,6 @@ const allHaikus = useMemo(
         transition={{ duration: 0.9, ease: "easeOut" }}
       >
         <Box
-          px={{ base: 6, md: 10 }}
           textAlign="center"
           maxW="1100px"
           mx="auto"
@@ -468,21 +467,14 @@ bgGradient={bgGradient}
           <HeroSection nfts={allNfts} haikus={allHaikus} />
 
 
-
           <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
 
           <Box
             boxShadow="2xl"
             borderRadius="2xl"
             bg={cardBg}
-            p={{ base: 8, md: 12 }}
-            maxW="95%"
-            mx="auto"
-            mt={10}
           >
             <Heading
-              mt={6}
-              mb={2}
               size="lg"
 bgGradient={bgGradient}
               bgClip="text"
@@ -557,6 +549,9 @@ bgGradient={bgGradient}
             ))}
           </SimpleGrid>
 
+          <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
+
+
           <AteliersCalendarView />
 
 
@@ -601,7 +596,7 @@ bgGradient={bgGradient}
           Fusionnons des œuvres digitales et des poèmes on-chain
         </Heading>
 
-        <Box py={{ base: 10, md: 16 }} w="100%" maxW="1100px" mx="auto" px={{ base: 6, md: 10 }}>
+        <Box w="100%" maxW="1100px" mx="auto" >
           {collections.length > 0 ? (
             <DynamicCarousel
               nfts={allNfts}
