@@ -205,8 +205,9 @@ const useAteliersData = () => {
   useEffect(() => {
     const fetchConfigs = async () => {
       try {
-        const [rulesRes, mapRes] = await Promise.all([fetch("/api/ateliers.json"), fetch("/api/discord-author-addresses")]);
+        const [rulesRes, mapRes] = await Promise.all([fetch("/config/ateliers.json"), fetch("/api/discord-author-addresses")]);
         const rulesJson = rulesRes.ok ? await rulesRes.json() : {};
+
         const mapJson = mapRes.ok ? await mapRes.json() : {};
         setRulesCfg(rulesJson || {});
         setAuthorAddressMap(mapJson || {});

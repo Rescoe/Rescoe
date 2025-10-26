@@ -1,0 +1,190 @@
+{
+  "#gravure": {
+    "hashtag": "#gravure",
+    "label": "Gravure sur bois",
+    "color": "#C9643B",
+    "price": 0.01,
+    "maxEditions": 6,
+    "type": "evenement",
+    "splitAddress": "0xAaBbCcDdEeFf0011223344556677889900aAbBcC",
+    "descriptionTemplate": "Atelier de gravure animé par {host}",
+    "defaultDurationHuman": "3h"
+  },
+  "#peinture": {
+    "hashtag": "#peinture",
+    "label": "Peinture collective",
+    "color": "#3B82C9",
+    "price": 0.005,
+    "maxEditions": 12,
+    "type": "atelier",
+    "splitAddress": "0x1111222233334444555566667777888899990000",
+    "descriptionTemplate": "Atelier peinture : {host} propose une session collaborative",
+    "defaultDurationHuman": "2h"
+  },
+  "#photographie": {
+    "hashtag": "#photographie",
+    "label": "Photographie",
+    "color": "#22C55E",
+    "price": 0.008,
+    "maxEditions": 10,
+    "type": "atelier",
+    "splitAddress": "0xAAAABBBBCCCCDDDDEEEEFFFF0000111122223333",
+    "descriptionTemplate": "Atelier photo pratique",
+    "defaultDurationHuman": "4h"
+  },
+  "#atelier-test": {
+    "hashtag": "#atelier-test",
+    "label": "Atelier Test",
+    "color": "#A78BFA",
+    "price": 0.001,
+    "maxEditions": 0,
+    "type": "atelier",
+    "splitAddress": null,
+    "descriptionTemplate": "Atelier test - description par défaut",
+    "defaultDurationHuman": "1h"
+  },
+
+  "#initiation-web3": {
+    "hashtag": "#initiation-web3",
+    "label": "Découverte du Web3 pour artistes",
+    "color": "#2D9CDB",
+    "type": "atelier",
+    "price": 0.002,
+    "maxEditions": 15,
+    "splitAddress": "0xFa6d6E36Da4acA3e6aa3bf2b4939165C39d83879",
+    "descriptionTemplate": "Atelier d'initiation au Web3 animé par {host}. Présentation accessible sur les NFTs et la blockchain artistique.",
+    "defaultDurationHuman": "2h"
+  },
+  "#haikus-collectifs": {
+    "hashtag": "#haikus-collectifs",
+    "label": "Écriture de haïkus collectifs",
+    "color": "#A855F7",
+    "type": "atelier",
+    "price": 0.001,
+    "maxEditions": 20,
+    "splitAddress": "0x7EbDE55C4Aba6b3b31E03306e833fF92187F984b",
+    "descriptionTemplate": "Atelier d'écriture poétique participatif. Thème : {theme}.",
+    "defaultDurationHuman": "2h"
+  },
+  "#atelier-poesie-libre": {
+    "hashtag": "#atelier-poesie-libre",
+    "label": "Poésie libre & contraintes créatives",
+    "color": "#F472B6",
+    "type": "atelier",
+    "price": 0.0015,
+    "maxEditions": 15,
+    "splitAddress": null,
+    "descriptionTemplate": "Atelier d’écriture poétique explorant les contraintes formelles et les libertés du langage.",
+    "defaultDurationHuman": "2h30"
+  },
+  "#atelier-texte-numerique": {
+    "hashtag": "#atelier-texte-numerique",
+    "label": "Texte & algorithme : écrire avec la machine",
+    "color": "#06B6D4",
+    "type": "atelier",
+    "price": 0.002,
+    "maxEditions": 10,
+    "splitAddress": null,
+    "descriptionTemplate": "Atelier expérimental mêlant écriture et code génératif (textes poétiques ou narratifs produits avec p5.js ou IA).",
+    "defaultDurationHuman": "3h"
+  },
+  "#atelier-slam": {
+    "hashtag": "#atelier-slam",
+    "label": "Slam et voix poétique",
+    "color": "#DC2626",
+    "type": "atelier",
+    "price": 0.001,
+    "maxEditions": 15,
+    "splitAddress": null,
+    "descriptionTemplate": "Atelier d’expression orale et de performance poétique animé par {host}.",
+    "defaultDurationHuman": "2h"
+  },
+  "#Fenetres-graphiques": {
+    "hashtag": "#Tkinter Generatif",
+    "label": "Introduction à l’art génératif",
+    "color": "#22C55E",
+    "type": "atelier",
+    "price": 0.003,
+    "maxEditions": 10,
+    "splitAddress": "roubzi.eth",
+    "descriptionTemplate": "Découverte de p5.js et création d'une œuvre générative simple.",
+    "defaultDurationHuman": "3h"
+  },
+  "#gravure-phygitale": {
+    "hashtag": "#gravure-phygitale",
+    "label": "Gravure et numérisation d’œuvre",
+    "color": "#C9643B",
+    "type": "atelier",
+    "price": 0.004,
+    "maxEditions": 8,
+    "splitAddress": null,
+    "descriptionTemplate": "Atelier phygital : réalisation d’une mini gravure, photographie et tokenisation de l’œuvre.",
+    "defaultDurationHuman": "3h"
+  },
+  "#appel-a-texte": {
+    "hashtag": "#appel-a-texte",
+    "label": "Appel à texte – Poésie et technologie",
+    "color": "#EAB308",
+    "type": "appel",
+    "price": 0,
+    "maxEditions": 0,
+    "splitAddress": null,
+    "descriptionTemplate": "Appel à texte autour de la relation entre poésie, outils numériques et création décentralisée.",
+    "defaultDurationHuman": "—"
+  },
+  "#appel-a-oeuvre": {
+    "hashtag": "#appel-a-oeuvre",
+    "label": "Appel à œuvres – Échos du code",
+    "color": "#EF4444",
+    "type": "appel",
+    "price": 0,
+    "maxEditions": 0,
+    "splitAddress": null,
+    "descriptionTemplate": "Soumission d'œuvres visuelles, sonores ou textuelles inspirées par la programmation, la donnée ou la blockchain.",
+    "defaultDurationHuman": "—"
+  },
+  "#defi-24h": {
+    "hashtag": "#defi-24h",
+    "label": "Défi 24h – Crée ton œuvre autour d’un mot",
+    "color": "#3B82F6",
+    "type": "defi",
+    "price": 0,
+    "maxEditions": 0,
+    "splitAddress": null,
+    "descriptionTemplate": "Challenge express : créer une œuvre (texte, image, son) en 24h autour du mot clé {mot}.",
+    "defaultDurationHuman": "24h"
+  },
+  "#oeuvre-collective": {
+    "hashtag": "#oeuvre-collective",
+    "label": "Œuvre collective",
+    "color": "#14B8A6",
+    "type": "defi",
+    "price": 0.001,
+    "maxEditions": 30,
+    "splitAddress": null,
+    "descriptionTemplate": "Création à plusieurs mains, réunissant texte, image et son.",
+    "defaultDurationHuman": "4h"
+  },
+  "#rencontre-phygital": {
+    "hashtag": "#rencontre-phygital",
+    "label": "Rencontre autour du phygital art",
+    "color": "#F97316",
+    "type": "evenement",
+    "price": 0,
+    "maxEditions": 50,
+    "splitAddress": null,
+    "descriptionTemplate": "Discussion ouverte sur les pratiques artistiques entre le réel et le numérique.",
+    "defaultDurationHuman": "1h30"
+  },
+  "#lecture-partage": {
+    "hashtag": "#lecture-partage",
+    "label": "Lecture & partage de textes",
+    "color": "#8B5CF6",
+    "type": "evenement",
+    "price": 0,
+    "maxEditions": 20,
+    "splitAddress": null,
+    "descriptionTemplate": "Soirée de lecture participative de textes poétiques, extraits de fanzines ou créations personnelles.",
+    "defaultDurationHuman": "2h"
+  }
+}

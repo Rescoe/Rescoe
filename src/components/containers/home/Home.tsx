@@ -557,6 +557,9 @@ bgGradient={bgGradient}
             ))}
           </SimpleGrid>
 
+          <AteliersCalendarView />
+
+
           <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
 
           <Heading
@@ -777,7 +780,6 @@ bgGradient={bgGradient}
         </VStack>
       </motion.div>
 
-      <AteliersCalendarView />
 {/*
       <motion.div
         initial={{ opacity: 0, y: 40 }}

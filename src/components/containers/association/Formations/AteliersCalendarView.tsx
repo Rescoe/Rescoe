@@ -59,6 +59,24 @@ const {
   computeMintDurationSeconds,
 } = useAteliersData();
 
+// juste après les imports
+const TYPE_COLORS: Record<string, string> = {
+  atelier: "#22C55E",     // vert
+  appel: "#EAB308",       // jaune
+  defi: "#3B82F6",        // bleu
+  evenement: "#F97316",   // orange
+  default: "#94A3B8"      // gris clair
+};
+
+// Fonction pour vérifier si un event s'étend sur plusieurs jours
+const isMultiDay = (ev: any) => {
+  if (!ev.rules.startDate || !ev.rules.endDate) return false;
+  const start = new Date(ev.rules.startDate);
+  const end = new Date(ev.rules.endDate);
+  return (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24) >= 1;
+};
+
+
   // ---------- UI render ----------
   return (
       <Box maxW="1200px" mx="auto" p={4}>
@@ -120,7 +138,7 @@ const {
               mb={3}
               overflowX="auto" // pour éviter débordement horizontal sur mobile
             >
-              {["D", "L", "M", "M", "J", "V", "S"].map((d) => (
+              {["D", "L", "Mar", "Mer", "J", "V", "S"].map((d) => (
                 <Box key={d} textAlign="center" fontWeight="bold" fontSize="xs">
                   {d}
                 </Box>
@@ -145,12 +163,24 @@ const {
                     _hover={{ bg: "#014241" }}
                   >
                     <Text fontSize="xs">{d.getDate()}</Text>
-                    <Flex justify="center" flexWrap="wrap" gap={0.5} mt={1}>
-                      {events.slice(0, 4).map((ev: any, i: number) => {
-                        const color = ev.cfg?.color || (ev.rules.hashtag ? rulesCfg[ev.rules.hashtag]?.color : null) || "#3182ce";
-                        return <Box key={i} w={2} h={2} borderRadius="50%" bg={color} />;
-                      })}
-                    </Flex>
+                    {events.slice(0, 4).map((ev: any, i: number) => {
+                      const type = ev.cfg?.type || ev.rules?.type;
+                      const color =ev.cfg?.color || TYPE_COLORS[type] || TYPE_COLORS.default;
+                      const multi = isMultiDay(ev);
+
+                      return (
+                        <Box
+                          key={`${ev.raw?.id || i}-${type}`}
+                          w={multi ? "100%" : 2}
+                          h={multi ? "4px" : 2}
+                          borderRadius={multi ? "4px" : "50%"}
+                          bg={color}
+                          mt={multi ? 0.5 : 0}
+                        />
+                      );
+                    })}
+
+
                   </Box>
                 );
               })}
@@ -227,52 +257,104 @@ const {
                   const { raw: msg, rules, cfg } = entry;
                   const isFuture = !!rules.datetime && (rules.datetime as Date).getTime() > Date.now();
                   const open = !!openPanels[msg.id];
-                  //const leftColor = cfg?.color || (rules.hashtag ? rulesCfg[rules.hashtag]?.color : null) || "#2c7a7b";
                   const hashtagKey = rules.hashtag?.startsWith("#")
                     ? rules.hashtag
                     : `#${rules.hashtag ?? ""}`;
 
-                    const leftColor =
-                      cfg?.color ||
-                      (rulesCfg && Object.keys(rulesCfg).length > 0
-                        ? (hashtagKey && rulesCfg?.[hashtagKey]?.color)
-                        : null) ||
-                      "#2c7a7b";
+                    const typeColor = cfg?.color || TYPE_COLORS[rules.type] || TYPE_COLORS.default;
 
-
-                  console.log("🎨 leftColor:", leftColor, "for", hashtagKey);
-                  const onChain = onChainDataByMsgId[msg.id];
+                    const leftColor = typeColor;
+                    const onChain = onChainDataByMsgId[msg.id];
+                    const placesRes = onChain?.totalEditions || 0;
+                    const placesDIspo =  rules.maxEditions - placesRes;
 
                   return (
-                    <Flex key={msg.id} border="1px solid #333" borderRadius="12px" overflow="hidden" mb={4} bg={isFuture ? "#023537" : "#2d2d2d"} color="#fff">
-                      <Box w="6px" bg={leftColor} />
+                    <Flex
+                      key={`${msg.id}-${rules.datetime?.toISOString() || Math.random()}`}
+                      direction="column"
+                      border="1px solid #333"
+                      borderRadius="16px"
+                      borderColor= {typeColor}
+                      overflow="hidden"
+                      mb={4}
+                      bg={isFuture ? "#" : "#2d2d2d"}
+                      _hover={{ transform: "scale(1.01)", transition: "0.2s" }}
+                    >
+                      <Box w="6px"  />
                       <Box flex="1" p={4}>
                         <Flex align="center" mb={2}>
                           <Box flex="1">
                             <Text fontWeight="bold">{rules.title || cfg?.title || rules.description?.slice(0, 60) || "Atelier sans titre"}</Text>
-                            <Text fontSize="sm" color="#a7d7d7">{entry.hashtag || (cfg?.label || cfg?.hashtag)}</Text>
-                            {cfg?.type && <Text fontSize="xs" color={leftColor}>{cfg.type}</Text>}
+                            <Text fontSize="sm">{entry.hashtag || (cfg?.label || cfg?.hashtag)}</Text>
+                            {cfg?.type && <Text fontSize="xs" >{cfg.type}</Text>}
                           </Box>
+
 
                           <Box textAlign="right">
                             <Text fontSize="sm" color="#cfecec">{rules.datetime ? (rules.datetime as Date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Heure non définie"}</Text>
-                            <Text fontSize="xs" color="#9dd">{rules.splitAddress || cfg?.splitAddress || "Formateur non défini"}</Text>
+                            <Text
+                              fontSize="xs"
+                              color="#9dd"
+                              maxW="200px"
+                              overflow="hidden"
+                              textOverflow="ellipsis"
+                              whiteSpace="nowrap"
+                              title={rules.splitAddress || cfg?.splitAddress}
+                              fontFamily="mono"
+                            >
+
+                              {rules.splitAddress || cfg?.splitAddress || "Formateur non défini"}
+                            </Text>
                           </Box>
                         </Flex>
 
-                        <Collapse in={open} animateOpacity>
+{/*
                           <Box whiteSpace="pre-wrap" mb={3} bg="#014241" p={3} borderRadius={6}>
                             {rules.description || cfg?.description || msg.content.split("\n").filter((line: string) => !line.startsWith("/")).join("\n")}
                           </Box>
+*/}
+
+                          <Box bg="#012" borderRadius={6} p={2} fontSize="xs" color="#9ed"><pre style={{ whiteSpace: "pre-wrap" }}>{msg.content}</pre></Box>
+
+                          <Divider my={8} />
+
+                          <Collapse in={open} animateOpacity>
 
                           <Box fontSize="sm" mb={3}>
-                            <strong>Prix :</strong> {(rules.price ?? cfg?.price) ? `${rules.price ?? cfg?.price} ETH` : "Non défini"} <br />
-                            <strong>Places :</strong> {rules.maxEditions ?? cfg?.maxEditions ?? "Illimité"} <br />
-                            <strong>Durée :</strong> {rules.dureeAtelier ?? cfg?.defaultDuration ?? "Non précisée"} <br />
-                            {rules.splitAddress && <><strong>Adresse du formateur :</strong> {rules.splitAddress}<br /></>}
+                          <Box flex="1">
+                            <Text fontWeight="bold" fontSize="lg">{rules.title || cfg?.title || "Atelier sans titre"}</Text>
+
+                            <Text fontSize="sm" color="#a7d7d7">{entry.hashtag || cfg?.label}</Text>
+                            {cfg?.type && <Badge ml={2} backgroundColor={leftColor} color="#fff">{cfg.type}</Badge>}
                           </Box>
 
-                          {/* On-chain box */}
+                            <strong>Prix :</strong> {(rules.price ?? cfg?.price) ? `${rules.price ?? cfg?.price} ETH` : "Non défini"} <br />
+                            <strong>Places :</strong> { rules.maxEditions ?? cfg?.maxEditions ?? "Illimité"} <br />
+                            <strong>Places déjà reservées :</strong> {placesRes} {placesRes === rules.maxEditions && <Badge colorScheme="red" ml={2}>Complet</Badge>} <br />
+
+                            <strong>Places restantes :</strong> {placesDIspo} {placesDIspo === 0 && <Badge colorScheme="red" ml={2}>Complet</Badge>} <br />
+                            <strong>Durée :</strong> {rules.dureeAtelier ?? cfg?.defaultDuration ?? "Non précisée"} <br />
+                            {rules.splitAddress && <><strong>Formateur :</strong> {rules.splitAddress}<br /></>}
+                            <Box mt={2}>
+                              <Text fontWeight="bold" mb={1}>Image associée :</Text>
+                              <Image
+                                src={onChain?.parsedImageUrl || msg.attachments.url}
+                                alt="atelier image"
+                                maxH="260px"
+                                borderRadius="8px"
+                                objectFit="contain"
+                                mx="auto"
+                              />
+                            </Box>
+                            </Box>
+                            </Collapse>
+
+
+{/* On-chain box */}
+
+{/*
+<Collapse in={open} animateOpacity>
+
                           <Box mb={3} p={3} borderRadius={6} bg="#071f1f" fontSize="sm">
                             <Text fontWeight="bold" mb={2}>Synthèse mint (on-chain)</Text>
 
@@ -305,6 +387,7 @@ const {
                             )}
                           </Box>
                         </Collapse>
+*/}
 
                         <Flex gap={3}>
                           <Button size="sm" colorScheme="teal" onClick={() => mintAtelierTicket(entry)} isLoading={mintingIds.includes(msg.id)}>
