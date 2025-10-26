@@ -25,7 +25,8 @@ import { SlArrowRight, SlArrowLeft } from "react-icons/sl";
 import Web3 from "web3";
 import MessageEditions from "@/components/ABI/MessageEditions.json";
 import useAteliersData from "@/hooks/useAteliersData";
-
+import CopyableAddress from "@/hooks/useCopyableAddress";
+import useEthToEur from "@/hooks/useEuro";
 
 function AteliersCalendarView() {
 
@@ -68,6 +69,8 @@ const TYPE_COLORS: Record<string, string> = {
   default: "#94A3B8"      // gris clair
 };
 
+
+
 // Fonction pour vérifier si un event s'étend sur plusieurs jours
 const isMultiDay = (ev: any) => {
   if (!ev.rules.startDate || !ev.rules.endDate) return false;
@@ -76,17 +79,37 @@ const isMultiDay = (ev: any) => {
   return (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24) >= 1;
 };
 
+const { ethPrice, loading: ethLoading, error: ethError } = useEthToEur();
 
   // ---------- UI render ----------
   return (
       <Box maxW="1200px" mx="auto" p={4}>
-        <Flex mb={4} alignItems="center" justify="space-between">
-          <Heading fontSize="2xl">Ateliers & Formations</Heading>
-          <Box>
-            <Text as="span" mr={2}>Afficher ateliers passés</Text>
-            <Switch isChecked={showPast} onChange={(e) => setShowPast(e.target.checked)} />
-          </Box>
-        </Flex>
+      <Flex
+    mb={6}
+    direction={['column', 'row']} // colonne sur mobile, ligne sur desktop
+    align={['center', 'center']}
+    justify="space-between"
+    gap={4} // espace entre les éléments
+  >
+    {/* Titre principal */}
+    <Heading fontSize={['xl', '2xl']}>Ateliers & Formations</Heading>
+
+    {/* Date sélectionnée + nombre d’ateliers */}
+    <Box textAlign={['center', 'center']}>
+      <Heading fontSize={['lg', 'xl']} fontWeight="bold">
+        {selectedDate
+          ? selectedDate.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })
+          : 'Sélectionnez une date'}
+      </Heading>
+      <Text fontSize="sm" color="#99b">
+        {selectedDate
+          ? (calendarDays[new Date(selectedDate).toISOString().slice(0, 10)] || []).length
+          : enriched.length}{' '}
+        ateliers
+      </Text>
+    </Box>
+  </Flex>
+
 
         {/* Conteneur principal responsive */}
         <Flex
@@ -94,6 +117,7 @@ const isMultiDay = (ev: any) => {
           alignItems="flex-start"
           flexDirection={['column', 'column', 'row']} // col on mobile, row on md+
         >
+
           {/* Calendrier */}
           <Box
             flex="2"
@@ -129,19 +153,19 @@ const isMultiDay = (ev: any) => {
                   </option>
                 ))}
               </Select>
+
             </Flex>
 
+            {/* Calendrier */}
             <Box
               display="grid"
               gridTemplateColumns="repeat(7,1fr)"
               gap={1}
               mb={3}
-              overflowX="auto" // pour éviter débordement horizontal sur mobile
+              overflowX="auto"
             >
               {["D", "L", "Mar", "Mer", "J", "V", "S"].map((d) => (
-                <Box key={d} textAlign="center" fontWeight="bold" fontSize="xs">
-                  {d}
-                </Box>
+                <Box key={d} textAlign="center" fontWeight="bold" fontSize="xs">{d}</Box>
               ))}
 
               {(() => {
@@ -165,9 +189,8 @@ const isMultiDay = (ev: any) => {
                     <Text fontSize="xs">{d.getDate()}</Text>
                     {events.slice(0, 4).map((ev: any, i: number) => {
                       const type = ev.cfg?.type || ev.rules?.type;
-                      const color =ev.cfg?.color || TYPE_COLORS[type] || TYPE_COLORS.default;
+                      const color = ev.cfg?.color || TYPE_COLORS[type] || TYPE_COLORS.default;
                       const multi = isMultiDay(ev);
-
                       return (
                         <Box
                           key={`${ev.raw?.id || i}-${type}`}
@@ -179,64 +202,86 @@ const isMultiDay = (ev: any) => {
                         />
                       );
                     })}
-
-
                   </Box>
                 );
               })}
             </Box>
 
             <Divider my={3} />
+
+            {/* Légende dynamique avec couleurs exactes */}
             <Stack direction="row" spacing={3} wrap="wrap">
-              {Object.entries(rulesCfg).map(([hashtag, cfg]: any) => (
-                <HStack key={hashtag} spacing={2}>
-                  <Box w={3} h={3} borderRadius="50%" bg={cfg?.color || "#ccc"} />
-                  <Text fontSize="xs" color="#cfecec">
-                    {cfg?.type || cfg?.label || hashtag}
-                  </Text>
+
+              {Object.values(
+                daysInMonthGrid
+                  .flatMap((d) => {
+                    const key = d.toISOString().slice(0, 10);
+                    const events = calendarDays[key] || [];
+                    return events.map((ev: any) => {
+                      const type = ev.cfg?.type || ev.rules?.type || "default";
+                      const color =
+                        ev.cfg?.color ||
+                        (ev.rules?.hashtag ? rulesCfg[ev.rules.hashtag]?.color : null) ||
+                        TYPE_COLORS[type] ||
+                        TYPE_COLORS.default;
+                      return { type, color };
+                    });
+                  })
+                  .reduce((acc, curr) => {
+                    // Ne garder que le premier event par type
+                    if (!acc[curr.type]) acc[curr.type] = curr;
+                    return acc;
+                  }, {} as Record<string, { type: string; color: string }>)
+              ).map(({ type, color }) => (
+                <HStack key={type} spacing={2}>
+                  <Box w={3} h={3} borderRadius="50%" bg={color} />
+                  <Text fontSize="xs" color="#cfecec">{type}</Text>
                 </HStack>
               ))}
             </Stack>
+
+
           </Box>
 
         {/* details / day list */}
         <Box flex="3">
         <SimpleGrid minChildWidth="300px" gap={4}>
 
-          <Flex mb={4} align="center" justify="space-between">
-          <VStack>
-            <Box>
-              <Text fontSize="lg" fontWeight="bold">
-                {selectedDate
-                  ? selectedDate.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })
-                  : "Sélectionnez une date"}
-              </Text>
-              <Text fontSize="sm" color="#99b">
-                {selectedDate ? (calendarDays[new Date(selectedDate).toISOString().slice(0, 10)] || []).length : enriched.length} ateliers
-              </Text>
-            </Box>
+        <Stack
+          direction={['column', 'row']} // column sur mobile, row sur md+
+          spacing={4}                  // espace entre les éléments
+          mb={4}
+          align="flex-start"
+        >
+          <Select
+            value={filters.type}
+            onChange={(e) => setFilters((f) => ({ ...f, type: e.target.value }))}
+            width={['100%', '220px']} // plein largeur sur mobile, fixe sur desktop
+          >
+            <option value="all">Tous types</option>
+            {availableTypes.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </Select>
 
-            <Box>
-              <Select value={filters.type} onChange={(e) => setFilters((f) => ({ ...f, type: e.target.value }))} width="220px" mr={2}>
-                <option value="all">Tous types</option>
-                {availableTypes.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </Select>
+          <Select
+            value={filters.splitAddress}
+            onChange={(e) => setFilters((f) => ({ ...f, splitAddress: e.target.value }))}
+            width={['100%', '260px']}
+          >
+            <option value="all">Tous les formateurs</option>
+            {availableSplitAddresses.map((a) => (
+              <option key={a} value={a}>{a}</option>
+            ))}
+          </Select>
 
-              <Select value={filters.splitAddress} onChange={(e) => setFilters((f) => ({ ...f, splitAddress: e.target.value }))} width="260px" mt={2}>
-                <option value="all">Tous les formateurs</option>
-                {availableSplitAddresses.map((a) => (
-                  <option key={a} value={a}>
-                    {a}
-                  </option>
-                ))}
-              </Select>
-            </Box>
-            </VStack>
+          {/* Switch pour afficher les ateliers passés */}
+          <Flex justify ='right' textAlign='right'>
+            <Text as="span" mr={2}>Ateliers passés</Text>
+            <Switch isChecked={showPast} onChange={(e) => setShowPast(e.target.checked)} />
           </Flex>
+
+        </Stack>
 
           <Box>
             {selectedDate ? (
@@ -268,6 +313,20 @@ const isMultiDay = (ev: any) => {
                     const placesRes = onChain?.totalEditions || 0;
                     const placesDIspo =  rules.maxEditions - placesRes;
 
+
+
+                    // Juste après const dayEvents = ...
+const addresses = dayEvents
+  .map((e: any) => e.rules?.splitAddress || e.cfg?.splitAddress)
+  .filter((addr: any) => typeof addr === "string" && addr.startsWith("0x") && addr.length === 42);
+
+  const priceEth = rules.price ?? cfg?.price;
+  const priceEur = priceEth && ethPrice ? (priceEth * ethPrice).toFixed(2) : null;
+
+//console.log(priceEur);
+
+
+
                   return (
                     <Flex
                       key={`${msg.id}-${rules.datetime?.toISOString() || Math.random()}`}
@@ -280,13 +339,15 @@ const isMultiDay = (ev: any) => {
                       bg={isFuture ? "#" : "#2d2d2d"}
                       _hover={{ transform: "scale(1.01)", transition: "0.2s" }}
                     >
-                      <Box w="6px"  />
+                      <Box w="6px" mb={4} />
+                      <Text fontWeight="bold">{rules.title || cfg?.title || rules.description?.slice(0, 60) || "Atelier sans titre"}</Text>
+
                       <Box flex="1" p={4}>
                         <Flex align="center" mb={2}>
+
                           <Box flex="1">
-                            <Text fontWeight="bold">{rules.title || cfg?.title || rules.description?.slice(0, 60) || "Atelier sans titre"}</Text>
                             <Text fontSize="sm">{entry.hashtag || (cfg?.label || cfg?.hashtag)}</Text>
-                            {cfg?.type && <Text fontSize="xs" >{cfg.type}</Text>}
+                            {cfg?.type && <Badge ml={2} backgroundColor={leftColor} color="#fff">{cfg.type}</Badge>}
                           </Box>
 
 
@@ -305,6 +366,8 @@ const isMultiDay = (ev: any) => {
 
                               {rules.splitAddress || cfg?.splitAddress || "Formateur non défini"}
                             </Text>
+                            <strong>Prix :</strong> {priceEur ? `${priceEur} €` : "—"} <br />
+
                           </Box>
                         </Flex>
 
@@ -321,14 +384,9 @@ const isMultiDay = (ev: any) => {
                           <Collapse in={open} animateOpacity>
 
                           <Box fontSize="sm" mb={3}>
-                          <Box flex="1">
-                            <Text fontWeight="bold" fontSize="lg">{rules.title || cfg?.title || "Atelier sans titre"}</Text>
 
-                            <Text fontSize="sm" color="#a7d7d7">{entry.hashtag || cfg?.label}</Text>
-                            {cfg?.type && <Badge ml={2} backgroundColor={leftColor} color="#fff">{cfg.type}</Badge>}
-                          </Box>
+                            <strong>Equivalent :</strong> {(rules.price ?? cfg?.price) ? `${rules.price ?? cfg?.price} ETH` : "Non défini"} <br />
 
-                            <strong>Prix :</strong> {(rules.price ?? cfg?.price) ? `${rules.price ?? cfg?.price} ETH` : "Non défini"} <br />
                             <strong>Places :</strong> { rules.maxEditions ?? cfg?.maxEditions ?? "Illimité"} <br />
                             <strong>Places déjà reservées :</strong> {placesRes} {placesRes === rules.maxEditions && <Badge colorScheme="red" ml={2}>Complet</Badge>} <br />
 
