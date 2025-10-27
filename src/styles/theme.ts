@@ -98,7 +98,7 @@ const components = {
         bgGradient:
           props.colorMode === "light"
             ? `linear(to-r, ${colors.brand.blue}, ${colors.brand.blue})`
-            : `linear(to-r, ${colors.brand.mauve}, ${colors.brand.mauve})`,
+            : `linear(to-r, ${colors.brand.blue}, ${colors.brand.blue})`,
         color: "white",
         fontWeight: "bold",
         _hover: {
@@ -117,7 +117,7 @@ const components = {
     baseStyle: (props: StyleFunctionProps) => ({
       bgGradient:
         props.colorMode === "light"
-          ? `linear(to-r, ${colors.brand.mauve}, ${colors.brand.mauve})`
+          ? `linear(to-r, ${colors.brand.navy}, ${colors.brand.navy})`
           : `linear(to-r, ${colors.brand.gold}, ${colors.brand.gold})`,
       bgClip: "text",
       fontWeight: "extrabold",

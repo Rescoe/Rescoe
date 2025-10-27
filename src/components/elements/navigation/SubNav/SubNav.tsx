@@ -2,6 +2,8 @@ import { IconType } from 'react-icons';  // Import IconType de react-icons
 import { Icon, ChevronRightIcon } from '@chakra-ui/icons';
 import { useColorModeValue, Stack, Flex, Box, Text, Link } from '@chakra-ui/react';
 import NextLink from 'next/link';
+import { brandHover, hoverStyles } from "@styles/theme"; //Style
+
 
 export interface ISubNav {
   label: string;
@@ -14,6 +16,12 @@ export interface ISubNav {
 }
 
 const SubNav = ({ label, href, subLabel, icon }: ISubNav) => {
+
+  // Couleurs du thème
+const iconColor = useColorModeValue('brand.gold', 'brand.gold');
+const textColor = useColorModeValue('brand.textDark', 'brand.textLight');
+const hoverBg = useColorModeValue('brand.startLight', 'brand.startDark');
+
   return (
     <NextLink href={href || '#'} legacyBehavior>
       <Link
@@ -21,13 +29,16 @@ const SubNav = ({ label, href, subLabel, icon }: ISubNav) => {
         display={'block'}
         p={2}
         rounded={'md'}
-        _hover={{ bg: useColorModeValue('green.50', 'gray.900') }}
+        _hover={{
+          ...hoverStyles.brandHover._hover,
+          ...brandHover,
+        }}
       >
         <Stack direction={'row'} align={'center'}>
           {/* Affiche l'icône s'il est fourni */}
-          {icon && <Icon as={icon} boxSize={5} color="green.400" />}
+          {icon && <Icon as={icon} boxSize={5} color={textColor} />}
           <Box>
-            <Text transition={'all .3s ease'} _groupHover={{ color: 'green.400' }} fontWeight={500}>
+            <Text transition={'all .3s ease'} _groupHover={{ color: textColor }} fontWeight={500}>
               {label}
             </Text>
             <Text fontSize={'sm'}>{subLabel}</Text>
@@ -41,7 +52,7 @@ const SubNav = ({ label, href, subLabel, icon }: ISubNav) => {
             align={'center'}
             flex={1}
           >
-            <Icon color={'green.400'} w={5} h={5} as={ChevronRightIcon} />
+            <Icon color={textColor} w={5} h={5} as={ChevronRightIcon} />
           </Flex>
         </Stack>
       </Link>

@@ -20,9 +20,6 @@ const links = {
 
 
 const Footer = () => {
-
-
-
   return (
 
     <Box

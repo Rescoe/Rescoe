@@ -1,130 +1,123 @@
-import { FaHome, FaHandshake, FaEthereum, FaImages, FaPalette, FaChalkboardTeacher, FaImage , FaSketch , FaNewspaper, FaCalendarAlt, FaFeather, FaRegAddressCard, FaUserCheck, FaUsers, FaPaintBrush, FaPen, FaBookOpen, FaCode, FaGem, FaBug } from 'react-icons/fa';
+// src/components/navigation/NAV_LINKS.ts
+import {
+  FaHome,
+  FaHandshake,
+  FaEthereum,
+  FaImages,
+  FaPalette,
+  FaChalkboardTeacher,
+  FaImage,
+  FaSketch,
+  FaNewspaper,
+  FaCalendarAlt,
+  FaFeather,
+  FaRegAddressCard,
+  FaUserCheck,
+  FaUsers,
+  FaPaintBrush,
+  FaPen,
+  FaBookOpen,
+  FaCode,
+  FaGem,
+  FaBug,
+} from 'react-icons/fa';
 import { ISubNav } from '../SubNav/SubNav';
 
 const NAV_LINKS: ISubNav[] = [
-  { label: 'Accueil', href: '/', icon: FaHome },  // Ajout de l'icône
+  {
+    label: 'Accueil',
+    subLabel: 'Explorer les dernières créations et actualités du réseau',
+    href: '/',
+    icon: FaHome,
+  },
 
   {
-    label: 'Association',
-    href: '/association', //Ajouter une page qui détaille les 4 onglets
-    icon: FaUsers,  // Icône livre pour l'association
+    label: 'L’association',
+    subLabel: 'Nos valeurs, nos membres et nos contacts',
+    href: '/association',
+    icon: FaUsers,
 
     children: [
       {
-        label: "L'association",
-        subLabel: 'Qui sommes nous ?',
+        label: 'Présentation',
+        subLabel: 'Découvrir la mission et les actions du RESCOE',
         href: '/association/rescoe',
-        icon: FaHandshake,  // Icône livre pour l'association
+        icon: FaHandshake,
       },
       {
-        label: "Adhérents",
-        subLabel: 'Liste des adhérents',
+        label: 'Adhérents',
+        subLabel: 'Rencontrez les artistes et membres du réseau',
         href: '/association/adherent',
-        icon: FaBug  ,  // Icône livre pour l'association
+        icon: FaUserCheck,
       },
       {
-        label: "Ateliers",
-        subLabel: 'Découvrir nos offres',
-        href: '/association/formations',
-        icon: FaChalkboardTeacher ,  // Icône livre pour l'association
-      },
-      {
-        label: "Contacts",
-        subLabel: 'Qui sommes nous ?',
+        label: 'Contacts',
+        subLabel: 'Entrer en contact avec notre équipe',
         href: '/association/contact',
-        icon: FaRegAddressCard ,  // Icône livre pour l'association
+        icon: FaRegAddressCard,
       },
-
     ],
   },
 
   {
-    label: 'Minter',
+    label: 'Créer',
+    subLabel: 'Mintez votre art, code ou poésie sur la blockchain',
     href: '/mintart',
-    icon: FaEthereum ,  // Icône palette ajoutée
-    requiresAuth: true, // Ajout de la propriété
+    icon: FaEthereum,
+    requiresAuth: true,
+
     children: [
       {
-        label: "Art 1/1",
-        subLabel: 'Créez une oeuvre unique',
+        label: 'Art visuel',
+        subLabel: 'Créez une œuvre unique en un clic',
         href: '/mint/mintart',
-        icon: FaPaintBrush,  // Icône livre pour l'association
+        icon: FaPaintBrush,
+      },
+      {
+        label: 'Poésie',
+        subLabel: 'Publiez vos poèmes et immortalisez vos mots',
+        href: '/mint/poesie',
+        icon: FaFeather,
       },
       /*
       {
         label: 'Art génératif',
-        subLabel: 'Mintez du code !',
-        href: '/mint/art-generatif',
-        icon: FaCode,  // Icône flèches pour les NFT
+        subLabel: 'Codez et mintez vos algorithmes créatifs',
+        href: '/mint/generative',
+        icon: FaCode,
       },
-    */
-
-      {
-        label: 'Poesie',
-        subLabel: 'Mintez vos poèmes',
-        href: '/mint/poesie',
-        icon: FaFeather,  // Icône flèches pour les NFT
-      },
+      */
     ],
   },
 
   {
     label: 'Galerie',
+    subLabel: 'Explorez les œuvres et poèmes du réseau RESCOE',
     href: '/galerie',
-    icon: FaGem ,  // Icône livre pour l'association
+    icon: FaGem,
 
     children: [
       {
-        label: 'Digital Art',
-        subLabel: 'Collection digitale',
+        label: 'Œuvres',
+        subLabel: 'Collection d’œuvres numériques uniques',
         href: '/galerie/art',
-        icon: FaImage ,  // Icône pinceau pour les collections
+        icon: FaImage,
       },
-      /*
       {
-        label: 'Generative Art',
-        subLabel: 'Generative art collection',
-        href: '/galerie/generative',
-        icon: FaSketch,  // Icône pinceau pour les collections
-      },
-      */
-      {
-        label: 'Poemes',
-        subLabel: 'Recueil de poèmes',
+        label: 'Poèmes',
+        subLabel: 'Recueil de poèmes des membres du réseau',
         href: '/galerie/poesie',
-        icon: FaBookOpen,  // Icône flèches pour les NFT
+        icon: FaBookOpen,
       },
     ],
   },
 
   {
-    label: 'Actu & Expo',
+    label: 'Agenda',
+    subLabel: 'Ateliers, expositions et actualités du réseau',
     href: '/actus',
-    icon: FaNewspaper ,  // Icône livre pour l'association
-/*
-    children: [
-      {
-        label: 'Actus du moment',
-        subLabel: 'Unique art collection',
-        href: '/galerie/art',
-        icon: FaSketch,  // Icône pinceau pour les collections
-      },
-      {
-        label: '?',
-        subLabel: 'Generative art collection',
-        href: '/galerie/generative',
-        icon: FaSketch,  // Icône pinceau pour les collections
-      },
-      {
-        label: 'Poemes',
-        subLabel: '/!\ Ne renvoi rien pour le moment',
-        href: '/gelerie/poesie',
-        icon: FaFeather,  // Icône flèches pour les NFT
-      },
-    ],
-  */
+    icon: FaCalendarAlt,
   },
-
 ];
 
 export default NAV_LINKS;

@@ -1,11 +1,21 @@
 // src/components/containers/actus/Actus.tsx
+"use client";
+
 import React, { useEffect, useState } from "react";
-import { Box, Button, useToast } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  useToast,
+  Tabs,
+  TabList,
+  TabPanels,
+  Tab,
+  TabPanel,
+} from "@chakra-ui/react";
 import Web3 from "web3";
 import MessageEditions from "../../ABI/MessageEditions.json";
-import axios from "axios";
 import { keccak256 } from "js-sha3";
-
+import { Formations } from "@/components/containers/association/Formations";
 
 interface DiscordMessage {
   id: string;
@@ -23,7 +33,7 @@ interface ChannelFeedProps {
   channelId: string;
 }
 
-const CONTRACT_ADDRESS = "0x2c4368bebb206f2b3765caa96e35c01487af5fbe";
+const CONTRACT_ADDRESS = "0x2c4368bebb206f2b3765caa96e35c01487af5be";
 
 const ChannelFeed: React.FC<ChannelFeedProps> = ({ channelId }) => {
   const [messages, setMessages] = useState<DiscordMessage[]>([]);
@@ -37,7 +47,6 @@ const ChannelFeed: React.FC<ChannelFeedProps> = ({ channelId }) => {
     duration?: string;
   }>({});
 
-  // --- FETCH DES MESSAGES DISCORD ---
   const fetchMessages = async () => {
     try {
       const res = await fetch(`/api/channel/${channelId}?limit=${limit}`);
@@ -220,11 +229,11 @@ const ChannelFeed: React.FC<ChannelFeedProps> = ({ channelId }) => {
   };
 
 
-
-
+  // Assurez-vous que mintMessage est bien déclarée dans ce scope.
 
   return (
     <Box maxWidth="700px" mx="auto" p={4}>
+      <Formations />
       {Object.keys(rules).length > 0 ? (
         <Box
           border="1px solid #444"
@@ -312,7 +321,7 @@ const ChannelFeed: React.FC<ChannelFeedProps> = ({ channelId }) => {
             onClick={() => mintMessage(msg)}
             isLoading={mintingIds.includes(msg.id)}
           >
-            Mint ce message
+            Acheter ce journal
           </Button>
         </Box>
       ))}
@@ -326,43 +335,34 @@ const ChannelFeed: React.FC<ChannelFeedProps> = ({ channelId }) => {
 };
 
 export default function Actus() {
-  const [activeTab, setActiveTab] = useState<"news" | "expos">("news");
+  const [activeTab, setActiveTab] = useState("news");
+
   const channels = {
     news: process.env.NEXT_PUBLIC_CHANNEL_NEWS_ID as string,
     expos: process.env.NEXT_PUBLIC_CHANNEL_EXPOS_ID as string,
   };
 
   return (
-    <div style={{ maxWidth: "800px", margin: "0 auto", padding: "2rem" }}>
-      <h2 style={{ textAlign: "center", marginBottom: "1.5rem" }}>
+    <Box maxWidth="800px" mx="auto" p={8}>
+      <Box as="h2" textAlign="center" mb={6} fontSize="2xl" fontWeight="bold">
         Actualités & Expositions
-      </h2>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          marginBottom: "1rem",
-        }}
-      >
-        {(["news", "expos"] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            style={{
-              padding: "0.5rem 1rem",
-              margin: "0 0.5rem",
-              borderRadius: "8px",
-              border: "none",
-              backgroundColor: activeTab === tab ? "#0070f3" : "#333",
-              color: "#fff",
-              cursor: "pointer",
-            }}
-          >
-            {tab === "news" ? "News" : "Expos"}
-          </button>
-        ))}
-      </div>
-      <ChannelFeed channelId={channels[activeTab]} />
-    </div>
+      </Box>
+
+      <Tabs index={activeTab === "expos" ? 1 : 0} onChange={(i) => setActiveTab(i === 0 ? "news" : "expos")}>
+        <TabList justifyContent="center" mb={4}>
+          <Tab>News</Tab>
+          <Tab>Expositions</Tab>
+        </TabList>
+
+        <TabPanels>
+          <TabPanel>
+            <ChannelFeed channelId={channels.news} />
+          </TabPanel>
+          <TabPanel>
+            <ChannelFeed channelId={channels.expos} />
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
+    </Box>
   );
 }

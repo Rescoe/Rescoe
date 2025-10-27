@@ -12,6 +12,8 @@ import ABIRESCOLLECTION from '../../ABI/ABI_Collections.json';
 import { useRouter } from 'next/router';
 import { motion } from "framer-motion";
 import { keyframes } from "@emotion/react";
+import { brandHover, hoverStyles } from "@styles/theme"; //Style
+
 
 import RelatedFull from '../../../utils/RelatedFull'; // Assurez-vous d'importer le bon chemin
 import DerniersAdherents from '../association/Adherents/DerniersAdherents'; // Votre ABI de contrat ici.
@@ -77,8 +79,6 @@ const endColor = useColorModeValue(
     theme.colors.brand.endDark
   );
 
-  const bgGradient = `linear(to-b, ${startColor}, ${endColor})`;
-
 interface Haiku {
   poemText: string[];  // Change this to string[] if it's meant to be an array of strings.
   poet?: string;
@@ -134,6 +134,14 @@ const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider)
 // Charger uniquement les collections FEATURED
 const fetchCollections = useCallback(async () => {
   setIsLoading(true);
+  const cachedCollections = localStorage.getItem('featuredCollections');
+
+  if (cachedCollections) {
+    setCollections(JSON.parse(cachedCollections));
+    setIsLoading(false);
+    return;
+  }
+
   try {
     const total = await contract.getTotalCollectionsMinted();
     const collectionsPaginated = await contract.getCollectionsPaginated(0, total);
@@ -142,12 +150,10 @@ const fetchCollections = useCallback(async () => {
 
     const collectionsData = await Promise.all(
       collectionsPaginated.map(async (tuple: CollectionTuple | null) => {
-        // ⚠️ Skip si le tuple est null/undefined
         if (!tuple) return null;
 
         const [id, name, collectionType, creator, associatedAddresses, isActive, isFeatured] = tuple;
 
-        // ⚠️ Skip si pas featured
         if (!isFeatured) return null;
 
         const uri = await contract.getCollectionURI(id);
@@ -176,21 +182,27 @@ const fetchCollections = useCallback(async () => {
       })
     );
 
-    // ⚠️ On ne garde que les objets valides
     const featured = collectionsData.filter((col): col is Collection => col !== null);
-
-    //////console.log("Collections FEATURED :", featured);
+    localStorage.setItem('featuredCollections', JSON.stringify(featured)); // Cache les collections
     setCollections(featured);
   } catch (error) {
     console.error("Erreur lors du chargement des collections featured :", error);
   } finally {
     setIsLoading(false);
   }
-
 }, [contract]);
 
 const fetchPoems = async (collectionId: string, associatedAddress: string): Promise<void> => {
   setIsLoading(true);
+  const cacheKey = `poems_${collectionId}`;
+  const cachedPoems = sessionStorage.getItem(cacheKey);
+
+  if (cachedPoems) {
+    setHaikusByCollection(prev => ({ ...prev, [collectionId]: JSON.parse(cachedPoems) }));
+    setIsLoading(false);
+    return;
+  }
+
   try {
     const collectionContract = new Contract(associatedAddress, haikuContractABI, provider);
     const uniqueTokenCount = await collectionContract.getLastUniqueHaikusMinted();
@@ -211,13 +223,15 @@ const fetchPoems = async (collectionId: string, associatedAddress: string): Prom
 
         return {
           tokenId: tokenId.toString(),
-          poemText: haikuText,
+          poemText: haikuText.map(text => text.toString()), // Convertir chaque texte en chaîne
           mintContractAddress: associatedAddress,
-          uniqueIdAssociated: Number(uniqueIdAssociated).toString(),
+          uniqueIdAssociated: uniqueIdAssociated.toString(), // Assurez-vous que c'est une chaîne
         };
       })
     ).then(results => results.filter(result => result !== null));
 
+    // Stocker les poèmes dans le cache
+    sessionStorage.setItem(cacheKey, JSON.stringify(poemsData)); // Assurez-vous que poemsData ne contient pas de BigInt
     setHaikusByCollection(prev => ({ ...prev, [collectionId]: poemsData }));
 
   } catch (error) {
@@ -231,40 +245,39 @@ const fetchPoems = async (collectionId: string, associatedAddress: string): Prom
 
 const fetchNFTs = async (collectionId: string, associatedAddress: string): Promise<void> => {
   setIsLoading(true);
+  const cacheKey = `nfts_${collectionId}`;
+  const cachedNfts = sessionStorage.getItem(cacheKey);
+
+  if (cachedNfts) {
+    setNftsByCollection(prev => ({
+      ...prev,
+      [collectionId]: JSON.parse(cachedNfts),
+    }));
+    setIsLoading(false);
+    return;
+  }
 
   try {
     const collectionContract = new Contract(associatedAddress, nftContractABI, provider);
-    ////console.log(`Récupération des NFTs pour la collection : ${collectionId}`);
-
-    // Récupère le max et limite à 10
     let max = await collectionContract.getLastMintedTokenId();
-    ////console.log(`Max tokens pour la collection ${collectionId}:`, max);
     if (max > 9) max = 9;
     const pagination = Number(max) + 1;
     const tokenIds = await collectionContract.getTokenPaginated(0, pagination);
-    //console.log("Token IDs récupérés:", tokenIds);
 
     const nftsData = await Promise.all(
       tokenIds.map(async (tokenId: string) => {
         try {
-          // 🔍 Vérifie si le token est encore vivant
           const owner = await collectionContract.ownerOf(tokenId).catch(() => null);
           if (!owner || owner === "0x0000000000000000000000000000000000000000") {
-            //console.log(`⛔ Token ${tokenId} est burn → skip`);
             return null;
           }
 
-          // Si le token existe encore → on récupère son URI
           let tokenURI = await collectionContract.tokenURI(tokenId);
-          //console.log(`Récupération du tokenURI pour ${tokenId}: ${tokenURI}`);
-
-          // Gestion du cache local
           const cachedMetadata = localStorage.getItem(tokenURI);
           const metadata = cachedMetadata
             ? JSON.parse(cachedMetadata)
             : await (await fetch(`/api/proxyPinata?ipfsHash=${tokenURI.split('/').pop()}`)).json();
 
-          // Retourne un objet NFT normalisé
           return {
             image: metadata.image,
             name: metadata.name,
@@ -282,8 +295,8 @@ const fetchNFTs = async (collectionId: string, associatedAddress: string): Promi
       })
     );
 
-    // Mettre à jour l'état pour cette collection
-    setNftsByCollection((prev) => ({
+    sessionStorage.setItem(cacheKey, JSON.stringify(nftsData.filter(nft => nft !== null))); // Stocker dans le cache
+    setNftsByCollection(prev => ({
       ...prev,
       [collectionId]: nftsData.filter(nft => nft !== null),
     }));
@@ -293,6 +306,7 @@ const fetchNFTs = async (collectionId: string, associatedAddress: string): Promi
     setIsLoading(false);
   }
 };
+
 
 
 
@@ -388,7 +402,7 @@ const allHaikus = useMemo(
           "linear(to-b, bgGradientLight.start, bgGradientLight.end)",
           "linear(to-b, bgGradientDark.start, bgGradientDark.end)"
         )}
-        color={textColor}      >
+        >
       {/* ===== SECTION INTRO / PRÉSENTATION ===== */}
       <motion.div
         initial={{ opacity: 0, y: -30 }}
@@ -402,7 +416,6 @@ const allHaikus = useMemo(
         >
         <Heading
           size={{ base: "xl", md: "2xl" }}
-          bgGradient={bgGradient}
           bgClip="text"
           fontWeight="extrabold"
           mb={6}
@@ -436,14 +449,13 @@ const allHaikus = useMemo(
             px={12}
             py={7}
             fontWeight="bold"
-            bgGradient={bgGradient}
             color="white"
             borderRadius="full"
             animation={`${pulse} 2.5s infinite`}
             mb={12}
             _hover={{
-              bgGradient: "linear(to-r, pink.600, purple.700)",
-              transform: "scale(1.05)",
+              ...hoverStyles.brandHover._hover,
+              ...brandHover,
             }}
           >
             🚀 Adhérez Maintenant
@@ -455,7 +467,6 @@ const allHaikus = useMemo(
             mt={6}
             mb={2}
             size="lg"
-bgGradient={bgGradient}
             bgClip="text"
             textAlign="center"
             py={2}            // <-- évite la coupe du haut/bas
@@ -476,7 +487,6 @@ bgGradient={bgGradient}
           >
             <Heading
               size="lg"
-bgGradient={bgGradient}
               bgClip="text"
             >
           Pour vous :
@@ -561,7 +571,6 @@ bgGradient={bgGradient}
             mt={6}
             mb={2}
             size="lg"
-bgGradient={bgGradient}
             bgClip="text"
             textAlign="center"
           >
@@ -589,7 +598,6 @@ bgGradient={bgGradient}
           mt={6}
           mb={2}
           size="lg"
-bgGradient={bgGradient}
           bgClip="text"
           textAlign="center"
         >
@@ -615,7 +623,6 @@ bgGradient={bgGradient}
             <Heading
               size="lg"
               mb={6}
-bgGradient={bgGradient}
               bgClip="text"
               textAlign="center"
             >
@@ -656,7 +663,6 @@ bgGradient={bgGradient}
         >
           <Heading
             size={{ base: "lg", md: "xl" }}
-bgGradient={bgGradient}
             bgClip="text"
             fontWeight="extrabold"
             textAlign="center"
@@ -693,9 +699,7 @@ bgGradient={bgGradient}
                 px={10}
                 py={8}
                 borderRadius="2xl"
-                bgGradient={bgGradient}
                 border="1px solid"
-                borderColor={useColorModeValue("brand.mauve", "brand.gold")}
                 boxShadow={useColorModeValue(
                   "0 0 15px rgba(180, 166, 213, 0.25)", // mauve clair en light
                   "0 0 15px rgba(238, 212, 132, 0.25)"  // doré doux en dark
@@ -760,7 +764,6 @@ bgGradient={bgGradient}
               mt={6}
               mb={2}
               size="lg"
-              bgGradient={bgGradient}
               bgClip="text"
               textAlign="center"
             >

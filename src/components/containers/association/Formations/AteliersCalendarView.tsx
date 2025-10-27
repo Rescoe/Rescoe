@@ -298,7 +298,7 @@ const { ethPrice, loading: ethLoading, error: ethError } = useEthToEur();
                 const key = new Date(selectedDate).toISOString().slice(0, 10);
                 const dayEvents = (calendarDays[key] || [])
                   .filter((e: any) => {
-                    if (filters.upcomingOnly && e.rules.datetime && (e.rules.datetime as Date).getTime() <= Date.now()) return false;
+                    if (!showPast && e.rules.datetime && (e.rules.datetime as Date).getTime() <= Date.now()) return false;
                     if (filters.type !== "all" && (e.rules.type || e.cfg?.type) !== filters.type) return false;
                     if (filters.splitAddress !== "all" && (e.rules.splitAddress || e.cfg?.splitAddress || "") !== filters.splitAddress) return false;
                     return true;
@@ -464,28 +464,28 @@ const addresses = dayEvents
                         </Collapse>
 */}
 
-<Flex gap={3} alignItems="center"> {/* Alignement au centre */}
-  <Button size="sm" colorScheme="teal" onClick={() => mintAtelierTicket(entry)} isLoading={mintingIds.includes(msg.id)}>
-    Réserver
-  </Button>
-  <Divider my={8} borderColor="purple.700" w="50%" mx="auto" />
-  <Text fontSize="sm">
-    <strong>Prix :</strong> {priceEur ? `${priceEur} €` : "—"}
-  </Text>
-</Flex>
+                      <Flex gap={3} alignItems="center"> {/* Alignement au centre */}
+                        <Button size="sm" colorScheme="teal" onClick={() => mintAtelierTicket(entry)} isLoading={mintingIds.includes(msg.id)}>
+                          Réserver
+                        </Button>
+                        <Divider my={8} borderColor="purple.700" w="50%" mx="auto" />
+                        <Text fontSize="sm">
+                          <strong>Prix :</strong> {priceEur ? `${priceEur} €` : "—"}
+                        </Text>
+                      </Flex>
 
-<Flex mt={2} direction="column">
-  <Button size="sm" variant="outline" onClick={() => togglePanel(msg.id)}>
-    {open ? "Fermer les détails" : "Voir plus"}
-  </Button>
+                      <Flex mt={2} direction="column">
+                        <Button size="sm" variant="outline" onClick={() => togglePanel(msg.id)}>
+                          {open ? "Fermer les détails" : "Voir plus"}
+                        </Button>
 
-  <Collapse in={open}>
-    <Box mt={2}>
-      {/* Contenu détaillé ici, par exemple */}
-      <Text fontSize="sm">Détails supplémentaires sur le billet...</Text>
-    </Box>
-  </Collapse>
-</Flex>
+                        <Collapse in={open}>
+                          <Box mt={2}>
+                            {/* Contenu détaillé ici, par exemple */}
+                            <Text fontSize="sm">Contactez {adherent?.name || addr || "Rescoe"} sur Discord pour plus d'information</Text>
+                          </Box>
+                        </Collapse>
+                      </Flex>
                       </Box>
                     </Flex>
                   );
