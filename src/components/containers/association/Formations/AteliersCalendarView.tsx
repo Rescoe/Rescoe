@@ -27,6 +27,10 @@ import MessageEditions from "@/components/ABI/MessageEditions.json";
 import useAteliersData from "@/hooks/useAteliersData";
 import CopyableAddress from "@/hooks/useCopyableAddress";
 import useEthToEur from "@/hooks/useEuro";
+import { useAdherentFullData } from '@/hooks/useListAdherentData';
+import CollectionsVignettes from '@/utils/CollectionsVignettes';
+
+
 
 function AteliersCalendarView() {
 
@@ -59,6 +63,8 @@ const {
   rulesCfg,
   computeMintDurationSeconds,
 } = useAteliersData();
+
+const { data: adherentData, loading: loadingAdherent, error: adherentError } = useAdherentFullData(availableSplitAddresses);
 
 // juste après les imports
 const TYPE_COLORS: Record<string, string> = {
@@ -263,16 +269,18 @@ const { ethPrice, loading: ethLoading, error: ethError } = useEthToEur();
               <option key={t} value={t}>{t}</option>
             ))}
           </Select>
-
           <Select
             value={filters.splitAddress}
             onChange={(e) => setFilters((f) => ({ ...f, splitAddress: e.target.value }))}
             width={['100%', '260px']}
           >
             <option value="all">Tous les formateurs</option>
-            {availableSplitAddresses.map((a) => (
-              <option key={a} value={a}>{a}</option>
-            ))}
+            {adherentData &&
+              Object.entries(adherentData).map(([address, data]: [string, any]) => (
+                <option key={address} value={address}>
+                  {data.name || address}
+                </option>
+              ))}
           </Select>
 
           {/* Switch pour afficher les ateliers passés */}
@@ -323,53 +331,50 @@ const addresses = dayEvents
   const priceEth = rules.price ?? cfg?.price;
   const priceEur = priceEth && ethPrice ? (priceEth * ethPrice).toFixed(2) : null;
 
-//console.log(priceEur);
+  // récupération formateur + collections
+  const addr = rules.splitAddress || cfg?.splitAddress;
+  const adherent = addr ? adherentData?.[addr] : null;
+  const collectionsArray = Array.isArray(adherent?.collections) ? adherent.collections : [];
+  const lastCollections = [...collectionsArray.slice(-5)].reverse();
 
+  console.log(lastCollections);
+  return (
+    <Flex
+      key={`${msg.id}-${rules.datetime?.toISOString() || Math.random()}`}
+      direction="column"
+      border="1px solid #333"
+      borderRadius="16px"
+      borderColor={typeColor}
+      overflow="hidden"
+      mb={4}
+      bg={isFuture ? "#" : "#2d2d2d"}
+      _hover={{ transform: "scale(1.01)", transition: "0.2s" }}
+    >
+      <Box w="6px" mb={4} />
+      <Text fontWeight="bold">{rules.title || cfg?.title || rules.description?.slice(0, 60) || "Atelier sans titre"}</Text>
 
+      <Box flex="1" p={4}>
+        <Flex align="center" mb={2}>
+          <Box flex="1">
+            <Text fontSize="sm">{entry.hashtag || (cfg?.label || cfg?.hashtag)}</Text>
+            {cfg?.type && <Badge ml={2} backgroundColor={leftColor} color="#fff">{cfg.type}</Badge>}
+          </Box>
 
-                  return (
-                    <Flex
-                      key={`${msg.id}-${rules.datetime?.toISOString() || Math.random()}`}
-                      direction="column"
-                      border="1px solid #333"
-                      borderRadius="16px"
-                      borderColor= {typeColor}
-                      overflow="hidden"
-                      mb={4}
-                      bg={isFuture ? "#" : "#2d2d2d"}
-                      _hover={{ transform: "scale(1.01)", transition: "0.2s" }}
-                    >
-                      <Box w="6px" mb={4} />
-                      <Text fontWeight="bold">{rules.title || cfg?.title || rules.description?.slice(0, 60) || "Atelier sans titre"}</Text>
-
-                      <Box flex="1" p={4}>
-                        <Flex align="center" mb={2}>
-
-                          <Box flex="1">
-                            <Text fontSize="sm">{entry.hashtag || (cfg?.label || cfg?.hashtag)}</Text>
-                            {cfg?.type && <Badge ml={2} backgroundColor={leftColor} color="#fff">{cfg.type}</Badge>}
-                          </Box>
-
-
-                          <Box textAlign="right">
-                            <Text fontSize="sm" color="#cfecec">{rules.datetime ? (rules.datetime as Date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Heure non définie"}</Text>
-                            <Text
-                              fontSize="xs"
-                              color="#9dd"
-                              maxW="200px"
-                              overflow="hidden"
-                              textOverflow="ellipsis"
-                              whiteSpace="nowrap"
-                              title={rules.splitAddress || cfg?.splitAddress}
-                              fontFamily="mono"
-                            >
-
-                              {rules.splitAddress || cfg?.splitAddress || "Formateur non défini"}
-                            </Text>
-                            <strong>Prix :</strong> {priceEur ? `${priceEur} €` : "—"} <br />
-
-                          </Box>
-                        </Flex>
+          <Box textAlign="right">
+            <Text fontSize="sm" color="#cfecec">{rules.datetime ? (rules.datetime as Date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Heure non définie"}</Text>
+            <Badge
+              fontSize="xs"
+              color={typeColor}
+            >
+            {adherent?.name || addr || "Formateur non défini"}
+          </Badge>
+          <Flex mt={2} gap={2} wrap="wrap">
+            {/* Affichez uniquement le composant CollectionsVignettes, sans boucle */}
+            {adherent?.name && <CollectionsVignettes creator={addr} />}
+          </Flex>
+            <strong>Prix :</strong> {priceEur ? `${priceEur} €` : "—"} <br />
+          </Box>
+        </Flex>
 
 {/*
                           <Box whiteSpace="pre-wrap" mb={3} bg="#014241" p={3} borderRadius={6}>
