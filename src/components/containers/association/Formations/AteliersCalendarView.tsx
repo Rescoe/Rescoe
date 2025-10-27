@@ -29,6 +29,7 @@ import CopyableAddress from "@/hooks/useCopyableAddress";
 import useEthToEur from "@/hooks/useEuro";
 import { useAdherentFullData } from '@/hooks/useListAdherentData';
 import CollectionsVignettes from '@/utils/CollectionsVignettes';
+import NextLink from 'next/link';
 
 
 
@@ -337,7 +338,6 @@ const addresses = dayEvents
   const collectionsArray = Array.isArray(adherent?.collections) ? adherent.collections : [];
   const lastCollections = [...collectionsArray.slice(-5)].reverse();
 
-  console.log(lastCollections);
   return (
     <Flex
       key={`${msg.id}-${rules.datetime?.toISOString() || Math.random()}`}
@@ -354,27 +354,41 @@ const addresses = dayEvents
       <Text fontWeight="bold">{rules.title || cfg?.title || rules.description?.slice(0, 60) || "Atelier sans titre"}</Text>
 
       <Box flex="1" p={4}>
-        <Flex align="center" mb={2}>
-          <Box flex="1">
-            <Text fontSize="sm">{entry.hashtag || (cfg?.label || cfg?.hashtag)}</Text>
-            {cfg?.type && <Badge ml={2} backgroundColor={leftColor} color="#fff">{cfg.type}</Badge>}
+      <Flex direction="column" mb={2}>
+        <HStack justify="space-between" w="100%">
+          {/* Partie gauche : type + badge */}
+          <Box flex="1" display={{ base: "block", md: "flex" }} alignItems={{ md: "center" }}>
+            <Text fontSize="sm">{entry.hashtag || cfg?.label || cfg?.hashtag}</Text>
+            {cfg?.type && (
+              <Badge ml={2} backgroundColor={leftColor} color="#fff">
+                {cfg.type}
+              </Badge>
+            )}
           </Box>
 
-          <Box textAlign="right">
-            <Text fontSize="sm" color="#cfecec">{rules.datetime ? (rules.datetime as Date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Heure non définie"}</Text>
-            <Badge
-              fontSize="xs"
-              color={typeColor}
-            >
-            {adherent?.name || addr || "Formateur non défini"}
-          </Badge>
-          <Flex mt={2} gap={2} wrap="wrap">
-            {/* Affichez uniquement le composant CollectionsVignettes, sans boucle */}
-            {adherent?.name && <CollectionsVignettes creator={addr} />}
-          </Flex>
-            <strong>Prix :</strong> {priceEur ? `${priceEur} €` : "—"} <br />
-          </Box>
+          {/* Partie droite : empilé sur mobile, aligné sur PC */}
+          <VStack align="flex-end" spacing={0} display={{ base: "block", md: "flex" }} alignItems={{ md: "flex-end" }}>
+            <Text fontSize="sm" color="#cfecec">
+              {rules.datetime
+                ? (rules.datetime as Date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                : "Heure non définie"}
+            </Text>
+            <NextLink href={`/u/${addr}`} passHref>
+            <Badge fontSize="xs" color={typeColor}>
+              {adherent?.name || addr || "Formateur non défini"}
+            </Badge>
+            </NextLink>
+
+          </VStack>
+        </HStack>
+
+        {/* Vignettes collections */}
+        <Flex mt={2} gap={2} wrap="wrap" justify={{ base: "center", md: "flex-start" }}>
+          {adherent?.name && <CollectionsVignettes creator={addr} />}
         </Flex>
+      </Flex>
+
+
 
 {/*
                           <Box whiteSpace="pre-wrap" mb={3} bg="#014241" p={3} borderRadius={6}>
@@ -383,8 +397,6 @@ const addresses = dayEvents
 */}
 
                           <Box bg="#012" borderRadius={6} p={2} fontSize="xs" color="#9ed"><pre style={{ whiteSpace: "pre-wrap" }}>{msg.content}</pre></Box>
-
-                          <Divider my={8} />
 
                           <Collapse in={open} animateOpacity>
 
@@ -452,12 +464,28 @@ const addresses = dayEvents
                         </Collapse>
 */}
 
-                        <Flex gap={3}>
-                          <Button size="sm" colorScheme="teal" onClick={() => mintAtelierTicket(entry)} isLoading={mintingIds.includes(msg.id)}>
-                            Réserver
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => togglePanel(msg.id)}>{open ? "Fermer les détails" : "Voir les détails"}</Button>
-                        </Flex>
+<Flex gap={3} alignItems="center"> {/* Alignement au centre */}
+  <Button size="sm" colorScheme="teal" onClick={() => mintAtelierTicket(entry)} isLoading={mintingIds.includes(msg.id)}>
+    Réserver
+  </Button>
+  <Divider my={8} borderColor="purple.700" w="50%" mx="auto" />
+  <Text fontSize="sm">
+    <strong>Prix :</strong> {priceEur ? `${priceEur} €` : "—"}
+  </Text>
+</Flex>
+
+<Flex mt={2} direction="column">
+  <Button size="sm" variant="outline" onClick={() => togglePanel(msg.id)}>
+    {open ? "Fermer les détails" : "Voir plus"}
+  </Button>
+
+  <Collapse in={open}>
+    <Box mt={2}>
+      {/* Contenu détaillé ici, par exemple */}
+      <Text fontSize="sm">Détails supplémentaires sur le billet...</Text>
+    </Box>
+  </Collapse>
+</Flex>
                       </Box>
                     </Flex>
                   );

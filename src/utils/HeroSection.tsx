@@ -90,10 +90,6 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
     setSelectedNft(randomNft);
     setSelectedHaiku(randomHaiku);
 
-    console.log(randomNft);
-    console.log(randomHaiku);
-
-
     const addrs: string[] = [];
     if (randomNft.artist) addrs.push(randomNft.artist);
     const poetAddr = randomHaiku?.poemText?.[7];
@@ -111,7 +107,6 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
   };
 
   const handleNavigateNft = () => {
-    console.log(selectedNft);
 
     if (selectedNft) {
       router.push(`/oeuvresId/${selectedNft.content.mintContractAddress}/${selectedNft.content.tokenId}`);

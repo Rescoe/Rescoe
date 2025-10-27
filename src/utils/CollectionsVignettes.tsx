@@ -85,6 +85,7 @@ const CollectionsVignettes: React.FC<{ creator: string }> = ({ creator }) => {
               />
             )}
           </Box>
+          {/*
           <Text
             fontSize="xs"
             mt={1}
@@ -94,6 +95,7 @@ const CollectionsVignettes: React.FC<{ creator: string }> = ({ creator }) => {
           >
             {col.name}
           </Text>
+          */}
         </Flex>
       ))}
     </Flex>
