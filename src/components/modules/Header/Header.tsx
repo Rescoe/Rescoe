@@ -15,6 +15,10 @@ import SelectInsect from '../InsectSelector';
 
 import { Insect } from '../InsectSelector';
 
+import { motion } from "framer-motion";
+
+const MotionMenuButton = motion(MenuButton);
+
 import { brandHover, hoverStyles } from "@styles/theme"; //Style
 
 
@@ -80,6 +84,13 @@ const Header = () => {
   useEffect(() => {
     localStorage.setItem('insectVisibility', JSON.stringify(isInsectVisible));
   }, [isInsectVisible]);
+
+
+  const boxShadowHover = useColorModeValue(
+  "0 0 15px rgba(180, 166, 213, 0.25)", // light
+  "0 0 15px rgba(238, 212, 132, 0.25)"  // dark
+);
+
 
   return (
   <Box
@@ -150,7 +161,7 @@ const Header = () => {
 
           {isAdmin && (
             <Menu>
-              <MenuButton
+              <MotionMenuButton
                 as={Button}
                 px={10}
                 py={6}
@@ -158,6 +169,11 @@ const Header = () => {
                 fontWeight="bold"
                 borderRadius="full"
                 boxShadow="lg"
+                border="1px solid"
+                whileHover={{
+                  scale: 1.03,
+                  boxShadow: boxShadowHover,
+                }}
                 _hover={{
                   ...hoverStyles.brandHover._hover,
                   ...brandHover,
@@ -165,10 +181,10 @@ const Header = () => {
                 _active={{
                   transform: "scale(0.98)",
                 }}
-                transition="all 0.25s ease"
+                transition={{ duration: 0.25, ease: "easeInOut" }}
               >
                 Admin
-              </MenuButton>
+              </MotionMenuButton>
               <MenuList bg="gray.800" borderColor="purple.600">
                 <NextLink href="/u/admin" passHref>
                   <MenuItem as="a">Gestion du site</MenuItem>
@@ -188,7 +204,7 @@ const Header = () => {
 
           {isContributor && (
             <Menu>
-            <MenuButton
+            <MotionMenuButton
               as={Button}
               px={10}
               py={6}
@@ -197,6 +213,11 @@ const Header = () => {
               borderRadius="full"
               color="white"
               boxShadow="lg"
+              border="1px solid"
+              whileHover={{
+                scale: 1.03,
+                boxShadow: boxShadowHover,
+              }}
               _hover={{
                 ...hoverStyles.brandHover._hover,
                 ...brandHover,
@@ -204,10 +225,10 @@ const Header = () => {
               _active={{
                 transform: "scale(0.98)",
               }}
-              transition="all 0.25s ease"
+              transition={{ duration: 0.25, ease: "easeInOut" }}
             >
               Contributeur
-              </MenuButton>
+              </MotionMenuButton>
 
               <MenuList bg="gray.800" borderColor="purple.600">
                 <NextLink href="/u/dashboard" passHref>
@@ -225,7 +246,7 @@ const Header = () => {
 
           {isPoet && (
             <Menu>
-            <MenuButton
+            <MotionMenuButton
                 as={Button}
                 px={10}
                 py={6}
@@ -234,6 +255,11 @@ const Header = () => {
                 borderRadius="full"
                 color="white"
                 boxShadow="lg"
+                border="1px solid"
+                whileHover={{
+                  scale: 1.03,
+                  boxShadow: boxShadowHover,
+                }}
                 _hover={{
                   ...hoverStyles.brandHover._hover,
                   ...brandHover,
@@ -241,10 +267,10 @@ const Header = () => {
                 _active={{
                   transform: "scale(0.98)",
                 }}
-                transition="all 0.25s ease"
+                transition={{ duration: 0.25, ease: "easeInOut" }}
               >
                 Poète
-                </MenuButton>
+                </MotionMenuButton>
               <MenuList bg="gray.800" borderColor="purple.600">
                 <NextLink href="/u/dashboard" passHref>
                   <MenuItem as="a">Dashboard</MenuItem>
@@ -260,7 +286,7 @@ const Header = () => {
 
           {isArtist && (
             <Menu>
-            <MenuButton
+            <MotionMenuButton
                 as={Button}
                 px={10}
                 py={6}
@@ -268,6 +294,11 @@ const Header = () => {
                 fontWeight="bold"
                 borderRadius="full"
                 boxShadow="lg"
+                border="1px solid"
+                whileHover={{
+                  scale: 1.03,
+                  boxShadow: boxShadowHover,
+                }}
                 _hover={{
                   ...hoverStyles.brandHover._hover,
                   ...brandHover,
@@ -275,10 +306,11 @@ const Header = () => {
                 _active={{
                   transform: "scale(0.98)",
                 }}
-                transition="all 0.25s ease"
+                transition={{ duration: 0.25, ease: "easeInOut" }}
               >
                 Artiste
-                </MenuButton>
+                </MotionMenuButton>
+
 
               <MenuList bg="gray.800" borderColor="purple.600">
                 <NextLink href="/u/dashboard" passHref>
@@ -296,7 +328,7 @@ const Header = () => {
 
           {isTrainee && (
             <Menu>
-            <MenuButton
+            <MotionMenuButton
                 as={Button}
                 px={10}
                 py={6}
@@ -304,6 +336,11 @@ const Header = () => {
                 fontWeight="bold"
                 borderRadius="full"
                 boxShadow="lg"
+                border="1px solid"
+                whileHover={{
+                  scale: 1.03,
+                  boxShadow: boxShadowHover,
+                }}
                 _hover={{
                   ...hoverStyles.brandHover._hover,
                   ...brandHover,
@@ -311,10 +348,12 @@ const Header = () => {
                 _active={{
                   transform: "scale(0.98)",
                 }}
-                transition="all 0.25s ease"
+                transition={{ duration: 0.25, ease: "easeInOut" }}
               >
                 Apprenti
-                </MenuButton>
+                </MotionMenuButton>
+
+                
                 <MenuList bg="gray.800" borderColor="purple.600">
                   <NextLink href="/u/dashboard" passHref>
                     <MenuItem as="a">Dashboard</MenuItem>
@@ -333,10 +372,11 @@ const Header = () => {
           )}
 
           {isAuthenticated && (
-            <HStack spacing={4} cursor="pointer" aria-label="Menu insecte">
+            <HStack spacing={4} cursor="pointer" aria-label="Menu insecte" >
               <Menu>
                 <MenuButton as="div">
-                  <Button colorScheme="teal" size="sm" aria-haspopup="true" aria-expanded="false">
+                  <Button size="sm" aria-haspopup="true" aria-expanded="false"
+                   >
                     <FaBug />
                   </Button>
                 </MenuButton>
@@ -368,6 +408,7 @@ const Header = () => {
           {!isAuthenticated && (
             <Tooltip label="Veuillez d'abord connecter votre wallet pour adhérer" aria-label="Aide Adhésion">
               <span>
+
                 <NextLink href="/adhesion" passHref>
                 <Button
                   px={4}

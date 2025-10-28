@@ -545,7 +545,6 @@ const allHaikus = useMemo(
                   />
                   <Heading
                     size="md"
-                    color="purple.300"
                     fontWeight="bold"
                     mb={2}
                   >

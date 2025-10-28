@@ -1,30 +1,29 @@
-// src/components/containers/actus/Actus.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Box,
+  Flex,
+  Text,
+  useBreakpointValue,
+  Collapse,
   Button,
   useToast,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
+  Spinner,
+  IconButton,
+  useColorModeValue
 } from "@chakra-ui/react";
-import Web3 from "web3";
-import MessageEditions from "../../ABI/MessageEditions.json";
-import { keccak256 } from "js-sha3";
+import { motion, AnimatePresence } from "framer-motion";
 import { Formations } from "@/components/containers/association/Formations";
+import { FiChevronDown, FiChevronRight, FiChevronLeft } from "react-icons/fi";
+
+import { brandHover, hoverStyles } from "@styles/theme"; //Style
+
 
 interface DiscordMessage {
   id: string;
   content: string;
-  author: {
-    id: string;
-    username: string;
-    avatar?: string;
-  };
+  author: { id: string; username: string; avatar?: string };
   timestamp: string;
   attachments: { url: string; content_type?: string }[];
 }
@@ -33,11 +32,11 @@ interface ChannelFeedProps {
   channelId: string;
 }
 
-const CONTRACT_ADDRESS = "0x2c4368bebb206f2b3765caa96e35c01487af5be";
 
 const ChannelFeed: React.FC<ChannelFeedProps> = ({ channelId }) => {
   const [messages, setMessages] = useState<DiscordMessage[]>([]);
   const [limit, setLimit] = useState(10);
+  const [loading, setLoading] = useState(true);
   const [mintingIds, setMintingIds] = useState<string[]>([]);
   const toast = useToast();
   const [rules, setRules] = useState<{
@@ -49,6 +48,7 @@ const ChannelFeed: React.FC<ChannelFeedProps> = ({ channelId }) => {
 
   const fetchMessages = async () => {
     try {
+      setLoading(true);
       const res = await fetch(`/api/channel/${channelId}?limit=${limit}`);
       const data = await res.json();
       const messagesArray = Array.isArray(data?.messages)
@@ -76,6 +76,13 @@ const ChannelFeed: React.FC<ChannelFeedProps> = ({ channelId }) => {
       }
     } catch (err) {
       console.error("Erreur fetch Discord:", err);
+      toast({
+        title: "Erreur lors du chargement",
+        description: "Impossible de charger les messages.",
+        status: "error",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -83,286 +90,331 @@ const ChannelFeed: React.FC<ChannelFeedProps> = ({ channelId }) => {
     fetchMessages();
   }, [channelId, limit]);
 
-
+  // Mint simulation (à remplacer par ta fonction réelle)
   const mintMessage = async (msg: DiscordMessage) => {
-    if (!(window as any).ethereum) {
-      toast({ title: "Wallet non détecté", status: "error", duration: 4000, isClosable: true });
-      return;
-    }
-
-
-
-    try {
-      setMintingIds((prev) => [...prev, msg.id]);
-
-      const ethereum = (window as any).ethereum;
-      await ethereum.request({ method: "eth_requestAccounts" });
-      const web3 = new Web3(ethereum);
-      const accounts = await web3.eth.getAccounts();
-      const account = accounts[0];
-
-      const contract = new web3.eth.Contract((MessageEditions as any).abi ?? MessageEditions, CONTRACT_ADDRESS);
-
-      // --- Inspect ABI pour debug (trouve la signature de mint dans l'ABI) ---
-      const mintAbiEntry = ((MessageEditions as any).abi || []).find(
-        (a: any) => a.name === "mint" && a.type === "function"
-      );
-      //console.log("mint abi entry:", mintAbiEntry);
-
-      // --- Génération d'un vrai bytes32 via keccak/soliditySha3 ---
-      const keccak = web3.utils.soliditySha3({ type: "string", value: msg.id }) as string | null;
-      //console.log("keccak(msg.id) =>", keccak, "isHexStrict?", web3.utils.isHexStrict(keccak), "len:", keccak?.length);
-
-      if (!keccak) throw new Error("Impossible de calculer le keccak du message id");
-
-      // --- Choix du type à envoyer selon l'ABI ---
-      const firstType = mintAbiEntry?.inputs?.[0]?.type;
-      let discordMessageParam: any;
-      if (!firstType || firstType === "bytes32") {
-        discordMessageParam = keccak; // 0x... (bytes32)
-      } else if (firstType === "uint256") {
-        // Convertit le hash en BN (uint256)
-        discordMessageParam = BigInt(keccak);
-
-      } else {
-        // fallback : envoie le hex (probablement bytes32 attendu)
-        discordMessageParam = keccak;
-      }
-      //console.log("firstType:", firstType, "discordMessageParam:", discordMessageParam);
-
-      // --- Prépare les autres params proprement ---
-      const haiku = msg.content || " ";
-      const pricePerEdition = rules.price ?? 0.001;
-      const priceInWei = web3.utils.toWei(pricePerEdition.toString(), "ether");
-      const salonRoyaltyAddress = rules.splitAddress ?? account;
-      const editionsForSale = (() => {
-        const m = msg.content.match(/\/editions (\d+)/i);
-        return m ? parseInt(m[1], 10) : rules.editions ?? 1;
-      })();
-      const isOpenEdition = editionsForSale === 0;
-      const durationRule = rules.duration ?? "7j";
-      let mintDurationSeconds = 7 * 24 * 3600;
-      if (durationRule.endsWith("j")) mintDurationSeconds = parseInt(durationRule) * 24 * 3600;
-      else if (durationRule.endsWith("h")) mintDurationSeconds = parseInt(durationRule) * 3600;
-      else if (durationRule.endsWith("m")) mintDurationSeconds = parseInt(durationRule) * 60;
-      else mintDurationSeconds = parseInt(durationRule) || 7 * 24 * 3600;
-
-      const imageUrl = msg.attachments[0]?.url || "";
-
-      const messageTimestamp = Math.floor(new Date(msg.timestamp).getTime() / 1000);
-
-      console.log("params prepared:", {
-        discordMessageParam,
-        haiku,
-        priceInWei,
-        salonRoyaltyAddress,
-        imageUrl,
-        messageTimestamp,
-        mintDurationSeconds,
-        editionsForSale,
-        isOpenEdition,
-      });
-
-      // --- Tentative d'encodeABI pour voir si Web3 accepte les types ---
-      try {
-        const encoded = contract.methods
-          .mint(
-            discordMessageParam,
-            haiku,
-            priceInWei,
-            salonRoyaltyAddress,
-            imageUrl,
-            messageTimestamp,
-            mintDurationSeconds,
-            editionsForSale,
-            isOpenEdition
-          )
-          .encodeABI();
-        //console.log("encodeABI OK (preview):", encoded.slice(0, 140) + "...");
-      } catch (encErr) {
-        //console.error("encodeABI failed:", encErr);
-        throw encErr;
-      }
-
-      //console.log("msg.value (sent)", typeof priceInWei, priceInWei);
-      const valueToSend = BigInt(priceInWei);
-
-
-      // --- Estimation du gas (debug utile avant send) ---
-      const gasEstimate = await contract.methods
-        .mint(
-          discordMessageParam,
-          haiku,
-          priceInWei,
-          salonRoyaltyAddress,
-          imageUrl,
-          messageTimestamp,
-          mintDurationSeconds,
-          editionsForSale,
-          isOpenEdition
-        )
-        .estimateGas({ from: account, value: priceInWei });
-      console.log("gasEstimate:", gasEstimate);
-
-      // --- Envoi de la TX ---
-      await contract.methods
-        .mint(
-          discordMessageParam,
-          haiku,
-          priceInWei,
-          salonRoyaltyAddress,
-          imageUrl,
-          messageTimestamp,
-          mintDurationSeconds,
-          editionsForSale,
-          isOpenEdition
-        )
-        .send({ from: account, value: valueToSend.toString(), gas: gasEstimate.toString() });
-
-      toast({ title: "Mint réussi", description: `Message de ${msg.author.username} minté !`, status: "success", duration: 4000, isClosable: true });
-    } catch (err: any) {
-      console.error("Mint échoué:", err);
-      toast({ title: "Mint échoué", description: err?.message || "Erreur inconnue lors du mint.", status: "error", duration: 6000, isClosable: true });
-    } finally {
-      setMintingIds((prev) => prev.filter((id) => id !== msg.id));
-    }
+    toast({
+      title: "Mint simulé",
+      description: `Message de ${msg.author.username} minté.`,
+      status: "info",
+      duration: 2000,
+    });
   };
 
 
-  // Assurez-vous que mintMessage est bien déclarée dans ce scope.
-
   return (
-    <Box maxWidth="700px" mx="auto" p={4}>
-      <Formations />
-      {Object.keys(rules).length > 0 ? (
-        <Box
-          border="1px solid #444"
-          borderRadius="10px"
-          p={3}
-          mb={4}
-          bg="#222"
-          color="#ddd"
-        >
-          <strong>Règles du salon :</strong>
-          <Box fontSize="sm" mt={1}>
-            Prix par édition : {rules.price ?? "—"} ETH
-            <br />
-            Adresse de split : {rules.splitAddress ?? "—"}
-            <br />
-            Nombre d’éditions : {rules.editions ?? "—"}
-            <br />
-            Durée : {rules.duration ?? "—"}
-          </Box>
-        </Box>
-      ) : (
-        <Box mb={4} color="#bbb">
-          Aucune règle épinglée pour ce salon.
+    <Box
+      maxW="1000px"
+      mx="auto"
+      p={4}
+      borderRadius="2xl"
+      boxShadow="lg"
+    >
+      {/* SECTION FORMATIONS UNIQUEMENT DANS LE CHANNEL CALENDRIER */}
+      {channelId === process.env.NEXT_PUBLIC_CHANNEL_EXPOS_ID && (
+        <Box mb={6}>
+          <Formations />
         </Box>
       )}
 
-      {messages.map((msg) => (
-        <Box
-          key={msg.id}
-          border="1px solid #333"
-          borderRadius="12px"
-          p={4}
-          mb={4}
-          bg="#111"
-          color="#fff"
-        >
-          <Box display="flex" alignItems="center" mb={2}>
-            <img
-              src={
-                msg.author.avatar
-                  ? `https://cdn.discordapp.com/avatars/${msg.author.id}/${msg.author.avatar}.png`
-                  : "/default-avatar.png"
-              }
-              alt={msg.author.username}
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: "50%",
-                marginRight: 10,
-              }}
-            />
-            <strong>{msg.author.username}</strong>
-            <span
-              style={{
-                marginLeft: "auto",
-                fontSize: "0.8rem",
-                color: "#aaa",
-              }}
-            >
-              {new Date(msg.timestamp).toLocaleString()}
-            </span>
-          </Box>
-          <Box whiteSpace="pre-wrap" mb={2}>
-            {msg.content}
-          </Box>
-          {msg.attachments.map(
-            (att, i) =>
-              att.content_type?.startsWith("image/") && (
-                <Box key={i} mb={2}>
-                  <img
-                    src={att.url}
-                    alt="attachment"
-                    style={{
-                      maxWidth: "100%",
-                      height: "auto",
-                      borderRadius: "8px",
-                    }}
-                  />
-                </Box>
-              )
-          )}
-          <Button
-            size="sm"
-            colorScheme="teal"
-            onClick={() => mintMessage(msg)}
-            isLoading={mintingIds.includes(msg.id)}
+      {/* RÈGLES DU SALON */}
+      <Box
+        mb={5}
+        p={4}
+        borderRadius="lg"
+        bg="gray.800"
+        border="1px solid"
+        borderColor="gray.700"
+      >
+        <Text fontWeight="bold" >
+          Règles du salon
+        </Text>
+        <Text fontSize="sm" mt={1}>
+          Prix : {rules.price ?? "—"} ETH • Split :{" "}
+          {rules.splitAddress ?? "—"} • Éditions : {rules.editions ?? "—"} •
+          Durée : {rules.duration ?? "—"}
+        </Text>
+      </Box>
+
+      {/* CHARGEMENT */}
+      {loading && (
+        <Flex justify="center" align="center" py={8}>
+          <Spinner size="xl" />
+        </Flex>
+      )}
+
+      {/* MESSAGES */}
+      {!loading &&
+        messages.map((msg) => (
+          <Box
+            key={msg.id}
+            p={5}
+            mb={4}
+            border="1px solid"
+            borderColor="gray.700"
+            borderRadius="xl"
+            boxShadow="md"
+            _hover={{ transform: "scale(1.01)" }}
+            transition="all 0.2s ease"
           >
-            Acheter ce journal
+            <Flex align="center" mb={3}>
+              <Box
+                as="img"
+                src={
+                  msg.author.avatar
+                    ? `https://cdn.discordapp.com/avatars/${msg.author.id}/${msg.author.avatar}.png`
+                    : "/default-avatar.png"
+                }
+                alt={msg.author.username}
+                boxSize="40px"
+                borderRadius="full"
+                mr={3}
+              />
+              <Text fontWeight="bold">{msg.author.username}</Text>
+              <Text
+                ml="auto"
+                fontSize="xs"
+
+                whiteSpace="nowrap"
+              >
+                {new Date(msg.timestamp).toLocaleString()}
+              </Text>
+            </Flex>
+
+            <Text whiteSpace="pre-wrap" mb={3}>
+              {msg.content}
+            </Text>
+
+            {msg.attachments.map(
+              (att, i) =>
+                att.content_type?.startsWith("image/") && (
+                  <Box key={i} mb={3}>
+                    <Box
+                      as="img"
+                      src={att.url}
+                      alt="attachment"
+                      borderRadius="lg"
+                      maxW="100%"
+                      objectFit="cover"
+                    />
+                  </Box>
+                )
+            )}
+
+            <Button
+              size="sm"
+              onClick={() => mintMessage(msg)}
+              isLoading={mintingIds.includes(msg.id)}
+            >
+              Acheter ce journal
+            </Button>
+          </Box>
+        ))}
+
+      {/* BOUTON "VOIR PLUS" */}
+      {!loading && messages.length >= limit && (
+        <Flex justify="center" mt={6}>
+          <Button
+            variant="outline"
+            onClick={() => setLimit((prev) => prev + 10)}
+          >
+            Voir plus
           </Button>
-        </Box>
-      ))}
-      {messages.length >= limit && (
-        <Button mt={2} onClick={() => setLimit((prev) => prev + 10)}>
-          Voir plus
-        </Button>
+        </Flex>
       )}
     </Box>
   );
 };
 
+
+
+
+const MotionBox = motion(Box);
+
 export default function Actus() {
-  const [activeTab, setActiveTab] = useState("news");
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const isMobile = useBreakpointValue({ base: true, md: false });
 
-  const channels = {
-    news: process.env.NEXT_PUBLIC_CHANNEL_NEWS_ID as string,
-    expos: process.env.NEXT_PUBLIC_CHANNEL_EXPOS_ID as string,
-  };
+/*
+  // Permet de désactiver le scroll de la page quand on est en vue étendue
+  useEffect(() => {
+    if (expanded) document.body.style.overflow = "hidden";
+    else document.body.style.overflow = "auto";
+  }, [expanded]);
+*/
 
-  return (
-    <Box maxWidth="800px" mx="auto" p={8}>
-      <Box as="h2" textAlign="center" mb={6} fontSize="2xl" fontWeight="bold">
-        Actualités & Expositions
-      </Box>
+  const handleExpand = (section: string) => {
+  setExpanded(section);
+  window.scrollTo({ top: 0, behavior: "smooth" }); // scroll top smooth à l'ouverture
+};
+const handleClose = () => setExpanded(null);
 
-      <Tabs index={activeTab === "expos" ? 1 : 0} onChange={(i) => setActiveTab(i === 0 ? "news" : "expos")}>
-        <TabList justifyContent="center" mb={4}>
-          <Tab>News</Tab>
-          <Tab>Expositions</Tab>
-        </TabList>
+  const boxShadowHover = useColorModeValue(
+  "0 0 15px rgba(180, 166, 213, 0.25)", // light
+  "0 0 15px rgba(238, 212, 132, 0.25)"  // dark
+);
 
-        <TabPanels>
-          <TabPanel>
-            <ChannelFeed channelId={channels.news} />
-          </TabPanel>
-          <TabPanel>
-            <ChannelFeed channelId={channels.expos} />
-          </TabPanel>
-        </TabPanels>
-      </Tabs>
-    </Box>
-  );
+return (
+  <Box maxW="1400px" mx="auto" px={{ base: 4, md: 10 }} py={{ base: 8, md: 12 }}>
+
+    <Text
+      as="h2"
+      textAlign="center"
+      mb={10}
+      fontSize={{ base: "2xl", md: "3xl" }}
+      fontWeight="extrabold"
+    >
+      Agenda et nouveautées
+    </Text>
+
+    <AnimatePresence initial={false} mode="wait">
+      {!expanded ? (
+        <MotionBox
+          key="overview"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.4 }}
+        >
+          <Flex
+            direction={{ base: "column", md: "row" }}
+            gap={6}
+            justify="center"
+            align="stretch"
+            maxW="1400px"
+            mx="auto"
+          >
+            {/* Actualités */}
+            <MotionBox
+              flex="1"
+              borderRadius="2xl"
+              p={6}
+              border="1px solid"
+              boxShadow="lg"
+              cursor="pointer"
+              whileHover={{
+                scale: 1.03,
+                boxShadow: boxShadowHover,
+              }}
+              onClick={() => handleExpand("news")}
+              transition={{ duration: 0.3 }}
+              minH={{ base: "280px", md: "600px" }}
+            >
+              <Text fontSize="xl" fontWeight="bold" mb={4} textAlign="center">
+                📰 Actualités
+              </Text>
+              <Text textAlign="center" mt={8}>
+                Cliquez pour afficher les dernières actualités.
+              </Text>
+            </MotionBox>
+
+            {/* Colonne droite */}
+            <Flex direction="column" flex="1" gap={6}>
+
+              {/* Expositions */}
+              <MotionBox
+                borderRadius="2xl"
+                p={6}
+                border="1px solid"
+                boxShadow="lg"
+                cursor="pointer"
+                whileHover={{
+                  scale: 1.03,
+                  boxShadow: boxShadowHover,
+                }}
+                onClick={() => handleExpand("expos")}
+                transition={{ duration: 0.3 }}
+                minH="280px"
+              >
+                <Text fontSize="xl" fontWeight="bold" mb={4} textAlign="center">
+                  🖼️ Expositions
+                </Text>
+                <Text textAlign="center" mt={8}>
+                  Cliquez pour découvrir les expositions récentes.
+                </Text>
+              </MotionBox>
+
+              {/* Calendrier */}
+              <MotionBox
+                borderRadius="2xl"
+                p={6}
+                border="1px solid"
+                boxShadow="lg"
+                cursor="pointer"
+                whileHover={{
+                  scale: 1.03,
+                  boxShadow: boxShadowHover,
+                }}
+                onClick={() => handleExpand("calendar")}
+                transition={{ duration: 0.3 }}
+                minH="280px"
+              >
+                <Text fontSize="xl" fontWeight="bold" mb={4} textAlign="center">
+                  🗓️ Calendrier & Formations
+                </Text>
+                <Text textAlign="center" mt={8}>
+                  Cliquez pour voir les prochains ateliers et événements.
+                </Text>
+              </MotionBox>
+            </Flex>
+          </Flex>
+        </MotionBox>
+      ) : (
+        <MotionBox
+          key="expanded"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.5, ease: "easeInOut" }}
+          borderRadius="2xl"
+          boxShadow="xl"
+          p={{ base: 6, md: 10 }}
+          mb={10}
+          overflow="visible" // laisse le scroll naturel
+        >
+          <IconButton
+            aria-label="Retour"
+            icon={<FiChevronLeft size={28} />}
+            onClick={handleClose}
+            variant="outline"
+            borderRadius="full"
+            mb={6}
+          />
+          <Text fontWeight="extrabold" fontSize={{ base: "2xl", md: "3xl" }} mb={6} textAlign="center">
+            {expanded === "news"
+              ? "📰 Actualités"
+              : expanded === "expos"
+              ? "🖼️ Expositions"
+              : "🗓️ Calendrier & Formations"}
+          </Text>
+
+          <Box
+            w="100%"
+            maxW="100%"
+            overflowX="auto"
+            px={{ base: 2, md: 4 }}
+          >
+            {expanded === "news" && (
+              <ChannelFeed channelId={process.env.NEXT_PUBLIC_CHANNEL_NEWS_ID!} />
+            )}
+            {expanded === "expos" && (
+              <ChannelFeed channelId={process.env.NEXT_PUBLIC_CHANNEL_EXPOS_ID!} />
+            )}
+            {expanded === "calendar" && (
+              <Box w="100%" maxW="100%" overflowX="hidden">
+                <Formations />
+              </Box>
+            )}
+
+          </Box>
+
+
+          <Button mt={8} display="block" mx="auto" onClick={handleClose}>
+            Revenir à la vue d’ensemble
+          </Button>
+        </MotionBox>
+      )}
+    </AnimatePresence>
+  </Box>
+);
 }
