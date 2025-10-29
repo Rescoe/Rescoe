@@ -63,6 +63,7 @@ const {
   toggleDetails,
   rulesCfg,
   computeMintDurationSeconds,
+  getMessageImage,
 } = useAteliersData();
 
 const { data: adherentData, loading: loadingAdherent, error: adherentError } = useAdherentFullData(availableSplitAddresses);
@@ -90,7 +91,7 @@ const { ethPrice, loading: ethLoading, error: ethError } = useEthToEur();
 
   // ---------- UI render ----------
   return (
-      <Box maxW="1200px" mx="auto" p={4}>
+    <Box w="full" maxW="100%" overflow="hidden">
       <Flex
     mb={6}
     direction={['column', 'row']} // colonne sur mobile, ligne sur desktop
@@ -147,7 +148,7 @@ const { ethPrice, loading: ethLoading, error: ethError } = useEthToEur();
                 </IconButton>
               </HStack>
 
-              <Select
+{/*              <Select
                 size="sm"
                 w="150px"
                 value={filters.type}
@@ -160,7 +161,7 @@ const { ethPrice, loading: ethLoading, error: ethError } = useEthToEur();
                   </option>
                 ))}
               </Select>
-
+*/}
             </Flex>
 
             {/* Calendrier */}
@@ -359,9 +360,9 @@ const addresses = dayEvents
           {/* Partie gauche : type + badge */}
           <Box flex="1" display={{ base: "block", md: "flex" }} alignItems={{ md: "center" }}>
             <Text fontSize="sm">{entry.hashtag || cfg?.label || cfg?.hashtag}</Text>
-            {cfg?.type && (
+            {rules?.type && (
               <Badge ml={2} backgroundColor={leftColor} color="#fff">
-                {cfg.type}
+                {rules.type}
               </Badge>
             )}
           </Box>
@@ -413,13 +414,14 @@ const addresses = dayEvents
                             <Box mt={2}>
                               <Text fontWeight="bold" mb={1}>Image associée :</Text>
                               <Image
-                                src={onChain?.parsedImageUrl || msg.attachments.url}
-                                alt="atelier image"
+                                src={getMessageImage(msg, onChain) || "/placeholder.jpg"}
+                                alt={rules.title || "atelier image"}
                                 maxH="260px"
                                 borderRadius="8px"
                                 objectFit="contain"
                                 mx="auto"
                               />
+
                             </Box>
                             </Box>
                             </Collapse>

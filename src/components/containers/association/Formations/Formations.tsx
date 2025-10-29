@@ -18,6 +18,7 @@ import {
   Image,
   Spinner,
   Badge,
+  VStack
 } from "@chakra-ui/react";
 import { SlArrowRight, SlArrowLeft } from "react-icons/sl";
 import Web3 from "web3";
@@ -66,7 +67,7 @@ return (
     <AteliersCalendarView />
 
     {/* --- Bouton pour afficher/masquer les anciens ateliers --- */}
-    <Flex justify="center" my={6}>
+    <VStack justify="center" my={6}>
       <Button
         colorScheme="teal"
         variant="solid"
@@ -81,7 +82,7 @@ return (
       >
         {showAll ? "Masquer tous les ateliers" : "Afficher tous les ateliers"}
       </Button>
-    </Flex>
+    </VStack>
 
     {/* --- Ateliers à venir --- */}
     <Collapse in={showAll} animateOpacity>

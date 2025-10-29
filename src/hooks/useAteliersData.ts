@@ -48,6 +48,21 @@ const extractHashtags = (content: string): string[] => {
   return matches ? matches.map((s) => s.trim()) : [];
 };
 
+const extractTitleFromText = (text: string): string | null => {
+  if (!text) return null;
+  const firstLine = text.trim().split("\n")[0];
+  return firstLine?.trim() || null;
+};
+
+const extractTypeFromText = (text: string): string | null => {
+  if (!text) return null;
+  const typesList = ["atelier", "exposition", "expo", "formation", "stage", "conférence", "projection", "concert"];
+  const lower = text.toLowerCase();
+  const found = typesList.find((t) => lower.includes(t));
+  return found || null;
+};
+
+
 // accepte "27/10/2025 à 15h30", "27/10/2025 15:30", "2025-10-27 15:30", "2025-10-27T15:30"
 const extractDateTimeFromText = (text: string): Date | null => {
   if (!text) return null;
@@ -119,9 +134,10 @@ const extractSplit = (text: string): string | null => {
 
 const extractDurationHuman = (text: string): string | null => {
   if (!text) return null;
-  const r = text.match(/(\d+\s*(?:h|heure|heures|m|min))/i);
-  return r ? r[1] : null;
+  const r = text.match(/dur(é|e)e?\s*(?:de|:)?\s*(\d+\s*(?:h|heures?|m|min))/i);
+  return r ? r[2].trim() : null;
 };
+
 
 const extractImageUrlFromText = (text: string): string | null => {
   if (!text) return null;
@@ -145,7 +161,7 @@ const computeMintDurationSeconds = (messageTimestamp: number, atelierDate?: Date
 const isAtelierKeyword = (content: string) => {
   if (!content) return false;
   const low = content.toLowerCase();
-  return /atelier|formation|stage|cours/.test(low);
+  return /atelier|formation|stage|cours|défi|expo|exposition|evenement/.test(low);
 };
 
 // helper to parse base64 tokenURI JSON
@@ -168,6 +184,38 @@ const parseTokenURIForImage = (tokenURI: string): string | null => {
     return null;
   }
 };
+
+// Récupère l'image la plus pertinente (Discord > on-chain > texte > null)
+const getMessageImage = (msg: DiscordMessage, onChain?: OnChainAtelierInfo): string | null => {
+  if (!msg) return null;
+
+  // Cas 1 : attachements Discord (nouveau format tableau)
+  if (Array.isArray(msg.attachments) && msg.attachments.length > 0) {
+    return msg.attachments[0].url;
+  }
+
+  // Cas 2 : attachement unique (ancien format)
+  if ((msg as any).attachments?.url) {
+    return (msg as any).attachments.url;
+  }
+
+  // Cas 3 : lien d'image directement dans le texte du message
+  const fromText = extractImageUrlFromText(msg.content);
+  if (fromText) return fromText;
+
+  // Cas 4 : image on-chain (NFT metadata)
+  if (onChain?.parsedImageUrl) {
+    // Gestion IPFS → gateway publique
+    if (onChain.parsedImageUrl.startsWith("ipfs://")) {
+      return onChain.parsedImageUrl.replace("ipfs://", "https://ipfs.io/ipfs/");
+    }
+    return onChain.parsedImageUrl;
+  }
+
+  // Cas 5 : aucune image trouvée
+  return null;
+};
+
 
 const useAteliersData = () => {
 
@@ -249,44 +297,66 @@ const useAteliersData = () => {
 
   // ---------- parse message to rules (message > JSON) ----------
   const parseMessageToRules = useCallback(
-    (msg: DiscordMessage): AtelierRulesParsed | null => {
-      const text = msg.content || "";
-      const tags = extractHashtags(text); // ['#peinture', ...]
-      const hasKnownTag = tags.some((t) => Object.prototype.hasOwnProperty.call(rulesCfg, t));
-      if (!hasKnownTag && !isAtelierKeyword(text)) return null;
+  (msg: DiscordMessage): AtelierRulesParsed | null => {
+    const text = msg.content || "";
+    if (!text.trim()) return null;
 
-      const chosenTag = tags.find((t) => Object.prototype.hasOwnProperty.call(rulesCfg, t)) || tags[0] || null;
-      const cfg = chosenTag ? rulesCfg[chosenTag] : null;
+    // --- Extraction des hashtags ---
+    const tags = extractHashtags(text);
+    const hasKnownTag = tags.some((t) => Object.prototype.hasOwnProperty.call(rulesCfg, t));
 
-      // extracted fields (support french formats)
-      const datetime = extractDateTimeFromText(text) ?? null;
-      const price = extractPrice(text) ?? (cfg ? cfg.price ?? null : null);
-      const maxEditions = extractPlaces(text) ?? (cfg ? cfg.maxEditions ?? null : null);
-      const durationHuman = extractDurationHuman(text) ?? (cfg ? cfg.defaultDurationHuman ?? null : null);
-      const split = extractSplit(text) ?? (cfg ? cfg.splitAddress ?? null : null);
-      const description = sanitizeDescription(text) || cfg?.descriptionTemplate || cfg?.description || null;
-      const title = cfg?.label ?? cfg?.title ?? null;
-      const type = cfg?.type ?? (chosenTag ? (chosenTag.replace("#", "") as string) : null);
+    // --- Vérifie si le message correspond à un mot-clé connu (atelier, expo, stage, etc.) ---
+    const isRelevant = hasKnownTag || isAtelierKeyword(text);
+    if (!isRelevant) return null;
 
-      const parsed: AtelierRulesParsed = {
-        title,
-        price,
-        maxEditions,
-        dureeAtelier: durationHuman,
-        datetime,
-        splitAddress: split,
-        description,
-        hashtag: chosenTag,
+    // --- Tag principal (s'il existe) ---
+    const chosenTag = tags.find((t) => Object.prototype.hasOwnProperty.call(rulesCfg, t)) || tags[0] || null;
+
+    // --- Type déduit depuis le contenu (atelier, exposition, conférence...) ---
+    let type = extractTypeFromText(text);
+
+    // --- Config associée au tag ---
+    let cfg = chosenTag && rulesCfg[chosenTag] ? rulesCfg[chosenTag] : null;
+
+    // --- Si le type est inconnu, on crée dynamiquement une config temporaire ---
+    if (type && !Object.values(rulesCfg).some((c: any) => c?.type === type)) {
+      cfg = {
+        label: type.charAt(0).toUpperCase() + type.slice(1),
         type,
+        price: null,
+        maxEditions: null,
+        splitAddress: null,
+        defaultDurationHuman: null,
       };
+    }
 
-      // ensure that if type exists in cfg we populate rules.type so filters work
-      if (!parsed.type && cfg?.type) parsed.type = cfg.type;
+    // --- Extraction des données du message ---
+    const datetime = extractDateTimeFromText(text) ?? null;
+    const price = extractPrice(text) ?? cfg?.price ?? null;
+    const maxEditions = extractPlaces(text) ?? cfg?.maxEditions ?? null;
+    const durationHuman = extractDurationHuman(text) ?? cfg?.defaultDurationHuman ?? null;
+    const split = extractSplit(text) ?? cfg?.splitAddress ?? null;
+    const title = extractTitleFromText(text) ?? cfg?.label ?? cfg?.title ?? null;
+    const description = sanitizeDescription(text) || cfg?.descriptionTemplate || cfg?.description || null;
 
-      return parsed;
-    },
-    [rulesCfg]
-  );
+    const parsed: AtelierRulesParsed = {
+      title,
+      price,
+      maxEditions,
+      dureeAtelier: durationHuman,
+      datetime,
+      splitAddress: split,
+      description,
+      hashtag: chosenTag,
+      type,
+    };
+
+    return parsed;
+  },
+  [rulesCfg]
+);
+
+
 
   // ---------- enriched list (merge message + cfg rules) ----------
   const enriched = useMemo(() => {
@@ -635,6 +705,7 @@ const useAteliersData = () => {
   toggleDetails,
   rulesCfg,
   computeMintDurationSeconds,
+  getMessageImage,
 }
 
 };

@@ -102,13 +102,8 @@ const ChannelFeed: React.FC<ChannelFeedProps> = ({ channelId }) => {
 
 
   return (
-    <Box
-      maxW="1000px"
-      mx="auto"
-      p={4}
-      borderRadius="2xl"
-      boxShadow="lg"
-    >
+<Box w="full" px={0} py={0}>
+
       {/* SECTION FORMATIONS UNIQUEMENT DANS LE CHANNEL CALENDRIER */}
       {channelId === process.env.NEXT_PUBLIC_CHANNEL_EXPOS_ID && (
         <Box mb={6}>
@@ -118,8 +113,6 @@ const ChannelFeed: React.FC<ChannelFeedProps> = ({ channelId }) => {
 
       {/* RÈGLES DU SALON */}
       <Box
-        mb={5}
-        p={4}
         borderRadius="lg"
         bg="gray.800"
         border="1px solid"
@@ -255,7 +248,7 @@ const handleClose = () => setExpanded(null);
 );
 
 return (
-  <Box maxW="1400px" mx="auto" px={{ base: 4, md: 10 }} py={{ base: 8, md: 12 }}>
+  <Box w="full" px={0} py={0}>
 
     <Text
       as="h2"
@@ -362,15 +355,13 @@ return (
       ) : (
         <MotionBox
           key="expanded"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.5, ease: "easeInOut" }}
-          borderRadius="2xl"
-          boxShadow="xl"
-          p={{ base: 6, md: 10 }}
-          mb={10}
-          overflow="visible" // laisse le scroll naturel
+          w="full"
+          maxW="none"
+          px={{ base: 4, md: 8 }}
+          py={{ base: 6, md: 10 }}
+          borderRadius="0"
+          boxShadow="none"
+          overflow="visible"
         >
           <IconButton
             aria-label="Retour"
@@ -398,13 +389,20 @@ return (
               <ChannelFeed channelId={process.env.NEXT_PUBLIC_CHANNEL_NEWS_ID!} />
             )}
             {expanded === "expos" && (
+              <Flex w="full" justify="center">
+                <Box w="full" maxW="1200px" px={{ base: 2, md: 6 }}>
               <ChannelFeed channelId={process.env.NEXT_PUBLIC_CHANNEL_EXPOS_ID!} />
+              </Box>
+            </Flex>
             )}
             {expanded === "calendar" && (
-              <Box w="100%" maxW="100%" overflowX="hidden">
-                <Formations />
-              </Box>
-            )}
+  <Flex w="full" justify="center">
+    <Box w="full" maxW="1200px" px={{ base: 2, md: 6 }}>
+      <Formations />
+    </Box>
+  </Flex>
+)}
+
 
           </Box>
 
