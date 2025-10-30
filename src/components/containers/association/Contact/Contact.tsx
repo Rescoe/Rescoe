@@ -50,28 +50,28 @@ const teamMembers: TeamMember[] = [
   {
     name: 'Clément Roubeyrie',
     role: 'Président',
-    image: 'https://sapphire-central-catfish-736.mypinata.cloud/ipfs/Qma243vdQ17Rc77uW1BCRSmXn5xEtpKq7R5cKkFPFgrVDq', // Lien IPFS
+    image: 'https://purple-managerial-ermine-688.mypinata.cloud/ipfs/Qma243vdQ17Rc77uW1BCRSmXn5xEtpKq7R5cKkFPFgrVDq', // Lien IPFS
     description: 'Directeur de l\'association.',
     profileLink: '', // Lien vers le profil
   },
   {
     name: 'Thibault Franzinetti',
     role: 'Vice-Président',
-    image: 'https://sapphire-central-catfish-736.mypinata.cloud/ipfs/QmVA6TRBDMLdp2AxQ7hs2TQiZcaUYqbVNmfLnz9eT8CU8S', // Lien IPFS
+    image: 'https://purple-managerial-ermine-688.mypinata.cloud/ipfs/QmVA6TRBDMLdp2AxQ7hs2TQiZcaUYqbVNmfLnz9eT8CU8S', // Lien IPFS
     description: 'En charge du developpement de l\'asociation',
     profileLink: '',
   },
   {
     name: 'Simon Louf',
     role: 'Secrétaire en chef',
-    image: 'https://sapphire-central-catfish-736.mypinata.cloud/ipfs/QmYUmTHmHueWoGNvyXnV2kJubrGCwh6ykHvpb2HZJZ21Td', // Lien IPFS
+    image: 'https://purple-managerial-ermine-688.mypinata.cloud/ipfs/QmYUmTHmHueWoGNvyXnV2kJubrGCwh6ykHvpb2HZJZ21Td', // Lien IPFS
     description: 'Bonne question tiens!',
     profileLink: '',
   },
   {
     name: 'May Santot',
     role: 'Directrice de publication',
-    image: 'https://sapphire-central-catfish-736.mypinata.cloud/ipfs/QmVnujT2hHLTJ3iYD2hP7XyLGNUXtyXG3NZj9BPtJfsK8f', // Lien IPFS
+    image: 'https://purple-managerial-ermine-688.mypinata.cloud/ipfs/QmVnujT2hHLTJ3iYD2hP7XyLGNUXtyXG3NZj9BPtJfsK8f', // Lien IPFS
     description: 'Responsable du contenu, de l\'orientation et de la validation littéraire',
     profileLink: '',
   },

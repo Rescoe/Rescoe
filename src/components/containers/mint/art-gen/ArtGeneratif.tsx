@@ -9,7 +9,7 @@ import ABIRESCOLLECTION from '../../../ABI/ABI_Collections.json';
 import html2canvas from 'html2canvas';
 
 // Constantes de l'API Pinata
-const PINATA_GATEWAY = "https://sapphire-central-catfish-736.mypinata.cloud/ipfs/";
+const PINATA_GATEWAY = "https://purple-managerial-ermine-688.mypinata.cloud/ipfs/";
 const PINATA_API_URL = "https://api.pinata.cloud/pinning";
 
 interface Collection {

@@ -191,7 +191,7 @@ const fetchMintPrice = async () => {
                 }
             });
 
-            const imageIpfsUrl = `https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${imageResponse.data.IpfsHash}`;
+            const imageIpfsUrl = `https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${imageResponse.data.IpfsHash}`;
 
             // Métadonnées
             const metadataJson = {
@@ -215,7 +215,7 @@ const fetchMintPrice = async () => {
                 }
             );
 
-            setIpfsUrl(`https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`);
+            setIpfsUrl(`https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`);
         } catch (error) {
             console.error("Error uploading to IPFS:", error);
             alert("Erreur lors de l'upload sur IPFS.");

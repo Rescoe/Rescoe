@@ -20,7 +20,7 @@ export default async function handler(req, res) {
       }
 
       // Utiliser l'URL personnalisée Pinata (assurez-vous que c'est celle qui fonctionne)
-      const pinataUrl = `https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${ipfsHash}`;
+      const pinataUrl = `https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${ipfsHash}`;
 
       const response = await fetch(pinataUrl);
       if (response.ok) {

@@ -191,7 +191,7 @@ const MintArt: React.FC = () => {
           }
         );
 
-        const imageUrl = `https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${imageResponse.data.IpfsHash}`;
+        const imageUrl = `https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${imageResponse.data.IpfsHash}`;
         const metadataJson = {
           artist: address,
           name: metadata.name,
@@ -211,7 +211,7 @@ const MintArt: React.FC = () => {
           }
         );
 
-        setIpfsUrl(`https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`);
+        setIpfsUrl(`https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`);
 
         toast({
           title: "Oeuvre uploadée",

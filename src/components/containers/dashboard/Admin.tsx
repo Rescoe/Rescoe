@@ -212,7 +212,7 @@ const uploadFileToIPFS = async (imageUrl: string, adhesion: Adhesion) => {
             },
         });
 
-        const imageIpfsUrl = `https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${imageResponse.data.IpfsHash}`;
+        const imageIpfsUrl = `https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${imageResponse.data.IpfsHash}`;
         setIpfsUrl(imageIpfsUrl);
 
         const metadataJson = {
@@ -231,7 +231,7 @@ const uploadFileToIPFS = async (imageUrl: string, adhesion: Adhesion) => {
             },
         });
 
-        const metadataIpfsUrl = `https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`;
+        const metadataIpfsUrl = `https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`;
         // Stocke les détails des métadonnées pour chaque adhérent
         setDetails((prevDetails) => [...prevDetails, { uri: metadataIpfsUrl, role: adhesion.role, name: adhesion.name, bio: adhesion.bio }]);
     } catch (error) {
@@ -278,7 +278,7 @@ const handleMintMultiple = async (): Promise<void> => {
                     },
                 });
 
-                return `https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`;
+                return `https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`;
             }));
 
             // Vérifier que tous les tableaux ont la même longueur

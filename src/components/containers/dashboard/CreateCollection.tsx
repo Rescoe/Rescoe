@@ -114,7 +114,7 @@ const [account, setAccount] = useState<string | null>(null);
           }
         });
 
-        const imageUrl = `https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${imageResponse.data.IpfsHash}`;
+        const imageUrl = `https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${imageResponse.data.IpfsHash}`;
 
         const metadataJson = {
           name: metadata.name,
@@ -130,7 +130,7 @@ const [account, setAccount] = useState<string | null>(null);
           }
         });
 
-        setIpfsUrl(`https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`);
+        setIpfsUrl(`https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`);
       } catch (error) {
         console.error('Error uploading to IPFS:', error );
         alert('Error uploading to IPFS: ');

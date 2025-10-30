@@ -162,7 +162,7 @@ const CreateSocialCollection: React.FC = () => {
         },
       });
 
-      const imageUrl = `https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${fileRes.data.IpfsHash}`;
+      const imageUrl = `https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${fileRes.data.IpfsHash}`;
 
       const meta = {
         name: metadata.name,
@@ -176,7 +176,7 @@ const CreateSocialCollection: React.FC = () => {
         },
       });
 
-      const url = `https://sapphire-central-catfish-736.mypinata.cloud/ipfs/${metaRes.data.IpfsHash}`;
+      const url = `https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${metaRes.data.IpfsHash}`;
       setIpfsUrl(url);
 
       toast({
