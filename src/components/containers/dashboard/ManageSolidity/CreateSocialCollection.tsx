@@ -85,7 +85,7 @@ const CreateSocialCollection: React.FC = () => {
       // --- Récupération des collections Social ---
       const totalMinted = await resFactory.methods.getTotalCollectionsMinted().call();
       const addressSalonRaw: any = await resFactory.methods
-        .getCollectionsByType("Social", 50, Number(totalMinted) - 1)
+        .getCollectionsByType("Social", 0, Number(totalMinted) - 1)
         .call();
 
       const addressSalonArray = Array.isArray(addressSalonRaw) ? addressSalonRaw : Object.values(addressSalonRaw);

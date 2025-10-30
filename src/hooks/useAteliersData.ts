@@ -39,7 +39,7 @@ interface OnChainAtelierInfo {
 }
 
 // CONTRACT: adjust to your deployed address (or keep the earlier one)
-const CONTRACT_ADDRESS = "0xf3ddf285d21c9f9bf962ad78f775fd21d7c49fe0";
+const CONTRACT_ADDRESS = "0x71B779C8415925DBE89152aE59bad358A4baa98B";
 
 // ---------- Helpers améliorés ----------
 const extractHashtags = (content: string): string[] => {
@@ -628,6 +628,15 @@ const useAteliersData = () => {
       const mintDurationSeconds = computeMintDurationSeconds(messageTimestamp, rules.datetime);
       const imageUrl = msg.attachments?.[0]?.url || "";
 
+      console.log(keccak,
+      rules.description || msg.content,
+      priceInWei,
+      splitAddress,
+      imageUrl,
+      messageTimestamp,
+      mintDurationSeconds,
+      maxEditions,
+      isOpenEdition)
       // Gas estimate & send
       const gasEstimate = await contract.methods
         .mint(
