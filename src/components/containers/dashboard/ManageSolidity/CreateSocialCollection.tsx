@@ -33,6 +33,7 @@ const CreateSocialCollection: React.FC = () => {
 
   const [salonName, setSalonName] = useState<string>("");
   const [requiresMembership, setRequiresMembership] = useState<boolean>(false);
+  const [royaltyAddress, setRoyaltyAddress] = useState<string>(""); // Nouvel état pour l'adresse de royalties
   const [metadata, setMetadata] = useState({ name: "", description: "" });
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -52,7 +53,6 @@ const CreateSocialCollection: React.FC = () => {
 
   const [isFetchingSalons, setIsFetchingSalons] = useState<boolean>(false);
 
-
   // --- Init Web3 ---
   useEffect(() => {
     const initWeb3 = async () => {
@@ -67,26 +67,47 @@ const CreateSocialCollection: React.FC = () => {
     initWeb3();
   }, []);
 
-
   const fetchAllSalons = async () => {
     if (!web3) return;
     setIsFetchingSalons(true);
+
     try {
       const messageFactory = new web3.eth.Contract(ABI_MESSAGE_FACTORY, MESSAGE_FACTORY_ADDRESS);
       const resFactory = new web3.eth.Contract(ABI_RESCOLLECTION, RESCOLLECTION_FACTORY_ADDRESS);
 
-      const salonList: string[] = await messageFactory.methods.getAllSalons().call();
-      setSalons(salonList);
-      const totalMinted = await resFactory.methods.getTotalCollectionsMinted().call();
-      const addressSalon: string[] = await resFactory.methods.getCollectionsByType("Social", 50, Number(totalMinted)-1).call();
+      // --- Récupération des noms de salons ---
+      const salonListRaw: any = await messageFactory.methods.getAllSalons().call();
+      const salonList = Array.isArray(salonListRaw) ? salonListRaw : Object.values(salonListRaw);
 
-      const collectionsInfo: CollectionInfo[] = addressSalon.map((addr, i) => ({
-        name: salonList[i] || "Salon inconnu",
-        collectionType: "Social",
-        collectionAddress: addr,
-      }));
+      setSalons(salonList);
+
+      // --- Récupération des collections Social ---
+      const totalMinted = await resFactory.methods.getTotalCollectionsMinted().call();
+      const addressSalonRaw: any = await resFactory.methods
+        .getCollectionsByType("Social", 50, Number(totalMinted) - 1)
+        .call();
+
+      const addressSalonArray = Array.isArray(addressSalonRaw) ? addressSalonRaw : Object.values(addressSalonRaw);
+
+      // --- Normalisation des données pour React ---
+      const collectionsInfo: CollectionInfo[] = addressSalonArray.map((c: any, i: number) => {
+        const collectionAddress =
+          typeof c === "string"
+            ? c
+            : c.collectionAddress || JSON.stringify(c);
+        const collectionType = typeof c === "object" && c.collectionType ? c.collectionType : "Social";
+        const name =
+          typeof salonList[i] === "string"
+            ? salonList[i]
+            : salonList[i]?.name
+            ? salonList[i].name
+            : `Salon inconnu`;
+
+        return { name, collectionType, collectionAddress };
+      });
 
       setAddressSalons(collectionsInfo);
+
       toast({
         title: "Salons chargés",
         description: `${salonList.length} salon(s) trouvé(s).`,
@@ -107,7 +128,6 @@ const CreateSocialCollection: React.FC = () => {
       setIsFetchingSalons(false);
     }
   };
-
 
   // --- Gestion fichier image ---
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -198,7 +218,11 @@ const CreateSocialCollection: React.FC = () => {
     try {
       // 1️⃣ Configurer le salon sur MessageFactory
       const messageFactory = new web3.eth.Contract(ABI_MESSAGE_FACTORY, MESSAGE_FACTORY_ADDRESS);
-      await messageFactory.methods.configureSalon(salonName, requiresMembership).send({ from: account });
+
+      // Récupérer l'adresse de royalties si elle est spécifiée, sinon mettre à `0`
+      const royaltyAddressToUse = royaltyAddress ? royaltyAddress : "0x0000000000000000000000000000000000000000";
+
+      await messageFactory.methods.configureSalon(salonName, requiresMembership, royaltyAddressToUse).send({ from: account });
 
       // 2️⃣ Créer la collection sur ResCollectionFactory
       const resFactory = new web3.eth.Contract(ABI_RESCOLLECTION, RESCOLLECTION_FACTORY_ADDRESS);
@@ -236,44 +260,44 @@ const CreateSocialCollection: React.FC = () => {
       border="1px solid"
       borderColor="purple.300"
     >
-<Box>
-<Heading
-  size="xl"
-  mb={6}
-  textAlign="center"
-  fontWeight="black"
-  bgGradient="linear(to-r, purple.400, pink.400)"
-  bgClip="text"
->
-  Voir les salon existants
-</Heading>
+      <Box>
+        <Heading
+          size="xl"
+          mb={6}
+          textAlign="center"
+          fontWeight="black"
+          bgGradient="linear(to-r, purple.400, pink.400)"
+          bgClip="text"
+        >
+          Voir les salons existants
+        </Heading>
 
-    <Button
-  onClick={fetchAllSalons}
-  bgGradient="linear(to-r, blue.500, cyan.400)"
-  color="white"
-  mb={4}
-  isLoading={isFetchingSalons}
->
-  📜 Afficher les salons existants
-</Button>
+        <Button
+          onClick={fetchAllSalons}
+          bgGradient="linear(to-r, blue.500, cyan.400)"
+          color="white"
+          mb={4}
+          isLoading={isFetchingSalons}
+        >
+          📜 Afficher les salons existants
+        </Button>
 
-{salons.length > 0 && (
-  <Box mt={4} p={4} borderRadius="xl" bg="blackAlpha.400">
-    <Heading size="md" mb={3} color="purple.200">
-      Salons existants :
-    </Heading>
-    <VStack align="start" spacing={2}>
-    {addressSalons.map((s, i) => (
-      <Text key={i}>
-        {s.name} — {s.collectionAddress}
-      </Text>
-      ))}
-    </VStack>
-  </Box>
-)}
+        {salons.length > 0 && (
+          <Box mt={4} p={4} borderRadius="xl" bg="blackAlpha.400">
+            <Heading size="md" mb={3} color="purple.200">
+              Salons existants :
+            </Heading>
+            <VStack align="start" spacing={2}>
+              {addressSalons.map((s, i) => (
+                <Text key={i}>
+                  {s.name} — {s.collectionAddress}
+                </Text>
+              ))}
+            </VStack>
+          </Box>
+        )}
+      </Box>
 
-</Box>
       <Heading
         size="xl"
         mb={6}
@@ -307,6 +331,16 @@ const CreateSocialCollection: React.FC = () => {
           <option style={{ backgroundColor: "#1A202C" }} value="no">Non</option>
           <option style={{ backgroundColor: "#1A202C" }} value="yes">Oui</option>
         </Select>
+
+        <FormLabel color="gray.300" fontWeight="bold">Adresse de royalties (facultatif)</FormLabel>
+        <Input
+          placeholder="Adresse de royalties"
+          value={royaltyAddress}
+          onChange={(e) => setRoyaltyAddress(e.target.value)} // Changer pour mettre à jour l'adresse de royalties
+          bg="blackAlpha.300"
+          color="white"
+          borderColor="purple.300"
+        />
 
         <FormLabel color="gray.300" fontWeight="bold">Nom de la collection</FormLabel>
         <Input

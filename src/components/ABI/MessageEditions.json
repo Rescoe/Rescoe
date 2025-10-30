@@ -40,6 +40,11 @@
 				"internalType": "bool",
 				"name": "_requiresMembership",
 				"type": "bool"
+			},
+			{
+				"internalType": "address",
+				"name": "_defaultRoyaltyAddress",
+				"type": "address"
 			}
 		],
 		"stateMutability": "nonpayable",
@@ -497,6 +502,19 @@
 				"internalType": "string",
 				"name": "",
 				"type": "string"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "defaultRoyaltyAddress",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -1308,6 +1326,19 @@
 			}
 		],
 		"name": "transferOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newRoyaltyAddress",
+				"type": "address"
+			}
+		],
+		"name": "updateDefaultRoyaltyAddress",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
