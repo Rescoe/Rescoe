@@ -34,7 +34,7 @@ const pulse = keyframes`
 
 
 const featuredAddresses = [
-    "0x7EbDE55C4Aba6b3b31E03306e833fF92187F984b",
+    "0xFa6d6E36Da4acA3e6aa3bf2b4939165C39d83879",
     // Ajoutez d'autres adresses ici
 ];
 

@@ -353,7 +353,7 @@ const handleMint = async () => {
         return (
               <Box p={5} textAlign="center">
                   <Center>
-                      <Heading mb={5}>Mint votre NFT basé sur un rôle</Heading>
+                      <Heading mb={5}>Prendre un badge d'adhésion :</Heading>
                   </Center>
 
                   <Button colorScheme="blue" onClick={handleCryptoAdhesion} mb={4}>
