@@ -19,6 +19,9 @@ import RelatedFull from '../../../utils/RelatedFull'; // Assurez-vous d'importer
 import DerniersAdherents from '../association/Adherents/DerniersAdherents'; // Votre ABI de contrat ici.
 import FeaturedMembers from '../association/Adherents/FeaturedMembers'; // Votre ABI de contrat ici.
 import AteliersCalendarView from '../association/Formations/AteliersCalendarView'; // Votre ABI de contrat ici.
+import ChannelPreview from '../../../utils/channels/ChannelPreview'; // Assurez-vous d'importer le bon chemin
+
+const MotionBox = motion(Box);
 
 
 // Animation pulsante pour le bouton "Adhérez"
@@ -27,6 +30,8 @@ const pulse = keyframes`
   70% { box-shadow: 0 0 0 15px rgba(236, 72, 153, 0); }
   100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0); }
 `;
+
+
 
 const featuredAddresses = [
     "0x7EbDE55C4Aba6b3b31E03306e833fF92187F984b",
@@ -63,6 +68,10 @@ const [isLoading, setIsLoading] = useState(false);
 const router = useRouter();
 const theme = useTheme();
 
+const boxShadowHover = useColorModeValue(
+"0 0 15px rgba(180, 166, 213, 0.25)", // light
+"0 0 15px rgba(238, 212, 132, 0.25)"  // dark
+);
 
 const accentGradient = "linear(to-r, purple.500, pink.400)";
 
@@ -476,6 +485,93 @@ const allHaikus = useMemo(
 
 
           <HeroSection nfts={allNfts} haikus={allHaikus} />
+
+
+          <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
+
+          <Heading
+            mt={6}
+            mb={2}
+            size="lg"
+            bgClip="text"
+            textAlign="center"
+            py={2}            // <-- évite la coupe du haut/bas
+          >
+            Les nouveautées
+          </Heading>
+          <Flex
+  direction={{ base: "column", md: "row" }}
+  gap={6}
+  justify="center"
+  align="stretch"
+  maxW="1400px"
+  mx="auto"
+>
+  {/* Actualités */}
+  <Box flex="1" borderRadius="2xl" border="1px solid #ccc" overflow="hidden">
+    <NextLink
+      href={{
+        pathname: "/actus",
+        query: { expand: "news" }, // indique quel bloc ouvrir
+      }}
+      passHref
+    >
+      <MotionBox
+        as="a"
+        p={6}
+        cursor="pointer"
+        whileHover={{ scale: 1.03, boxShadow: boxShadowHover }}
+        transition={{ duration: 0.3 }}
+        display="flex"
+        flexDirection="column"
+        justifyContent="space-between"
+      >
+        <ChannelPreview
+          channelId={process.env.NEXT_PUBLIC_CHANNEL_NEWS_ID!}
+          title="📰 Actualités"
+          limit={3}
+          maxLines={5}
+        />
+        <Text textAlign="center" mt={8}>
+          Cliquez pour afficher les dernières actualités.
+        </Text>
+      </MotionBox>
+    </NextLink>
+  </Box>
+
+  {/* Colonne droite */}
+  <Flex direction="column" flex="1" gap={6}>
+    {/* Expositions */}
+    <Box flex="1" borderRadius="2xl" border="1px solid #ccc" overflow="hidden">
+      <NextLink
+        href={{
+          pathname: "/actus",
+          query: { expand: "expos" },
+        }}
+        passHref
+      >
+        <MotionBox
+          as="a"
+          p={6}
+          cursor="pointer"
+          whileHover={{ scale: 1.03, boxShadow: boxShadowHover }}
+          transition={{ duration: 0.3 }}
+          display="flex"
+          flexDirection="column"
+          justifyContent="space-between"
+        >
+          <ChannelPreview
+            channelId={process.env.NEXT_PUBLIC_CHANNEL_EXPOS_ID!}
+            title="🖼️ Expositions"
+          />
+          <Text textAlign="center" mt={8}>
+            Cliquez pour en savoir plus !
+          </Text>
+        </MotionBox>
+      </NextLink>
+    </Box>
+  </Flex>
+</Flex>
 
 
           <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />

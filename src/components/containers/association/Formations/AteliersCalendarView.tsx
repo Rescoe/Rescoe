@@ -31,6 +31,27 @@ import { useAdherentFullData } from '@/hooks/useListAdherentData';
 import CollectionsVignettes from '@/utils/CollectionsVignettes';
 import NextLink from 'next/link';
 
+export function getAteliersDuJourCalendar(enrichedAteliers: any[], date: Date = new Date()) {
+  const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const endOfDay = startOfDay + 24 * 60 * 60 * 1000;
+
+  return enrichedAteliers
+    .filter((e) => {
+      const time = e.rules?.datetime ? new Date(e.rules.datetime).getTime() : null;
+      return time && time >= startOfDay && time < endOfDay;
+    })
+    .map((e) => ({
+      id: e.raw?.id,
+      title: e.rules?.title || e.cfg?.title || "Atelier sans titre",
+      heure: e.rules?.datetime
+        ? new Date(e.rules.datetime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+        : null,
+      type: e.rules?.type || e.cfg?.type || "autre",
+      formateur: e.rules?.splitAddress || e.cfg?.splitAddress || null,
+      hashtag: e.rules?.hashtag || e.cfg?.hashtag || null,
+    }));
+}
+
 
 
 function AteliersCalendarView() {
@@ -66,6 +87,10 @@ const {
   getMessageImage,
 } = useAteliersData();
 
+// dans ton composant
+const [today] = useState(new Date());
+
+
 const { data: adherentData, loading: loadingAdherent, error: adherentError } = useAdherentFullData(availableSplitAddresses);
 
 // juste après les imports
@@ -77,7 +102,162 @@ const TYPE_COLORS: Record<string, string> = {
   default: "#94A3B8"      // gris clair
 };
 
+function formatDateKey(d: Date) {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
+function getLocalDateKey(dateString: string) {
+  const d = new Date(dateString);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getLocalDateKeyFromDate(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+}
+
+
+
+const renderDayEvents = () => {
+  // Si pas de date, on n'affiche rien
+  const dateToShow = selectedDate || today;
+  if (!dateToShow) return <Text color="#777">Sélectionne une date dans le calendrier pour voir les ateliers du jour.</Text>;
+
+  const todayKey = getLocalDateKey(today.toISOString());
+  const dateToShowKey = selectedDate ? getLocalDateKey(selectedDate.toISOString()) : todayKey;
+
+  const dayEvents = Object.values(calendarDays)
+    .flat()
+    .filter((e: any) => {
+      const evKey = getLocalDateKey(e.rules.datetime);
+      if (evKey !== dateToShowKey) return false;
+      if (!showPast && e.rules.datetime && new Date(e.rules.datetime).getTime() < Date.now()) return false;
+      if (filters.type !== "all" && (e.rules.type || e.cfg?.type) !== filters.type) return false;
+      if (filters.splitAddress !== "all" && (e.rules.splitAddress || e.cfg?.splitAddress || "") !== filters.splitAddress) return false;
+      return true;
+    })
+    .sort((a: any, b: any) => (a.rules.datetime ? new Date(a.rules.datetime).getTime() : 0) - (b.rules.datetime ? new Date(b.rules.datetime).getTime() : 0));
+
+  if (dayEvents.length === 0) return <Text color="#999">Aucun atelier ce jour-là.</Text>;
+
+  return dayEvents.map((entry: any) => {
+    const { raw: msg, rules, cfg } = entry;
+    const isFuture = !!rules.datetime && (new Date(rules.datetime).getTime() > Date.now());
+    const open = !!openPanels[msg.id];
+    const typeColor = cfg?.color || TYPE_COLORS[rules.type] || TYPE_COLORS.default;
+    const leftColor = typeColor;
+    const onChain = onChainDataByMsgId[msg.id];
+    const placesRes = onChain?.totalEditions || 0;
+    const placesDIspo = rules.maxEditions - placesRes;
+    const priceEth = rules.price ?? cfg?.price;
+    const priceEur = priceEth && ethPrice ? (priceEth * ethPrice).toFixed(2) : null;
+    const addr = rules.splitAddress || cfg?.splitAddress;
+    const adherent = addr ? adherentData?.[addr] : null;
+
+    const collectionsArray = Array.isArray(adherent?.collections) ? adherent.collections : [];
+    const lastCollections = [...collectionsArray.slice(-5)].reverse();
+
+    return (
+      <Flex
+        key={msg.id}
+        direction="column"
+        border="1px solid #333"
+        borderRadius="16px"
+        borderColor={typeColor}
+        overflow="hidden"
+        mb={4}
+        bg={isFuture ? "#" : "#2d2d2d"}
+        _hover={{ transform: "scale(1.01)", transition: "0.2s" }}
+      >
+        <Box w="6px" mb={4} />
+        <Text fontWeight="bold">{rules.title || cfg?.title || "Atelier sans titre"}</Text>
+
+        <Box flex="1" p={4}>
+          <Flex direction="column" mb={2}>
+            <HStack justify="space-between" w="100%">
+              <Box flex="1" display={{ base: "block", md: "flex" }} alignItems={{ md: "center" }}>
+                <Text fontSize="sm">{entry.hashtag || cfg?.label || cfg?.hashtag}</Text>
+                {rules?.type && (
+                  <Badge ml={2} backgroundColor={leftColor} color="#fff">
+                    {rules.type}
+                  </Badge>
+                )}
+              </Box>
+
+              <VStack align="flex-end" spacing={0} display={{ base: "block", md: "flex" }} alignItems={{ md: "flex-end" }}>
+                <Text fontSize="sm" color="#cfecec">
+                  {rules.datetime ? new Date(rules.datetime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Heure non définie"}
+                </Text>
+                <NextLink href={`/u/${addr}`} passHref>
+                  <Badge fontSize="xs" color={typeColor}>
+                    {adherent?.name || addr || "Formateur non défini"}
+                  </Badge>
+                </NextLink>
+              </VStack>
+            </HStack>
+
+            <Flex mt={2} gap={2} wrap="wrap" justify={{ base: "center", md: "flex-start" }}>
+              {adherent?.name && <CollectionsVignettes creator={addr} />}
+            </Flex>
+          </Flex>
+
+          <Box bg="#012" borderRadius={6} p={2} fontSize="xs" color="#9ed">
+            <pre style={{ whiteSpace: "pre-wrap" }}>{msg.content}</pre>
+          </Box>
+
+          <Collapse in={open} animateOpacity>
+            <Box fontSize="sm" mb={3}>
+              <strong>Equivalent :</strong> {priceEth ? `${priceEth} ETH` : "Non défini"} <br />
+              <strong>Places :</strong> {rules.maxEditions ?? cfg?.maxEditions ?? "Illimité"} <br />
+              <strong>Places déjà réservées :</strong> {placesRes} {placesRes === rules.maxEditions && <Badge colorScheme="red" ml={2}>Complet</Badge>} <br />
+              <strong>Places restantes :</strong> {placesDIspo} {placesDIspo === 0 && <Badge colorScheme="red" ml={2}>Complet</Badge>} <br />
+              <strong>Durée :</strong> {rules.dureeAtelier ?? cfg?.defaultDuration ?? "Non précisée"} <br />
+              {rules.splitAddress && <><strong>Formateur :</strong> {rules.splitAddress}<br /></>}
+              <Box mt={2}>
+                <Text fontWeight="bold" mb={1}>Image associée :</Text>
+                <Image
+                  src={getMessageImage(msg, onChain) || "/placeholder.jpg"}
+                  alt={rules.title || "atelier image"}
+                  maxH="260px"
+                  borderRadius="8px"
+                  objectFit="contain"
+                  mx="auto"
+                />
+              </Box>
+            </Box>
+          </Collapse>
+
+          <Flex gap={3} alignItems="center">
+            <Button size="sm" colorScheme="teal" onClick={() => mintAtelierTicket(entry)} isLoading={mintingIds.includes(msg.id)}>
+              Réserver
+            </Button>
+            <Divider my={8} borderColor="purple.700" w="50%" mx="auto" />
+            <Text fontSize="sm">
+              <strong>Prix :</strong> {priceEur ? `${priceEur} €` : "—"}
+            </Text>
+          </Flex>
+
+          <Flex mt={2} direction="column">
+            <Button size="sm" variant="outline" onClick={() => togglePanel(msg.id)}>
+              {open ? "Fermer les détails" : "Voir plus"}
+            </Button>
+
+            <Collapse in={open}>
+              <Box mt={2}>
+                <Text fontSize="sm">Contactez {adherent?.name || addr || "Rescoe"} sur Discord pour plus d'information</Text>
+              </Box>
+            </Collapse>
+          </Flex>
+        </Box>
+      </Flex>
+    );
+  });
+};
 
 // Fonction pour vérifier si un event s'étend sur plusieurs jours
 const isMultiDay = (ev: any) => {
@@ -107,15 +287,26 @@ const { ethPrice, loading: ethLoading, error: ethError } = useEthToEur();
       <Heading fontSize={['lg', 'xl']} fontWeight="bold">
         {selectedDate
           ? selectedDate.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })
-          : 'Sélectionnez une date'}
+          : today.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
       </Heading>
       <Text fontSize="sm" color="#99b">
-        {selectedDate
-          ? (calendarDays[new Date(selectedDate).toISOString().slice(0, 10)] || []).length
-          : enriched.length}{' '}
-        ateliers
+        {(() => {
+          const dateToShow = selectedDate || today;
+          const key = getLocalDateKeyFromDate(dateToShow);
+
+          const count = Object.values(calendarDays)
+            .flat()
+            .filter(e => getLocalDateKey(e.rules.datetime) === key)
+            .length;
+
+          return `${count} atelier${count > 1 ? 's' : ''}`;
+        })()}
       </Text>
+
+
+
     </Box>
+
   </Flex>
 
 
@@ -294,208 +485,8 @@ const { ethPrice, loading: ethLoading, error: ethError } = useEthToEur();
         </Stack>
 
           <Box>
-            {selectedDate ? (
-              (() => {
-                const key = new Date(selectedDate).toISOString().slice(0, 10);
-                const dayEvents = (calendarDays[key] || [])
-                  .filter((e: any) => {
-                    if (!showPast && e.rules.datetime && (e.rules.datetime as Date).getTime() <= Date.now()) return false;
-                    if (filters.type !== "all" && (e.rules.type || e.cfg?.type) !== filters.type) return false;
-                    if (filters.splitAddress !== "all" && (e.rules.splitAddress || e.cfg?.splitAddress || "") !== filters.splitAddress) return false;
-                    return true;
-                  })
-                  .sort((a: any, b: any) => (a.rules.datetime?.getTime() || 0) - (b.rules.datetime?.getTime() || 0));
 
-                if (dayEvents.length === 0) return <Text color="#999">Aucun atelier ce jour-là.</Text>;
-
-                return dayEvents.map((entry: any) => {
-                  const { raw: msg, rules, cfg } = entry;
-                  const isFuture = !!rules.datetime && (rules.datetime as Date).getTime() > Date.now();
-                  const open = !!openPanels[msg.id];
-                  const hashtagKey = rules.hashtag?.startsWith("#")
-                    ? rules.hashtag
-                    : `#${rules.hashtag ?? ""}`;
-
-                    const typeColor = cfg?.color || TYPE_COLORS[rules.type] || TYPE_COLORS.default;
-
-                    const leftColor = typeColor;
-                    const onChain = onChainDataByMsgId[msg.id];
-                    const placesRes = onChain?.totalEditions || 0;
-                    const placesDIspo =  rules.maxEditions - placesRes;
-
-
-
-                    // Juste après const dayEvents = ...
-const addresses = dayEvents
-  .map((e: any) => e.rules?.splitAddress || e.cfg?.splitAddress)
-  .filter((addr: any) => typeof addr === "string" && addr.startsWith("0x") && addr.length === 42);
-
-  const priceEth = rules.price ?? cfg?.price;
-  const priceEur = priceEth && ethPrice ? (priceEth * ethPrice).toFixed(2) : null;
-
-  // récupération formateur + collections
-  const addr = rules.splitAddress || cfg?.splitAddress;
-  const adherent = addr ? adherentData?.[addr] : null;
-  const collectionsArray = Array.isArray(adherent?.collections) ? adherent.collections : [];
-  const lastCollections = [...collectionsArray.slice(-5)].reverse();
-
-  return (
-    <Flex
-      key={`${msg.id}-${rules.datetime?.toISOString() || Math.random()}`}
-      direction="column"
-      border="1px solid #333"
-      borderRadius="16px"
-      borderColor={typeColor}
-      overflow="hidden"
-      mb={4}
-      bg={isFuture ? "#" : "#2d2d2d"}
-      _hover={{ transform: "scale(1.01)", transition: "0.2s" }}
-    >
-      <Box w="6px" mb={4} />
-      <Text fontWeight="bold">{rules.title || cfg?.title || rules.description?.slice(0, 60) || "Atelier sans titre"}</Text>
-
-      <Box flex="1" p={4}>
-      <Flex direction="column" mb={2}>
-        <HStack justify="space-between" w="100%">
-          {/* Partie gauche : type + badge */}
-          <Box flex="1" display={{ base: "block", md: "flex" }} alignItems={{ md: "center" }}>
-            <Text fontSize="sm">{entry.hashtag || cfg?.label || cfg?.hashtag}</Text>
-            {rules?.type && (
-              <Badge ml={2} backgroundColor={leftColor} color="#fff">
-                {rules.type}
-              </Badge>
-            )}
-          </Box>
-
-          {/* Partie droite : empilé sur mobile, aligné sur PC */}
-          <VStack align="flex-end" spacing={0} display={{ base: "block", md: "flex" }} alignItems={{ md: "flex-end" }}>
-            <Text fontSize="sm" color="#cfecec">
-              {rules.datetime
-                ? (rules.datetime as Date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-                : "Heure non définie"}
-            </Text>
-            <NextLink href={`/u/${addr}`} passHref>
-            <Badge fontSize="xs" color={typeColor}>
-              {adherent?.name || addr || "Formateur non défini"}
-            </Badge>
-            </NextLink>
-
-          </VStack>
-        </HStack>
-
-        {/* Vignettes collections */}
-        <Flex mt={2} gap={2} wrap="wrap" justify={{ base: "center", md: "flex-start" }}>
-          {adherent?.name && <CollectionsVignettes creator={addr} />}
-        </Flex>
-      </Flex>
-
-
-
-{/*
-                          <Box whiteSpace="pre-wrap" mb={3} bg="#014241" p={3} borderRadius={6}>
-                            {rules.description || cfg?.description || msg.content.split("\n").filter((line: string) => !line.startsWith("/")).join("\n")}
-                          </Box>
-*/}
-
-                          <Box bg="#012" borderRadius={6} p={2} fontSize="xs" color="#9ed"><pre style={{ whiteSpace: "pre-wrap" }}>{msg.content}</pre></Box>
-
-                          <Collapse in={open} animateOpacity>
-
-                          <Box fontSize="sm" mb={3}>
-
-                            <strong>Equivalent :</strong> {(rules.price ?? cfg?.price) ? `${rules.price ?? cfg?.price} ETH` : "Non défini"} <br />
-
-                            <strong>Places :</strong> { rules.maxEditions ?? cfg?.maxEditions ?? "Illimité"} <br />
-                            <strong>Places déjà reservées :</strong> {placesRes} {placesRes === rules.maxEditions && <Badge colorScheme="red" ml={2}>Complet</Badge>} <br />
-
-                            <strong>Places restantes :</strong> {placesDIspo} {placesDIspo === 0 && <Badge colorScheme="red" ml={2}>Complet</Badge>} <br />
-                            <strong>Durée :</strong> {rules.dureeAtelier ?? cfg?.defaultDuration ?? "Non précisée"} <br />
-                            {rules.splitAddress && <><strong>Formateur :</strong> {rules.splitAddress}<br /></>}
-                            <Box mt={2}>
-                              <Text fontWeight="bold" mb={1}>Image associée :</Text>
-                              <Image
-                                src={getMessageImage(msg, onChain) || "/placeholder.jpg"}
-                                alt={rules.title || "atelier image"}
-                                maxH="260px"
-                                borderRadius="8px"
-                                objectFit="contain"
-                                mx="auto"
-                              />
-
-                            </Box>
-                            </Box>
-                            </Collapse>
-
-
-{/* On-chain box */}
-
-{/*
-<Collapse in={open} animateOpacity>
-
-                          <Box mb={3} p={3} borderRadius={6} bg="#071f1f" fontSize="sm">
-                            <Text fontWeight="bold" mb={2}>Synthèse mint (on-chain)</Text>
-
-                            { !onChain ? (
-                              <Flex align="center" gap={2}><Spinner size="xs" /><Text fontSize="sm">Chargement données on-chain...</Text></Flex>
-                            ) : !onChain.exists ? (
-                              <Text fontSize="sm">Aucun haiku minté pour ce message (pas encore minté on-chain).</Text>
-                            ) : (
-                              <>
-                                <Text>haikuId: <strong>{onChain.haikuId}</strong></Text>
-                                <Text>firstTokenId: <strong>{onChain.firstTokenId ?? "—"}</strong></Text>
-                                <Text>places totales (chain) : <strong>{onChain.totalEditions ?? "-"}</strong></Text>
-                                <Text>places restantes : <strong>{onChain.remaining ?? "-"}</strong></Text>
-                                <Text>prix (on-chain wei) : <strong>{onChain.currentPriceWei ?? "-"}</strong></Text>
-                                {onChain.parsedImageUrl ? (
-                                  <Box mt={2}>
-                                    <Text fontWeight="bold" mb={1}>Image associée :</Text>
-                                    <Image src={onChain.parsedImageUrl} alt="atelier image" maxH="260px" borderRadius="8px" objectFit="contain" />
-                                  </Box>
-                                ) : (
-                                  // If no image on-chain but attachment found in discord message, show that
-                                  (msg.attachments?.[0]?.url) && (
-                                    <Box mt={2}>
-                                      <Text fontWeight="bold" mb={1}>Image (Discord attachment) :</Text>
-                                      <Image src={msg.attachments[0].url} alt="attachment" maxH="260px" borderRadius="8px" objectFit="contain" />
-                                    </Box>
-                                  )
-                                )}
-                              </>
-                            )}
-                          </Box>
-                        </Collapse>
-*/}
-
-                      <Flex gap={3} alignItems="center"> {/* Alignement au centre */}
-                        <Button size="sm" colorScheme="teal" onClick={() => mintAtelierTicket(entry)} isLoading={mintingIds.includes(msg.id)}>
-                          Réserver
-                        </Button>
-                        <Divider my={8} borderColor="purple.700" w="50%" mx="auto" />
-                        <Text fontSize="sm">
-                          <strong>Prix :</strong> {priceEur ? `${priceEur} €` : "—"}
-                        </Text>
-                      </Flex>
-
-                      <Flex mt={2} direction="column">
-                        <Button size="sm" variant="outline" onClick={() => togglePanel(msg.id)}>
-                          {open ? "Fermer les détails" : "Voir plus"}
-                        </Button>
-
-                        <Collapse in={open}>
-                          <Box mt={2}>
-                            {/* Contenu détaillé ici, par exemple */}
-                            <Text fontSize="sm">Contactez {adherent?.name || addr || "Rescoe"} sur Discord pour plus d'information</Text>
-                          </Box>
-                        </Collapse>
-                      </Flex>
-                      </Box>
-                    </Flex>
-                  );
-                });
-              })()
-            ) : (
-              <Text color="#777">Sélectionne une date dans le calendrier pour voir les ateliers du jour.</Text>
-            )}
+          {renderDayEvents()}
 
           </Box>
 
