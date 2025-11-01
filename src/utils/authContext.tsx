@@ -75,10 +75,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [web3auth, setWeb3auth] = useState<Web3Auth | null>(null);
   const toast = useToast();
 
+/*
   const web3AuthNetwork =
     process.env.NODE_ENV === "production"
       ? "sapphire_mainnet"
       : "sapphire_devnet";
+*/
+
 
   useEffect(() => {
     const initWeb3Auth = async () => {
@@ -86,7 +89,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         const instance = new Web3Auth({
           clientId: WEB3AUTH_CLIENT_ID,
-          web3AuthNetwork: web3AuthNetwork,
+          web3AuthNetwork: "sapphire_devnet",
           uiConfig: {
             loginMethodsOrder: ["google", "facebook", "email_passwordless", "metamask"],
           },
