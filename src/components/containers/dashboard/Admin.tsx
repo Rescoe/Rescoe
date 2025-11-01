@@ -327,10 +327,10 @@ const fetchPointPrice = async () => {
 
     try {
       const actualPointPrice = await contract.methods.pointPrice().call() as string; // ✅ cast en string
-      console.log("Prix en wei:", actualPointPrice);
+      //console.log("Prix en wei:", actualPointPrice);
 
       const priceInEth = web3.utils.fromWei(actualPointPrice, "ether");
-      console.log("Prix en ETH:", priceInEth);
+      //console.log("Prix en ETH:", priceInEth);
 
       setprixPoints(priceInEth);
 
@@ -472,11 +472,13 @@ const handleSearch = async () => {
 
 
 const handleSetMintPrice = async (): Promise<void> => {
-    if (window.ethereum && web3 && account) {
+  const sender = account || authAddress;
+
+    if (window.ethereum && web3 && sender) {
         const contract = new web3.eth.Contract(ABI, contractAddress);
         try {
             const priceInWei = web3.utils.toWei(mintPrice.toString(), 'ether'); // Convertir le prix en wei
-            await contract.methods.setMintPrice(priceInWei).send({ from: account });
+            await contract.methods.setMintPrice(priceInWei).send({ from: sender });
             alert('Prix de mint mis à jour avec succès!');
         } catch (error) {
             console.error("Erreur lors de la mise à jour du prix:", error);
@@ -486,7 +488,6 @@ const handleSetMintPrice = async (): Promise<void> => {
         alert("Assurez-vous d'être connecté et d'avoir une instance Web3 disponible.");
     }
 };
-
 
 //############################################################# => Gestion du retrait de l'argent des adhesions
 const handleWithdrawAdhesion = async (): Promise<void> => {

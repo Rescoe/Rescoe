@@ -32,8 +32,7 @@ import { useAuth } from '../../../utils/authContext';
 
 
 const RoleBasedNFTPage = () => {
-    const [web3, setWeb3] = useState<Web3 | null>(null);
-    const [account, setAccount] = useState<string>('');
+  const { address: account, web3 } = useAuth();
     const [selectedRole, setSelectedRole] = useState<string>('');
     const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
     const [ipfsUrl, setIpfsUrl] = useState<string | null>(null);
@@ -55,7 +54,6 @@ const RoleBasedNFTPage = () => {
     const [isMinted, setIsMinted] = useState<boolean>(false);
     const [nftId, setNftId] = useState<string>('');
 
-    const { address } = useAuth();
 
     const [progress, setProgress] = useState(0);
     const [countdown, setCountdown] = useState(5); // 5 secondes avant redirection
@@ -89,36 +87,33 @@ const RoleBasedNFTPage = () => {
     const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS  as string; // Mettez à jour avec votre adresse de contrat
 
     useEffect(() => {
-        const initWeb3 = async () => {
-            const provider = (await detectEthereumProvider()) as any;
-            if (address) {
-                const web3Instance = new Web3(provider);
-                setWeb3(web3Instance);
-                const accounts = await web3Instance.eth.getAccounts();
-                setAccount(accounts[0]);
+      if (!account) return; // attendre la connexion
 
-                const chainId = await web3Instance.eth.getChainId();
-                setIsOnSepolia(Number(chainId) === 11155111); // Vérifier si sur Sepolia
+      const checkNetwork = async () => {
+        if (!web3) return;
+        const chainId = await web3.eth.getChainId();
+        setIsOnSepolia(Number(chainId) === 11155111);
 
-                const storedChoice = localStorage.getItem('wantsCryptoAdhesion');
-                if (storedChoice) {
-                    setWantsCryptoAdhesion(JSON.parse(storedChoice)); // Charge le choix sauvegardé
-                }
+        const storedChoice = localStorage.getItem('wantsCryptoAdhesion');
+        if (storedChoice) {
+          setWantsCryptoAdhesion(JSON.parse(storedChoice));
+        }
 
-                const contract = new web3Instance.eth.Contract(ABI, contractAddress);
-                const totalMinted: number = await contract.methods.getTotalMinted().call();
+        const contract = new web3.eth.Contract(ABI, contractAddress);
+        const totalMinted = await contract.methods.getTotalMinted().call();
+        setNftId(Number(totalMinted).toString());
+      };
 
-                setNftId(Number(totalMinted).toString()); // Convertit BigNumber en nombre normal
-            }
-        };
-        initWeb3();
-    }, []);
+      checkNetwork();
+    }, [account, web3]);
 
     useEffect(() => {
-      if (address || !loadingEthPrice) {
+      if (account && !loadingEthPrice) {
           fetchMintPrice();
-              }
-    }, [address, loadingEthPrice]);
+      }
+    }, [account, loadingEthPrice]);
+
+
 
 
 const fetchMintPrice = async () => {
@@ -319,7 +314,7 @@ const handleMint = async () => {
 
 
         const handleCryptoAdhesion = async () => {
-          if(address){
+          if(account){
             setWantsCryptoAdhesion(true); // L'utilisateur veut adhérer en crypto
 
             const provider = await detectEthereumProvider();

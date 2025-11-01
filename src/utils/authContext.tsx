@@ -31,6 +31,12 @@ interface AuthContextType {
   logout: () => Promise<void>;
 }
 
+// Interface représentant les informations du membre
+interface MemberInfo {
+  role: number; // ou string selon la structure retournée par votre contrat
+  // Ajoutez d'autres propriétés si nécessaire
+}
+
 const AuthContext = createContext<AuthContextType>({
   address: null,
   role: null,
@@ -69,19 +75,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [web3auth, setWeb3auth] = useState<Web3Auth | null>(null);
   const toast = useToast();
 
+  const web3AuthNetwork =
+    process.env.NODE_ENV === "production"
+      ? "sapphire_mainnet"
+      : "sapphire_devnet";
+
   useEffect(() => {
     const initWeb3Auth = async () => {
       const start = Date.now();
       try {
         const instance = new Web3Auth({
           clientId: WEB3AUTH_CLIENT_ID,
-          web3AuthNetwork: "sapphire_devnet", // ou "mainnet"
+          web3AuthNetwork: web3AuthNetwork,
           uiConfig: {
             loginMethodsOrder: ["google", "facebook", "email_passwordless", "metamask"],
           },
         });
 
-        await instance.init(); // ✅ plus besoin de configureAdapter()
+        await instance.init();
         setWeb3auth(instance);
 
         if (instance.provider) {
@@ -105,24 +116,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     initWeb3Auth();
   }, []);
 
-  const fetchRole = async (userAddress: string) => {
+  const fetchRole = async (web3Instance: Web3, userAddress: string) => {
+    if (!web3Instance || !userAddress) {
+      console.error("[fetchRole] web3Instance or userAddress is missing", web3Instance, userAddress);
+      setRole(null);
+      return;
+    }
+
     try {
-      if (web3 && userAddress) {
-        const contract = new web3.eth.Contract(ABI as any, CONTRACT_ADDRESS);
-        const owner = (await contract.methods.owner().call()) as string;
+      console.log("[fetchRole] Start fetching role for", userAddress);
 
-        if (userAddress.toLowerCase() === owner.toLowerCase()) {
-          setRole("admin");
-          return;
-        }
+      const contract = new web3Instance.eth.Contract(ABI as any, CONTRACT_ADDRESS);
 
-        // pour le membre
-        const memberInfo = (await contract.methods.members(userAddress).call()) as { role: number };
-        setRole(roleMapping[memberInfo.role] || null);
-
+      const owner: string = await contract.methods.owner().call();
+      if (owner && typeof owner === "string" && userAddress.toLowerCase() === owner.toLowerCase()) {
+        console.log("[fetchRole] Address is owner/admin");
+        setRole("admin");
+        return;
+      } else {
+        console.warn("[fetchRole] La valeur de 'owner' n'est pas valide ou ne correspond pas :", owner);
       }
+
+      // Récupération des informations sur le membre
+      const memberInfo: MemberInfo = await contract.methods.members(userAddress).call();
+      console.log("[fetchRole] memberInfo received:", memberInfo);
+
+      if (!memberInfo || typeof memberInfo.role === 'undefined') {
+        console.warn("[fetchRole] No role found for address");
+        setRole(null);
+        return;
+      }
+
+      const roleIndex = parseInt(String(memberInfo.role), 10);
+      const resolvedRole = roleMapping[roleIndex] || null;
+
+      console.log("[fetchRole] Role resolved to:", resolvedRole);
+      setRole(resolvedRole);
+
     } catch (error) {
-      console.error("Erreur récupération rôle:", error);
+      console.error("[fetchRole] Error fetching role:", error);
+      setRole(null);
     }
   };
 
@@ -130,27 +163,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const detectedProvider = await detectEthereumProvider();
       if (!detectedProvider) {
-        toast({
-          title: "Wallet non détecté",
-          description: "Veuillez installer MetaMask.",
-          status: "error",
-          duration: 4000,
-          isClosable: true,
-        });
-        return;
+        throw new Error("Wallet non détecté");
       }
 
       const web3Instance = new Web3(detectedProvider);
-      setWeb3(web3Instance);
-
       const accounts = await web3Instance.eth.requestAccounts();
-      if (accounts.length > 0) {
-        setAddress(accounts[0]);
-        setIsAuthenticated(true);
-        await fetchRole(accounts[0].toLowerCase());
+
+      if (accounts.length === 0) {
+        throw new Error("Aucun compte trouvé");
       }
+
+      const userAddress = accounts[0].toLowerCase();
+      setWeb3(web3Instance);
+      setProvider(detectedProvider as any);
+      setAddress(userAddress);
+      setIsAuthenticated(true);
+
+      await fetchRole(web3Instance, userAddress);
     } catch (error) {
-      console.error("Erreur connexion MetaMask:", error);
+      console.error("[connectWallet] Erreur:", error);
     }
   };
 
@@ -158,26 +189,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       if (!web3auth) throw new Error("Web3Auth non initialisé");
 
-      const provider = await web3auth.connect();
-      if (provider) {
-        const web3Instance = new Web3(provider as any);
-        setWeb3(web3Instance);
-        const accounts = await web3Instance.eth.getAccounts();
-        if (accounts.length > 0) {
-          setAddress(accounts[0]);
-          setIsAuthenticated(true);
-          await fetchRole(accounts[0].toLowerCase());
-        }
+      const providerInstance = await web3auth.connect();
+      if (!providerInstance) throw new Error("Provider Web3Auth non retourné");
+
+      const web3Instance = new Web3(providerInstance);
+      const accounts = await web3Instance.eth.getAccounts();
+
+      if (accounts.length === 0) {
+        throw new Error("Aucun compte trouvé");
       }
+
+      const userAddress = accounts[0].toLowerCase();
+      setWeb3(web3Instance);
+      setProvider(providerInstance);
+      setAddress(userAddress);
+      setIsAuthenticated(true);
+
+      await fetchRole(web3Instance, userAddress);
     } catch (error) {
-      console.error("Erreur connexion email:", error);
-      toast({
-        title: "Erreur de connexion",
-        description: "Impossible de se connecter via e-mail.",
-        status: "error",
-        duration: 4000,
-        isClosable: true,
-      });
+      console.error("[connectWithEmail] Erreur:", error);
     }
   };
 

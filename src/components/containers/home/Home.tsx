@@ -14,6 +14,8 @@ import { motion } from "framer-motion";
 import { keyframes } from "@emotion/react";
 import { brandHover, hoverStyles } from "@styles/theme"; //Style
 
+import FaucetWidget from '@/utils/Faucet/Faucet'; // Assurez-vous d'importer le bon chemin
+
 
 import RelatedFull from '../../../utils/RelatedFull'; // Assurez-vous d'importer le bon chemin
 import DerniersAdherents from '../association/Adherents/DerniersAdherents'; // Votre ABI de contrat ici.
@@ -433,6 +435,8 @@ const allHaikus = useMemo(
         >
             RESCOE — Réseau Expérimental Solidaire de Crypto Œuvres Émergentes
           </Heading>
+
+          <FaucetWidget />
 
           <Divider my={8} borderColor="purple.700" w="5%" mx="auto" />
 

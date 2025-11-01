@@ -147,16 +147,19 @@ const ConnectBouton: React.FC = () => {
           Se connecter
         </MenuButton>
         <MenuList>
-          <MenuItem
-            onClick={async () => {
-              await connectWallet();
-              if (wagmiAddress) {
-                await handleAuth(wagmiAddress, selectedChainId);
-              }
-            }}
-          >
-            🦊 MetaMask / Wallet
-          </MenuItem>
+        <MenuItem
+          onClick={async () => {
+            await connectWallet();
+            if (address) { // on utilise l’adresse du contexte mise à jour par connectWallet
+              await handleAuth(address, selectedChainId);
+            } else {
+              console.warn("Adresse absente après connexion wallet");
+            }
+          }}
+        >
+          🦊 MetaMask / Wallet
+        </MenuItem>
+
 
           <MenuItem
             onClick={async () => {
