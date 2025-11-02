@@ -24,6 +24,7 @@ import detectEthereumProvider from "@metamask/detect-provider";
 const ConnectBouton: React.FC = () => {
   const { disconnectAsync } = useDisconnect();
   const { isConnected, address: wagmiAddress } = useAccount();
+
   const { signMessageAsync } = useSignMessage();
   const { requestChallengeAsync } = useAuthRequestChallengeEvm();
   const toast = useToast();
@@ -34,6 +35,7 @@ const ConnectBouton: React.FC = () => {
     setAddress,
     connectWithEmail,
     connectWallet,
+    provider, // 🆕 récupère le provider ici
     logout,
     role,
     address, // ✅ On récupère l’adresse du contexte (connexion Web3Auth)
@@ -43,6 +45,7 @@ const ConnectBouton: React.FC = () => {
   const [selectedChainId, setSelectedChainId] = useState(11155111);
   const [chainName, setChainName] = useState("Sepolia");
   const [web3, setWeb3] = useState<Web3 | null>(null);
+
 
   // Init Web3 instance
   useEffect(() => {
@@ -210,16 +213,8 @@ const ConnectBouton: React.FC = () => {
                 <MenuList>
                   <MenuItem onClick={() => handleChainSelect(1)}>Ethereum</MenuItem>
                   <MenuItem onClick={() => handleChainSelect(11155111)}>Sepolia</MenuItem>
-                  <MenuItem onClick={() => handleChainSelect(84531)}>Base</MenuItem>
                   <MenuItem onClick={handleDisconnect}>Se déconnecter</MenuItem>
 
-                  {displayAddress && (
-                    <MenuItem
-                      onClick={() => handleAuth(displayAddress, selectedChainId)}
-                    >
-                      🔁 Vérifier l’adhésion
-                    </MenuItem>
-                  )}
                 </MenuList>
               </Menu>
             </Tooltip>

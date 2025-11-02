@@ -75,6 +75,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [web3auth, setWeb3auth] = useState<Web3Auth | null>(null);
   const toast = useToast();
 
+
+
 /*
   const web3AuthNetwork =
     process.env.NODE_ENV === "production"
@@ -82,42 +84,60 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       : "sapphire_devnet";
 */
 
-
-  useEffect(() => {
-    const initWeb3Auth = async () => {
-      const start = Date.now();
-      try {
-        const instance = new Web3Auth({
-          clientId: WEB3AUTH_CLIENT_ID,
-          web3AuthNetwork: "sapphire_devnet",
-          uiConfig: {
-            loginMethodsOrder: ["google", "facebook", "email_passwordless", "metamask"],
+useEffect(() => {
+  const initWeb3Auth = async () => {
+    try {
+      // Configuration de Web3Auth avec walletServicesConfig
+      const instance = new Web3Auth({
+        clientId: WEB3AUTH_CLIENT_ID,
+        web3AuthNetwork: "sapphire_devnet",
+        uiConfig: {
+          loginMethodsOrder: ["google", "facebook", "email_passwordless", "metamask"],
+        },
+        walletServicesConfig: {
+          confirmationStrategy: "default", // Ou "default" selon votre choix
+          modalZIndex: 99999,
+          enableKeyExport: false,
+          whiteLabel: {
+            showWidgetButton: true,
+            buttonPosition: "bottom-right", // Modifiez selon vos préférences
+            hideNftDisplay: false,
+            hideTokenDisplay: false,
+            hideTransfers: false,
+            hideTopup: false,
+            hideReceive: false,
+            hideSwap: false,
+            hideShowAllTokens: false,
+            hideWalletConnect: false,
+            defaultPortfolio: 'token', // Ou "nft" selon vos besoins
           },
-        });
+        },
+      });
 
-        await instance.init();
-        setWeb3auth(instance);
+      await instance.init();
 
-        if (instance.provider) {
-          const web3Instance = new Web3(instance.provider as any);
-          setWeb3(web3Instance);
-          const accounts = await web3Instance.eth.getAccounts();
-          if (accounts.length > 0) {
-            setAddress(accounts[0]);
-            setIsAuthenticated(true);
-          }
+      setWeb3auth(instance);
+
+      if (instance.provider) {
+        const web3Instance = new Web3(instance.provider as any);
+        setWeb3(web3Instance);
+        const accounts = await web3Instance.eth.getAccounts();
+        if (accounts.length > 0) {
+          setAddress(accounts[0]);
+          setIsAuthenticated(true);
         }
-      } catch (err) {
-        console.error("Erreur init Web3Auth:", err);
-      } finally {
-        const elapsed = Date.now() - start;
-        const minDuration = 1500;
-        setTimeout(() => setIsLoading(false), Math.max(0, minDuration - elapsed));
       }
-    };
+    } catch (err) {
+      console.error("Erreur init Web3Auth:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    initWeb3Auth();
-  }, []);
+  initWeb3Auth();
+}, []);
+
+
 
   const fetchRole = async (web3Instance: Web3, userAddress: string) => {
     if (!web3Instance || !userAddress) {
@@ -127,22 +147,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      console.log("[fetchRole] Start fetching role for", userAddress);
+      //console.log("[fetchRole] Start fetching role for", userAddress);
 
       const contract = new web3Instance.eth.Contract(ABI as any, CONTRACT_ADDRESS);
 
       const owner: string = await contract.methods.owner().call();
       if (owner && typeof owner === "string" && userAddress.toLowerCase() === owner.toLowerCase()) {
-        console.log("[fetchRole] Address is owner/admin");
         setRole("admin");
         return;
-      } else {
-        console.warn("[fetchRole] La valeur de 'owner' n'est pas valide ou ne correspond pas :", owner);
       }
 
       // Récupération des informations sur le membre
       const memberInfo: MemberInfo = await contract.methods.members(userAddress).call();
-      console.log("[fetchRole] memberInfo received:", memberInfo);
+      console.log(memberInfo);
+      //console.log("[fetchRole] memberInfo received:", memberInfo);
 
       if (!memberInfo || typeof memberInfo.role === 'undefined') {
         console.warn("[fetchRole] No role found for address");
@@ -153,7 +171,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const roleIndex = parseInt(String(memberInfo.role), 10);
       const resolvedRole = roleMapping[roleIndex] || null;
 
-      console.log("[fetchRole] Role resolved to:", resolvedRole);
+      //console.log("[fetchRole] Role resolved to:", resolvedRole);
       setRole(resolvedRole);
 
     } catch (error) {
@@ -226,6 +244,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error("Erreur lors de la déconnexion:", error);
     }
   };
+
 
   const isMember = !!role;
 
