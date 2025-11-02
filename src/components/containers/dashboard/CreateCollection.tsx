@@ -1,21 +1,20 @@
 import React, { useState, useEffect } from "react";
 import { Box, Heading, VStack, Divider, Flex, HStack, Input, Button, Text, FormLabel, useToast, Spinner, Tab, TabList, TabPanels, TabPanel, Tabs, Image, Grid, FormControl, Select } from "@chakra-ui/react";
 import { JsonRpcProvider, Contract, ethers } from "ethers";
-import { useAuth } from '../../../utils/authContext';
-import ABIRESCOLLECTION from '../../ABI/ABI_Collections.json';
+import { useAuth } from '@/utils/authContext';
+import { handleMessageTransactions } from '@/utils/handleMessageTransactions';
+
+import ABIRESCOLLECTION from '@/components/ABI/ABI_Collections.json';
 import { BigNumberish } from "ethers";
 import axios from "axios";
 import Web3 from "web3";
-import detectEthereumProvider from '@metamask/detect-provider';
-
 
 const CreateCollection: React.FC = () => {
   const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!;
 
-  const { address: authAddress } = useAuth();
-  const [address, setAddress] = useState<string>(authAddress || '');
+  const { web3, address, isAuthenticated } = useAuth();
 
-  const [web3, setWeb3] = useState<Web3 | null>(null);
+
 const [account, setAccount] = useState<string | null>(null);
 
   const [avatarSvg, setAvatarSvg] = useState<string>('');
@@ -40,6 +39,10 @@ const [account, setAccount] = useState<string | null>(null);
   const [collectionType, setCollectionType] = useState<string>('');
   const [customCollectionType, setCustomCollectionType] = useState<string>('');
 
+  const [estimatedCost, setEstimatedCost] = useState<string | null>(null);
+  const [isEstimating, setIsEstimating] = useState<boolean>(false);
+
+
   const toast = useToast();
 
   useEffect(() => {
@@ -57,19 +60,6 @@ const [account, setAccount] = useState<string | null>(null);
       initialize();
     }
   }, [address]);
-
-  useEffect(() => {
-      const initWeb3 = async () => {
-          const provider = await detectEthereumProvider();
-          if (provider) {
-              const web3Instance = new Web3(provider);
-              setWeb3(web3Instance);
-              const accounts = await web3Instance.eth.getAccounts();
-              setAccount(accounts[0]);
-          }
-      };
-      initWeb3();
-  }, []);
 
   // Récupérer les collections
   const fetchCollections = async (userAddress: string): Promise<void> => {
@@ -183,11 +173,72 @@ const [account, setAccount] = useState<string | null>(null);
   };
 
 
+  const estimateCollectionCost = async () => {
+    if (!web3 || !address) return;
+
+    try {
+      setIsEstimating(true);
+
+      const contractResCollection = new web3.eth.Contract(
+        ABIRESCOLLECTION,
+        contractRESCOLLECTION
+      );
+
+      // 1️⃣ Estimer le gas limit
+      const gasLimit = await contractResCollection.methods
+        .createCollection(metadata.name || "Preview", ipfsUrl || "0x0", collectionType || "default")
+        .estimateGas({ from: address });
+
+      // 2️⃣ Récupérer le prix du gas actuel
+      const gasPrice = await web3.eth.getGasPrice();
+
+      // 3️⃣ Calculer le coût total en WEI
+      const totalCostWei = BigInt(gasLimit) * BigInt(gasPrice);
+
+      // 4️⃣ Convertir en ETH
+      const totalCostEth = Number(web3.utils.fromWei(totalCostWei.toString(), "ether")).toFixed(6);
+
+      // 🔍 Bonus : on ajoute une marge de sécurité (20%)
+      const totalCostWithBuffer = (Number(totalCostEth) * 1.2).toFixed(6);
+
+      setEstimatedCost(totalCostWithBuffer);
+    } catch (err) {
+      console.error("Erreur lors de l'estimation du gas :", err);
+      setEstimatedCost(null);
+    } finally {
+      setIsEstimating(false);
+    }
+  };
+
+
+  useEffect(() => {
+    if (estimatedCost) {
+      toast({
+        title: "💰 Coût estimé",
+        description: `Cette transaction coûtera environ ${estimatedCost} ETH (incl. marge de 20%).`,
+        status: "info",
+        duration: 4000,
+        isClosable: true,
+      });
+    }
+  }, [estimatedCost]);
+
+
+  useEffect(() => {
+  if (metadata.name && ipfsUrl && collectionType) {
+    estimateCollectionCost();
+  } else {
+    setEstimatedCost(null);
+  }
+}, [metadata.name, ipfsUrl, collectionType]);
+
+
+
   const handleCreateCollection = async (): Promise<void> => {
     if (!metadata.name || !ipfsUrl) {
       toast({
         title: "Erreur",
-        description: "Le nom de la collection (issu des métadonnées) et l'image (IPFS) ne peuvent pas être vides.",
+        description: "Le nom et l'image de la collection sont requis.",
         status: "error",
         duration: 3000,
         isClosable: true,
@@ -196,7 +247,6 @@ const [account, setAccount] = useState<string | null>(null);
     }
 
     if (!web3) {
-      console.error("Web3 n'est pas initialisé.");
       toast({
         title: "Erreur",
         description: "Web3 n'est pas initialisé.",
@@ -210,36 +260,68 @@ const [account, setAccount] = useState<string | null>(null);
     setLoading(true);
     try {
       const accounts = await web3.eth.getAccounts();
-      if (!accounts[0]) {
-        throw new Error("Aucun compte Ethereum détecté.");
-      }
+      const from = accounts[0];
+      if (!from) throw new Error("Aucun compte Ethereum détecté.");
 
-      // Création du contrat pour RESCOLLECTION
-      const contractResCollection = new web3.eth.Contract(ABIRESCOLLECTION, contractRESCOLLECTION);
+      const contract = new web3.eth.Contract(ABIRESCOLLECTION, contractRESCOLLECTION);
 
-      // Appel de la fonction createCollection du contrat
-      const tx = await contractResCollection.methods.createCollection(metadata.name, ipfsUrl, collectionType).send({ from: accounts[0] });
+      // ✅ Estimation du coût
+      const gasEstimate = await contract.methods
+        .createCollection(metadata.name, ipfsUrl, collectionType)
+        .estimateGas({ from });
 
-      // Vérification de la réussite de la transaction
+      const gasPrice = await web3.eth.getGasPrice(); // en wei
+      const estimatedCostWei = BigInt(gasEstimate) * BigInt(gasPrice);
+      const estimatedCostEth = Number(estimatedCostWei) / 1e18;
+
+      toast({
+        title: "Estimation du coût 💰",
+        description: `Cette transaction pourrait coûter environ ${estimatedCostEth.toFixed(6)} ETH.`,
+        status: "info",
+        duration: 5000,
+        isClosable: true,
+        position: "top-right",
+      });
+
+      // ✅ Envoi de la transaction avec gestion toasts
+      const tx = await handleMessageTransactions(
+        contract.methods
+          .createCollection(metadata.name, ipfsUrl, collectionType)
+          .send({ from }),
+        toast,
+        "Collection créée avec succès 🎉",
+        "Échec lors de la création de la collection"
+      );
+
       if (!tx || !tx.transactionHash) {
         throw new Error("La création de la collection a échoué.");
       }
 
       toast({
         title: "Succès",
-        description: `Collection "${metadata.name}" créée avec succès. Transaction Hash: ${tx.transactionHash}`,
+        description: `Collection "${metadata.name}" créée avec succès. TX: ${tx.transactionHash}`,
         status: "success",
-        duration: 3000,
+        duration: 4000,
         isClosable: true,
       });
-    } catch (error) {
-      console.error("Erreur lors de la création de la collection :", error);
+
+    } catch (error: any) {
+      console.error("Erreur lors de la création :", error);
+
+      let description = "Échec de la création de la collection.";
+      if (error.message?.includes("insufficient funds")) {
+        description = "Fonds insuffisants pour payer le gas.";
+      } else if (error.message?.includes("User denied")) {
+        description = "Transaction refusée par l'utilisateur.";
+      }
+
       toast({
         title: "Erreur",
-        description: "Échec de la création de la collection. Vérifiez vos données.",
+        description,
         status: "error",
-        duration: 3000,
+        duration: 4000,
         isClosable: true,
+        position: "top-right",
       });
     } finally {
       setLoading(false);
@@ -425,28 +507,32 @@ const [account, setAccount] = useState<string | null>(null);
       <Divider my={10} borderColor="purple.300" />
 
       <Flex justify="center">
-        <Button
-          onClick={handleCreateCollection}
-          px={10}
-          py={6}
-          fontSize="lg"
-          fontWeight="bold"
-          borderRadius="full"
-          bgGradient="linear(to-r, purple.700, pink.600)"
-          color="white"
-          boxShadow="lg"
-          _hover={{
-            transform: "scale(1.05)",
-            boxShadow: "2xl",
-          }}
-          _active={{
-            transform: "scale(0.98)",
-          }}
-          transition="all 0.25s ease"
-          isDisabled={!collectionType || !metadata.name || !file}
-        >
-          🎨 Créer la collection
-        </Button>
+
+
+      <Button
+        onClick={handleCreateCollection}
+        px={10}
+        py={6}
+        fontSize="lg"
+        fontWeight="bold"
+        borderRadius="full"
+        bgGradient="linear(to-r, purple.700, pink.600)"
+        color="white"
+        boxShadow="lg"
+        _hover={{ transform: "scale(1.05)", boxShadow: "2xl" }}
+        _active={{ transform: "scale(0.98)" }}
+        transition="all 0.25s ease"
+        isDisabled={!collectionType || !metadata.name || !file}
+        isLoading={loading}
+      >
+        {isEstimating
+          ? "💰 Estimation du coût..."
+          : estimatedCost
+          ? `🎨 Créer la collection (~${estimatedCost} ETH)`
+          : "🎨 Créer la collection"}
+      </Button>
+
+
 
 
       </Flex>
