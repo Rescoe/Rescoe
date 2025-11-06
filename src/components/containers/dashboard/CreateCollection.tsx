@@ -5,12 +5,18 @@ import { useAuth } from '@/utils/authContext';
 import { handleMessageTransactions } from '@/utils/handleMessageTransactions';
 
 import ABIRESCOLLECTION from '@/components/ABI/ABI_Collections.json';
+import ABIMasterFactory from '@/components/ABI/Factories/ABI_MasterFactory.json';
+
+import ABI_ART_FACTORY from '@/components/ABI/Factories/ABI_ART_FACTORY.json';
+import ABI_POESIE_FACTORY from '@/components/ABI/Factories/ABI_POESIE_FACTORY.json';
+
 import { BigNumberish } from "ethers";
 import axios from "axios";
 import Web3 from "web3";
 
 const CreateCollection: React.FC = () => {
-  const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!;
+  const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT as string;
+  const masterFactoryAddress = process.env.NEXT_PUBLIC_MASTERFACTORY_CONTRACT as string;
 
   const { web3, address, isAuthenticated } = useAuth();
 
@@ -60,6 +66,25 @@ const [account, setAccount] = useState<string | null>(null);
       initialize();
     }
   }, [address]);
+
+
+  // Charger les adresses existantes des factories
+  const fetchFactories = async () => {
+    if (web3 && account) {
+      try {
+        const contract = new web3.eth.Contract(ABIMasterFactory as any, masterFactoryAddress);
+        const types = ["Art", "Poesie"];
+        const results: Record<string, string> = {};
+        for (const type of types) {
+          results[type] = await contract.methods.collectionFactories(type).call();
+        }
+        setCurrentAddresses(results);
+      } catch (err) {
+        console.error("Erreur lors du chargement des factories:", err);
+      }
+    }
+  };
+
 
   // Récupérer les collections
   const fetchCollections = async (userAddress: string): Promise<void> => {
@@ -173,55 +198,97 @@ const [account, setAccount] = useState<string | null>(null);
   };
 
 
-  const estimateCollectionCost = async () => {
-    if (!web3 || !address) return;
+  // On suppose que tu as dans ton .env les adresses et ABIs de chaque factory par type
+  // State pour stocker dynamiquement les adresses des factories
+const [currentAddresses, setCurrentAddresses] = useState<Record<string, string>>({});
 
-    try {
-      setIsEstimating(true);
+const fetchFactoryAddress = async (type: string): Promise<string> => {
+  if (!web3 || !masterFactoryAddress) throw new Error("Web3 ou MasterFactory non initialisé");
 
-      const contractResCollection = new web3.eth.Contract(
-        ABIRESCOLLECTION,
-        contractRESCOLLECTION
-      );
-
-      // 1️⃣ Estimer le gas limit
-      const gasLimit = await contractResCollection.methods
-        .createCollection(metadata.name || "Preview", ipfsUrl || "0x0", collectionType || "default")
-        .estimateGas({ from: address });
-
-      // 2️⃣ Récupérer le prix du gas actuel
-      const gasPrice = await web3.eth.getGasPrice();
-
-      // 3️⃣ Calculer le coût total en WEI
-      const totalCostWei = BigInt(gasLimit) * BigInt(gasPrice);
-
-      // 4️⃣ Convertir en ETH
-      const totalCostEth = Number(web3.utils.fromWei(totalCostWei.toString(), "ether")).toFixed(6);
-
-      // 🔍 Bonus : on ajoute une marge de sécurité (20%)
-      const totalCostWithBuffer = (Number(totalCostEth) * 1.2).toFixed(6);
-
-      setEstimatedCost(totalCostWithBuffer);
-    } catch (err) {
-      console.error("Erreur lors de l'estimation du gas :", err);
-      setEstimatedCost(null);
-    } finally {
-      setIsEstimating(false);
-    }
-  };
+  try {
+    const masterFactoryContract = new web3.eth.Contract(ABIMasterFactory as any, masterFactoryAddress);
+    const factoryAddress = (await masterFactoryContract.methods.collectionFactories(type).call()) as string;
+    return factoryAddress;
+  } catch (err) {
+    console.error(`Erreur lors de la récupération de l'adresse de la factory pour ${type}:`, err);
+    throw err;
+  }
+};
 
 
-  useEffect(() => {
-    if (estimatedCost) {
-      toast({
-        title: "💰 Coût estimé",
-        description: `Cette transaction coûtera environ ${estimatedCost} ETH (incl. marge de 20%).`,
-        status: "info",
-        duration: 4000,
-        isClosable: true,
-      });
-    }
-  }, [estimatedCost]);
+const estimateCollectionCost = async () => {
+  if (!web3 || !address || !collectionType || !metadata.name || !ipfsUrl) return;
+
+  try {
+    setIsEstimating(true);
+
+    // 1️⃣ Récupération dynamique de l'adresse de la factory
+    const factoryAddress = await fetchFactoryAddress(collectionType);
+
+    // 2️⃣ Choix de l'ABI
+    const factoryABI = collectionType === "Art" ? ABI_ART_FACTORY : ABI_POESIE_FACTORY;
+
+    // 3️⃣ Créer le contrat Web3
+    const factoryContract = new web3.eth.Contract(factoryABI, factoryAddress);
+
+    const Rescoe_contract = new web3.eth.Contract(ABIRESCOLLECTION, contractRESCOLLECTION);
+
+    // 4️⃣ Préparer les paramètres exacts
+    const params = [metadata.name, collectionType, address, 0];
+    const paramsRescoe = [metadata.name, ipfsUrl, collectionType];
+
+    // 5️⃣ Encoder l'appel pour estimateGas
+    const data = factoryContract.methods.createDynamicCollection(...params).encodeABI();
+    const dataRescoellection = Rescoe_contract.methods.createCollection(...paramsRescoe).encodeABI();
+
+    // 6️⃣ Estimation du gas
+    let gasLimitdata = await web3.eth.estimateGas({
+      from: address,
+      to: factoryAddress,
+      data,
+    });
+
+/* //ICI TROP DE STACK DE DONN2E A ESTIMER, IL FAUT ESTIMER LES APPELS INDEVIDUELLEMENT
+    // 6️⃣ Estimation du gas
+    let gasLimitRescoellection = await web3.eth.estimateGas({
+      from: address,
+      to: Rescoe_contract,
+      dataRescoellection,
+    });
+*/
+    // Buffer de sécurité (+20%)
+    const gasLimit = Math.floor( Number(gasLimitdata) /* +  Number(gasLimitRescoellection)*/ * 1.2);
+
+    // 7️⃣ Gas price réel depuis le RPC ou Etherscan API
+    // Option A: via web3.eth.getGasPrice (simple)
+    let gasPrice = BigInt(await web3.eth.getGasPrice());
+
+    // Option B: via un fetch sur Etherscan Gas Tracker (plus précis)
+
+    const res = await axios.get(
+      `https://api.etherscan.io/v2/api?chainid=1&module=gastracker&action=gasoracle&apikey=${process.env.NEXT_PUBLIC_ETHERSCAN_API_KEY}`
+    );
+    const gasPriceGwei = Number(res.data.result.ProposeGasPrice); // en Gwei
+    gasPrice = BigInt(Math.floor(gasPriceGwei * 1e9)); // convertir en wei
+
+
+    const totalWei = BigInt(gasLimit) * gasPrice;
+    const totalEth = Number(web3.utils.fromWei(totalWei.toString(), "ether")).toFixed(6);
+
+    console.log(
+      `[ESTIMATION] ${collectionType} collection - GasLimit: ${gasLimit}, GasPrice: ${gasPrice.toString()} wei, Total ETH: ${totalEth}`
+    );
+
+//MARGE de x4 pour etre sur que l'utilisateur ne soit pas surpris
+setEstimatedCost((Number(totalEth) * 5).toFixed(6));
+  } catch (err) {
+    console.error("Erreur lors de l'estimation du gas :", err);
+    setEstimatedCost(null);
+  } finally {
+    setIsEstimating(false);
+  }
+};
+
 
 
   useEffect(() => {
@@ -265,23 +332,6 @@ const [account, setAccount] = useState<string | null>(null);
 
       const contract = new web3.eth.Contract(ABIRESCOLLECTION, contractRESCOLLECTION);
 
-      // ✅ Estimation du coût
-      const gasEstimate = await contract.methods
-        .createCollection(metadata.name, ipfsUrl, collectionType)
-        .estimateGas({ from });
-
-      const gasPrice = await web3.eth.getGasPrice(); // en wei
-      const estimatedCostWei = BigInt(gasEstimate) * BigInt(gasPrice);
-      const estimatedCostEth = Number(estimatedCostWei) / 1e18;
-
-      toast({
-        title: "Estimation du coût 💰",
-        description: `Cette transaction pourrait coûter environ ${estimatedCostEth.toFixed(6)} ETH.`,
-        status: "info",
-        duration: 5000,
-        isClosable: true,
-        position: "top-right",
-      });
 
       // ✅ Envoi de la transaction avec gestion toasts
       const tx = await handleMessageTransactions(
@@ -461,28 +511,7 @@ const [account, setAccount] = useState<string | null>(null);
         <option style={{ backgroundColor: "#1A202C" }} value="Poesie">
           Poésie
         </option>
-        <option style={{ backgroundColor: "#1A202C" }} value="Generative">
-          Génératif
-        </option>
-        <option style={{ backgroundColor: "#1A202C" }} value="Social">
-          Social
-        </option>
-        <option style={{ backgroundColor: "#1A202C" }} value="autre">
-          Autre
-        </option>
       </Select>
-
-      {/* Barre d'écriture conditionnelle */}
-      {collectionType === "autre" && (
-        <Input
-          placeholder="Entrez un type personnalisé"
-          value={customCollectionType}
-          onChange={(e) => setCustomCollectionType(e.target.value)}
-          bg="blackAlpha.300"
-          color="white"
-          mb={4}
-        />
-      )}
 
       <Button
         mt={4}

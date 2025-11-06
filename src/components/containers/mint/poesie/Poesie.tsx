@@ -1,8 +1,23 @@
 import React, { useState, useEffect } from "react";
-import { Box, Button, Input, Select, FormLabel, Textarea, useToast, Alert, AlertIcon } from "@chakra-ui/react";
-import Web3 from "web3";
+import {
+  Box,
+  Button,
+  Input,
+  Select,
+  FormLabel,
+  Textarea,
+  useToast,
+  Alert,
+  AlertIcon,
+} from "@chakra-ui/react";
+import { JsonRpcProvider, Contract } from "ethers";
+import { ethers } from "ethers";
+
 import ABIRESCOLLECTION from "../../../ABI/ABI_Collections.json";
 import ABI from "../../../ABI/HaikuEditions.json";
+import { useAuth } from "@/utils/authContext";
+import useEstimateGas from "@/hooks/useEstimateGas"; // Importez votre hook d'estimation de gas
+
 
 interface Collection {
   id: string;
@@ -13,72 +28,83 @@ interface Collection {
 }
 
 const PoemMintingPage: React.FC = () => {
+  const { address, web3 } = useAuth();  // Récupération de l'adresse et de Web3 depuis le contexte
   const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT as string;
 
   const [collections, setCollections] = useState<Collection[]>([]);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>("");
-  const [poemText, setPoemText] = useState<string>(""); // ← un seul champ
+  const [poemText, setPoemText] = useState<string>("");
   const [editions, setEditions] = useState<number>(1);
   const [editionsForSale, setEditionsForSale] = useState<number>(0);
-  const [salePrice, setSalePrice] = useState<string>(""); // ← string pour éviter les floats JS
+  const [salePrice, setSalePrice] = useState<string>("");
   const [isMinting, setIsMinting] = useState<boolean>(false);
   const [contractAddress, setContractAddress] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [web3, setWeb3] = useState<Web3 | null>(null);
-
   const toast = useToast();
+  const { estimateGas, estimatedCost, isEstimating, estimatedCostEuro} = useEstimateGas(); // Utilisation de votre hook
+
 
   useEffect(() => {
-    if (typeof window !== "undefined" && (window as any).ethereum) {
-      const web3Instance = new Web3((window as any).ethereum);
-      setWeb3(web3Instance);
-      fetchUserCollections(web3Instance);
-    }
-  }, []);
+    const fetchUserCollections = async () => {
+      if (web3 && address) {
+        setLoading(true);
+        const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+        const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
+        try {
+          const result: any = await contract.getCollectionsByUser(address);
 
-  const fetchUserCollections = async (web3Instance: Web3) => {
-    try {
-      setLoading(true);
-      const accounts = await web3Instance.eth.getAccounts();
-      const userAddress = accounts[0];
+          if (Array.isArray(result)) {
+            const filteredCollections: Collection[] = result
+              .map((collection: any) => ({
+                id: collection[0].toString(),
+                name: collection[1],
+                type: collection[2],
+                owner: collection[3],
+                otherData: collection[4],
+              }))
+              .filter((collection) => collection.type === "Poesie");
 
-      const contract = new web3Instance.eth.Contract(ABIRESCOLLECTION as any, contractRESCOLLECTION);
-      const result: any = await contract.methods.getCollectionsByUser(userAddress).call();
-
-      if (Array.isArray(result)) {
-        const filteredCollections: Collection[] = result
-          .map((collection: any) => ({
-            id: collection[0].toString(),
-            name: collection[1],
-            type: collection[2],
-            owner: collection[3],
-            otherData: collection[4],
-          }))
-          .filter((collection) => collection.type === "Poesie");
-
-        setCollections(filteredCollections);
-      } else {
-        setError("Unexpected result format");
+            setCollections(filteredCollections);
+          } else {
+            setError("Format de résultat inattendu");
+          }
+        } catch (err) {
+          setError((err as Error).message || "Erreur inconnue");
+        } finally {
+          setLoading(false);
+        }
       }
-    } catch (err) {
-      setError((err as Error).message || "Unknown error");
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    fetchUserCollections();
+  }, [web3, address]);
+
+
+  //On estme les frais de gas dès que tout est remplis
+  // Gestion debouncing pour estimer les frais de gas
+    useEffect(() => {
+      const timer = setTimeout(() => {
+        if (contractAddress && poemText && web3 && salePrice && editionsForSale && editions) {
+          estimateGas(contractAddress, "mint", [editions, poemText, ethers.parseEther(salePrice ?? "0"), editionsForSale], address!, ABI);
+        }
+      }, 1000); // 1s après la dernière modification
+
+      return () => clearTimeout(timer); // Nettoyer l'effet
+    }, [poemText, salePrice, editions, editionsForSale, contractAddress, web3]);
 
   const fetchMintingContractAddress = async (collectionId: string) => {
     if (!web3) return;
     try {
-      const contractResCollection = new web3.eth.Contract(ABIRESCOLLECTION as any, contractRESCOLLECTION);
-      const collectionDetails: any = await contractResCollection.methods.getCollection(collectionId).call();
+      const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+      const contractResCollection = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
+      const collectionDetails: any = await contractResCollection.getCollection(collectionId);
       const collectionMintAddress: string = collectionDetails.collectionAddress;
       setContractAddress(collectionMintAddress || "");
     } catch (error) {
       toast({
-        title: "Error fetching contract address",
-        description: "Something went wrong. Please try again later.",
+        title: "Erreur lors de la récupération de l'adresse du contrat",
+        description: "Quelque chose s'est mal passé. Réessayez plus tard.",
         status: "error",
         duration: 3000,
         isClosable: true,
@@ -86,149 +112,143 @@ const PoemMintingPage: React.FC = () => {
     }
   };
 
-  // Conversion robuste (string décimale → wei). Accepte "0,001" et "0.001".
-  const toWeiSafe = (value: string): string => {
-    const normalized = String(value).trim().replace(",", ".");
-    if (normalized === "") return "0";
-    // autoriser 0 / nombre décimal simple
-    if (!/^\d+(\.\d+)?$/.test(normalized)) {
-      throw new Error("Invalid price format");
-    }
-    return Web3.utils.toWei(normalized, "ether");
-  };
 
-  const mintPoem = async () => {
-    // validations minimales
-    if (!poemText.trim()) {
-      toast({
-        title: "Missing poem",
-        description: "Le poème ne peut pas être vide.",
-        status: "error",
-        duration: 3000,
-        isClosable: true,
-      });
-      return;
-    }
-    if (!selectedCollectionId) {
-      toast({
-        title: "Select a collection",
-        description: "Veuillez choisir une collection de poésie.",
-        status: "error",
-        duration: 3000,
-        isClosable: true,
-      });
-      return;
-    }
-    if (!contractAddress || !web3) {
-      toast({
-        title: "Wallet/Contract not ready",
-        description: "Contrat introuvable ou web3 non initialisé.",
-        status: "error",
-        duration: 3000,
-        isClosable: true,
-      });
-      return;
-    }
-    if (editions < 1) {
-      toast({
-        title: "Invalid editions",
-        description: "Le nombre d’éditions doit être au moins 1.",
-        status: "error",
-        duration: 3000,
-        isClosable: true,
-      });
-      return;
-    }
-    if (editionsForSale < 0 || editionsForSale > editions) {
-      toast({
-        title: "Invalid editions for sale",
-        description: "Les éditions en vente doivent être entre 0 et le total.",
-        status: "error",
-        duration: 3000,
-        isClosable: true,
-      });
-      return;
-    }
-
-    try {
-      setIsMinting(true);
-
-      const contract = new web3.eth.Contract(ABI as any, contractAddress);
-      const accounts = await web3.eth.getAccounts();
-      const userAddress = accounts[0];
-
-      // Prix optionnel : vide → 0
-      let salePriceInWei = "0";
-      try {
-        salePriceInWei = toWeiSafe(salePrice);
-      } catch (err) {
+    const mintPoem = async () => {
+      if (!poemText.trim()) {
         toast({
-          title: "Invalid price",
-          description: "Format de prix invalide. Exemple : 0.001",
+          title: "Poème manquant",
+          description: "Le poème ne peut pas être vide.",
           status: "error",
           duration: 3000,
           isClosable: true,
         });
-        setIsMinting(false);
         return;
       }
-
-      // Mint le haïku
-      await contract.methods
-        .mint(editions, poemText, salePriceInWei, editionsForSale)
-        .send({ from: userAddress });
-
-      if (salePriceInWei === "0" && editionsForSale > 0) {
+      if (!selectedCollectionId) {
         toast({
-          title: "Minted (0 ETH)",
-          description: "Poème listé à 0 ETH (gratuit).",
-          status: "info",
-          duration: 3500,
-          isClosable: true,
-        });
-      } else {
-        toast({
-          title: "Haiku Minted!",
-          description: "Your haiku has been successfully minted.",
-          status: "success",
+          title: "Sélectionnez une collection",
+          description: "Veuillez choisir une collection de poésie.",
+          status: "error",
           duration: 3000,
           isClosable: true,
         });
+        return;
+      }
+      if (!contractAddress || !web3) {
+        toast({
+          title: "Wallet/Contract non prêt",
+          description: "Contrat introuvable ou web3 non initialisé.",
+          status: "error",
+          duration: 3000,
+          isClosable: true,
+        });
+        return;
+      }
+      if (editions < 1) {
+        toast({
+          title: "Éditions invalides",
+          description: "Le nombre d’éditions doit être au moins 1.",
+          status: "error",
+          duration: 3000,
+          isClosable: true,
+        });
+        return;
+      }
+      if (editionsForSale < 0 || editionsForSale > editions) {
+        toast({
+          title: "Éditions en vente invalides",
+          description: "Les éditions en vente doivent être entre 0 et le total.",
+          status: "error",
+          duration: 3000,
+          isClosable: true,
+        });
+        return;
       }
 
-      // Reset
-      setPoemText("");
-      setEditions(1);
-      setEditionsForSale(0);
-      setSalePrice("");
-      setSelectedCollectionId("");
-      setContractAddress("");
-    } catch (error) {
-      console.error("Minting error:", error);
-      toast({
-        title: "Minting Failed",
-        description: "Something went wrong. Please try again later.",
-        status: "error",
-        duration: 3000,
-        isClosable: true,
-      });
-    } finally {
-      setIsMinting(false);
-    }
-  };
+      try {
+        setIsMinting(true);
 
-  const isMintDisabled =
-    !poemText.trim() ||
-    !selectedCollectionId ||
-    !contractAddress ||
-    !web3 ||
-    editions < 1 ||
-    editionsForSale < 0 ||
-    editionsForSale > editions;
+        const contract = new web3.eth.Contract(ABI as any, contractAddress);
+        const accounts = await web3.eth.getAccounts();
+        const userAddress = accounts[0];
+
+        // Conversion du prix de vente en wei
+        let salePriceInWei = "0";
+        if (salePrice.trim()) {
+          const normalizedPrice = salePrice.trim(); // Normalisation
+          // Vérification du format et conversion
+          if (!/^\d+(\.\d+)?$/.test(normalizedPrice)) {
+            toast({
+              title: "Prix invalide",
+              description: "Format de prix invalide. Exemple : 0.001",
+              status: "error",
+              duration: 3000,
+              isClosable: true,
+            });
+            setIsMinting(false);
+            return;
+          }
+          salePriceInWei = ethers.parseEther(normalizedPrice).toString();
+        }
+
+
+        // Mint le poème
+        await contract.methods
+          .mint(editions, poemText, salePriceInWei, editionsForSale)
+          .send({ from: userAddress });
+
+        if (salePriceInWei === "0" && editionsForSale > 0) {
+          toast({
+            title: "Minté (0 ETH)",
+            description: "Poème listé à 0 ETH (gratuit).",
+            status: "info",
+            duration: 3500,
+            isClosable: true,
+          });
+        } else {
+          toast({
+            title: "Poème Minté !",
+            description: "Votre poème a été minté avec succès.",
+            status: "success",
+            duration: 3000,
+            isClosable: true,
+          });
+        }
+
+        // Reset
+        setPoemText("");
+        setEditions(1);
+        setEditionsForSale(0);
+        setSalePrice("");
+        setSelectedCollectionId("");
+        setContractAddress("");
+      } catch (error) {
+        console.error("Erreur lors du minting :", error);
+        toast({
+          title: "Échec du minting",
+          description: "Quelque chose s'est mal passé. Réessayez plus tard.",
+          status: "error",
+          duration: 3000,
+          isClosable: true,
+        });
+      } finally {
+        setIsMinting(false);
+      }
+    };
+
+    const isMintDisabled =
+      !poemText.trim() ||
+      !selectedCollectionId ||
+      !contractAddress ||
+      !web3 ||
+      editions < 1 ||
+      editionsForSale < 0 ||
+      editionsForSale > editions;
+
 
   return (
     <Box p={5} maxWidth="640px" mx="auto">
-      <FormLabel>Poem</FormLabel>
+      <FormLabel>Poème</FormLabel>
       <Textarea
         value={poemText}
         onChange={(e) => setPoemText(e.target.value)}
@@ -236,14 +256,14 @@ const PoemMintingPage: React.FC = () => {
         rows={6}
       />
 
-      <FormLabel mt={5}>Select Collection</FormLabel>
+      <FormLabel mt={5}>Sélectionnez la collection</FormLabel>
       <Select
         value={selectedCollectionId}
         onChange={(e) => {
           setSelectedCollectionId(e.target.value);
           fetchMintingContractAddress(e.target.value);
         }}
-        placeholder={loading ? "Loading..." : "Select a Poetry Collection"}
+        placeholder={loading ? "Chargement..." : "Sélectionnez une collection de poésie"}
       >
         {collections.map((collection) => (
           <option key={collection.id} value={collection.id}>
@@ -252,29 +272,28 @@ const PoemMintingPage: React.FC = () => {
         ))}
       </Select>
 
-      <FormLabel mt={5}>Number of Editions</FormLabel>
+      <FormLabel mt={5}>Nombre d'éditions</FormLabel>
       <Input
         type="number"
         min="1"
         value={editions}
         onChange={(e) => setEditions(Number(e.target.value))}
-        placeholder="Number of Editions"
+        placeholder="Nombre d'éditions"
       />
 
-      <FormLabel mt={5}>Number of Editions to Sell</FormLabel>
+      <FormLabel mt={5}>Nombre d'éditions à vendre</FormLabel>
       <Input
         type="number"
         min="0"
         max={editions}
         value={editionsForSale}
         onChange={(e) => setEditionsForSale(Number(e.target.value))}
-        placeholder="Editions to Sell (0 to total editions)"
+        placeholder="Éditions à vendre (0 au total)"
       />
 
-      <FormLabel mt={5}>Sale Price (in ETH)</FormLabel>
+      <FormLabel mt={5}>Prix de vente (en ETH)</FormLabel>
       <Input
-        type="text" // ← string pour éviter la notation scientifique des floats
-        inputMode="decimal"
+        type="text"
         value={salePrice}
         onChange={(e) => setSalePrice(e.target.value)}
         placeholder="ex: 0.001 (laisser vide = gratuit)"
@@ -288,14 +307,20 @@ const PoemMintingPage: React.FC = () => {
       )}
 
       <Button
-        mt={4}
-        colorScheme="teal"
-        onClick={mintPoem}
-        isLoading={isMinting}
-        isDisabled={isMintDisabled}
+          mt={4}
+          colorScheme="teal"
+          onClick={mintPoem}
+          isLoading={isMinting}
+          isDisabled={isMintDisabled} // Utilisez une fonction pour déterminer si le bouton est désactivé
       >
-        Mint Haiku
+          Mint Poème
+          {isEstimating && <span>...Estimating gas costs...</span>}
+          {estimatedCost && !isEstimating && (
+              <span> - Estimated cost: {estimatedCostEuro} €</span>
+          )}
       </Button>
+
+
     </Box>
   );
 };

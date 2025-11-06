@@ -114,6 +114,7 @@ const MintArt: React.FC = () => {
 
 
   useEffect(() => {
+    console.log(address);
     if (address) {
         fetchUserCollections();
             }
