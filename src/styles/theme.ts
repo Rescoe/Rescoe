@@ -14,6 +14,12 @@ export const pulse = (color: string) => keyframes`
   100% { box-shadow: 0 0 0 0 ${color}00; }
 `;
 
+// 🌈 Animation de bordure dynamique
+export const borderAnimation = keyframes`
+  0% { background-position: 0% 50%; }
+  100% { background-position: 400% 50%; }
+`;
+
 //Fond cream
 const colors = {
   brand: {
@@ -33,7 +39,31 @@ const colors = {
   },
 };
 
-const styles = {
+export const gradients = {
+  cardBorderLight: `linear-gradient(45deg,
+    ${colors.brand.navy} 0%,
+    ${colors.brand.blue} 25%,
+    ${colors.brand.cream} 50%,
+    ${colors.brand.blue} 70%,
+    ${colors.brand.blue} 85%,
+    ${colors.brand.navy} 100%
+  )`,
+  cardBorderDark: `linear-gradient(45deg,
+    ${colors.brand.gold} 0%,
+    ${colors.brand.cream} 25%,
+    ${colors.brand.navy} 50%,
+    ${colors.brand.cream} 70%,
+    ${colors.brand.cream} 85%,
+    ${colors.brand.gold} 100%
+  )`,
+};
+
+export const Backgrounds = {
+  cardBorderLight: colors.brand.cream,  // couleur claire
+  cardBorderDark: colors.brand.navy,    // couleur foncée
+};
+
+export const styles = {
   global: (props: any) => ({
     body: {
       bgGradient:
@@ -69,6 +99,16 @@ export const brandHover = {
 };
 
 
+const effects = {
+  glowLight: "0 0 25px rgba(180, 166, 213, 0.6)",
+  glowDark: "0 0 25px rgba(238, 212, 132, 0.6)",
+};
+
+
+// 🌟 Animation réutilisable pour les GridItems
+export const animations = {
+  borderGlow: `${borderAnimation} 6s linear infinite`,
+};
 
 
 const components = {
@@ -133,8 +173,40 @@ const components = {
       sm: { fontSize: "lg" },
     },
   },
+
+  Box: {
+    baseStyle: (props: StyleFunctionProps) => ({
+      bgGradient:
+        props.colorMode === "light"
+          ? `linear(to-r, ${colors.brand.navy}, ${colors.brand.navy})`
+          : `linear(to-r, ${colors.brand.gold}, ${colors.brand.gold})`,
+      bgClip: "text",
+      fontWeight: "extrabold",
+      letterSpacing: "wide",
+      lineHeight: "shorter",
+      textTransform: "uppercase",
+      transition: "color 0.3s ease, background 0.3s ease",
+    }),
+    sizes: {
+      xl: { fontSize: ["3xl", "4xl", "5xl"] },
+      lg: { fontSize: ["2xl", "3xl"] },
+      md: { fontSize: ["xl", "2xl"] },
+      sm: { fontSize: "lg" },
+    },
+  },
 };
 
 
-const theme = extendTheme({ config, colors, styles, components, hoverStyles });
+const theme = extendTheme({
+  config,
+  colors,
+  styles,
+  components,
+  hoverStyles,
+  gradients,
+  effects,
+  animations,
+
+});
+
 export default theme;

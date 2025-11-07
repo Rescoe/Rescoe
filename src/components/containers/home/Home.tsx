@@ -75,7 +75,6 @@ const boxShadowHover = useColorModeValue(
 "0 0 15px rgba(238, 212, 132, 0.25)"  // dark
 );
 
-const accentGradient = "linear(to-r, purple.500, pink.400)";
 
 const bg = useColorModeValue("bg.light", "bg.dark");
 const cardBg = useColorModeValue("card.light", "card.dark");

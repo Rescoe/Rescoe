@@ -1,139 +1,140 @@
 import { useState, useEffect } from "react";
 import Web3 from "web3";
-import detectEthereumProvider from '@metamask/detect-provider';
-import ABI from '../../../ABI/ABIAdhesion.json'; // Votre ABI de contrat ici.
-import ABI_ADHESION_MANAGEMENT from '../../../ABI/ABI_ADHESION_MANAGEMENT.json'; // Votre ABI de contrat ici.
-import { Box, Heading, Text, Grid, GridItem, Center, Image, Tooltip } from "@chakra-ui/react";
-import { keyframes } from "@emotion/react"; // <-- important
+import ABI from '../../../ABI/ABIAdhesion.json';
+import ABI_ADHESION_MANAGEMENT from '../../../ABI/ABI_ADHESION_MANAGEMENT.json';
+import { Box, Heading, Text, Grid, GridItem, Center, Image, Tooltip, useColorModeValue, useColorMode } from "@chakra-ui/react";
+import Link from 'next/link';
 
-import Link from 'next/link'; // Assurez-vous d'importer Link en haut du fichier
+import {borderAnimation, gradients, animations, styles, Backgrounds} from "@/styles/theme"
 
 interface InsectURI {
-    id: string;
-    image: string;
-    name?: string;
+  id: string;
+  image: string;
+  name?: string;
 }
 
 interface UserInfo {
-    membershipValid: boolean;
-    name: string;
-    bio: string;
-    address: string; // Ajout de l'adresse Ethereum
-    tokens: number[];
-    insects: InsectURI[];
+  membershipValid: boolean;
+  name: string;
+  bio: string;
+  address: string;
+  tokens: number[];
+  insects: InsectURI[];
 }
 
-// Animation d'une lueur qui tourne autour du contour
-const borderAnimation = keyframes`
-  0% {
-    background-position: 0% 50%;
-  }
-  100% {
-    background-position: 400% 50%;
-  }
-`;
 
 const DerniersAdherents: React.FC = () => {
-    const [web3, setWeb3] = useState<Web3 | null>(null);
-    const [dernierAdherentsInfo, setDernierAdherentsInfo] = useState<UserInfo[]>([]);
-    const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS;
-    const contractAddressManagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGER;
+  const [web3, setWeb3] = useState<Web3 | null>(null);
+  const [rpcWeb3, setRpcWeb3] = useState<Web3 | null>(null); // ✅ Provider public Moralis
+  const [dernierAdherentsInfo, setDernierAdherentsInfo] = useState<UserInfo[]>([]);
 
-    const RPC_URL = process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string; // ✅ Fallback RPC public
+  const { colorMode } = useColorMode();
 
-    // ✅ Initialisation de Web3 : essaie MetaMask, sinon RPC public
-    useEffect(() => {
-      const initWeb3 = async () => {
-        let web3Instance;
-        if (typeof window !== "undefined" && (window as any).ethereum) {
-          // Si MetaMask est dispo, on l’utilise
-          web3Instance = new Web3((window as any).ethereum);
-          console.log("✅ Utilisation du provider MetaMask");
-        } else {
-          // Sinon fallback sur le RPC Moralis
-          web3Instance = new Web3(new Web3.providers.HttpProvider(RPC_URL));
-          console.log("🌐 Utilisation du provider RPC public (lecture seule)");
-        }
-        setWeb3(web3Instance);
-      };
-      initWeb3();
-    }, [RPC_URL]);
+  const bgColor = useColorModeValue(
+    Backgrounds.cardBorderLight,
+    Backgrounds.cardBorderDark
+  );
 
-    useEffect(() => {
-   if (web3) {
-     fetchDerniersAdherents();
-   }
- }, [web3]);
+  const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS!;
+  const contractAddressManagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGER!;
+  const RPC_URL = process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string;
 
-    const fetchDerniersAdherents = async () => {
-        try {
-            const contract = new web3!.eth.Contract(ABI, contractAddress);
-            const uniqueMembers = new Set<string>();
-            const roles = { 0: 'Artist', 1: 'Poet', 2: 'Contributor', 3: 'Trainee' };
+  // ✅ Initialisation de Web3 + fallback RPC
+  useEffect(() => {
+    const initProviders = async () => {
+      let instanceWeb3: Web3 | null = null;
 
-            for (let role in roles) {
-                const members: string[] = await contract.methods.getMembersByRole(role).call();
-                members.forEach(member => uniqueMembers.add(member));
-            }
+      if (typeof window !== "undefined" && (window as any).ethereum) {
+        instanceWeb3 = new Web3((window as any).ethereum);
+        console.log("✅ Provider MetaMask détecté");
+      } else {
+        console.log("❌ Pas de MetaMask, fallback RPC public");
+      }
 
-            const lastFourAdherents = Array.from(uniqueMembers).slice(-4); // Récupérer les 4 derniers adhérents
-            const membersInfoPromises = lastFourAdherents.map(address => getUserInfo(address, contract)); // Passer l'adresse ici
-            const membersInfo = await Promise.all(membersInfoPromises);
+      const rpcInstance = new Web3(new Web3.providers.HttpProvider(RPC_URL));
 
-            setDernierAdherentsInfo(membersInfo);
-        } catch (error) {
-            console.error("Erreur lors de la récupération des derniers adhérents:", error);
-        }
+      setWeb3(instanceWeb3);
+      setRpcWeb3(rpcInstance);
     };
 
-    const getUserInfo = async (address: string, contract: any): Promise<UserInfo> => {
-        try {
-            const contractManagement = new web3!.eth.Contract(ABI_ADHESION_MANAGEMENT, contractAddressManagement);
+    initProviders();
+  }, [RPC_URL]);
 
-            // <-- Typage minimal pour ne pas casser la logique runtime (on garde userInfo[0], [1], [2] tels quels)
-            const userInfo = await contractManagement.methods.getUserInfo(address).call() as any;
+  // ✅ Fetch toujours avec le provider public (lecture seule)
+  useEffect(() => {
+    if (rpcWeb3) fetchDerniersAdherents(rpcWeb3);
+  }, [rpcWeb3]);
 
-            const membershipValid = userInfo[0]; // Booléen pour la validité
-            const name = userInfo[1]; // Nom
-            const bio = userInfo[2]; // Bio
+  const fetchDerniersAdherents = async (provider: Web3) => {
+    try {
+      const contract = new provider.eth.Contract(ABI as any, contractAddress);
+      const uniqueMembers = new Set<string>();
+      const roles = [0, 1, 2, 3];
 
-            // Récupérer les tokens
-            const tokens = await contract.methods.getTokensByOwner(address).call();
+      for (const role of roles) {
+        const members: string[] = await contract.methods.getMembersByRole(role).call();
+        members.forEach((m) => uniqueMembers.add(m));
+      }
 
-            // Récupérer les images des insectes associés aux tokens
-            const insects = await Promise.all(tokens.map(async (tokenId: number) => {
-                try {
-                    const tokenURI: string = await contract.methods.tokenURI(tokenId).call();
-                    const response = await fetch(tokenURI);
+      const lastFour = Array.from(uniqueMembers).slice(-4);
+      const membersInfo = await Promise.all(
+        lastFour.map((addr) => getUserInfo(addr, provider))
+      );
 
-                    if (!response.ok) {
-                        throw new Error(`Erreur lors de la récupération de l'URI : ${response.statusText}`);
-                    }
+      setDernierAdherentsInfo(membersInfo);
+    } catch (err) {
+      console.error("❌ Erreur lors de la récupération des derniers adhérents :", err);
+    }
+  };
 
-                    const metadata = await response.json();
-                    return { id: tokenId.toString(), image: metadata.image, name: metadata.name }; // Récupérer l'image
-                } catch (error) {
-                    console.error("Erreur lors de la récupération de l'insecte:", error);
-                    return null;
-                }
-            }));
+  const getUserInfo = async (address: string, contract: any): Promise<UserInfo> => {
+      try {
+          const contractManagement = new web3!.eth.Contract(ABI_ADHESION_MANAGEMENT, contractAddressManagement);
 
-            // Filtrer les null et renvoyer un tableau vide si pas d'insectes
-            return {
-                membershipValid,
-                name,
-                bio,
-                address,  // Ajoutez l'adresse Ethereum ici
-                tokens,
-                insects: (insects.filter(Boolean) as InsectURI[])
-            };
-        } catch (error) {
-            console.error(`Erreur lors de la récupération des informations de l'utilisateur ${address}:`, error);
-            return { membershipValid: false, name: "", bio: "", address, tokens: [], insects: [] }; // Initialiser insects comme tableau vide
-        }
-    };
+          // <-- Typage minimal pour ne pas casser la logique runtime (on garde userInfo[0], [1], [2] tels quels)
+          const userInfo = await contractManagement.methods.getUserInfo(address).call() as any;
 
-      return (
+          const membershipValid = userInfo[0]; // Booléen pour la validité
+          const name = userInfo[1]; // Nom
+          const bio = userInfo[2]; // Bio
+
+          // Récupérer les tokens
+          const tokens = await contract.methods.getTokensByOwner(address).call();
+
+          // Récupérer les images des insectes associés aux tokens
+          const insects = await Promise.all(tokens.map(async (tokenId: number) => {
+              try {
+                  const tokenURI: string = await contract.methods.tokenURI(tokenId).call();
+                  const response = await fetch(tokenURI);
+
+                  if (!response.ok) {
+                      throw new Error(`Erreur lors de la récupération de l'URI : ${response.statusText}`);
+                  }
+
+                  const metadata = await response.json();
+                  return { id: tokenId.toString(), image: metadata.image, name: metadata.name }; // Récupérer l'image
+              } catch (error) {
+                  console.error("Erreur lors de la récupération de l'insecte:", error);
+                  return null;
+              }
+          }));
+
+          // Filtrer les null et renvoyer un tableau vide si pas d'insectes
+          return {
+              membershipValid,
+              name,
+              bio,
+              address,  // Ajoutez l'adresse Ethereum ici
+              tokens,
+              insects: (insects.filter(Boolean) as InsectURI[])
+          };
+      } catch (error) {
+          console.error(`Erreur lors de la récupération des informations de l'utilisateur ${address}:`, error);
+          return { membershipValid: false, name: "", bio: "", address, tokens: [], insects: [] }; // Initialiser insects comme tableau vide
+      }
+  };
+
+  return (
     <Box p={5}>
       <Box mt={5}>
         {dernierAdherentsInfo.length > 0 ? (
@@ -145,35 +146,48 @@ const DerniersAdherents: React.FC = () => {
             {dernierAdherentsInfo.map((info, idx) => (
               <GridItem
                 key={idx}
-                w={{ base: "100%", md: "200px" }}  // Pleine largeur mobile, fixe desktop
-                height="250px"
+                w={{ base: "100%", md: "200px" }}
+                h="250px"
                 borderRadius="xl"
                 position="relative"
                 p="2px"
-                bgGradient="linear-gradient(90deg, pink.400, purple.700, pink.400)"
+                bgGradient={
+                  colorMode === "light"
+                    ? gradients.cardBorderLight
+                    : gradients.cardBorderDark
+                }
                 backgroundSize="300% 300%"
-                animation={`${borderAnimation} 6s linear infinite`}
+                animation={animations.borderGlow}
                 transition="all 0.3s ease"
                 _hover={{
-                  animation: `${borderAnimation} 2s linear infinite`,
+                  animation: animations.borderGlow.replace("6s", "2s"),
                   transform: "scale(1.05)",
-                  boxShadow: "0 0 25px rgba(216, 112, 255, 0.6)",
+                  boxShadow:
+                    colorMode === "light"
+                      ? "0 0 25px rgba(180, 166, 213, 0.6)"
+                      : "0 0 25px rgba(238, 212, 132, 0.6)",
                 }}
+                justifySelf="center"
+                mx="auto"
               >
-                <Box
-                  bg="gray.900"
-                  borderRadius="xl"
-                  height="100%"
-                  p={4}
-                  textAlign="center"
-                >
+              <Box
+                borderRadius="xl"
+                height="100%"
+                p={4}
+                textAlign="center"
+                bg={bgColor} // <-- couleur dynamique
+              >
                   <Link href={`/u/${info.address}`} passHref>
-                    <Tooltip label="Cliquez pour voir le profil" hasArrow>
+                    <Tooltip label="Voir le profil" hasArrow>
                       <Box as="a" display="block" height="100%">
-                        <Text fontWeight="bold" color="pink.200">{info.name}</Text>
-                        <Text fontSize="sm" color="gray.300">{info.bio}</Text>
+                        <Text fontWeight="bold" color="pink.200">
+                          {info.name || "Utilisateur anonyme"}
+                        </Text>
+                        <Text fontSize="sm" color="gray.300">
+                          {info.bio || "Aucune bio"}
+                        </Text>
                         <Box display="flex" justifyContent="center" mt={3}>
-                          {info.insects && info.insects.length > 0 ? (
+                          {info.insects.length > 0 ? (
                             info.insects.map((insect) => (
                               <Box key={insect.id} mr={2} textAlign="center">
                                 <Image
@@ -183,11 +197,15 @@ const DerniersAdherents: React.FC = () => {
                                   borderRadius="md"
                                   objectFit="cover"
                                 />
-                                <Text fontSize="xs" color="gray.400" mt={1}>{insect.name}</Text>
+                                <Text fontSize="xs" color="gray.400" mt={1}>
+                                  {insect.name}
+                                </Text>
                               </Box>
                             ))
                           ) : (
-                            <Text fontSize="xs" color="gray.500">Aucun jeton d'adhésion</Text>
+                            <Text fontSize="xs" color="gray.500">
+                              Aucun jeton
+                            </Text>
                           )}
                         </Box>
                       </Box>
@@ -198,12 +216,11 @@ const DerniersAdherents: React.FC = () => {
             ))}
           </Grid>
         ) : (
-          <Text>Aucun adhérent trouvé.</Text>
+          <Center><Text>Aucun adhérent trouvé.</Text></Center>
         )}
       </Box>
     </Box>
   );
-
 };
 
 export default DerniersAdherents;

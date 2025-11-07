@@ -28,7 +28,7 @@ const CollectionsVignettes: React.FC<{ creator: string }> = ({ creator }) => {
       try {
         const allCollections: CollectionOnChain[] = await contract.getCollectionsByUser(creator);
         // on ne garde que les 5 dernières
-        const lastCollections = [...allCollections].slice(-5).reverse(); // 5 dernières
+        const lastCollections = [...allCollections].slice(-2).reverse(); // 5 dernières
         setCollections(lastCollections);
 
         // fetch metadata pour récupérer l'image

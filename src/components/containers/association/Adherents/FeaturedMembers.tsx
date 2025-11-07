@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import Web3 from "web3";
-import { Box, Grid, GridItem, Text, Image, Tooltip } from "@chakra-ui/react";
-import Link from 'next/link';
-import { keyframes } from "@emotion/react";
-import ABI from '../../../ABI/ABIAdhesion.json';
-import ABI_ADHESION_MANAGEMENT from '../../../ABI/ABI_ADHESION_MANAGEMENT.json';
+import { Box, Grid, GridItem, Text, Image, Tooltip, useColorMode, useColorModeValue } from "@chakra-ui/react";
+import Link from "next/link";
 
-// ✅ Interfaces locales
+import {borderAnimation, gradients, animations, styles, Backgrounds} from "@/styles/theme"
+
+import ABI from "../../../ABI/ABIAdhesion.json";
+import ABI_ADHESION_MANAGEMENT from "../../../ABI/ABI_ADHESION_MANAGEMENT.json";
+
 interface InsectURI {
   id: string;
   image: string;
@@ -26,58 +27,62 @@ interface FeaturedMembersProps {
   addresses: string[];
 }
 
-// ✅ Animation d'une lueur autour du contour
-const borderAnimation = keyframes`
-  0% { background-position: 0% 50%; }
-  100% { background-position: 400% 50%; }
-`;
 
 const FeaturedMembers: React.FC<FeaturedMembersProps> = ({ addresses }) => {
-  const [web3, setWeb3] = useState<Web3 | null>(null);
   const [featuredMembersInfo, setFeaturedMembersInfo] = useState<UserInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const { colorMode } = useColorMode();
+
+  const bgColor = useColorModeValue(
+    Backgrounds.cardBorderLight,
+    Backgrounds.cardBorderDark
+  );
+
 
   const contractAddressManagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGER!;
   const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS!;
-  const RPC_URL = process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string; // ✅ Fallback RPC public
+  const RPC_URL = process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string;
 
-  // ✅ Initialisation de Web3 : essaie MetaMask, sinon RPC public
+  // ✅ Un seul useEffect pour tout gérer
   useEffect(() => {
-    const initWeb3 = async () => {
-      let web3Instance;
-      if (typeof window !== "undefined" && (window as any).ethereum) {
-        // Si MetaMask est dispo, on l’utilise
-        web3Instance = new Web3((window as any).ethereum);
-        console.log("✅ Utilisation du provider MetaMask");
-      } else {
-        // Sinon fallback sur le RPC Moralis
-        web3Instance = new Web3(new Web3.providers.HttpProvider(RPC_URL));
-        console.log("🌐 Utilisation du provider RPC public (lecture seule)");
+    const fetchMembers = async () => {
+      if (!addresses || addresses.length === 0) return;
+
+      try {
+        setLoading(true);
+        console.log("📬 Adresses reçues :", addresses);
+
+        // 🔒 Toujours lecture en RPC public — pas de MetaMask ici
+        const web3 = new Web3(new Web3.providers.HttpProvider(RPC_URL));
+        console.log("🌐 Lecture via RPC public :", RPC_URL);
+
+        const contractManagement = new web3.eth.Contract(
+          ABI_ADHESION_MANAGEMENT as any,
+          contractAddressManagement
+        );
+
+        const contract = new web3.eth.Contract(
+          ABI as any,
+          contractAddress
+        );
+
+        // 🔍 Récupération des infos utilisateur
+        const membersInfoPromises = addresses.map((address) =>
+          getUserInfo(address, contractManagement, contract)
+        );
+
+        const membersInfo = await Promise.all(membersInfoPromises);
+        setFeaturedMembersInfo(membersInfo);
+      } catch (error) {
+        console.error("Erreur lors de la récupération des membres :", error);
+      } finally {
+        setLoading(false);
       }
-      setWeb3(web3Instance);
     };
-    initWeb3();
-  }, [RPC_URL]);
 
-  // ✅ Récupération des membres quand Web3 est prêt
-  useEffect(() => {
-    if (web3) fetchFeaturedMembers();
-  }, [web3]);
-
-  const fetchFeaturedMembers = async () => {
-    try {
-      const contractManagement = new web3!.eth.Contract(ABI_ADHESION_MANAGEMENT as any, contractAddressManagement);
-      const contract = new web3!.eth.Contract(ABI as any, contractAddress);
-
-      const membersInfoPromises = addresses.map((address) =>
-        getUserInfo(address, contractManagement, contract)
-      );
-
-      const membersInfo = await Promise.all(membersInfoPromises);
-      setFeaturedMembersInfo(membersInfo);
-    } catch (error) {
-      console.error("Erreur lors de la récupération des adhérents en avant:", error);
-    }
-  };
+    fetchMembers();
+  }, [addresses, RPC_URL]);
 
   const getUserInfo = async (
     address: string,
@@ -85,21 +90,36 @@ const FeaturedMembers: React.FC<FeaturedMembersProps> = ({ addresses }) => {
     contract: any
   ): Promise<UserInfo> => {
     try {
-      const userInfo: unknown[] = await contractManagement.methods.getUserInfo(address).call();
+      console.log("🔍 Lecture infos utilisateur pour :", address);
+
+      const userInfo: unknown[] = await contractManagement.methods
+        .getUserInfo(address)
+        .call();
+
       const membershipValid = Boolean(userInfo[0]);
       const name = String(userInfo[1] || "");
       const bio = String(userInfo[2] || "");
 
-      const tokens: number[] = await contract.methods.getTokensByOwner(address).call();
+      const tokens: number[] = await contract.methods
+        .getTokensByOwner(address)
+        .call();
 
       const insects = await Promise.all(
         tokens.map(async (tokenId: number) => {
           try {
-            const tokenURI: string = await contract.methods.tokenURI(tokenId).call();
+            const tokenURI: string = await contract.methods
+              .tokenURI(tokenId)
+              .call();
+
             const response = await fetch(tokenURI);
             if (!response.ok) throw new Error(`Erreur HTTP ${response.status}`);
+
             const metadata = await response.json();
-            return { id: tokenId.toString(), image: metadata.image, name: metadata.name } as InsectURI;
+            return {
+              id: tokenId.toString(),
+              image: metadata.image,
+              name: metadata.name,
+            } as InsectURI;
           } catch (err) {
             console.error("Erreur lors de la récupération du token", tokenId, err);
             return null;
@@ -113,19 +133,30 @@ const FeaturedMembers: React.FC<FeaturedMembersProps> = ({ addresses }) => {
         bio,
         address,
         tokens,
-        insects: insects.filter((insect): insect is InsectURI => insect !== null),
+        insects: insects.filter((i): i is InsectURI => i !== null),
       };
     } catch (error) {
-      console.error(`Erreur lors de la récupération des infos utilisateur ${address}:`, error);
-      return { membershipValid: false, name: "", bio: "", address, tokens: [], insects: [] };
+      console.error(`Erreur lors de la récupération de ${address}:`, error);
+      return {
+        membershipValid: false,
+        name: "",
+        bio: "",
+        address,
+        tokens: [],
+        insects: [],
+      };
     }
   };
 
-  // ✅ Rendu visuel
+  // ✅ Rendu
   return (
     <Box p={5}>
       <Box mt={5}>
-        {featuredMembersInfo.length > 0 ? (
+        {loading ? (
+          <Text color="gray.400" textAlign="center">
+            Chargement des membres...
+          </Text>
+        ) : featuredMembersInfo.length > 0 ? (
           <Grid
             templateColumns={{
               base: "1fr",
@@ -139,28 +170,45 @@ const FeaturedMembers: React.FC<FeaturedMembersProps> = ({ addresses }) => {
               <GridItem
                 key={idx}
                 w={{ base: "100%", md: "200px" }}
-                height="250px"
+                h="250px"
                 borderRadius="xl"
                 position="relative"
                 p="2px"
-                bgGradient="linear-gradient(90deg, pink.400, purple.700, pink.400)"
+                bgGradient={
+                  colorMode === "light"
+                    ? gradients.cardBorderLight
+                    : gradients.cardBorderDark
+                }
                 backgroundSize="300% 300%"
-                animation={`${borderAnimation} 6s linear infinite`}
+                animation={animations.borderGlow}
                 transition="all 0.3s ease"
                 _hover={{
-                  animation: `${borderAnimation} 2s linear infinite`,
+                  animation: animations.borderGlow.replace("6s", "2s"),
                   transform: "scale(1.05)",
-                  boxShadow: "0 0 25px rgba(216, 112, 255, 0.6)",
+                  boxShadow:
+                    colorMode === "light"
+                      ? "0 0 25px rgba(180, 166, 213, 0.6)"
+                      : "0 0 25px rgba(238, 212, 132, 0.6)",
                 }}
                 justifySelf="center"
                 mx="auto"
               >
-                <Box bg="gray.900" borderRadius="xl" height="100%" p={4} textAlign="center">
+              <Box
+                borderRadius="xl"
+                height="100%"
+                p={4}
+                textAlign="center"
+                bg={bgColor} // <-- couleur dynamique
+              >
                   <Link href={`/u/${info.address}`} passHref>
                     <Tooltip label="Cliquez pour voir le profil" hasArrow>
                       <Box as="a" display="block" height="100%">
-                        <Text fontWeight="bold" color="pink.200">{info.name}</Text>
-                        <Text fontSize="sm" color="gray.300">{info.bio}</Text>
+                        <Text fontWeight="bold" color="pink.200">
+                          {info.name || "Membre anonyme"}
+                        </Text>
+                        <Text fontSize="sm" color="gray.300">
+                          {info.bio || "Aucune biographie"}
+                        </Text>
 
                         <Box display="flex" justifyContent="center" mt={3}>
                           {info.insects.length > 0 ? (
@@ -193,7 +241,7 @@ const FeaturedMembers: React.FC<FeaturedMembersProps> = ({ addresses }) => {
           </Grid>
         ) : (
           <Text color="gray.400" textAlign="center">
-            Aucun adhérent trouvé.
+            Aucun membre trouvé.
           </Text>
         )}
       </Box>

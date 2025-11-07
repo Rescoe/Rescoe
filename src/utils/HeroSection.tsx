@@ -4,11 +4,9 @@ import { ChevronDownIcon, ChevronUpIcon } from "@chakra-ui/icons";
 import { motion } from "framer-motion";
 import Link from 'next/link';
 
-
-
 import { useRouter } from "next/router";
 import { JsonRpcProvider } from 'ethers';
-import {FilteredCollectionsCarousel} from '../components/containers/galerie/art';
+import ColorOverlayBox from '@/utils/ColorOverlayBox';
 
 
 // ---------------------- Types ----------------------
@@ -149,35 +147,40 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
               />
 
               {/* Poème overlay */}
+
               <Box
                 position="absolute"
                 top="0"
                 left="0"
                 w="100%"
                 h="100%"
-                bg="rgba(0, 0, 0, 0.5)" // Couleur de l'overlay pour le poème
                 display="flex"
                 justifyContent="center"
                 alignItems="center"
                 zIndex={1}
               >
-                <VStack spacing={2} textAlign="center" color="white" maxW="80%" mx="auto" px={2}>
+              <ColorOverlayBox imageUrl={selectedNft.image}>
+
+                <VStack spacing={2} textAlign="center" maxW="80%" mx="auto" px={2} bg="rgba(0, 0, 0, 0.1)" >
                   {getPoemText(selectedHaiku.poemText)
                     ?.split("\n")
                     .map((line: string, i: number) => (
                       <Text
                         key={i}
                         fontStyle="italic"
-                        fontSize={{ base: "md", md: "lg" }}
-                        lineHeight="1.6"
-                        fontWeight="medium"
+                        fontSize={{ base: "lg", md: "2xl" }} // taille augmentée
+                        lineHeight="1.8" // un peu plus espacé
+                        fontWeight="bold" // texte plus épais
                         whiteSpace="pre-wrap"
                         wordBreak="break-word"
+
                       >
                         {line}
                       </Text>
                   ))}
                 </VStack>
+                </ColorOverlayBox>
+
               </Box>
 
               {/* Overlay pour la sélection des actions */}
@@ -188,7 +191,6 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
                   left="50%"
                   transform="translate(-50%, -50%)" // Centrage de l'overlay
                   w="80%" // Largeur de l'overlay
-                  bg="rgba(0, 0, 0, 0.3)" // Fond blanc semi-transparent
                   p={4}
                   borderRadius="md"
                   boxShadow="md"
@@ -201,7 +203,6 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
                   <HStack spacing={4} justifyContent="center">
                     <Button
                       colorScheme="white"
-                      bg="rgba(255, 255, 255, 0.9)"
                       onClick={() => {
                         handleNavigatePoem();
                         handleOverlayClick();
@@ -212,7 +213,6 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
 
                     <Button
                       colorScheme="white"
-                      bg="rgba(255, 255, 255, 0.9)"
                       onClick={() => {
                         handleNavigateNft();
                         handleOverlayClick();
@@ -239,7 +239,6 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
                       as="a"
                       fontStyle="italic"
                       fontSize="sm"
-                      color="purple.300"
                       _hover={{ textDecoration: "underline" }}
                     >
                       {resolveName(selectedNft.artist, "Artiste inconnu")}
@@ -248,85 +247,25 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
                 )}
               </Box>
 
+
               <Box>
                 <Text fontWeight="bold" fontSize="md">
                   Poème :{" "}
-                  <Text as="span" fontWeight="normal">
-                    {/* clickable pour le poète */}
+                </Text>
                     {selectedHaiku.poemText?.[7] && (
                       <Link href={`/u/${selectedHaiku.poemText[7]}`} passHref>
                         <Text
                           as="a"
                           fontStyle="italic"
                           fontSize="sm"
-                          color="purple.300"
                           _hover={{ textDecoration: "underline" }}
                         >
                           {resolveName(selectedHaiku.poemText[7], "Poète inconnu")}
                         </Text>
                       </Link>
                     )}
-                  </Text>
-                </Text>
               </Box>
             </HStack>
-
-{/*
-            <Divider my={6} borderColor="purple.700" w="60%" mx="auto" />
-
-
-            <Button
-              variant="ghost"
-              size="lg"
-              fontSize="xl"
-              fontWeight="bold"
-              px={8}
-              py={6}
-              rightIcon={
-                !showCollections
-                  ? (
-                      <MotionChevron
-                        animate={{ y: [0, -5, 0] }}
-                        transition={{ repeat: Infinity, duration: 0.6 }}
-                        boxSize={6}
-                        color="purple.400"
-                      />
-                    )
-                  : undefined
-              }
-              color="purple.400"
-              onClick={() => setShowCollections(prev => !prev)}
-              _hover={{ bg: "purple.100" }}
-              textAlign="center"
-              whiteSpace="normal"
-            >
-              Voir les collections mises en avant
-            </Button>
-
-
-
-            <VStack spacing={5} w="full">
-
-                  {showCollections && (
-
-                    <Box w="full" maxW="900px" mx="auto" overflow="hidden">
-                    <Heading size="lg" mb={4} color="purple.700" textAlign="center">
-{resolveName(selectedNft.artist, "Artiste inconnu")}
-</Heading>
-
-                    {selectedNft.artist && <FilteredCollectionsCarousel creator={selectedNft.artist} />}
-
-                    <Divider my={8} borderColor="purple.300" />
-
-                    <Heading size="lg" mb={4} color="purple.700" textAlign="center">
-{resolveName(selectedHaiku.poemText?.[7], "Artiste inconnu")}
-</Heading>
-
-                    {<FilteredCollectionsCarousel creator={selectedHaiku.poemText?.[7]} />}
-                    </Box>
-                  )}
-                </VStack>
-*/}
           </>
         )}
       </Box>
