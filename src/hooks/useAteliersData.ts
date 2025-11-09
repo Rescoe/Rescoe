@@ -39,7 +39,7 @@ interface OnChainAtelierInfo {
 }
 
 // CONTRACT: adjust to your deployed address (or keep the earlier one)
-const CONTRACT_ADDRESS = "0x71B779C8415925DBE89152aE59bad358A4baa98B";
+const CONTRACT_ADDRESS = "0x480cFD5601572Dd2C8B47103cD9cDeD979A602C7";
 
 // ---------- Helpers améliorés ----------
 const extractHashtags = (content: string): string[] => {

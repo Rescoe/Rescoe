@@ -118,6 +118,28 @@ const NAV_LINKS: ISubNav[] = [
     href: '/actus',
     icon: FaCalendarAlt,
   },
+
+  {
+      label: 'Résidences',
+      subLabel: 'Artistes et poètes en résidences chez Rescoe',
+      href: '/residents',
+      icon: FaCalendarAlt,
+        children: [
+          {
+            label: 'May Santot',
+            subLabel: 'Poétesse (bio à ajouter)',
+            href: '/residents/maysantot',
+            icon: FaHandshake,
+          },
+          {
+            label: 'Roubzi',
+            subLabel: 'Artiste et dresseur de shtern',
+            href: '/residents/roubzi',
+            icon: FaUserCheck,
+          },
+        ],
+  },
+
 ];
 
 export default NAV_LINKS;

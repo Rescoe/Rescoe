@@ -15,6 +15,12 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { Formations } from "@/components/containers/association/Formations";
 
+import { useAuth } from "@/utils/authContext"; // chemin vers ton AuthProvider
+import MessageEditions from "@/components/ABI/MessageEditions.json";
+import { keccak256 } from "js-sha3";
+
+
+const CONTRACT_ADDRESS = "0xAe9D3d25c58ff1730AC6ec54E1349c42138249A5";
 
 interface DiscordMessage {
   id: string;
@@ -32,6 +38,8 @@ const ChannelFeed: React.FC<ChannelFeedProps> = ({ channelId }) => {
   const [messages, setMessages] = useState<DiscordMessage[]>([]);
   const [limit, setLimit] = useState(10);
   const [loading, setLoading] = useState(true);
+
+  const { web3, address } = useAuth();
   const [mintingIds, setMintingIds] = useState<string[]>([]);
   const toast = useToast();
   const [rules, setRules] = useState<{
@@ -85,15 +93,114 @@ const ChannelFeed: React.FC<ChannelFeedProps> = ({ channelId }) => {
     fetchMessages();
   }, [channelId, limit]);
 
-  // Mint simulation (à remplacer par ta fonction réelle)
-  const mintMessage = async (msg: DiscordMessage) => {
-    toast({
-      title: "Mint simulé",
-      description: `Message de ${msg.author.username} minté.`,
-      status: "info",
-      duration: 2000,
-    });
-  };
+
+
+    const mintMessage = async (msg: DiscordMessage) => {
+
+
+      if (!web3 || !address) throw new Error("Connectez votre wallet avant de mint");
+      if (!rules.price) throw new Error("Prix non défini");
+
+      try {
+        setMintingIds((prev) => [...prev, msg.id]);
+        const ethereum = (window as any).ethereum;
+        await ethereum.request({ method: "eth_requestAccounts" });
+
+        const contract = new web3.eth.Contract(
+          (MessageEditions as any).abi ?? MessageEditions,
+          CONTRACT_ADDRESS
+        );
+
+        const keccak = web3.utils.soliditySha3({
+          type: "string",
+          value: msg.id,
+        }) as string;
+
+        const haiku = msg.content || " ";
+        const pricePerEdition = rules.price ?? 0.001;
+        const priceInWei = web3.utils.toWei(pricePerEdition.toString(), "ether");
+        const salonRoyaltyAddress = rules.splitAddress ?? address;
+        const editionsForSale = (() => {
+          const m = msg.content.match(/\/editions (\d+)/i);
+          return m ? parseInt(m[1], 10) : rules.editions ?? 1;
+        })();
+        const isOpenEdition = editionsForSale === 0;
+        const durationRule = rules.duration ?? "7j";
+        let mintDurationSeconds = 7 * 24 * 3600;
+        if (durationRule.endsWith("j"))
+          mintDurationSeconds = parseInt(durationRule) * 24 * 3600;
+        else if (durationRule.endsWith("h"))
+          mintDurationSeconds = parseInt(durationRule) * 3600;
+        else if (durationRule.endsWith("m"))
+          mintDurationSeconds = parseInt(durationRule) * 60;
+
+        const imageUrl = msg.attachments?.[0]?.url || "";
+        const messageTimestamp = Math.floor(new Date(msg.timestamp).getTime() / 1000);
+
+        const valueToSend = BigInt(priceInWei);
+
+        console.log(            keccak,
+                    haiku,
+                    priceInWei,
+                    salonRoyaltyAddress,
+                    imageUrl,
+                    messageTimestamp,
+                    mintDurationSeconds,
+                    editionsForSale,
+                    isOpenEdition);
+
+        const gasEstimate = await contract.methods
+          .mint(
+            keccak,
+            haiku,
+            priceInWei,
+            salonRoyaltyAddress,
+            imageUrl,
+            messageTimestamp,
+            mintDurationSeconds,
+            editionsForSale,
+            isOpenEdition
+          )
+          .estimateGas({ from: address, value: priceInWei });
+
+        await contract.methods
+          .mint(
+            keccak,
+            haiku,
+            priceInWei,
+            salonRoyaltyAddress,
+            imageUrl,
+            messageTimestamp,
+            mintDurationSeconds,
+            editionsForSale,
+            isOpenEdition
+          )
+          .send({
+            from: address,
+            value: valueToSend.toString(),
+            gas: gasEstimate.toString(),
+          });
+
+        toast({
+          title: "Mint réussi",
+          description: `Message de ${msg.author.username} minté !`,
+          status: "success",
+          duration: 4000,
+          isClosable: true,
+        });
+      } catch (err: any) {
+        console.error("Mint échoué:", err);
+        toast({
+          title: "Mint échoué",
+          description: err?.message || "Erreur inconnue lors du mint.",
+          status: "error",
+          duration: 6000,
+          isClosable: true,
+        });
+      } finally {
+        setMintingIds((prev) => prev.filter((id) => id !== msg.id));
+      }
+    };
 
 
   return (

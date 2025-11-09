@@ -99,7 +99,7 @@ export const brandHover = {
 };
 
 
-const effects = {
+export const effects = {
   glowLight: "0 0 25px rgba(180, 166, 213, 0.6)",
   glowDark: "0 0 25px rgba(238, 212, 132, 0.6)",
 };

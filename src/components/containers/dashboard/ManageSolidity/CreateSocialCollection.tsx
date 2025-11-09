@@ -25,7 +25,7 @@ const CreateSocialCollection: React.FC = () => {
   const toast = useToast();
   const { address: authAddress } = useAuth();
 
-  const MESSAGE_FACTORY_ADDRESS = process.env.NEXT_PUBLIC_MESSAGE_FACTORY_ADDRESS!;
+  const MESSAGE_FACTORY_ADDRESS = "0x0027731b92352Dc6F429b388aA42bd0c0cFBAB62";
   const RESCOLLECTION_FACTORY_ADDRESS = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!;
 
   const [web3, setWeb3] = useState<Web3 | null>(null);
@@ -76,43 +76,57 @@ const CreateSocialCollection: React.FC = () => {
       const messageFactory = new web3.eth.Contract(ABI_MESSAGE_FACTORY, MESSAGE_FACTORY_ADDRESS);
       const resFactory = new web3.eth.Contract(ABI_RESCOLLECTION, RESCOLLECTION_FACTORY_ADDRESS);
 
-      // --- Récupération des noms de salons ---
+      // --- Récupération des noms de salons depuis MessageFactory ---
       const salonListRaw: any = await messageFactory.methods.getAllSalons().call();
       const salonList = Array.isArray(salonListRaw) ? salonListRaw : Object.values(salonListRaw);
 
-      setSalons(salonList);
-
-      // --- Récupération des collections Social ---
+      // --- Récupération de TOUTES les collections Social ---
       const totalMinted = await resFactory.methods.getTotalCollectionsMinted().call();
       const addressSalonRaw: any = await resFactory.methods
-        .getCollectionsByType("Social", 0, Number(totalMinted) - 1)
+        .getCollectionsByType("Social", 11, Number(totalMinted) - 1)
         .call();
 
-      const addressSalonArray = Array.isArray(addressSalonRaw) ? addressSalonRaw : Object.values(addressSalonRaw);
+      const addressSalonArray = Array.isArray(addressSalonRaw)
+        ? addressSalonRaw
+        : Object.values(addressSalonRaw);
 
-      // --- Normalisation des données pour React ---
-      const collectionsInfo: CollectionInfo[] = addressSalonArray.map((c: any, i: number) => {
-        // Si c est un objet avec des clés, récupère les propriétés ; sinon, c est une string
+      // --- Association correcte par NOM (pas par index) ---
+      const collectionsInfo: CollectionInfo[] = addressSalonArray.map((c: any) => {
         const collectionAddress =
           typeof c === "string"
             ? c
-            : c.collectionAddress || JSON.stringify(c); // fallback en string pour debug
-        const collectionType = typeof c === "object" && c.collectionType ? c.collectionType : "Social";
-        const name =
-          typeof salonList[i] === "string"
-            ? salonList[i]
-            : salonList[i]?.name
-            ? salonList[i].name
-            : `Salon inconnu`;
+            : c.collectionAddress || JSON.stringify(c);
+
+        const collectionType =
+          typeof c === "object" && c.collectionType ? c.collectionType : "Social";
+
+        // Trouver un salon dont le nom correspond à la collection
+        const match = salonList.find((s: any) => {
+          const salonName =
+            typeof s === "string"
+              ? s
+              : s.name || s.salonName || "";
+          return (
+            salonName.toLowerCase().trim() ===
+            (c.name || c.collectionName || "").toLowerCase().trim()
+          );
+        });
+
+        const name = match
+          ? typeof match === "string"
+            ? match
+            : match.name || match.salonName
+          : "Salon inconnu";
 
         return { name, collectionType, collectionAddress };
       });
 
+      setSalons(salonList);
       setAddressSalons(collectionsInfo);
 
       toast({
         title: "Salons chargés",
-        description: `${salonList.length} salon(s) trouvé(s).`,
+        description: `${collectionsInfo.length} salon(s) trouvé(s).`,
         status: "success",
         duration: 2500,
         isClosable: true,
@@ -247,6 +261,13 @@ const CreateSocialCollection: React.FC = () => {
     }
   };
 
+
+//On donne automatiquement a la collection le nom du salon.
+//C'est necessaire au niveau du contrat que les deux aient le meme nom pour transmettre les règles d'adhésion (et peut etre d'autres dans le futur, royalties etc)
+  useEffect(() => {
+  setMetadata((prev) => ({ ...prev, name: salonName }));
+}, [salonName]);
+
   return (
     <Box
       maxW="700px"
@@ -306,6 +327,16 @@ const CreateSocialCollection: React.FC = () => {
       >
         Création d’un salon social
       </Heading>
+      <Heading
+        size="l"
+        mb={6}
+        textAlign="center"
+        fontWeight="black"
+        bgGradient="linear(to-r, purple.400, pink.400)"
+        bgClip="text"
+      >
+        Attention addresse adhesion du contrat doit etre management adhesion
+      </Heading>
 
       <VStack spacing={4} align="stretch">
         <FormLabel color="gray.300" fontWeight="bold">Nom du salon</FormLabel>
@@ -329,16 +360,6 @@ const CreateSocialCollection: React.FC = () => {
           <option style={{ backgroundColor: "#1A202C" }} value="no">Non</option>
           <option style={{ backgroundColor: "#1A202C" }} value="yes">Oui</option>
         </Select>
-
-        <FormLabel color="gray.300" fontWeight="bold">Nom de la collection</FormLabel>
-        <Input
-          placeholder="Titre de la collection"
-          value={metadata.name}
-          onChange={(e) => setMetadata({ ...metadata, name: e.target.value })}
-          bg="blackAlpha.300"
-          color="white"
-          borderColor="purple.300"
-        />
 
         <FormLabel color="gray.300" fontWeight="bold">Description</FormLabel>
         <Input
@@ -366,9 +387,15 @@ const CreateSocialCollection: React.FC = () => {
 
         {ipfsUrl && <Text wordBreak="break-word">IPFS: {ipfsUrl}</Text>}
 
+
         <Divider borderColor="purple.400" my={6} />
 
+        <Text fontStyle="italic">
+Nom de la collection : {metadata.name || "— (sera le même que le salon)"}
+</Text>
+
         <Flex justify="center">
+
           <Button
             onClick={handleCreateSocial}
             px={10}

@@ -1,15 +1,13 @@
 import { useState, useEffect } from "react";
 import Web3 from "web3";
 import { JsonRpcProvider, Contract } from 'ethers';
-import { ethers } from 'ethers';
-
 import { BigNumberish } from 'ethers';
-
 import detectEthereumProvider from '@metamask/detect-provider';
 import axios from 'axios';
 import ABI from '../../ABI/ABIAdhesion.json'; // Votre ABI de contrat ici.
 import getRandomInsectGif from '../../../utils/GenInsect24'; // Importer la fonction
 import { useRouter } from "next/router";
+import { FaAward, FaWallet, FaClock, FaUserShield, FaStar } from "react-icons/fa";
 
 import {
     Box,
@@ -18,21 +16,27 @@ import {
     Heading,
     Text,
     Select,
-    Image,
     FormControl,
     FormLabel,
     Input,
-    Progress
-} from "@chakra-ui/react";
-import dynamic from 'next/dynamic';
-import { Canvas } from '@react-three/fiber';
-import useEthToEur from "../../../hooks/useEuro";
+    List,
+    ListItem,
+    Stack,
+    Icon,
+    Image,
+    VStack,
+    Collapse,
+    useDisclosure,
 
+} from "@chakra-ui/react";
+import { FaCheckCircle } from 'react-icons/fa'; // Exemple d'icône pour les éléments de liste
+
+import dynamic from 'next/dynamic';
+import useEthToEur from "../../../hooks/useEuro";
 import { useAuth } from '../../../utils/authContext';
 
-
 const RoleBasedNFTPage = () => {
-  const { address: account, web3 } = useAuth();
+    const { address: account, web3 } = useAuth();
     const [selectedRole, setSelectedRole] = useState<string>('');
     const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
     const [ipfsUrl, setIpfsUrl] = useState<string | null>(null);
@@ -43,30 +47,20 @@ const RoleBasedNFTPage = () => {
     const [mintPrice, setMintPrice] = useState(0); // État pour le prix du mint
     const [priceEur, setEuroPrice] = useState(0); // État pour le prix du mint
 
-
-
-    const [showBananas, setShowBananas] = useState(false);  // Add state to control when to show Bananas
-    const [name, setName] = useState(''); // Ajouter état pour le nom
-    const [bio, setBio] = useState(''); // Ajouter état pour la biographie
+    const [showBananas, setShowBananas] = useState(false); // État pour afficher les Bananas
+    const [name, setName] = useState(''); // État pour le nom
+    const [bio, setBio] = useState(''); // État pour la biographie
     const [isOnSepolia, setIsOnSepolia] = useState<boolean>(false); // État pour vérifier si sur Sepolia
-    const [wantsCryptoAdhesion, setWantsCryptoAdhesion] = useState<boolean>(false); // État pour savoir si l'utilisateur veut adhérer en crypto
     const { isAuthenticated } = useAuth();
-    const [isMinted, setIsMinted] = useState<boolean>(false);
     const [nftId, setNftId] = useState<string>('');
-
-
-    const [progress, setProgress] = useState(0);
-    const [countdown, setCountdown] = useState(5); // 5 secondes avant redirection
-
     const [isReadyToMint, setIsReadyToMint] = useState(false);
-
-    const { convertEthToEur, loading: loadingEthPrice, error: ethPriceError } = useEthToEur();
-
+    const { convertEthToEur, loading: loadingEthPrice } = useEthToEur();
 
     const router = useRouter();
-
-
     const Bananas = dynamic(() => import('../../modules/Bananas'), { ssr: false });
+
+    const { isOpen, onToggle } = useDisclosure();
+
 
     const roles = [
         { value: 'Artiste', label: 'Artiste' },
@@ -76,7 +70,6 @@ const RoleBasedNFTPage = () => {
     ];
 
     type RoleKey = 'Artiste' | 'Poete' | 'Stagiaire' | 'Contributeur';
-
     const roleMapping: { [key in RoleKey]: number } = {
         Artiste: 0,
         Poete: 1,
@@ -84,70 +77,50 @@ const RoleBasedNFTPage = () => {
         Contributeur: 3,
     };
 
-    const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS  as string; // Mettez à jour avec votre adresse de contrat
+    const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS as string; // Mettez à jour avec votre adresse de contrat
 
     useEffect(() => {
-      if (!account) return; // attendre la connexion
+        if (!account) return; // attendre la connexion
 
-      const checkNetwork = async () => {
-        if (!web3) return;
-        const chainId = await web3.eth.getChainId();
-        setIsOnSepolia(Number(chainId) === 11155111);
+        const checkNetwork = async () => {
+            if (!web3) return;
+            const chainId = await web3.eth.getChainId();
+            setIsOnSepolia(Number(chainId) === 11155111);
 
-        const storedChoice = localStorage.getItem('wantsCryptoAdhesion');
-        if (storedChoice) {
-          setWantsCryptoAdhesion(JSON.parse(storedChoice));
-        }
+            const contract = new web3.eth.Contract(ABI, contractAddress);
+            const totalMinted = await contract.methods.getTotalMinted().call();
+            setNftId(Number(totalMinted).toString());
+        };
 
-        const contract = new web3.eth.Contract(ABI, contractAddress);
-        const totalMinted = await contract.methods.getTotalMinted().call();
-        setNftId(Number(totalMinted).toString());
-      };
-
-      checkNetwork();
+        checkNetwork();
     }, [account, web3]);
 
     useEffect(() => {
-      if (account && !loadingEthPrice) {
-          fetchMintPrice();
-      }
+        if (account && !loadingEthPrice) {
+            fetchMintPrice();
+        }
     }, [account, loadingEthPrice]);
 
+    const fetchMintPrice = async () => {
+        const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
 
+        if (!contractAddress) {
+            console.error("L'adresse du contrat n'est pas définie.");
+            return;
+        }
 
+        const contract = new Contract(contractAddress, ABI, provider);
 
-const fetchMintPrice = async () => {
-    const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
-
-    if (!contractAddress) {
-        console.error("L'adresse du contrat n'est pas définie.");
-        return;
-    }
-
-    const contract = new Contract(contractAddress, ABI, provider);
-
-    try {
-        // Récupération du prix de mint en Wei depuis le contrat
-        const price: BigNumberish = await contract.mintPrice(); // Le prix est en Wei
-
-        // Conversion manuelle du prix de Wei en Ether
-        const ethPrice = Number(price) / 1e18; // Division par 10^18 pour convertir de Wei vers Ether
-
-        const priceEur = await convertEthToEur(ethPrice);
-
-
-        // Stocker le prix dans l'état local
-        setMintPrice(ethPrice);
-        setEuroPrice(priceEur ?? 0);
-    } catch (error) {
-        console.error("Erreur lors de la récupération du prix du mint :", error);
-    }
-};
-
-
-
-
-
+        try {
+            const price: BigNumberish = await contract.mintPrice(); // Le prix est en Wei
+            const ethPrice = Number(price) / 1e18; // Conversion de Wei vers Ether
+            const priceEur = await convertEthToEur(ethPrice);
+            setMintPrice(ethPrice);
+            setEuroPrice(priceEur ?? 0);
+        } catch (error) {
+            console.error("Erreur lors de la récupération du prix du mint :", error);
+        }
+    };
 
     const generateImage = async () => {
         const gifUrl = await getRandomInsectGif(); // Attendre que le GIF soit généré
@@ -165,14 +138,12 @@ const fetchMintPrice = async () => {
 
     const uploadFileToIPFS = async (imageUrl: string | null) => {
         setIsUploading(true);
-
         try {
             if (!imageUrl) {
                 alert("Veuillez vous assurer que l'image est générée.");
                 setIsUploading(false);
                 return;
             }
-
 
             const formData = new FormData();
             const response = await fetch(imageUrl);
@@ -188,7 +159,6 @@ const fetchMintPrice = async () => {
 
             const imageIpfsUrl = `https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${imageResponse.data.IpfsHash}`;
 
-            // Métadonnées
             const metadataJson = {
                 name: name || "Nom inconnu",
                 bio: bio || "Aucune bio",
@@ -197,7 +167,6 @@ const fetchMintPrice = async () => {
                 role: selectedRole || "Membre",
                 tags: ["Adhesion", selectedRole || "Membre"]
             };
-
 
             const metadataResponse = await axios.post(
                 "https://api.pinata.cloud/pinning/pinJSONToIPFS",
@@ -212,15 +181,13 @@ const fetchMintPrice = async () => {
 
             setIpfsUrl(`https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`);
         } catch (error) {
-            console.error("Error uploading to IPFS:", error);
+            console.error("Erreur lors de l'upload sur IPFS:", error);
             alert("Erreur lors de l'upload sur IPFS.");
         } finally {
             setIsUploading(false);
             setIsReadyToMint(true);
-
         }
     };
-
 
     const mintNFT = async () => {
         if (!ipfsUrl || !selectedRole || !web3 || !account) {
@@ -236,7 +203,7 @@ const fetchMintPrice = async () => {
                 const roleValue = roleMapping[selectedRole as RoleKey];
 
                 // Minting NFT
-                const transaction = await contract.methods.safeMint(ipfsUrl, roleValue, name, bio).send({ from: account, value: priceInWei });
+                await contract.methods.safeMint(ipfsUrl, roleValue, name, bio).send({ from: account, value: priceInWei });
 
                 setShowBananas(true);
                 setIsMinting(true);
@@ -252,56 +219,29 @@ const fetchMintPrice = async () => {
         }
     };
 
-
-
-const handleMint = async () => {
-    if (isReadyToMint) {
-        await mintNFT(); // Appelez mintNFT lorsque nous savons que tout est prêt
-    } else {
-        alert("Les conditions ne sont pas remplies pour mint");
-    }
-};
-
-
-
-    const startLoadingAndRedirect = () => {
-        let progress = 0;
-        let countdown = 5; // Temps avant redirection
-        setProgress(progress);
-        setCountdown(countdown);
-
-        const progressInterval = setInterval(() => {
-            setProgress((oldProgress) => {
-                if (oldProgress >= 100) {
-                    clearInterval(progressInterval);
-                    return 100;
-                }
-                return oldProgress + 2; // Augmente par paliers de 20%
-            });
-        }, 1000);
-
-
-        const countdownInterval = setInterval(() => {
-            setCountdown((oldCount) => {
-                if (oldCount <= 1) {
-                    clearInterval(countdownInterval);
-                    setIsMinted(true);
-                    router.push(`/AdhesionId/${contractAddress}/${nftId}`);
-                }
-                return oldCount - 1;
-            });
-        }, 1000);
+    const handleMint = async () => {
+        if (isReadyToMint) {
+            await mintNFT(); // Appelez mintNFT lorsque nous savons que tout est prêt
+        } else {
+            alert("Les conditions ne sont pas remplies pour mint");
+        }
     };
 
+    const startLoadingAndRedirect = () => {
+        const countdownInterval = setInterval(() => {
+            router.push(`/AdhesionId/${contractAddress}/${nftId}`);
+            clearInterval(countdownInterval); // On arrête l'intervalle
+        }, 5000); // Redirection après 5 secondes
+    };
 
     const switchToSepolia = async () => {
-        if (web3 && web3.currentProvider) { // Vérifiez également que currentProvider est défini
+        if (web3 && web3.currentProvider) {
             try {
                 await web3.currentProvider.request({
                     method: 'wallet_switchEthereumChain',
                     params: [{ chainId: '0xaa36a7' }],
                 });
-                window.location.reload(); // Rafraîchir la page
+                window.location.reload();
             } catch (error) {
                 console.error(error);
                 alert("Erreur lors du changement de réseau. Assurez-vous que Sepolia est ajouté à Metamask.");
@@ -312,134 +252,150 @@ const handleMint = async () => {
         }
     };
 
+    return (
+        <Box p={5} textAlign="center">
+        <Box p={5} borderRadius="lg" boxShadow="md" mb={4} maxWidth="800px" mx="auto">
+              <Heading size="lg" mb={4} textAlign="center">
+Adhésion
+              </Heading>
+              <Text fontSize="md" mb={4} textAlign="center">
+                  En tant que membre de notre réseau unique, vous aurez l'opportunité de participer à une communauté dynamique d'artistes et de collectionneurs engagés dans l'innovation et la créativité.
+              </Text>
 
-        const handleCryptoAdhesion = async () => {
-          if(account){
-            setWantsCryptoAdhesion(true); // L'utilisateur veut adhérer en crypto
+              <Button onClick={onToggle} width="full" mb={4}>
+                  {isOpen ? "Masquer les détails" : "Voir les détails de l'adhésion"}
+              </Button>
 
-            const provider = await detectEthereumProvider();
-            if (provider) {
-                const web3Instance = new Web3(provider);
-                const chainId = await web3Instance.eth.getChainId(); // Vérifiez le chain ID ici
-                // Utilisez directement chainId pour la condition
-                if (Number(chainId) !== 11155111) {
-                    await switchToSepolia(); // Change le réseau uniquement si nécessaire
-                } else {
-                    // Si déjà sur Sepolia, continuez à afficher les champs
-                    //console.log("Champs de données pour l'adhésion en crypto affichés.");
-                    // Si vous voulez prouver que vous êtes sur le bon réseau ici, vous pouvez
-                    // mettre à jour l'état directement également
-                    setIsOnSepolia(true);
-                }
-            }
-            localStorage.setItem('wantsCryptoAdhesion', String(true));
-          }
-          else{
-            alert("Vous devez vous connecter avec votre wallet pour adhérer par crypto")
-          } // Sauvegarde le choix en tant que chaîne
-        };
+              <Collapse in={isOpen || !isAuthenticated}>
+              <Heading size="l" mb={4} textAlign="center">
+Vous devez être connecter pour pouvoir Adhérer
+              </Heading>
+                  <VStack align="start" spacing={4} mb={5}>
 
+                      <Box>
+                          <List spacing={3}>
+                              <ListItem display="flex" alignItems="center">
+                                  <Icon as={FaClock} boxSize={5} />
+                                  <Text ml={2}>
+                                      <strong>Durée de l'adhésion :</strong> 365 jours (1 an)
+                                  </Text>
+                              </ListItem>
+                              <ListItem display="flex" alignItems="center">
+                                  <Icon as={FaWallet} boxSize={5} />
+                                  <Text ml={2}>
+                                      <strong>Prix de l'adhésion :</strong> 0.005 ETH (environ 15 euros)
+                                  </Text>
+                              </ListItem>
+                              <ListItem display="flex" alignItems="center">
+                                  <Icon as={FaAward} boxSize={5} />
+                                  <Text ml={2}>
+                                      <strong>Points de récompense :</strong> Bénéficiez de 15 points attribués dès votre adhésion.
+                                  </Text>
+                              </ListItem>
+                              <ListItem display="flex" alignItems="center">
+                                  <Icon as={FaUserShield} boxSize={5} />
+                                  <Text ml={2}>
+                                      <strong>Rôles disponibles :</strong> Artiste, Poète, Stagiaire, Contributeur
+                                  </Text>
+                              </ListItem>
+                              <ListItem display="flex" alignItems="center">
+                                  <Icon as={FaStar} boxSize={5} />
+                                  <Text ml={2}>
+                                      <strong>Accès à la création de collections :</strong> Créez des collections uniques et dynamisez votre art !
+                                  </Text>
+                              </ListItem>
+                          </List>
+                      </Box>
 
-        const handleRegularAdhesion = async () => {
-            setWantsCryptoAdhesion(false); // L'utilisateur veut adhérer en crypto
-            localStorage.setItem('wantsCryptoAdhesion', String(false)); // Sauvegarde le choix
-        };
+                      <Text fontSize="lg" fontWeight="bold" mt={4}>
+                          Pourquoi rejoindre RESCOE ?
+                      </Text>
+                      <Text>- Accès direct aux outils de la blockchain et à des ressources pédagogiques pour enrichir votre pratique artistique.</Text>
+                      <Text>- Opportunités de collaboration avec d'autres artistes et créateurs au sein de notre réseau.</Text>
+                      <Text>- Formation et ateliers sur le Web3, la blockchain et la création artistique.</Text>
+                      <Text>- Possibilité de participer à des événements exposant des œuvres numériques et physiques.</Text>
+                      <Text>- Développez une présence dans le monde numérique tout en renforçant les liens avec l’art traditionnel.</Text>
+                  </VStack>
 
-        return (
-              <Box p={5} textAlign="center">
-                  <Center>
-                      <Heading mb={5}>Prendre un badge d'adhésion :</Heading>
-                  </Center>
+                  <Text textAlign="center" mb={4}>
+                      En devenant membre, vous contribuerez à un réseau qui valorise l’art, la technologie et la créativité tout en favorisant un environnement d'apprentissage et d'échange.
+                  </Text>
+                  <Text textAlign="center" fontWeight="bold">
+                      Ensemble, concrétisons vos idées et vos œuvres dans un écosystème innovant.
+                  </Text>
 
-                  <Button colorScheme="blue" onClick={handleCryptoAdhesion} mb={4}>
-                      Adhérer en Crypto (Sepolia)
-                  </Button>
+                  <Image
+                      src="/gifs/Scarabe.gif"
+                      alt="Badge d'adhésion animé"
+                      borderRadius="md"
+                      mb={4}
+                      boxSize="300px"
+                      objectFit="cover"
+                      mx="auto"
+                  />
 
-                  <Button colorScheme="green" onClick={handleRegularAdhesion} mb={4}>
-                      Adhérer par Carte Bancaire
-                  </Button>
-
-                  {(isAuthenticated || (wantsCryptoAdhesion && isOnSepolia)) && (
-                      <>
-                          <Select
-                              placeholder="Choisissez un rôle"
-                              onChange={(e) => {
-                                  setSelectedRole(e.target.value);
-                                  generateImage(); // Générez l'image lorsque l'utilisateur choisit un rôle
-                              }}
-                          >
-                              {roles.map(role => (
-                                  <option key={role.value} value={role.value}>{role.label}</option>
-                              ))}
-                          </Select>
-
-                          <FormControl mt={4}>
-                              <FormLabel htmlFor="name">Nom</FormLabel>
-                              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Entrez votre nom" />
-                          </FormControl>
-                          <FormControl mt={4}>
-                              <FormLabel htmlFor="bio">Biographie</FormLabel>
-                              <Input id="bio" value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Entrez votre biographie" />
-                          </FormControl>
-
-                          <Button
-                              onClick={handleConfirmRole}
-                              colorScheme="blue"
-                              isDisabled={!selectedRole || roleConfirmed}
-                              mt={2}
-                          >
-                              Confirmer le rôle
-                          </Button>
-
-                          {generatedImageUrl && (
-                              <Box mt={5}>
-                                  <Text fontSize="lg">Vous serez rediriger vers votre insecte après l'adhesion</Text>
-                              </Box>
-                          )}
-
-                          <Text mt={4}>
-                            Prix de mint : {mintPrice} ETH
-                            {priceEur && priceEur !== 0 && ` (~${priceEur} €)`}
-                          </Text>
+              </Collapse>
+          </Box>
 
 
-                          <Button
-                              onClick={handleMint}
-                              colorScheme="teal"
-                              isLoading={isMinting || isUploading}
-                              loadingText="Minting..."
-                              mb={5}
-                              isDisabled={!ipfsUrl || !roleConfirmed} // Désactiver le bouton mint tant que l'upload n'est pas terminé
-                          >
-                              Adhérer
-                          </Button>
-                      </>
+            {isAuthenticated && (
+                <>
+                    <FormControl mb={3}>
+                        <FormLabel>Choisissez un rôle</FormLabel>
+                        <Select
+                            placeholder="Sélectionnez votre rôle"
+                            onChange={(e) => { setSelectedRole(e.target.value); generateImage(); }}
+                        >
+                            {roles.map(role => (
+                                <option key={role.value} value={role.value}>{role.label}</option>
+                            ))}
+                        </Select>
+                    </FormControl>
 
-                  )}
+                    <FormControl mb={3}>
+                        <FormLabel>Nom</FormLabel>
+                        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Entrez votre nom" />
+                    </FormControl>
 
+                    <FormControl mb={3}>
+                        <FormLabel>Biographie</FormLabel>
+                        <Input value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Entrez votre biographie" />
+                    </FormControl>
 
+                    <Button
+                        colorScheme="blue"
+                        onClick={handleConfirmRole}
+                        isDisabled={!selectedRole || roleConfirmed}
+                        mb={3}
+                    >
+                        Confirmer le rôle
+                    </Button>
 
-                  {showBananas && (
+                    {generatedImageUrl && (
+                        <Text mb={3}>Votre insecte animé sera généré après confirmation du rôle.</Text>
+                    )}
 
-                      <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
-                          <Canvas
-                              camera={{ near: 0.1, far: 100 }}
-                              style={{
-                                  backgroundColor: 'transparent',
-                                  position: 'fixed',
-                                  top: 0,
-                                  left: 0,
-                                  width: '100%',
-                                  height: '100%',
-                                  zIndex: -1,
-                              }}
-                          >
-                              <Bananas />
-                          </Canvas>
-                      </div>
-                  )}
-              </Box>
-          );
-      };
+                    <Text mb={3}>Prix de l'adhésion : {mintPrice} ETH (~{priceEur} €)</Text>
 
-      export default RoleBasedNFTPage;
+                    <Button
+                        colorScheme="teal"
+                        onClick={handleMint}
+                        isLoading={isMinting || isUploading}
+                        loadingText="Création du badge..."
+                        isDisabled={!ipfsUrl || !roleConfirmed}
+                    >
+                        Adhérer
+                    </Button>
+                </>
+            )}
+
+            {showBananas && (
+                <Box position="fixed" top={0} left={0} width="100%" height="100%" zIndex={-1}>
+                    <Bananas />
+                </Box>
+            )}
+        </Box>
+    );
+};
+
+export default RoleBasedNFTPage;

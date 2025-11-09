@@ -144,34 +144,45 @@ import { FC,ReactNode  } from "react";
 import { IconProp } from "@fortawesome/fontawesome-svg-core"; // pour FA
 // Typing pour accepter children et toutes les props motion/Box
 
-// Custom components with theme integration
-const AnimatedCard = chakra(motion.div, {
-  baseStyle: () => {
-    const { colorMode } = useColorMode(); // Récupération du colorMode
+type AnimatedCardProps = BoxProps & HTMLMotionProps<"div"> & {
+  children: ReactNode;
+};
 
-    return {
-      bg: colorMode === 'light'
-        ? 'rgba(255, 255, 255, 0.85)'
-        : 'rgba(17, 25, 40, 0.85)',
-      borderRadius: '2xl',
-      boxShadow: colorMode === 'light'
-        ? '0 8px 32px rgba(0, 0, 0, 0.15)'
-        : '0 8px 32px rgba(0, 0, 0, 0.35)',
-      backdropFilter: 'blur(12px)',
-      border: '2px solid transparent',
-      bgClip: 'padding-box, border-box',
-      bgOrigin: 'padding-box, border-box',
-      animation: `${animations.borderGlow}`,
-    };
-  },
-});
+const MotionBox = motion<BoxProps>(Box);
 
-const TechCard = ({ icon, title, description, delay = 0 }) => (
+export const AnimatedCard: FC<AnimatedCardProps> = ({ children, ...props }) => {
+  const { colorMode } = useColorMode();
+
+  return (
+    <MotionBox
+      bg={colorMode === "light" ? "rgba(255,255,255,0.85)" : "rgba(17,25,40,0.85)"}
+      borderRadius="2xl"
+      boxShadow={colorMode === "light" ? "0 8px 32px rgba(0,0,0,0.15)" : "0 8px 32px rgba(0,0,0,0.35)"}
+      backdropFilter="blur(12px)"
+      border="2px solid transparent"
+      bgClip="padding-box, border-box"
+      animation={animations.borderGlow}
+      {...props} // Chakra + Motion props ici
+    >
+      {children}
+    </MotionBox>
+  );
+};
+
+
+type TechCardProps = {
+  icon: IconProp;    // icône FA
+  title: string;
+  description: string;
+  delay?: number;
+};
+
+const TechCard = ({ icon, title, description, delay = 0 }: TechCardProps) => (
   <ScaleFade in={true} initialScale={0.9} delay={delay}>
     <AnimatedCard
       p={6}
       whileHover={{ scale: 1.03 }}
-      transition={{ type: "spring", stiffness: 300 }}
+      transition={{ type: "spring", stiffness: 300 }} // ✅ OK maintenant
     >
       <VStack spacing={4} align="start">
         <Icon
@@ -254,7 +265,9 @@ const StatCard = ({ label, value, icon, trend, delay = 0 }) => (
         </Heading>
         {trend && (
           <HStack spacing={1} color={trend.includes('↑') ? 'green.400' : 'red.400'}>
+          <Stat>
             <StatArrow type={trend.includes('↑') ? 'increase' : 'decrease'} />
+          </Stat>
             <Text fontSize="sm">{trend}</Text>
           </HStack>
         )}

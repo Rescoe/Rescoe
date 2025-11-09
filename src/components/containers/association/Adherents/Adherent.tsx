@@ -1,48 +1,32 @@
 import { useState, useEffect } from "react";
-import Web3 from "web3";
-import detectEthereumProvider from "@metamask/detect-provider";
+import { ethers } from "ethers";
 import ABI from "../../../ABI/ABIAdhesion.json";
 import {
   Box,
-  Button,
   Heading,
   Text,
-  List,
-  ListItem,
   Card,
-  CardHeader,
   CardBody,
-  VStack,
-  Center,
-  CheckboxGroup,
-  Checkbox,
-  SimpleGrid,
-  Divider,
-  HStack,
+  CardHeader,
   StatGroup,
   Stat,
-  StatNumber,
   StatLabel,
+  StatNumber,
+  SimpleGrid,
+  CheckboxGroup,
+  Checkbox,
   Wrap,
   WrapItem,
-  AspectRatio,
-  Image,
+  Center,
+  List,
+  ListItem,
   Tag,
+  VStack,
 } from "@chakra-ui/react";
 import NextLink from "next/link";
 import DerniersAdherents from "./DerniersAdherents";
-
-//Style
-import { brandHover, hoverStyles } from "@styles/theme";
-import { pulse } from "@styles/theme";
-
-
-import { motion } from "framer-motion";
-import { keyframes } from "@emotion/react";
-
-import FeaturedMembers from './FeaturedMembers'; // Votre ABI de contrat ici.
-
-
+import { hoverStyles, brandHover } from "@styles/theme";
+import { AspectRatio, Image } from "@chakra-ui/react";
 
 interface InsectURI {
   id: string;
@@ -62,7 +46,6 @@ const roles: { [key: number]: string } = {
   3: "Trainee",
 };
 
-// Dictionnaire de traduction pour l’affichage
 const roleLabels: Record<string, string> = {
   Artist: "Artiste",
   Poet: "Poète",
@@ -71,127 +54,82 @@ const roleLabels: Record<string, string> = {
 };
 
 const Adherent: React.FC = () => {
-  const [web3, setWeb3] = useState<Web3 | null>(null);
+  const [provider, setProvider] = useState<ethers.JsonRpcProvider | null>(null);
+  const [contract, setContract] = useState<ethers.Contract | null>(null);
   const [membersByRole, setMembersByRole] = useState<MembersByRole>({});
   const [insectURIs, setInsectURIs] = useState<InsectURI[]>([]);
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
-  const [account, setAccount] = useState<string | null>(null);
   const [totalMembersCount, setTotalMembersCount] = useState<number>(0);
   const [totalInsectsMinted, setTotalInsectsMinted] = useState<number>(0);
 
   const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS!;
-  const RPC_URL = process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string; // ✅ Fallback RPC public
+  const RPC_URL = process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!;
 
-  // ✅ Initialisation de Web3 : MetaMask si dispo, sinon RPC public (lecture seule)
+  // ✅ Initialise le provider et le contrat Moralis
   useEffect(() => {
-    const initWeb3 = async () => {
-      let web3Instance: Web3;
+    const initProvider = async () => {
       try {
-        const provider = await detectEthereumProvider();
-        if (provider) {
-          web3Instance = new Web3(provider as any);
-          console.log("✅ Utilisation du provider MetaMask");
-
-          const accounts = await web3Instance.eth.getAccounts();
-          setAccount(accounts[0] || null);
-
-          // Écoute des changements d’adresse et de réseau
-          (provider as any).on("accountsChanged", (accounts: string[]) => {
-            setAccount(accounts[0] || null);
-          });
-          (provider as any).on("chainChanged", () => window.location.reload());
-        } else {
-          // Fallback : lecture seule via RPC public
-          web3Instance = new Web3(new Web3.providers.HttpProvider(RPC_URL));
-          console.log("🌐 Utilisation du provider RPC public (lecture seule)");
-        }
-
-        setWeb3(web3Instance);
+        const jsonProvider = new ethers.JsonRpcProvider(RPC_URL);
+        const adhesionContract = new ethers.Contract(contractAddress, ABI, jsonProvider);
+        setProvider(jsonProvider);
+        setContract(adhesionContract);
+        console.log("🟣 Lecture via Moralis RPC");
       } catch (error) {
-        console.error("Erreur d’initialisation Web3:", error);
+        console.error("Erreur init provider:", error);
       }
     };
+    initProvider();
+  }, [RPC_URL, contractAddress]);
 
-    initWeb3();
-  }, [RPC_URL]);
-
-  // ✅ Récupération du nombre total d’adhérents
+  // ✅ Récupère les données principales
   useEffect(() => {
-    const fetchTotalMembersCount = async () => {
-      if (!web3) return;
+    if (!contract) return;
+
+    const fetchData = async () => {
       try {
-        const contract = new web3.eth.Contract(ABI as any, contractAddress);
+        // --- Membres par rôle
+        const roleData: MembersByRole = {};
         const uniqueMembers = new Set<string>();
 
-        for (let role in roles) {
-          const members: string[] = await contract.methods
-            .getMembersByRole(role)
-            .call();
+        for (const role of Object.keys(roles)) {
+          const members: string[] = await contract.getMembersByRole(role);
+          roleData[roles[Number(role)]] = members;
           members.forEach((m) => uniqueMembers.add(m));
         }
 
+        setMembersByRole(roleData);
         setTotalMembersCount(uniqueMembers.size);
+
+        // --- Nombre d’insectes mintés
+        const insectsCount = await contract.getTotalMinted();
+        setTotalInsectsMinted(Number(insectsCount));
+
+        // --- Détails des insectes
+        const fetchedInsects: InsectURI[] = [];
+        for (let i = 0; i < Number(insectsCount); i++) {
+          try {
+            const tokenURI = await contract.tokenURI(i);
+            const res = await fetch(tokenURI);
+            const meta = await res.json();
+            fetchedInsects.push({
+              id: i.toString(),
+              image: meta.image,
+              name: meta.name,
+              bio: meta.bio || "",
+            });
+          } catch (err) {
+            console.warn(`Erreur sur token ${i}:`, err);
+          }
+        }
+
+        setInsectURIs(fetchedInsects);
       } catch (error) {
-        console.error("Erreur récupération total adhérents:", error);
+        console.error("Erreur fetchData:", error);
       }
     };
 
-    fetchTotalMembersCount();
-  }, [web3]);
-
-  // ✅ Récupération des membres et des insectes mintés
-  useEffect(() => {
-    if (web3) {
-      fetchMembersByRole();
-      fetchInsectURIs();
-    }
-  }, [web3]);
-
-  const fetchMembersByRole = async () => {
-    try {
-      const contract = new web3!.eth.Contract(ABI as any, contractAddress);
-      const roleData: MembersByRole = {};
-
-      for (let role in roles) {
-        const members: string[] = await contract.methods
-          .getMembersByRole(role)
-          .call();
-        roleData[roles[role]] = members;
-      }
-
-      setMembersByRole(roleData);
-    } catch (error) {
-      console.error("Erreur récupération membres par rôle:", error);
-    }
-  };
-
-  const fetchInsectURIs = async () => {
-    try {
-      const contract = new web3!.eth.Contract(ABI as any, contractAddress);
-      const insectsCount: string = await contract.methods.getTotalMinted().call();
-      setTotalInsectsMinted(Number(insectsCount));
-
-      const fetchedInsects: (InsectURI | null)[] = await Promise.all(
-        Array.from({ length: parseInt(insectsCount) }, async (_, i) => {
-          try {
-            const tokenURI: string = await contract.methods.tokenURI(i).call();
-            const response = await fetch(tokenURI);
-            if (!response.ok) throw new Error(response.statusText);
-
-            const metadata = await response.json();
-            return { id: i.toString(), image: metadata.image, name: metadata.name, bio: metadata.bio };
-          } catch (error) {
-            console.error("Erreur récupération insecte:", error);
-            return null;
-          }
-        })
-      );
-
-      setInsectURIs(fetchedInsects.filter(Boolean) as InsectURI[]);
-    } catch (error) {
-      console.error("Erreur récupération URIs:", error);
-    }
-  };
+    fetchData();
+  }, [contract]);
 
   const handleRoleChange = (role: string) => {
     setSelectedRoles((prev) =>
@@ -207,10 +145,10 @@ const Adherent: React.FC = () => {
       for (const addr of Array.from(filtered)) {
         if (!members.has(addr)) filtered.delete(addr);
       }
-
     });
     return Array.from(filtered);
   };
+
 
     return (
       <Box
@@ -532,28 +470,6 @@ const Adherent: React.FC = () => {
           <DerniersAdherents />
         </Box>
 
-        {/* Bouton d’appel à l’action (CTA) */}
-        <Center mt={10}>
-          <Button
-            as={NextLink}
-            href="/adhesion"
-            size="lg"
-            px={12}
-            py={6}
-            fontWeight="bold"
-            rounded="full"
-            _hover={{
-              ...hoverStyles.brandHover._hover,
-              ...brandHover,
-              transform: "scale(1.05)",
-              transition: "all 0.3s ease",
-            }}
-            animation={`${pulse} 2s infinite`}
-            boxShadow="0 8px 32px rgba(168, 85, 247, 0.25)"
-          >
-            🚀 Rejoindre le réseau
-          </Button>
-        </Center>
       </Box>
 
     );
