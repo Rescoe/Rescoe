@@ -11,10 +11,8 @@ import {
   MenuList,
   MenuItem,
 } from "@chakra-ui/react";
-import { useAccount, useDisconnect, useSignMessage } from "wagmi";
 import { signIn, signOut } from "next-auth/react";
 import { useAuthRequestChallengeEvm } from "@moralisweb3/next";
-import { ConnectButton as RainbowConnectButton } from "@rainbow-me/rainbowkit";
 import { getEllipsisTxt } from "../../../utils/format";
 import { useAuth } from "../../../utils/authContext";
 import { brandHover, hoverStyles } from "@styles/theme";
@@ -22,10 +20,7 @@ import Web3 from "web3";
 import detectEthereumProvider from "@metamask/detect-provider";
 
 const ConnectBouton: React.FC = () => {
-  const { disconnectAsync } = useDisconnect();
-  const { isConnected, address: wagmiAddress } = useAccount();
 
-  const { signMessageAsync } = useSignMessage();
   const { requestChallengeAsync } = useAuthRequestChallengeEvm();
   const toast = useToast();
 
@@ -66,15 +61,6 @@ const ConnectBouton: React.FC = () => {
       const challenge = await requestChallengeAsync({ address: account, chainId });
       if (!challenge?.message) throw new Error("Challenge non valide.");
 
-      const signature = await signMessageAsync({ message: challenge.message });
-      const result = await signIn("moralis-auth", {
-        message: challenge.message,
-        signature,
-        network: "Evm",
-        redirect: false,
-      });
-
-      if (result?.error) throw new Error(result.error);
 
       setAddress(account.toLowerCase());
       setIsAuthenticated(true);
@@ -95,7 +81,6 @@ const ConnectBouton: React.FC = () => {
   };
 
   const handleDisconnect = async () => {
-    await disconnectAsync();
     await logout();
     signOut({ callbackUrl: "/" });
     setIsAuthenticated(false);
@@ -178,14 +163,6 @@ const ConnectBouton: React.FC = () => {
 
   return (
     <Box>
-      <RainbowConnectButton.Custom>
-        {({ account, chain, openAccountModal, mounted }) => {
-          if (!mounted) return null;
-
-          // ✅ On choisit dynamiquement la source de l’adresse
-          const displayAddress = account?.address || address;
-
-          return (
             <Tooltip
               label={`Connecté : ${getUserRole()}`}
               aria-label="User Role Tooltip"
@@ -201,13 +178,11 @@ const ConnectBouton: React.FC = () => {
                   direction={{ base: "column", md: "row" }}
                 >
                   <Text fontWeight="medium">
-                    {displayAddress
-                      ? getEllipsisTxt(displayAddress)
+                    {address
+                      ? getEllipsisTxt(address)
                       : "Non connecté"}
                   </Text>
-                  <Text fontSize="sm" color="gray.500">
-                    {chain ? chain.name : chainName}
-                  </Text>
+
                 </MenuButton>
 
                 <MenuList>
@@ -218,9 +193,6 @@ const ConnectBouton: React.FC = () => {
                 </MenuList>
               </Menu>
             </Tooltip>
-          );
-        }}
-      </RainbowConnectButton.Custom>
     </Box>
   );
 };
