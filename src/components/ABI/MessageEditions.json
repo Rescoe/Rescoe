@@ -1093,6 +1093,11 @@
 				"internalType": "uint256[]",
 				"name": "extraRoyaltyPercentages",
 				"type": "uint256[]"
+			},
+			{
+				"internalType": "uint256",
+				"name": "reductionPourcentageAdherent",
+				"type": "uint256"
 			}
 		],
 		"name": "mint",

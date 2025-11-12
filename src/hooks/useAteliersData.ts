@@ -39,7 +39,7 @@ interface OnChainAtelierInfo {
 }
 
 // CONTRACT: adjust to your deployed address (or keep the earlier one)
-const CONTRACT_ADDRESS = "0xeb0897DF507795f4FA42509d28eba811843a96f0";
+const CONTRACT_ADDRESS = "0x0Da97c204B481DAbd44557A8b61B2acB4ED46A3A";
 
 // ---------- Helpers améliorés ----------
 const extractHashtags = (content: string): string[] => {
@@ -236,6 +236,9 @@ const useAteliersData = () => {
     splitAddress: "all",
     upcomingOnly: true,
   });
+
+  const [recipients, setRecipients] = useState<string[]>([]);
+  const [percentages, setPercentages] = useState<number[]>([]);
 
   const [openPanels, setOpenPanels] = useState<Record<string, boolean>>({});
   const [openDetails, setOpenDetails] = useState<Record<string, boolean>>({});
@@ -627,18 +630,61 @@ const useAteliersData = () => {
       const messageTimestamp = entry.messageTimestamp;
       const mintDurationSeconds = computeMintDurationSeconds(messageTimestamp, rules.datetime);
       const imageUrl = msg.attachments?.[0]?.url || "";
+            const splitAddr = rules.splitAddress || account;
 
-      console.log(keccak,
-      rules.description || msg.content,
-      priceInWei,
-      splitAddress,
-      imageUrl,
-      messageTimestamp,
-      mintDurationSeconds,
-      maxEditions,
-      isOpenEdition)
-      // Gas estimate & send
-      const gasEstimate = await contract.methods
+            const recipientsForMint = recipients.length > 0 ? recipients : [splitAddr];
+            const percentagesForMint = percentages.length > 0 ? percentages : [1000]; // fallback 10%
+
+console.log(keccak,
+rules.description || msg.content,
+priceInWei,
+splitAddress,
+imageUrl,
+messageTimestamp,
+mintDurationSeconds,
+maxEditions,
+isOpenEdition,
+recipientsForMint,
+percentagesForMint,
+200);
+
+const gasEstimate = await contract.methods
+  .mint(
+    keccak,
+    rules.description || msg.content,
+    priceInWei,
+    splitAddress,
+    imageUrl,
+    messageTimestamp,
+    mintDurationSeconds,
+    maxEditions,
+    isOpenEdition,
+    recipientsForMint,
+    percentagesForMint,
+    200 //20% de remises pour les adherents
+  )
+  .estimateGas({ from: account, value: priceInWei });
+
+console.log(gasEstimate.toString());
+
+            await contract.methods
+              .mint(
+                keccak,
+                rules.description || msg.content,
+                priceInWei,
+                splitAddress,
+                imageUrl,
+                messageTimestamp,
+                mintDurationSeconds,
+                maxEditions,
+                isOpenEdition,
+                recipientsForMint,
+                percentagesForMint,
+                200
+              )
+              .send({ from: account, value: priceInWei, gas: gasEstimate.toString()  });
+
+/*      const gasEstimate = await contract.methods
         .mint(
           keccak,
           rules.description || msg.content,
@@ -667,20 +713,16 @@ const useAteliersData = () => {
         .send({ from: account, value: priceInWei, gas: gasEstimate.toString() });
 
       toast({ title: "Ticket réservé", description: `Atelier minté avec succès !`, status: "success", duration: 4000, isClosable: true });
+*/
+            toast({ title: "Mint réussi", status: "success", duration: 4000, isClosable: true });
+          } catch (err: any) {
+            console.error("Mint échoué:", err);
+            toast({ title: "Erreur mint", description: err?.message || "Erreur inconnue", status: "error", duration: 6000, isClosable: true });
+          } finally {
+            setMintingIds((prev) => prev.filter((id) => id !== msg.id));
+          }
+        };
 
-      // After mint, refresh on-chain info for this entry
-      try {
-        await fetchOnChainForEntry(entry);
-      } catch (err) {
-        // ignore
-      }
-    } catch (err: any) {
-      console.error("Mint échoué:", err);
-      toast({ title: "Erreur mint", description: err?.message || "Erreur inconnue", status: "error", duration: 6000, isClosable: true });
-    } finally {
-      setMintingIds((prev) => prev.filter((id) => id !== msg.id));
-    }
-  };
 
   // ---------- toggles ----------
   const togglePanel = (id: string) => setOpenPanels((p) => ({ ...p, [id]: !p[id] }));

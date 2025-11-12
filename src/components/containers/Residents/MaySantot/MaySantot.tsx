@@ -77,7 +77,7 @@ const Roubzi: React.FC = () => {
         const adhesionManager = new Contract(CONTRACT_ADHESION_MANAGEMENT, ABI_ADHESION_MANAGEMENT, provider);
         const rescollection = new Contract(CONTRACT_RESCOLLECTION, ABIRESCOLLECTION, provider);
 
-        const userInfos = await adhesionManager.getUserInfo(userAddress);
+        const userInfos = await adhesionContract.getUserInfo(userAddress);
         const tokenIds = await adhesionManager.getTokensByOwnerPaginated(userAddress, 0, 100);
 
         const nfts: NFTData[] = await Promise.all(
@@ -198,7 +198,9 @@ const Roubzi: React.FC = () => {
           <OeuvresFeed
             channelId={"1433119911072497724"}
             collectionAddress={"0xfC37f68EBcD19419D6F485C8C1e739aAcf424DF1"}
+            artistAddress={HARDCODED_ADDRESS}
           />
+
           </TabPanel>
         </TabPanels>
       </Tabs>

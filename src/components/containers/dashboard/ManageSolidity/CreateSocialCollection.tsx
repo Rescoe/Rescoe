@@ -25,7 +25,7 @@ const CreateSocialCollection: React.FC = () => {
   const toast = useToast();
   const { address: authAddress } = useAuth();
 
-  const MESSAGE_FACTORY_ADDRESS = "0xb2E7A696AC5AD781460608AC8410D18C571cBa31";
+  const MESSAGE_FACTORY_ADDRESS = "0x02Efd59066618bDE4582021037938a55aBea08E6";
   const RESCOLLECTION_FACTORY_ADDRESS = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!;
 
   const [web3, setWeb3] = useState<Web3 | null>(null);
