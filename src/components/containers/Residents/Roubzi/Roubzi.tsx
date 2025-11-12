@@ -197,7 +197,7 @@ const Roubzi: React.FC = () => {
           <TabPanel>
             <OeuvresFeed
               channelId={"1437047144799273061"}
-              collectionAddress={"0x979DB063F1E3cb684F92A909702774294eCfFae5"}
+              collectionAddress={"0xEab520A02f2dC79c61F67C6A680FCc63Ea833Aa9"}
             />
           </TabPanel>
         </TabPanels>

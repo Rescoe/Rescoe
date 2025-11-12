@@ -86,6 +86,31 @@
 		"type": "event"
 	},
 	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "salonName",
+				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "bool",
+				"name": "requiresMembership",
+				"type": "bool"
+			},
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "royaltyAddress",
+				"type": "address"
+			}
+		],
+		"name": "SalonConfigured",
+		"type": "event"
+	},
+	{
 		"inputs": [],
 		"name": "adhesionContractAddress",
 		"outputs": [
@@ -147,6 +172,11 @@
 				"internalType": "bool",
 				"name": "requiresMembership",
 				"type": "bool"
+			},
+			{
+				"internalType": "address",
+				"name": "royaltyAddress",
+				"type": "address"
 			}
 		],
 		"name": "configureSalon",
@@ -233,6 +263,11 @@
 				"internalType": "bool",
 				"name": "requiresMembership",
 				"type": "bool"
+			},
+			{
+				"internalType": "address",
+				"name": "royaltyAddress",
+				"type": "address"
 			},
 			{
 				"internalType": "bool",

@@ -124,7 +124,7 @@ const TokenPage = () => {
       ] = await contract.getTokenDetails(tokenIdNumber);
 
       // récupère infos utilisateurs dans le contract management
-      const [membership, realName, realBio] = await contractManagement.getUserInfo(owner);
+      const [membership, realName, realBio] = await contract.getUserInfo(owner);
 
       // tokenURI + fetch via ton proxy pinata
       const uri = await contract.tokenURI(tokenIdNumber);

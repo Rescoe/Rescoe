@@ -92,7 +92,7 @@ const FeaturedMembers: React.FC<FeaturedMembersProps> = ({ addresses }) => {
     try {
       console.log("🔍 Lecture infos utilisateur pour :", address);
 
-      const userInfo: unknown[] = await contractManagement.methods
+      const userInfo: unknown[] = await contract.methods
         .getUserInfo(address)
         .call();
 

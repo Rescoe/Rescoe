@@ -141,7 +141,7 @@ const Dashboard = () => {
     const contractadhesion = new Contract(contractAdhesion, ABI, provider);
 
     const tokenIds = await contract.getTokensByOwnerPaginated(userAddress, 0, 100);
-    const userInfos = await contract.getUserInfo(userAddress);
+    const userInfos = await contractadhesion.getUserInfo(userAddress);
 
     const fetchedRolesAndImages = await Promise.all(tokenIds.map(async (tokenId: number) => {
       const fullDatas = await contractadhesion.getTokenDetails(tokenId);
@@ -239,7 +239,7 @@ const Dashboard = () => {
 
     const provider = new BrowserProvider(ethereum);
     const signer = await provider.getSigner();
-    const contract = new ethers.Contract(contratAdhesionManagement, ABI_ADHESION_MANAGEMENT, signer);
+    const contract = new ethers.Contract(contractAdhesion, ABI, signer);
 
     try {
       const prixParPoint = await fetchPointPrice();
@@ -257,7 +257,7 @@ const Dashboard = () => {
 
   const fetchPointPrice = async () => {
     const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
-    const contract = new Contract(contratAdhesionManagement, ABI_ADHESION_MANAGEMENT, provider);
+    const contract = new Contract(contractAdhesion, ABI, provider);
     try {
       const prixPoints = await contract.pointPrice();
       return prixPoints;

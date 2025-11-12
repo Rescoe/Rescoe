@@ -72,7 +72,7 @@ const DerniersAdherents: React.FC = () => {
         provider
       );
 
-      const [membershipValid, name, bio] = await contractManagement.getUserInfo(address);
+      const [membershipValid, name, bio] = await contract.getUserInfo(address);
       const tokens: bigint[] = await contract.getTokensByOwner(address);
 
       const insects = await Promise.all(

@@ -25,11 +25,13 @@ const CreateSocialCollection: React.FC = () => {
   const toast = useToast();
   const { address: authAddress } = useAuth();
 
-  const MESSAGE_FACTORY_ADDRESS = "0x0027731b92352Dc6F429b388aA42bd0c0cFBAB62";
+  const MESSAGE_FACTORY_ADDRESS = "0xb2E7A696AC5AD781460608AC8410D18C571cBa31";
   const RESCOLLECTION_FACTORY_ADDRESS = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!;
 
   const [web3, setWeb3] = useState<Web3 | null>(null);
   const [account, setAccount] = useState<string | null>(null);
+  const [royaltyAddress, setRoyaltyAddress] = useState<string>(authAddress || ""); // valeur par défaut
+
 
   const [salonName, setSalonName] = useState<string>("");
   const [requiresMembership, setRequiresMembership] = useState<boolean>(false);
@@ -83,7 +85,7 @@ const CreateSocialCollection: React.FC = () => {
       // --- Récupération de TOUTES les collections Social ---
       const totalMinted = await resFactory.methods.getTotalCollectionsMinted().call();
       const addressSalonRaw: any = await resFactory.methods
-        .getCollectionsByType("Social", 11, Number(totalMinted) - 1)
+        .getCollectionsByType("Social", 0, Number(totalMinted)-1)
         .call();
 
       const addressSalonArray = Array.isArray(addressSalonRaw)
@@ -234,7 +236,9 @@ const CreateSocialCollection: React.FC = () => {
     try {
       // 1️⃣ Configurer le salon sur MessageFactory
       const messageFactory = new web3.eth.Contract(ABI_MESSAGE_FACTORY, MESSAGE_FACTORY_ADDRESS);
-      await messageFactory.methods.configureSalon(salonName, requiresMembership).send({ from: account });
+      await messageFactory.methods
+        .configureSalon(salonName, requiresMembership, royaltyAddress)
+        .send({ from: account });
 
       // 2️⃣ Créer la collection sur ResCollectionFactory
       const resFactory = new web3.eth.Contract(ABI_RESCOLLECTION, RESCOLLECTION_FACTORY_ADDRESS);
@@ -370,6 +374,17 @@ const CreateSocialCollection: React.FC = () => {
           color="white"
           borderColor="purple.300"
         />
+
+        <FormLabel color="gray.300" fontWeight="bold">Adresse de royaltie principale</FormLabel>
+<Input
+  placeholder="0x..."
+  value={royaltyAddress}
+  onChange={(e) => setRoyaltyAddress(e.target.value)}
+  bg="blackAlpha.300"
+  color="white"
+  borderColor="purple.300"
+/>
+
 
         <FormLabel color="gray.300" fontWeight="bold">Image</FormLabel>
         <Input type="file" onChange={handleFileChange} border="2px dashed" borderColor="purple.400" />
