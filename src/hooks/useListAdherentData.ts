@@ -58,7 +58,7 @@ export const useAdherentFullData = (addresses?: string[]) => {
               }
 
               // 🧱 Étape 2 : infos utilisateur (on-chain)
-              const userInfos = await contract.getUserInfo(addr);
+              const userInfos = await contractAdhesionInstance.getUserInfo(addr);
 
               const fetchedRolesAndImages = await Promise.all(
                 tokenIds.map(async (tokenId: number) => {

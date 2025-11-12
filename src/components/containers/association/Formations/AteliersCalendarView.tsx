@@ -469,14 +469,11 @@ const { ethPrice, loading: ethLoading, error: ethError } = useEthToEur();
           >
             <option value="all">Tous les formateurs</option>
             {adherentData &&
-            Object.entries(adherentData)
-              .filter(([_, data]) => data && (data.name || data.isAdherent)) // on garde seulement les entrées valides
-              .map(([address, data]: [string, any]) => (
+              Object.entries(adherentData).map(([address, data]: [string, any]) => (
                 <option key={address} value={address}>
                   {data.name || address}
                 </option>
               ))}
-
           </Select>
 
           {/* Switch pour afficher les ateliers passés */}
