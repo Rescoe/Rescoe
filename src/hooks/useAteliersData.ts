@@ -519,10 +519,11 @@ const useAteliersData = () => {
         const totalEditions = parseInt(haikuInfo.editionsCount || haikuInfo[1] || 0, 10);
 
         // remaining editions
+        // remaining editions
         let remaining = 0;
         try {
           const remRaw = await contract.methods.getRemainingEditions(haikuIdNum).call();
-          remaining = parseInt(remRaw || remRaw?.toString() || "0", 10);
+          remaining = parseInt(remRaw?.toString() || "0", 10);
         } catch (err) {
           console.warn("getRemainingEditions failed", err);
         }
@@ -565,6 +566,8 @@ const useAteliersData = () => {
           creator,
           fetchedAt: Date.now(),
         };
+
+        console.log(info);
 
         setOnChainDataByMsgId((p) => ({ ...p, [msgId]: info }));
         return info;
@@ -634,7 +637,7 @@ const useAteliersData = () => {
 
             const recipientsForMint = recipients.length > 0 ? recipients : [splitAddr];
             const percentagesForMint = percentages.length > 0 ? percentages : [1000]; // fallback 10%
-
+/*
 console.log(keccak,
 rules.description || msg.content,
 priceInWei,
@@ -647,7 +650,7 @@ isOpenEdition,
 recipientsForMint,
 percentagesForMint,
 200);
-
+*/
 const gasEstimate = await contract.methods
   .mint(
     keccak,
@@ -664,8 +667,6 @@ const gasEstimate = await contract.methods
     200 //20% de remises pour les adherents
   )
   .estimateGas({ from: account, value: priceInWei });
-
-console.log(gasEstimate.toString());
 
             await contract.methods
               .mint(

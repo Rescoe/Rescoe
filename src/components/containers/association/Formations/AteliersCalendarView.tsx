@@ -20,6 +20,7 @@ import {
   Spinner,
   Badge,
   SimpleGrid,
+  Progress,
 } from "@chakra-ui/react";
 import { SlArrowRight, SlArrowLeft } from "react-icons/sl";
 import Web3 from "web3";
@@ -152,12 +153,16 @@ const renderDayEvents = () => {
     const typeColor = cfg?.color || TYPE_COLORS[rules.type] || TYPE_COLORS.default;
     const leftColor = typeColor;
     const onChain = onChainDataByMsgId[msg.id];
-    const placesRes = onChain?.totalEditions || 0;
-    const placesDIspo = rules.maxEditions - placesRes;
+    const placesDIspo = onChain?.remaining ?? 0;
+    const placesTot = onChain?.totalEditions ?? 0;
+    const placesRes = (placesTot - placesDIspo) || 0;
     const priceEth = rules.price ?? cfg?.price;
     const priceEur = priceEth && ethPrice ? (priceEth * ethPrice).toFixed(2) : null;
     const addr = rules.splitAddress || cfg?.splitAddress;
     const adherent = addr ? adherentData?.[addr] : null;
+
+    //Pour la jauge UI :
+    const percent = placesTot > 0 ? (placesRes / placesTot) * 100 : 0;
 
     const collectionsArray = Array.isArray(adherent?.collections) ? adherent.collections : [];
     const lastCollections = [...collectionsArray.slice(-5)].reverse();
@@ -212,10 +217,45 @@ const renderDayEvents = () => {
 
           <Collapse in={open} animateOpacity>
             <Box fontSize="sm" mb={3}>
+            {/*
               <strong>Equivalent :</strong> {priceEth ? `${priceEth} ETH` : "Non défini"} <br />
+
               <strong>Places :</strong> {rules.maxEditions ?? cfg?.maxEditions ?? "Illimité"} <br />
               <strong>Places déjà réservées :</strong> {placesRes} {placesRes === rules.maxEditions && <Badge colorScheme="red" ml={2}>Complet</Badge>} <br />
               <strong>Places restantes :</strong> {placesDIspo} {placesDIspo === 0 && <Badge colorScheme="red" ml={2}>Complet</Badge>} <br />
+*/}
+<Text fontWeight="bold">Places restantes :</Text>
+
+              <Progress
+              value={percent}
+              size="sm"
+              colorScheme={
+                placesDIspo === 0
+                  ? "red"
+                  : placesDIspo <= Math.ceil(placesTot * 0.2)
+                  ? "orange"
+                  : "green"
+              }
+              borderRadius="md"
+              hasStripe
+              isAnimated
+            />
+
+            <HStack justify="space-between" mt={1}>
+              <Text fontSize="xs" color="gray.500">
+                0
+              </Text>
+              <Text fontSize="xs" color="gray.500">
+                {placesTot > 0 ? placesTot : "∞"} places
+              </Text>
+            </HStack>
+
+            {placesDIspo === 0 && (
+              <Badge colorScheme="red" mt={2}>
+                Complet
+              </Badge>
+            )}
+
               <strong>Durée :</strong> {rules.dureeAtelier ?? cfg?.defaultDuration ?? "Non précisée"} <br />
               {rules.splitAddress && <><strong>Formateur :</strong> {rules.splitAddress}<br /></>}
               <Box mt={2}>

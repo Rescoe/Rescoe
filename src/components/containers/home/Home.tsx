@@ -21,6 +21,8 @@ import RelatedFull from '../../../utils/RelatedFull'; // Assurez-vous d'importer
 import DerniersAdherents from '../association/Adherents/DerniersAdherents'; // Votre ABI de contrat ici.
 import FeaturedMembers from '../association/Adherents/FeaturedMembers'; // Votre ABI de contrat ici.
 import AteliersCalendarView from '../association/Formations/AteliersCalendarView'; // Votre ABI de contrat ici.
+import MiniCalendar from '@/components/containers/actus/MiniCalendar'; // Votre ABI de contrat ici.
+
 import ChannelPreview from '../../../utils/channels/ChannelPreview'; // Assurez-vous d'importer le bon chemin
 
 const MotionBox = motion(Box);
@@ -660,7 +662,7 @@ const allHaikus = useMemo(
           <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
 
 
-          <AteliersCalendarView />
+          <MiniCalendar />
 
 
           <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
