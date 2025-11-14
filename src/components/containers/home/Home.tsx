@@ -578,8 +578,22 @@ const allHaikus = useMemo(
   </Flex>
 </Flex>
 
+<Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
 
-          <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
+
+<NextLink
+  href={{
+    pathname: "/actus",
+    query: { expand: "calendar" },
+  }}
+  passHref
+>
+
+    <MiniCalendar onClick={() => {}} />
+    <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
+
+</NextLink>
+
 
           <Box
             boxShadow="2xl"
@@ -658,11 +672,6 @@ const allHaikus = useMemo(
               </motion.div>
             ))}
           </SimpleGrid>
-
-          <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
-
-
-          <MiniCalendar />
 
 
           <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />

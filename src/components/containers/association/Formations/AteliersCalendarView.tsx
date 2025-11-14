@@ -90,7 +90,7 @@ const {
 
 // dans ton composant
 const [today] = useState(new Date());
-
+console.log(onChainDataByMsgId);
 
 const { data: adherentData, loading: loadingAdherent, error: adherentError } = useAdherentFullData(availableSplitAddresses);
 
@@ -215,6 +215,39 @@ const renderDayEvents = () => {
             <pre style={{ whiteSpace: "pre-wrap" }}>{msg.content}</pre>
           </Box>
 
+          <Text fontWeight="bold">Places restantes :</Text>
+
+                        <Progress
+                        value={percent}
+                        size="sm"
+                        colorScheme={
+                          placesDIspo === 0
+                            ? "red"
+                            : placesDIspo <= Math.ceil(placesTot * 0.2)
+                            ? "orange"
+                            : "green"
+                        }
+                        borderRadius="md"
+                        hasStripe
+                        isAnimated
+                      />
+
+                      <HStack justify="space-between" mt={1}>
+                        <Text fontSize="xs" color="gray.500">
+                          0
+                        </Text>
+                        <Text fontSize="xs" color="gray.500">
+                          {placesTot > 0 ? placesTot : "∞"} places
+                        </Text>
+                      </HStack>
+
+                      {placesDIspo === 0 && (
+                        <Badge colorScheme="red" mt={2}>
+                          Complet
+                        </Badge>
+                      )}
+
+
           <Collapse in={open} animateOpacity>
             <Box fontSize="sm" mb={3}>
             {/*
@@ -224,37 +257,7 @@ const renderDayEvents = () => {
               <strong>Places déjà réservées :</strong> {placesRes} {placesRes === rules.maxEditions && <Badge colorScheme="red" ml={2}>Complet</Badge>} <br />
               <strong>Places restantes :</strong> {placesDIspo} {placesDIspo === 0 && <Badge colorScheme="red" ml={2}>Complet</Badge>} <br />
 */}
-<Text fontWeight="bold">Places restantes :</Text>
 
-              <Progress
-              value={percent}
-              size="sm"
-              colorScheme={
-                placesDIspo === 0
-                  ? "red"
-                  : placesDIspo <= Math.ceil(placesTot * 0.2)
-                  ? "orange"
-                  : "green"
-              }
-              borderRadius="md"
-              hasStripe
-              isAnimated
-            />
-
-            <HStack justify="space-between" mt={1}>
-              <Text fontSize="xs" color="gray.500">
-                0
-              </Text>
-              <Text fontSize="xs" color="gray.500">
-                {placesTot > 0 ? placesTot : "∞"} places
-              </Text>
-            </HStack>
-
-            {placesDIspo === 0 && (
-              <Badge colorScheme="red" mt={2}>
-                Complet
-              </Badge>
-            )}
 
               <strong>Durée :</strong> {rules.dureeAtelier ?? cfg?.defaultDuration ?? "Non précisée"} <br />
               {rules.splitAddress && <><strong>Formateur :</strong> {rules.splitAddress}<br /></>}

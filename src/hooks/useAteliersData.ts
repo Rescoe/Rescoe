@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useToast } from "@chakra-ui/react";
+import { Contract, JsonRpcProvider } from "ethers";
+import { ethers } from "ethers";
+
 
 import Web3 from "web3";
 import MessageEditions from "@/components/ABI/MessageEditions.json";
@@ -288,15 +291,24 @@ const useAteliersData = () => {
   // instantiate web3 and contract for reads
   useEffect(() => {
     try {
-      const provider = (window as any).ethereum ? (window as any).ethereum : null;
-      const w3 = new Web3(provider || Web3.givenProvider || "https://cloudflare-eth.com"); // fallback public provider
+      const rpc = process.env.NEXT_PUBLIC_URL_SERVER_MORALIS;
+      if (!rpc) {
+        console.error("Missing NEXT_PUBLIC_URL_SERVER_MORALIS");
+        return;
+      }
+
+      // Provider public Moralis
+      const w3 = new Web3(rpc);
       setWeb3Instance(w3);
-      const contract = new w3.eth.Contract((MessageEditions as any).abi ?? MessageEditions, CONTRACT_ADDRESS);
+
+      const contract = new w3.eth.Contract(MessageEditions, CONTRACT_ADDRESS);
       setContractInstance(contract);
+
     } catch (err) {
       console.error("web3 init failed", err);
     }
   }, []);
+
 
   // ---------- parse message to rules (message > JSON) ----------
   const parseMessageToRules = useCallback(
@@ -489,69 +501,55 @@ const useAteliersData = () => {
   // fetch on-chain data for one entry
   const fetchOnChainForEntry = useCallback(
     async (entry: any): Promise<OnChainAtelierInfo | null> => {
-      const web3 = web3Instance;
-      const contract = contractInstance;
-      if (!web3 || !contract) return null;
+      if (!process.env.NEXT_PUBLIC_URL_SERVER_MORALIS) {
+        console.error("RPC Moralis non défini dans .env");
+        return null;
+      }
+
+      const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+      const contract = new Contract(CONTRACT_ADDRESS, MessageEditions, provider);
 
       const msgId = entry.raw.id;
-      // prevent re-fetch if cached recent (30s)
       const cached = onChainDataByMsgId[msgId];
       if (cached && Date.now() - cached.fetchedAt < 30 * 1000) return cached;
 
       try {
-        const keccak = computeKeccakForMessageId(web3, msgId);
-        if (!keccak) return null;
-        // messageIdToHaikuId returns uint256; mapping default 0 for not set
-        const haikuIdRaw = await contract.methods.messageIdToHaikuId(keccak).call();
-        const haikuId = typeof haikuIdRaw === "string" ? haikuIdRaw : String(haikuIdRaw);
-        const exists = haikuIdRaw && haikuIdRaw !== "0";
+
+        const keccak = ethers.solidityPackedKeccak256(["string"], [msgId]);
+        const haikuIdRaw = await contract.messageIdToHaikuId(keccak);
+        const exists = haikuIdRaw && haikuIdRaw.toString() !== "0";
+
         if (!exists) {
           const info: OnChainAtelierInfo = { exists: false, fetchedAt: Date.now() };
           setOnChainDataByMsgId((p) => ({ ...p, [msgId]: info }));
           return info;
         }
 
-        // read getHaikuInfoUnique(uint256 haikuId)
         const haikuIdNum = Number(haikuIdRaw);
-        const haikuInfo = await contract.methods.getHaikuInfoUnique(haikuIdNum).call();
-        // returns (firstTokenId, editionsCount)
-        const firstTokenId = parseInt(haikuInfo.firstTokenId || haikuInfo[0] || 0, 10);
-        const totalEditions = parseInt(haikuInfo.editionsCount || haikuInfo[1] || 0, 10);
+        const haikuInfo = await contract.getHaikuInfoUnique(haikuIdNum);
+        const firstTokenId = Number(haikuInfo.firstTokenId || haikuInfo[0] || 0);
+        const totalEditions = Number(haikuInfo.editionsCount || haikuInfo[1] || 0);
 
-        // remaining editions
-        // remaining editions
         let remaining = 0;
         try {
-          const remRaw = await contract.methods.getRemainingEditions(haikuIdNum).call();
-          remaining = parseInt(remRaw?.toString() || "0", 10);
-        } catch (err) {
-          console.warn("getRemainingEditions failed", err);
-        }
+          remaining = Number(await contract.getRemainingEditions(haikuIdNum));
+        } catch {}
 
-        // token details (if token exists)
         let tokenURI = "";
         let parsedImageUrl = "";
         let currentPriceWei = "";
         let creator = "";
-        try {
-          if (firstTokenId && firstTokenId > 0) {
-            // getTokenFullDetails(tokenId)
-            const details = await contract.methods.getTokenFullDetails(firstTokenId).call();
-            // getTokenFullDetails returns (owner, mintDate, currentPrice, forSale, priceHistory, transactions, haiku_, creator_)
-            currentPriceWei = (details.currentPrice && details.currentPrice.toString) ? details.currentPrice.toString() : details.currentPrice ?? "";
+
+        if (firstTokenId > 0) {
+          try {
+            const details = await contract.getTokenFullDetails(firstTokenId);
+            currentPriceWei = details.currentPrice?.toString() || "";
             creator = details.creator_ || details[7] || "";
-            // tokenURI via ERC721 tokenURI
             try {
-              tokenURI = await contract.methods.tokenURI(firstTokenId).call();
-            } catch (err) {
-              console.warn("tokenURI fetch failed", err);
-            }
-            if (tokenURI) {
-              parsedImageUrl = parseTokenURIForImage(tokenURI) || "";
-            }
-          }
-        } catch (err) {
-          console.warn("token details fetch failed", err);
+              tokenURI = await contract.tokenURI(firstTokenId);
+              parsedImageUrl = tokenURI ? parseTokenURIForImage(tokenURI) || "" : "";
+            } catch {}
+          } catch {}
         }
 
         const info: OnChainAtelierInfo = {
@@ -566,37 +564,39 @@ const useAteliersData = () => {
           creator,
           fetchedAt: Date.now(),
         };
-
         console.log("info");
+        console.log(info);
 
         setOnChainDataByMsgId((p) => ({ ...p, [msgId]: info }));
         return info;
       } catch (err) {
-        console.error("fetchOnChainForEntry error", err);
+        console.error("fetchOnChainForEntryPublic ethers error", err);
         return null;
       }
     },
-    [web3Instance, contractInstance, onChainDataByMsgId]
+    [onChainDataByMsgId]
   );
+
 
   // batch fetch on-chain data for visible entries
   useEffect(() => {
-    // we fetch for entries that have a hashtag or are identified as atelier
-    const toFetch = enriched.slice(0, 80); // limit to first 80 to avoid heavy calls
-    if (!contractInstance || !web3Instance) return;
+    const toFetch = enriched.slice(0, 20); // limit to first 80 messages
     let mounted = true;
+
     (async () => {
       for (const e of toFetch) {
         if (!mounted) break;
         try {
+          // on utilise la version publique
           await fetchOnChainForEntry(e);
         } catch (err) {
-          // continue
+          console.warn("fetchOnChain failed for entry", e.raw.id, err);
         }
       }
     })();
+
     return () => { mounted = false; };
-  }, [enriched, fetchOnChainForEntry, contractInstance, web3Instance]);
+  }, [enriched, fetchOnChainForEntry]);
 
   // ---------- mint function (existing behaviour, improved) ----------
   const mintAtelierTicket = async (entry: any) => {

@@ -21,27 +21,33 @@ const MotionBox = motion(Box);
 const MiniCalendar = ({ onClick }: { onClick?: () => void }) => {
   const { enriched, onChainDataByMsgId } = useAteliersData();
   const [ateliers, setAteliers] = useState<any[]>([]);
+  const [nextDate, setNextDate] = useState<Date | null>(null);
 
   // Filtrer les ateliers du jour quand enriched change
-  useEffect(() => {
-    if (!enriched?.length) {
-      setAteliers([]);
-      return;
-    }
 
-    const findNextAteliers = () => {
-      let date = new Date();
-      for (let i = 0; i < 30; i++) { // limite de recherche à 30 jours
-        const dayAteliers = getAteliersDuJourCalendar(enriched, date);
-        if (dayAteliers.length > 0) return dayAteliers;
-        date.setDate(date.getDate() + 1); // passer au jour suivant
+    useEffect(() => {
+      if (!enriched?.length) {
+        setAteliers([]);
+        setNextDate(null);
+        return;
       }
-      return []; // aucun atelier trouvé dans les 30 jours
-    };
 
-    const nextAteliers = findNextAteliers();
-    setAteliers(nextAteliers);
-  }, [enriched]);
+      const findNextAteliers = () => {
+        let date = new Date();
+        for (let i = 0; i < 30; i++) { // limite de recherche à 30 jours
+          const dayAteliers = getAteliersDuJourCalendar(enriched, date);
+          if (dayAteliers.length > 0) {
+            return { dayAteliers, date: new Date(date) }; // retourne la date ici
+          }
+          date.setDate(date.getDate() + 1); // passer au jour suivant
+        }
+        return { dayAteliers: [], date: null };
+      };
+
+      const { dayAteliers, date } = findNextAteliers();
+      setAteliers(dayAteliers);
+      setNextDate(date); // <- maintenant ça marche
+    }, [enriched]);
 
 
 /*
@@ -76,9 +82,13 @@ const MiniCalendar = ({ onClick }: { onClick?: () => void }) => {
       bg="gray.900"
       onClick={onClick}
     >
-      <Text fontSize="xl" fontWeight="bold" mb={4} textAlign="center">
-        🗓️ Ateliers du jour
+
+    {nextDate && (
+      <Text fontSize="md" fontWeight="semibold" textAlign="center" mb={2} color="teal.300">
+        Prochain évènement le {nextDate.toLocaleDateString()} : 
       </Text>
+    )}
+
 
       {ateliers.length === 0 ? (
         <Text textAlign="center" mt={6}>
