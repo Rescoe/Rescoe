@@ -10,7 +10,7 @@ import Loading from "./Loading";
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS!;
 const WEB3AUTH_CLIENT_ID = process.env.NEXT_PUBLIC_WEB3AUTH_CLIENT_ID!;
 
-type RoleType = "admin" | "artist" | "poet" | "trainee" | "contributor" | null;
+type RoleType = "admin" | "artist" | "poet" | "contributor" | "trainee" | "non-member" | null;
 
 interface AuthContextType {
   address: string | null;
@@ -29,11 +29,16 @@ interface AuthContextType {
   connectWallet: () => Promise<void>;
   connectWithEmail: () => Promise<void>;
   logout: () => Promise<void>;
+  roleLoading : boolean,
+  isLoading : boolean,
 }
 
 // Interface représentant les informations du membre
 interface MemberInfo {
   role: number; // ou string selon la structure retournée par votre contrat
+  exists: boolean;
+  timestamp: number;
+  isforSale: boolean;
   // Ajoutez d'autres propriétés si nécessaire
 }
 
@@ -54,6 +59,8 @@ const AuthContext = createContext<AuthContextType>({
   connectWallet: async () => {},
   connectWithEmail: async () => {},
   logout: async () => {},
+  roleLoading: false,
+  isLoading: false,
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -73,6 +80,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [web3auth, setWeb3auth] = useState<Web3Auth | null>(null);
+  const [roleLoading, setRoleLoading] = useState(false);
+
   const toast = useToast();
 
 
@@ -137,48 +146,57 @@ useEffect(() => {
   initWeb3Auth();
 }, []);
 
+const fetchRole = async (web3Instance: Web3, userAddress: string) => {
+  console.log(web3Instance);
+  console.log("FetchRole");
+  console.log(userAddress);
 
+  if (!web3Instance || !userAddress) {
+    console.error("[fetchRole] web3Instance or userAddress is missing", web3Instance, userAddress);
+    setRole(null);
+    return;
+  }
 
-  const fetchRole = async (web3Instance: Web3, userAddress: string) => {
-    if (!web3Instance || !userAddress) {
-      console.error("[fetchRole] web3Instance or userAddress is missing", web3Instance, userAddress);
-      setRole(null);
+  setRoleLoading(true);
+
+  try {
+    const contract = new web3Instance.eth.Contract(ABI as any, CONTRACT_ADDRESS);
+
+    const owner: string = await contract.methods.owner().call();
+    if (owner && typeof owner === "string" && userAddress.toLowerCase() === owner.toLowerCase()) {
+      setRole("admin");
       return;
     }
 
-    try {
-      //console.log("[fetchRole] Start fetching role for", userAddress);
+    // Récupération des informations sur le membre
+    const memberInfo: MemberInfo = await contract.methods.members(userAddress).call();
+    console.log("memberInfo");
+    console.log(memberInfo);
+    const membreExist = memberInfo.exists;
 
-      const contract = new web3Instance.eth.Contract(ABI as any, CONTRACT_ADDRESS);
-
-      const owner: string = await contract.methods.owner().call();
-      if (owner && typeof owner === "string" && userAddress.toLowerCase() === owner.toLowerCase()) {
-        setRole("admin");
-        return;
-      }
-
-      // Récupération des informations sur le membre
-      const memberInfo: MemberInfo = await contract.methods.members(userAddress).call();
-      console.log(memberInfo);
-      //console.log("[fetchRole] memberInfo received:", memberInfo);
-
-      if (!memberInfo || typeof memberInfo.role === 'undefined') {
-        console.warn("[fetchRole] No role found for address");
-        setRole(null);
-        return;
-      }
-
-      const roleIndex = parseInt(String(memberInfo.role), 10);
-      const resolvedRole = roleMapping[roleIndex] || null;
-
-      //console.log("[fetchRole] Role resolved to:", resolvedRole);
-      setRole(resolvedRole);
-
-    } catch (error) {
-      console.error("[fetchRole] Error fetching role:", error);
-      setRole(null);
+    // Vérification des informations du membre
+    if (!memberInfo || !membreExist) {
+      console.warn("[fetchRole] User does not exist, setting role to 'non-member'");
+      setRole("non-member"); // Définit le rôle pour les non-adhérents
+      return;
     }
-  };
+
+    // Maintenant que le membre existe, on définit le rôle
+    const roleIndex = parseInt(String(memberInfo.role), 10);
+    const resolvedRole = roleMapping[roleIndex] || null;
+
+    // Set the resolved role or null if none found
+    setRole(resolvedRole === null ? null : resolvedRole);
+
+  } catch (error) {
+    console.error("[fetchRole] Error fetching role:", error);
+    setRole(null);
+  } finally {
+    setRoleLoading(false);
+  }
+};
+
+
 
   const connectWallet = async () => {
     try {
@@ -198,9 +216,10 @@ useEffect(() => {
       setWeb3(web3Instance);
       setProvider(detectedProvider as any);
       setAddress(userAddress);
-      setIsAuthenticated(true);
 
       await fetchRole(web3Instance, userAddress);
+      setIsAuthenticated(true);
+
     } catch (error) {
       console.error("[connectWallet] Erreur:", error);
     }
@@ -234,16 +253,22 @@ useEffect(() => {
 
   const logout = async () => {
     try {
-      if (web3auth) await web3auth.logout();
+
+      if (web3auth?.provider) {
+        await web3auth.logout();
+      }
+
       setAddress(null);
       setRole(null);
       setIsAuthenticated(false);
       setWeb3(null);
       setProvider(null);
+
     } catch (error) {
-      console.error("Erreur lors de la déconnexion:", error);
+      console.error("Erreur imprévue lors de la déconnexion:", error);
     }
   };
+
 
 
   const isMember = !!role;
@@ -267,9 +292,11 @@ useEffect(() => {
         connectWallet,
         connectWithEmail,
         logout,
+        roleLoading,
+        isLoading,
       }}
     >
-      {isLoading ? <Loading /> : children}
+    {(isLoading || roleLoading) ? <Loading /> : children}
     </AuthContext.Provider>
   );
 };

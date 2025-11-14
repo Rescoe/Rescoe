@@ -21,29 +21,24 @@ const MotionMenuButton = motion(MenuButton);
 
 import { brandHover, hoverStyles } from "@styles/theme"; //Style
 
-
-interface AuthContextType {
-  address: string | null;
-  role: 'admin' | 'artist' | 'poet' | 'trainee' | 'contributor' | null;
-  isMember: boolean;
-  isAdmin: boolean;
-  isArtist: boolean;
-  isPoet: boolean;
-  isTrainee: boolean;
-  isContributor: boolean;
-  isAuthenticated: boolean;
-  setAddress: (address: string | null) => void;
-  setIsAuthenticated: (status: boolean) => void; // Ensure this matches what's provided
-}
-
-
 const Header = () => {
   const headerRef = useRef<HTMLDivElement>(null);
-  const { isAuthenticated } = useAuth();
   const theme = useTheme();
 
+  const {
+    isAuthenticated,
+    isAdmin,
+    isArtist,
+    isPoet,
+    isTrainee,
+    isContributor,
+    address,
+    isMember,
+    role,
+  } = useAuth();
 
-  const { isAdmin, isArtist, isPoet, isTrainee, isContributor, address, isMember } = useAuth();
+  console.log(role);
+
   const [isInsectVisible, setIsInsectVisible] = useState(true);
   const [selectedInsect, setSelectedInsect] = useState<Insect | null>(null);
   const [insectImage, setInsectImage] = useState<string | null>(null);
@@ -159,7 +154,7 @@ const Header = () => {
         >
           <ConnectBouton />
 
-          {isAdmin && (
+          {isAdmin && isMember && (
             <Menu>
               <MotionMenuButton
                 as={Button}
@@ -202,7 +197,7 @@ const Header = () => {
             </Menu>
           )}
 
-          {isContributor && (
+          {isContributor && isMember && (
             <Menu>
             <MotionMenuButton
               as={Button}
@@ -244,7 +239,7 @@ const Header = () => {
             </Menu>
             )}
 
-          {isPoet && (
+          {isPoet && isMember && (
             <Menu>
             <MotionMenuButton
                 as={Button}
@@ -284,7 +279,7 @@ const Header = () => {
               </MenuList>
             </Menu>          )}
 
-          {isArtist && (
+          {isArtist && isMember && (
             <Menu>
             <MotionMenuButton
                 as={Button}
@@ -326,7 +321,7 @@ const Header = () => {
             </Menu>
           )}
 
-          {isTrainee && (
+          {isTrainee && isMember && (
             <Menu>
             <MotionMenuButton
                 as={Button}
@@ -353,7 +348,7 @@ const Header = () => {
                 Apprenti
                 </MotionMenuButton>
 
-                
+
                 <MenuList bg="gray.800" borderColor="purple.600">
                   <NextLink href="/u/dashboard" passHref>
                     <MenuItem as="a">Dashboard</MenuItem>
@@ -371,7 +366,35 @@ const Header = () => {
               </Menu>
           )}
 
-          {isAuthenticated && (
+          {isAuthenticated && role === null && (
+            <Menu>
+              <MotionMenuButton
+                as={Button}
+                px={10}
+                py={6}
+                fontSize="sm"
+                fontWeight="bold"
+                borderRadius="full"
+                boxShadow="lg"
+                border="1px solid"
+                whileHover={{ scale: 1.03, boxShadow: boxShadowHover }}
+                _hover={{ ...hoverStyles.brandHover._hover, ...brandHover }}
+                _active={{ transform: "scale(0.98)" }}
+                transition={{ duration: 0.25, ease: "easeInOut" }}
+              >
+                Connecté (non-adhérent)
+              </MotionMenuButton>
+              <MenuList bg="gray.800" borderColor="purple.600">
+                <NextLink href="/adhesion" passHref>
+                  <MenuItem as="a">Devenir adhérent</MenuItem>
+                </NextLink>
+              </MenuList>
+            </Menu>
+          )}
+
+
+
+          {isAuthenticated && isMember && role !== "non-member" && (
             <HStack spacing={4} cursor="pointer" aria-label="Menu insecte" >
               <Menu>
                 <MenuButton as="div">
@@ -433,6 +456,43 @@ const Header = () => {
               </span>
             </Tooltip>
           )}
+
+          {isAuthenticated && role === "non-member" && (
+            <Box>
+              {/* Menu non-adhérent */}
+              <Menu>
+                <MotionMenuButton
+                  as={Button}
+                  px={10}
+                  py={6}
+                  fontSize="sm"
+                  fontWeight="bold"
+                  borderRadius="full"
+                  boxShadow="lg"
+                  border="1px solid"
+                  whileHover={{ scale: 1.03, boxShadow: boxShadowHover }}
+                  _hover={{ ...hoverStyles.brandHover._hover, ...brandHover }}
+                  _active={{ transform: "scale(0.98)" }}
+                  transition={{ duration: 0.25, ease: "easeInOut" }}
+                >
+                  Non-adhérent
+                </MotionMenuButton>
+
+                <MenuList bg="gray.800" borderColor="purple.600">
+                  {/* Ici tu peux ajouter tout le "bazar" de menu que tu veux */}
+                  <NextLink href="/adhesion" passHref>
+                    <MenuItem as="a">Devenir adhérent</MenuItem>
+                  </NextLink>
+                  {/* Exemple de menu supplémentaire */}
+                  <NextLink href="/faq" passHref>
+                    <MenuItem as="a">FAQ</MenuItem>
+                  </NextLink>
+                </MenuList>
+              </Menu>
+
+            </Box>
+          )}
+
 
           <Box
           py={6}

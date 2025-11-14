@@ -85,7 +85,7 @@ const PublicProfile: React.FC<PublicProfileProps> = ({ address }) => {
         const rescollection = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
 
         // --- Infos utilisateur
-        const userInfos = await adhesionManager.getUserInfo(userAddress);
+        const userInfos = await adhesionContract.getUserInfo(userAddress);
         const tokenIds = await adhesionManager.getTokensByOwnerPaginated(userAddress, 0, 100);
 
         // --- Récupérer les NFTs avec métadonnées

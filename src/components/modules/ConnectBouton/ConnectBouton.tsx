@@ -30,11 +30,14 @@ const ConnectBouton: React.FC = () => {
     setAddress,
     connectWithEmail,
     connectWallet,
-    provider, // 🆕 récupère le provider ici
+    provider,
     logout,
     role,
-    address, // ✅ On récupère l’adresse du contexte (connexion Web3Auth)
+    address,
+    isLoading,       // 🆕
+    roleLoading,     // 🆕
   } = useAuth();
+
 
   const [isConnecting, setIsConnecting] = useState(false);
   const [selectedChainId, setSelectedChainId] = useState(11155111);
@@ -119,6 +122,15 @@ const ConnectBouton: React.FC = () => {
   // --------------------------
   // 🟢 UI
   // --------------------------
+  // ⛔ Bloque l'affichage tant que l'auth Web3Auth + rôle n'est pas chargée
+  if (isLoading || roleLoading) {
+    return (
+      <Button px={6} py={4} fontSize="md" borderRadius="full" boxShadow="lg" isLoading>
+        Chargement...
+      </Button>
+    );
+  }
+  
   if (!isAuthenticated) {
     return (
       <Menu>

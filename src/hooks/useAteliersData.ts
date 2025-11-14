@@ -567,7 +567,7 @@ const useAteliersData = () => {
           fetchedAt: Date.now(),
         };
 
-        console.log(info);
+        console.log("info");
 
         setOnChainDataByMsgId((p) => ({ ...p, [msgId]: info }));
         return info;

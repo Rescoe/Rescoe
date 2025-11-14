@@ -27,7 +27,7 @@ import {
     VStack,
     Collapse,
     useDisclosure,
-
+    Divider,
 } from "@chakra-ui/react";
 import { FaCheckCircle } from 'react-icons/fa'; // Exemple d'icône pour les éléments de liste
 
@@ -36,7 +36,7 @@ import useEthToEur from "../../../hooks/useEuro";
 import { useAuth } from '../../../utils/authContext';
 
 const RoleBasedNFTPage = () => {
-    const { address: account, web3 } = useAuth();
+    const { address: account, web3, isAuthenticated } = useAuth();
     const [selectedRole, setSelectedRole] = useState<string>('');
     const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
     const [ipfsUrl, setIpfsUrl] = useState<string | null>(null);
@@ -51,7 +51,6 @@ const RoleBasedNFTPage = () => {
     const [name, setName] = useState(''); // État pour le nom
     const [bio, setBio] = useState(''); // État pour la biographie
     const [isOnSepolia, setIsOnSepolia] = useState<boolean>(false); // État pour vérifier si sur Sepolia
-    const { isAuthenticated } = useAuth();
     const [nftId, setNftId] = useState<string>('');
     const [isReadyToMint, setIsReadyToMint] = useState(false);
     const { convertEthToEur, loading: loadingEthPrice } = useEthToEur();
@@ -256,20 +255,34 @@ const RoleBasedNFTPage = () => {
         <Box p={5} textAlign="center">
         <Box p={5} borderRadius="lg" boxShadow="md" mb={4} maxWidth="800px" mx="auto">
               <Heading size="lg" mb={4} textAlign="center">
-Adhésion
+              Adhésion
               </Heading>
               <Text fontSize="md" mb={4} textAlign="center">
                   En tant que membre de notre réseau unique, vous aurez l'opportunité de participer à une communauté dynamique d'artistes et de collectionneurs engagés dans l'innovation et la créativité.
               </Text>
 
+              <Heading size="l" mb={4} textAlign="center">
+              Recevez un badge d'adhérent unique !
+              </Heading>
+              <Image
+                  src="/gifs/Scarabe.gif"
+                  alt="Badge d'adhésion animé"
+                  borderRadius="md"
+                  mb={4}
+                  boxSize="300px"
+                  objectFit="cover"
+                  mx="auto"
+              />
+
+
               <Button onClick={onToggle} width="full" mb={4}>
                   {isOpen ? "Masquer les détails" : "Voir les détails de l'adhésion"}
               </Button>
 
-              <Collapse in={isOpen || !isAuthenticated}>
-              <Heading size="l" mb={4} textAlign="center">
-Vous devez être connecter pour pouvoir Adhérer
-              </Heading>
+              <Collapse in={isOpen && !isAuthenticated}>
+
+
+
                   <VStack align="start" spacing={4} mb={5}>
 
                       <Box>
@@ -324,15 +337,10 @@ Vous devez être connecter pour pouvoir Adhérer
                       Ensemble, concrétisons vos idées et vos œuvres dans un écosystème innovant.
                   </Text>
 
-                  <Image
-                      src="/gifs/Scarabe.gif"
-                      alt="Badge d'adhésion animé"
-                      borderRadius="md"
-                      mb={4}
-                      boxSize="300px"
-                      objectFit="cover"
-                      mx="auto"
-                  />
+                  <Divider mb="10" />
+                  <Heading size="l" mb={4} textAlign="center">
+                  Connectez vous pour pouvoir adhérer
+                  </Heading>
 
               </Collapse>
           </Box>
