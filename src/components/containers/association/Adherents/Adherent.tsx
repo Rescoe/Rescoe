@@ -73,7 +73,7 @@ const Adherent: React.FC = () => {
         const adhesionContract = new ethers.Contract(contractAddress, ABI, jsonProvider);
         setProvider(jsonProvider);
         setContract(adhesionContract);
-        console.log("🟣 Lecture via Moralis RPC");
+        //console.log("🟣 Lecture via Moralis RPC");
       } catch (error) {
         console.error("Erreur init provider:", error);
       }

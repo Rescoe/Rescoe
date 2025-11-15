@@ -106,7 +106,7 @@ const ManageContracts = () => {
           newCollectionId
         ).send({ from: account });
         alert(`Collection ${newCollectionName} créée avec succès !`);
-        console.log("TX:", tx);
+        //console.log("TX:", tx);
       } catch (error) {
         console.error("Erreur lors de la création:", error);
         alert("Échec de la création !");

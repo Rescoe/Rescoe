@@ -87,28 +87,28 @@ const TokenPage: React.FC = () => {
         }
                 if (!fullDetails) {
                     return null;  // Si aucun détail n'est trouvé
-                    console.log("AucunFull details");
+                    //console.log("AucunFull details");
                 }
 
         */
         const fullDetails = await contract.getFullDetails(tokenId);
-        console.log("Fulld etails : ");
-        console.log(fullDetails);
+        //console.log("Fulld etails : ");
+        //console.log(fullDetails);
 
         // Récupérer le tokenURI du NFT
         const uri = await contract.tokenURI(tokenId as string);
         const CIID = await contract.getCID();
-        console.log(CIID);
+        //console.log(CIID);
                 // Récupérer les métadonnées de l'IPFS
         const IndexLoad = "https://ipfs.io/ipfs/" + CIID + "/index.html";
-        console.log(IndexLoad);
+        //console.log(IndexLoad);
         const res = await fetch(`/api/proxyPinata?ipfsHash=${uri.split('/').pop()}`);
         const data = await res.json();
 
         const owner: string = fullDetails[0];
         const collectionId: bigint = fullDetails[5];
 
-        console.log(owner);
+        //console.log(owner);
 
         setNftData({
           name: data.name,
@@ -140,7 +140,7 @@ const TokenPage: React.FC = () => {
     const contract = new web3.eth.Contract(ABI_MINT_CONTRACT as any, contractAddress);
 
     // Vérification de l'URL (ImageLoad)
-    console.log("URL de l'image (index.html) pour minter:", nftData.image); // Assure-toi que l'URL est correcte
+    //console.log("URL de l'image (index.html) pour minter:", nftData.image); // Assure-toi que l'URL est correcte
 
     try {
       // Utilisation de l'URL de l'index.html pour le mint

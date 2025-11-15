@@ -51,11 +51,11 @@ const FeaturedMembers: React.FC<FeaturedMembersProps> = ({ addresses }) => {
 
       try {
         setLoading(true);
-        console.log("📬 Adresses reçues :", addresses);
+        //console.log("📬 Adresses reçues :", addresses);
 
         // 🔒 Toujours lecture en RPC public — pas de MetaMask ici
         const web3 = new Web3(new Web3.providers.HttpProvider(RPC_URL));
-        console.log("🌐 Lecture via RPC public :", RPC_URL);
+        //console.log("🌐 Lecture via RPC public :", RPC_URL);
 
         const contractManagement = new web3.eth.Contract(
           ABI_ADHESION_MANAGEMENT as any,
@@ -90,7 +90,7 @@ const FeaturedMembers: React.FC<FeaturedMembersProps> = ({ addresses }) => {
     contract: any
   ): Promise<UserInfo> => {
     try {
-      console.log("🔍 Lecture infos utilisateur pour :", address);
+      //console.log("🔍 Lecture infos utilisateur pour :", address);
 
       const userInfo: unknown[] = await contract.methods
         .getUserInfo(address)

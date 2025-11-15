@@ -90,7 +90,7 @@ const {
 
 // dans ton composant
 const [today] = useState(new Date());
-console.log(onChainDataByMsgId);
+//console.log(onChainDataByMsgId);
 
 const { data: adherentData, loading: loadingAdherent, error: adherentError } = useAdherentFullData(availableSplitAddresses);
 

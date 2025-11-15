@@ -17,7 +17,7 @@ export function useUserCollections(userAddress?: string) {
 
   useEffect(() => {
     if (!userAddress) return;
-    console.log(userAddress);
+    //console.log(userAddress);
     const fetchCollections = async () => {
       setIsLoading(true);
       const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);

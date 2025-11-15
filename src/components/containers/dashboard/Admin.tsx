@@ -327,10 +327,10 @@ const fetchPointPrice = async () => {
 
     try {
       const actualPointPrice = await contract.methods.pointPrice().call() as string; // ✅ cast en string
-      //console.log("Prix en wei:", actualPointPrice);
+      ////console.log("Prix en wei:", actualPointPrice);
 
       const priceInEth = web3.utils.fromWei(actualPointPrice, "ether");
-      //console.log("Prix en ETH:", priceInEth);
+      ////console.log("Prix en ETH:", priceInEth);
 
       setprixPoints(priceInEth);
 

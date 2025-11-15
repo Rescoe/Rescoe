@@ -564,8 +564,8 @@ const useAteliersData = () => {
           creator,
           fetchedAt: Date.now(),
         };
-        console.log("info");
-        console.log(info);
+        //console.log("info");
+        //console.log(info);
 
         setOnChainDataByMsgId((p) => ({ ...p, [msgId]: info }));
         return info;
@@ -638,7 +638,7 @@ const useAteliersData = () => {
             const recipientsForMint = recipients.length > 0 ? recipients : [splitAddr];
             const percentagesForMint = percentages.length > 0 ? percentages : [1000]; // fallback 10%
 /*
-console.log(keccak,
+//console.log(keccak,
 rules.description || msg.content,
 priceInWei,
 splitAddress,

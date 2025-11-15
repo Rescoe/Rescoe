@@ -202,7 +202,7 @@ const UniqueArtGalerie: React.FC = () => {
           const receipt = await web3.eth.getTransactionReceipt(transaction.transactionHash);
 
           // Vous pouvez valider ou traiter le reçu ici
-          console.log(`NFT avec ID ${nft.tokenId} acheté avec succès !`, receipt);
+          //console.log(`NFT avec ID ${nft.tokenId} acheté avec succès !`, receipt);
 
       } catch (error) {
           console.error("Erreur lors de l'achat du NFT:", error);

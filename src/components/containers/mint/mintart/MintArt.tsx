@@ -114,7 +114,7 @@ const MintArt: React.FC = () => {
 
 
   useEffect(() => {
-    console.log(address);
+    //console.log(address);
     if (address) {
         fetchUserCollections();
             }
@@ -286,11 +286,11 @@ const MintArt: React.FC = () => {
       const currentTokenId: number = Number(lastTokenIdStr);
       setTokenId(currentTokenId);
 
-      console.log("tokenId lors du mint : ", currentTokenId);
+      //console.log("tokenId lors du mint : ", currentTokenId);
 
       if (isSaleListing && salePrice && parseFloat(salePrice) > 0) {
         const priceWei: string = web3.utils.toWei(salePrice, "ether");
-        console.log(priceWei);
+        //console.log(priceWei);
 
         await mintContract.methods.listNFTForSale(currentTokenId, priceWei).send({ from: userAddress });
       }
@@ -331,11 +331,11 @@ const MintArt: React.FC = () => {
 
       setTokenId(currentTokenId);
 
-      console.log("tokenId lors du sale : ", currentTokenId);
+      //console.log("tokenId lors du sale : ", currentTokenId);
 */
       if (salePrice && parseFloat(salePrice) > 0) {
         const priceWei: string = web3.utils.toWei(salePrice, "ether");
-        console.log(priceWei);
+        //console.log(priceWei);
 
         await mintContract.methods.listNFTForSale(tokenId, priceWei).send({ from: userAddress });
 
@@ -392,7 +392,7 @@ const MintArt: React.FC = () => {
       }
 
       setTokenId(currentTokenId);
-      console.log("✅ Nouveau tokenId : ", currentTokenId);
+      //console.log("✅ Nouveau tokenId : ", currentTokenId);
     } catch (err) {
       console.error("Erreur lors du fetch du tokenId :", err);
     }

@@ -36,7 +36,7 @@ const SelectInsect = ({ onSelect }: { onSelect: (insect: Insect) => void }) => {
         try {
           const tokenURI = await contract.tokenURI(tokenId);
           const response = await fetch(tokenURI);
-          console.log("Token URI:", tokenURI);
+          //console.log("Token URI:", tokenURI);
 
           if (!response.ok) {
             throw new Error('Erreur lors de la récupération de URI');

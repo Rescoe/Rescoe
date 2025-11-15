@@ -147,9 +147,9 @@ useEffect(() => {
 }, []);
 
 const fetchRole = async (web3Instance: Web3, userAddress: string) => {
-  console.log(web3Instance);
-  console.log("FetchRole");
-  console.log(userAddress);
+  //console.log(web3Instance);
+  //console.log("FetchRole");
+  //console.log(userAddress);
 
   if (!web3Instance || !userAddress) {
     console.error("[fetchRole] web3Instance or userAddress is missing", web3Instance, userAddress);
@@ -170,8 +170,8 @@ const fetchRole = async (web3Instance: Web3, userAddress: string) => {
 
     // Récupération des informations sur le membre
     const memberInfo: MemberInfo = await contract.methods.members(userAddress).call();
-    console.log("memberInfo");
-    console.log(memberInfo);
+    //console.log("memberInfo");
+    //console.log(memberInfo);
     const membreExist = memberInfo.exists;
 
     // Vérification des informations du membre

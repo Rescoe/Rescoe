@@ -131,9 +131,11 @@ const TokenPage = () => {
       const ipfsHash = uri.split('/').pop();
       const res = await fetch(`/api/proxyPinata?ipfsHash=${ipfsHash}`);
       const metadata = await res.json();
-      const finAdhesion = new Date((Number(mintTimestamp) + 365 * 24 * 60 * 60) * 1000).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' });
+      //const finAdhesion = new Date((Number(mintTimestamp) + 365 * 24 * 60 * 60) * 1000).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' });
 
-      console.log(finAdhesion);
+      const finAdhesion = new Date((Number(mintTimestamp) + Number(remainingTime)) * 1000).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' });
+      //console.log(finAdhesion);
+
       const nftData: NFTData = {
         ...metadata,
         owner,

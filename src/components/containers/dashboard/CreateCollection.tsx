@@ -275,9 +275,9 @@ const estimateCollectionCost = async () => {
     const totalWei = BigInt(gasLimit) * gasPrice;
     const totalEth = Number(web3.utils.fromWei(totalWei.toString(), "ether")).toFixed(6);
 
-    console.log(
-      `[ESTIMATION] ${collectionType} collection - GasLimit: ${gasLimit}, GasPrice: ${gasPrice.toString()} wei, Total ETH: ${totalEth}`
-    );
+    //console.log(
+    //  `[ESTIMATION] ${collectionType} collection - GasLimit: ${gasLimit}, GasPrice: ${gasPrice.toString()} wei, Total ETH: ${totalEth}`
+    //);
 
 //MARGE de x4 pour etre sur que l'utilisateur ne soit pas surpris
 setEstimatedCost((Number(totalEth) * 5).toFixed(6));

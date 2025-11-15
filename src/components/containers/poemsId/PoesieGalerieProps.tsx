@@ -80,13 +80,13 @@ const PoetryGallery: React.FC<PoetryGalleryProps> = ({ collectionAddress }) => {
   // Fonction d'achat
   const handleBuy = async (tokenId: string) => {
     if (!web3 || !address) {
-      console.log("Utilisateur non connecté");
+      //console.log("Utilisateur non connecté");
       return;
     }
     try {
       const tx = await contract.buyToken(tokenId, { from: address });
       await tx.wait();
-      console.log("Token acheté avec succès !", tokenId);
+      //console.log("Token acheté avec succès !", tokenId);
       // Optionnel: Recharger les poèmes ou mettre à jour l'état
     } catch (error) {
       console.error("Erreur lors de l'achat du token:", error);

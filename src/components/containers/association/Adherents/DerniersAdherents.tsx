@@ -53,7 +53,7 @@ const DerniersAdherents: React.FC = () => {
         );
 
         setDernierAdherentsInfo(membersInfo);
-        console.log("✅ Données récupérées via Moralis RPC");
+        //console.log("✅ Données récupérées via Moralis RPC");
       } catch (err) {
         console.error("Erreur lors de la récupération des adhérents:", err);
       }

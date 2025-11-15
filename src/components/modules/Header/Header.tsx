@@ -37,7 +37,7 @@ const Header = () => {
     role,
   } = useAuth();
 
-  console.log(role);
+  //console.log(role);
 
   const [isInsectVisible, setIsInsectVisible] = useState(true);
   const [selectedInsect, setSelectedInsect] = useState<Insect | null>(null);

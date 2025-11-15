@@ -145,8 +145,11 @@ const Dashboard = () => {
 
     const fetchedRolesAndImages = await Promise.all(tokenIds.map(async (tokenId: number) => {
       const fullDatas = await contractadhesion.getTokenDetails(tokenId);
-      const mintTimestamp = Number(fullDatas[2]);
-      const finAdhesion = new Date((mintTimestamp + 365 * 24 * 60 * 60) * 1000).toLocaleDateString('fr-FR');
+
+      const mintTimestamp = Number(fullDatas[2]); // secondes
+      const remainingTime = Number(await contractadhesion.getRemainingMembershipTime(tokenId)); // secondes
+      const finAdhesion = new Date((mintTimestamp + remainingTime) * 1000);
+
       const tokenURI = await contractadhesion.tokenURI(tokenId);
       const response = await fetch(tokenURI);
       const metadata = await response.json();

@@ -94,7 +94,7 @@ const GenerativeArtUploader: React.FC = () => {
       files[relativePath] = file;
     });
     setZipFiles(files);
-    console.log("Contenu du ZIP :", Object.keys(files));
+    //console.log("Contenu du ZIP :", Object.keys(files));
   };
 
   const fetchCollections = async () => {
@@ -153,7 +153,7 @@ const GenerativeArtUploader: React.FC = () => {
     }
 
     if (!fixedHtml) {
-      console.log("Aucun fichier index.html trouvé.");
+      //console.log("Aucun fichier index.html trouvé.");
       return null;
     }
 
@@ -210,7 +210,7 @@ const GenerativeArtUploader: React.FC = () => {
           }
         }, "image/png");
       } else {
-        console.log(`Canvas "${canvasName}" non trouvé, capture du preview`);
+        //console.log(`Canvas "${canvasName}" non trouvé, capture du preview`);
         capturePreview().then(resolve).catch(reject);
       }
     });
@@ -307,9 +307,9 @@ const GenerativeArtUploader: React.FC = () => {
         editions,
       };
 
-      console.log('Art data:', artData);
-      console.log('IPFS URL:', animationUrl);
-      console.log('Uploaded CIDs:', ipfsHash);
+      //console.log('Art data:', artData);
+      //console.log('IPFS URL:', animationUrl);
+      //console.log('Uploaded CIDs:', ipfsHash);
       setIpfsHash(CID);
     } catch (error) {
       console.error('Error processing ZIP file:');
@@ -317,8 +317,8 @@ const GenerativeArtUploader: React.FC = () => {
   };
 
   const ArtisteInitialize = async () => {
-    console.log("CID avant minting:", ipfsHash);
-    console.log("selectedCollectionId:", selectedCollectionId);
+    //console.log("CID avant minting:", ipfsHash);
+    //console.log("selectedCollectionId:", selectedCollectionId);
 
     if (!ipfsHash || !selectedCollectionId) {
       alert("Veuillez uploader le projet et sélectionner une collection.");
@@ -362,7 +362,7 @@ const GenerativeArtUploader: React.FC = () => {
       if (!isInitialized) {
         await mintContract.methods.initialize(ipfsHash, editions).send({ from: accounts[0] });
       }
-      console.log("Mint réussi !");
+      //console.log("Mint réussi !");
     } catch (error) {
       console.error("Erreur lors du minting :");
       alert(`Erreur lors du minting :`);
@@ -406,7 +406,7 @@ const GenerativeArtUploader: React.FC = () => {
       }
 
       for (let i = 0; i < editionsAsNumber; i++) {
-        console.log(`Minting édition ${i + 1}...`);
+        //console.log(`Minting édition ${i + 1}...`);
         const mintResult = await mintContract.methods
           .mint(ipfsHash) // Vous devriez passer la bonne URL ou l'IPFS ici
           .send({ from: accounts[0] });
@@ -416,7 +416,7 @@ const GenerativeArtUploader: React.FC = () => {
         }
 
         const tokenId = mintResult.events.NFTMinted.returnValues.tokenId;
-        console.log(`Mint réussi pour Token ID: ${tokenId}`);
+        //console.log(`Mint réussi pour Token ID: ${tokenId}`);
       }
 
       alert(`Félicitations ! Vous avez minté ${editionsAsNumber} éditions.`);

@@ -351,17 +351,17 @@ const fetchAllNFTsAndPoems = useCallback(async () => {
   const randomArtCollections = getRandomItems(artCollections, 5);
   const randomPoetryCollections = getRandomItems(poetryCollections, 5);
 
-  ////console.log("Collections d'art sélectionnées :", randomArtCollections.map(c => c.id));
-  ////console.log("Collections de poésie sélectionnées :", randomPoetryCollections.map(c => c.id));
+  //////console.log("Collections d'art sélectionnées :", randomArtCollections.map(c => c.id));
+  //////console.log("Collections de poésie sélectionnées :", randomPoetryCollections.map(c => c.id));
 
   // Récupérer les NFTs pour les collections d'art
   for (const collection of randomArtCollections) {
     if (collection && !fetchedCollections.current.has(collection.id)) {
-      ////console.log(`Récupération des NFTs pour la collection d'art ${collection.id}...`);
+      //////console.log(`Récupération des NFTs pour la collection d'art ${collection.id}...`);
       const nftsBefore = nfts.length;
       await fetchNFTs(collection.id, collection.mintContractAddress);
       const nftsAfter = nfts.length;
-      ////console.log(`Collection ${collection.id} récupérée : ${nftsAfter - nftsBefore} NFTs ajoutés`);
+      //////console.log(`Collection ${collection.id} récupérée : ${nftsAfter - nftsBefore} NFTs ajoutés`);
       fetchedCollections.current.add(collection.id); // Marquez comme récupérée
     }
   }
@@ -369,17 +369,17 @@ const fetchAllNFTsAndPoems = useCallback(async () => {
   // Récupérer les poèmes pour les collections de poésie
   for (const collection of randomPoetryCollections) {
     if (collection && !fetchedCollections.current.has(collection.id)) {
-      ////console.log(`Récupération des poèmes pour la collection ${collection.id}...`);
+      //////console.log(`Récupération des poèmes pour la collection ${collection.id}...`);
       const poemsBefore = haikus.length; // si tu as un state "poems"
       await fetchPoems(collection.id, collection.mintContractAddress);
       const poemsAfter = haikus.length;
-      ////console.log(`Collection ${collection.id} récupérée : ${poemsAfter - poemsBefore} poèmes ajoutés`);
+      //////console.log(`Collection ${collection.id} récupérée : ${poemsAfter - poemsBefore} poèmes ajoutés`);
       fetchedCollections.current.add(collection.id); // Marquez comme récupérée
     }
   }
 
-  ////console.log("Récupération terminée. NFTs totaux :", nfts.length);
-  ////console.log("Poèmes totaux :", haikus.length);
+  //////console.log("Récupération terminée. NFTs totaux :", nfts.length);
+  //////console.log("Poèmes totaux :", haikus.length);
 }, [collections]);
 
 // Appel de la fonction dans useEffect
