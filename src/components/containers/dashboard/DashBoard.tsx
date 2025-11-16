@@ -6,6 +6,8 @@ import { useAuth } from '../../../utils/authContext';
 import { JsonRpcProvider } from 'ethers';
 import { ethers } from "ethers";
 import { BrowserProvider, Eip1193Provider } from "ethers";
+import UserNFTFeed from "@/hooks/Moralis/userNFT"
+import UserTransactionsFeed from "@/hooks/Moralis/UserTransactionsFeed"
 
 import { Contract } from 'ethers';
 import ABI from '../../ABI/ABIAdhesion.json';
@@ -311,7 +313,9 @@ const Dashboard = () => {
                 <Divider my={6} borderColor="purple.700" w="80%" mx="auto" />
 
 
-                <Text fontSize="s"><strong>Fin de l'adhésion </strong> le {userData.finAdhesion}</Text>
+                <Text fontSize="s">
+                  <strong>Fin de l'adhésion</strong> le {userData.finAdhesion ? new Date(userData.finAdhesion).toLocaleDateString("fr-FR") : ""}
+                </Text>
 
               </Box>
             </HStack>
@@ -320,10 +324,12 @@ const Dashboard = () => {
           <Divider my={4} />
 
           <Tabs variant="soft-rounded" colorScheme="purple" isFitted>
-            <TabList mb={4}>
-              <Tab>Profil & Statistiques</Tab>
-              <Tab>Créer une Collection</Tab>
-              <Tab>Mes Collections</Tab>
+            <TabList mb={2}>
+              <Tab>Profil adhérent</Tab>
+            {/*  <Tab>Créer une Collection</Tab> */}
+              <Tab>Collections et oeuvres</Tab>
+              <Tab>Economie</Tab>
+
             </TabList>
 
             <TabPanels>
@@ -446,10 +452,11 @@ const Dashboard = () => {
                 </Grid>
               </TabPanel>
 
+{/*
               <TabPanel>
                 <CreateCollection />
               </TabPanel>
-
+*/}
               <TabPanel>
                 <Box borderWidth="1px" borderRadius="xl" p={6} shadow="md" w="100%">
                   <Heading size="md" mb={4}>Mes Collections</Heading>
@@ -458,7 +465,28 @@ const Dashboard = () => {
                   </Box>
                   <Divider my={6} borderColor="purple.700" />
                 </Box>
+
+                <Box borderWidth="1px" borderRadius="xl" p={6} shadow="md" w="100%">
+                  <Heading size="md" mb={4}>Mes oeuvres et poèmes</Heading>
+                  <Box mt={1} overflow="hidden" w="100%">
+                    {userData.address && <UserNFTFeed walletAddress={userData.address} />}
+                  </Box>
+                  <Divider my={6} borderColor="purple.700" />
+                </Box>
+
               </TabPanel>
+
+              <TabPanel>
+                <Box borderWidth="1px" borderRadius="xl" p={6} shadow="md" w="100%">
+                  <Heading size="md" mb={4}>Transactions</Heading>
+                  <Box mt={1} overflow="hidden" w="100%">
+                    {userData.address && <UserTransactionsFeed walletAddress={userData.address} />}
+                  </Box>
+                  <Divider my={6} borderColor="purple.700" />
+                </Box>
+              </TabPanel>
+
+
             </TabPanels>
           </Tabs>
         </>
