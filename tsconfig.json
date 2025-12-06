@@ -1,8 +1,16 @@
 {
   "compilerOptions": {
-    "typeRoots": ["./src/@types", "./node_modules/@types"],
+    "typeRoots": [
+      "./src/@types",
+      "./node_modules/@types"
+    ],
     "target": "es2020",
-    "lib": ["es2020", "dom", "dom.iterable", "esnext"],
+    "lib": [
+      "es2020",
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -13,14 +21,25 @@
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "incremental": true,
     "baseUrl": "./src",
     "paths": {
-      "@/*": ["*"],
-      "@styles/*": ["styles/*"]
-    },
+      "@/*": [
+        "*"
+      ],
+      "@styles/*": [
+        "styles/*"
+      ]
+    }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules", "cypress"]
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "cypress"
+  ]
 }

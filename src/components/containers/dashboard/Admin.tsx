@@ -189,7 +189,7 @@ const handleConfirmRole = async () => {
 
 // Nouvelle fonction pour générer des images par adhésion
 const generateImageForAdhesion = async (adhesion: Adhesion) => {
-    const response = await fetch('/gifs/Scarabe.gif'); // Ou le chemin de votre image
+    const response = await fetch('/gifs/Chenille.gif'); // Ou le chemin de votre image
     const blob = await response.blob();
     const gifURL = URL.createObjectURL(blob);
     setGeneratedImageUrl(gifURL); // Met à jour l'URL de l'image générée

@@ -141,7 +141,6 @@ import {
 import { motion, HTMLMotionProps, MotionProps, AnimatePresence, Transition } from "framer-motion";
 
 import { FC,ReactNode  } from "react";
-import { IconProp } from "@fortawesome/fontawesome-svg-core"; // pour FA
 // Typing pour accepter children et toutes les props motion/Box
 
 // Custom components with theme integration
