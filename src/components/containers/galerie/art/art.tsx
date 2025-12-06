@@ -57,7 +57,7 @@ const UniqueArtGalerie: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState<string>(''); // État pour stocker le terme de recherche
 
   const router = useRouter();
-  const { web3, address } = useAuth();
+  const { web3, address } = useAuth(); 
 
   const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!;
 
