@@ -5,12 +5,11 @@ import { useThree, useFrame } from '@react-three/fiber';
 
 function Banana({ index, z, speed }) {
   const ref = useRef();
-  const { viewport, camera } = useThree();
-  const { width, height } = viewport.getCurrentViewport
-    ? viewport.getCurrentViewport(camera, [0, 0, -z]) // pour compatibilité future
-    : viewport; // fallback
+  const { viewport } = useThree();           // <<< FIX
+  const { width, height } = viewport;        // <<< FIX
 
   const { scene } = useGLTF('/StagBeetle.glb');
+
   const [data] = useState({
     y: THREE.MathUtils.randFloatSpread(height * 2),
     x: THREE.MathUtils.randFloatSpread(2),
@@ -36,22 +35,37 @@ function Banana({ index, z, speed }) {
 
     ref.current.scale.set(0.1, 0.1, 0.2);
 
-    if (data.y > height * (index === 0 ? 4 : 1)) data.y = -(height * (index === 0 ? 4 : 1));
+    if (data.y > height * (index === 0 ? 4 : 1)) {
+      data.y = -height * (index === 0 ? 4 : 1);
+    }
   });
 
   return <primitive ref={ref} object={scene} />;
 }
 
-export default function Bananas({ count = 30, depth = 80, easing = (x) => Math.sqrt(1 - Math.pow(x - 1, 2)) }) {
+export default function Bananas({
+  count = 30,
+  depth = 80,
+  easing = (x) => Math.sqrt(1 - Math.pow(x - 1, 2)),
+}) {
   const speed = 5;
 
   return (
     <>
+      {/* <<< FIX: garder comme ça */}
       <ambientLight intensity={0.5} color="orange" />
+
       {Array.from({ length: Math.min(count, 30) }, (_, i) => (
-        <Banana key={i} index={i} z={Math.round(easing(i / count) * depth + 20)} speed={speed} />
+        <Banana
+          key={i}
+          index={i}
+          z={Math.round(easing(i / count) * depth + 20)}
+          speed={speed}
+        />
       ))}
-      <Environment preset="sunset" />
+
+      {/* <<< FIX: preset sunset OK, background désactivé pour éviter erreur */}
+      <Environment preset="sunset" background={false} />
     </>
   );
 }

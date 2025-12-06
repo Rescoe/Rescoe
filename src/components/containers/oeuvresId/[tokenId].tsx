@@ -61,7 +61,7 @@ interface NFTData {
     name: string;
     description: string;
     artist: string;
-    artistENS: string;
+    //artistENS: string;
     forsale: boolean;
     price: string;
     collectionId: number;  // Vérifiez ceci
@@ -100,7 +100,7 @@ const TokenPage: React.FC = () => {
   //const [collectionId, setCollectionId] = useState<bigint>({});
   const [transacActivity, setTransacActivity] = useState<boolean>(false);
   const [tabIndex, setTabIndex] = useState(0); // Initialement l'onglet 0 (Détails)
-  const [ensName, setEnsName] = useState<string>('');
+  //const [ensName, setEnsName] = useState<string>('');
 
   const [collectionNFTs, setCollectionNFTs] = useState<any[]>([]);
   const [isLoadingCollection, setIsLoadingCollection] = useState(true);
@@ -246,9 +246,9 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
         const ownerCheck = Boolean(authAddress && fullDetails?.owner && authAddress.toLowerCase() === fullDetails.owner.toLowerCase());
         setIsOwner(ownerCheck);
 
-        const resolvedOwner = await fetchENS(fullDetails.owner);
+        //const resolvedOwner = await fetchENS(fullDetails.owner);
 
-        const owner: string = resolvedOwner;
+        const owner: string = fullDetails.owner;
         const mintDate: bigint = fullDetails.mintDate;
         const currentPrice: bigint = fullDetails.currentPrice;
         const forsale: boolean = fullDetails.forSale;
@@ -278,7 +278,7 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
 
         const data = await res.json();
 
-        const resolvedArtist = await fetchENS(data.artist);
+        //const resolvedArtist = await fetchENS(data.artist);
 
 
         const nftData: NFTData = {
@@ -290,7 +290,7 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
             name: data.name,
             description: data.description,
             artist: data.artist,
-            artistENS: resolvedArtist,
+            //artistENS: resolvedArtist,
             forsale,
             price: priceInEther,
             collectionId: Number(collectionId),
@@ -360,7 +360,7 @@ const fetchCollectionNFTs = async (contractAddress: string) => {
 };
 
 
-
+/*
 const fetchENS = async (userAddress: string): Promise<string> => {
   const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
   try {
@@ -371,7 +371,7 @@ const fetchENS = async (userAddress: string): Promise<string> => {
     return formatAddress(userAddress);
   }
 };
-
+*/
 
 const fetchHistory = async (contractAddress: string, tokenId: number): Promise<HistoryData> => {
     const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
@@ -413,8 +413,14 @@ const handleListForSale = async () => {
 
   try {
     const contract = new web3.eth.Contract(ABI as any, contractAddress as string);
+    const gasPrice = await web3.eth.getGasPrice();
+
     await contract.methods.listNFTForSale(tokenId, web3.utils.toWei(price, "ether"))
-      .send({ from: accounts[0] });
+    .send({ from: accounts[0],
+      gasPrice: gasPrice.toString(),  // <-- force string
+      maxFeePerGas: null as any,       // TS ok
+      maxPriorityFeePerGas: null as any
+    });
 
     setIsForSale(true);
   } catch (error) {
@@ -506,7 +512,7 @@ const handleCopy = () => {
           borderRadius="md"
         />
         <Heading as="h1" fontSize={{ base: "xl", md: "3xl" }}>
-          {nftData.name} - {nftData.artistENS}
+          {nftData.name} - {nftData.artist}
         </Heading>
       </Stack>
 
@@ -592,7 +598,7 @@ const handleCopy = () => {
                 <VStack spacing={4} alignItems="start" mb={6}>
                     <Text fontSize="lg"><strong>Nom :</strong> {nftData.name}</Text>
                     <Text fontSize="lg"><strong>Description :</strong> {nftData.description}</Text>
-                    <Text fontSize="lg" cursor="pointer" onClick={handleCopy}><strong>Artiste :</strong> {nftData.artistENS}</Text>
+                    <Text fontSize="lg" cursor="pointer" onClick={handleCopy}><strong>Artiste :</strong> {nftData.artist}</Text>
                     <Text fontSize="lg" cursor="pointer" onClick={handleCopy}><strong>Propriétaire :</strong> {nftData.owner}</Text>
                     {/* Dernier prix de vente ou prix actuel */}
                       {!isForSale && nftData.price ? (
@@ -728,7 +734,7 @@ const handleCopy = () => {
       {/* Carrousels */}
       <Box mt={5} w="full">
         <Heading size="md" mb={3}>
-          Découvrez les autres collections de {nftData.artistENS}
+          Découvrez les autres collections de {nftData.artist}
         </Heading>
         <Stack direction={{ base: "column", md: "row" }} spacing={2}>
           <FilteredCollectionsCarousel

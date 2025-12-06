@@ -77,7 +77,6 @@ const PublicProfile: React.FC<PublicProfileProps> = ({ address }) => {
       const provider = new JsonRpcProvider(RPC_URL);
 
       try {
-        const ensName = (await provider.lookupAddress(userAddress)) || undefined;
 
         // --- Contracts
         const adhesionContract = new Contract(contractAdhesion, ABI, provider);
@@ -86,7 +85,9 @@ const PublicProfile: React.FC<PublicProfileProps> = ({ address }) => {
 
         // --- Infos utilisateur
         const userInfos = await adhesionContract.getUserInfo(userAddress);
-        const tokenIds = await adhesionManager.getTokensByOwnerPaginated(userAddress, 0, 100);
+        const tokenIds = await adhesionManager.getTokensByOwnerPaginated(userAddress, 0, 20);
+
+        const ensName = userInfos.name || `Utilisateur ${userAddress.slice(0, 6)}`;;
 
         // --- Récupérer les NFTs avec métadonnées
         const nfts: NFTData[] = await Promise.all(
@@ -106,6 +107,7 @@ const PublicProfile: React.FC<PublicProfileProps> = ({ address }) => {
             }
           })
         );
+
 
         // --- Points et collections
         const rewardPoints = Number(await adhesionContract.rewardPoints(userAddress));

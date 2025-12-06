@@ -35,6 +35,26 @@
 				"internalType": "address",
 				"name": "_associationAddress",
 				"type": "address"
+			},
+			{
+				"internalType": "uint8",
+				"name": "_associationFeeSharePercent",
+				"type": "uint8"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_maxSupply",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address[]",
+				"name": "_extraRecipients",
+				"type": "address[]"
+			},
+			{
+				"internalType": "uint256[]",
+				"name": "_extraPercents",
+				"type": "uint256[]"
 			}
 		],
 		"stateMutability": "nonpayable",
@@ -286,6 +306,18 @@
 				"internalType": "string",
 				"name": "uri",
 				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint8",
+				"name": "rarity",
+				"type": "uint8"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "editions",
+				"type": "uint256"
 			}
 		],
 		"name": "NFTMinted",
@@ -406,6 +438,19 @@
 		"type": "function"
 	},
 	{
+		"inputs": [],
+		"name": "_getCollectionMaxSupplyFallback",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
 		"inputs": [
 			{
 				"internalType": "address",
@@ -431,6 +476,19 @@
 				"internalType": "address",
 				"name": "",
 				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "associationFeeSharePercent",
+		"outputs": [
+			{
+				"internalType": "uint8",
+				"name": "",
+				"type": "uint8"
 			}
 		],
 		"stateMutability": "view",
@@ -530,6 +588,44 @@
 		"inputs": [
 			{
 				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "extraPercents",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "extraRecipients",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
 				"name": "tokenId",
 				"type": "uint256"
 			}
@@ -591,25 +687,6 @@
 				"internalType": "uint256[]",
 				"name": "",
 				"type": "uint256[]"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			}
-		],
-		"name": "getRewardPoints",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -686,6 +763,30 @@
 				"internalType": "string",
 				"name": "tokenURI_",
 				"type": "string"
+			},
+			{
+				"internalType": "uint8",
+				"name": "rarity",
+				"type": "uint8"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			}
+		],
+		"name": "getTokenLightMetadata",
+		"outputs": [
+			{
+				"internalType": "uint8",
+				"name": "rarity",
+				"type": "uint8"
 			}
 		],
 		"stateMutability": "view",
@@ -729,6 +830,54 @@
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "startIndex",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "pageSize",
+				"type": "uint256"
+			}
+		],
+		"name": "getTokenUniquesPaginated",
+		"outputs": [
+			{
+				"internalType": "uint256[]",
+				"name": "tokenUniques",
+				"type": "uint256[]"
+			},
+			{
+				"internalType": "uint256[]",
+				"name": "editionCounts",
+				"type": "uint256[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "colId",
+				"type": "uint256"
+			}
+		],
+		"name": "getTokensByCollection",
+		"outputs": [
+			{
+				"internalType": "uint256[]",
+				"name": "",
+				"type": "uint256[]"
 			}
 		],
 		"stateMutability": "view",
@@ -879,7 +1028,7 @@
 		"inputs": [
 			{
 				"internalType": "string",
-				"name": "tokenURI",
+				"name": "tokenURI_",
 				"type": "string"
 			},
 			{
@@ -933,6 +1082,25 @@
 				"internalType": "address",
 				"name": "",
 				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "pendingWithdrawals",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -1017,6 +1185,24 @@
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint8",
+				"name": "rarity",
+				"type": "uint8"
+			}
+		],
+		"name": "setTokenMetadataOnChain",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
 				"internalType": "bytes4",
 				"name": "interfaceId",
 				"type": "bytes4"
@@ -1069,6 +1255,25 @@
 		"inputs": [
 			{
 				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "tokenRarity",
+		"outputs": [
+			{
+				"internalType": "uint8",
+				"name": "",
+				"type": "uint8"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
 				"name": "tokenId",
 				"type": "uint256"
 			}
@@ -1079,6 +1284,19 @@
 				"internalType": "string",
 				"name": "",
 				"type": "string"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "totalSupply",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",

@@ -58,7 +58,7 @@ type BalanceSnapshot = {
 const USER_TRANSACTIONS_PAGE_SIZE = 500;
 
 const CHAINS = [
-  { label: "Sepolia", value: "sepolia", color: "#D69E2E" }, // jaune
+  { label: "Sepolia", value: "base sepolia", color: "#D69E2E" }, // jaune
   { label: "Ethereum", value: "eth", color: "#4299E1" }, // bleu
   { label: "Base", value: "base", color: "#ED8936" }, // orange
 ];
@@ -79,120 +79,99 @@ const UserFinanceDashboard = ({ walletAddress }: { walletAddress: string }) => {
 
   const [balanceHistory, setBalanceHistory] = useState<BalanceSnapshot[]>([]);
 
-  const [chain, setChain] = useState("sepolia");
+  const [chain, setChain] = useState("base sepolia");
   const [timeGroup, setTimeGroup] = useState<"hour" | "day" | "month">("hour");
   const [yearFilter, setYearFilter] = useState<number | null>(null);
 
-  const fetchTransactions = async () => {
+  useEffect(() => {
     if (!walletAddress) return;
-    setLoading(true);
-    try {
-      const response = await fetch(
-        `/api/proxy?url=https://deep-index.moralis.io/api/v2.2/${walletAddress}/verbose?chain=${chain}&include=internal_transactions&order=ASC&limit=${USER_TRANSACTIONS_PAGE_SIZE}`
-      );
-      if (!response.ok) throw new Error(`Erreur ${response.status}`);
-      const data = await response.json();
-      setTransactions(data.result || []);
-    } catch (err: any) {
-      setError(err.message);
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  // Calcul des balances cumulées
-  const processTransactions = () => {
+    const fetchTransactions = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(
+          `/api/proxy?url=https://deep-index.moralis.io/api/v2.2/${walletAddress}/verbose?chain=${chain}&include=internal_transactions&order=ASC&limit=${USER_TRANSACTIONS_PAGE_SIZE}`
+        );
+        if (!res.ok) throw new Error(`Erreur ${res.status}`);
+        const data = await res.json();
+        setTransactions(data.result || []);
+      } catch (err: any) {
+        setError(err.message);
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTransactions();
+  }, [walletAddress, chain]); // déclenche seulement si walletAddress ou chain changent
+
+  // Calcul du solde cumulatif
+  useEffect(() => {
+    if (!transactions.length) return;
+
+    const walletLower = walletAddress.toLowerCase();
+    let cumulativeBalance = 0;
     const snapshots: BalanceSnapshot[] = [];
-    let expenses = 0;
-    let gains = 0;
+    let totalGainsCalc = 0;
+    let totalExpensesCalc = 0;
 
-    // filtrer par année si nécessaire
-    const txs = yearFilter
-      ? transactions.filter(
-          (tx) => new Date(tx.block_timestamp).getFullYear() === yearFilter
-        )
-      : transactions;
+    // Tri par date ASC
+    const sortedTxs = [...transactions].sort(
+      (a, b) => new Date(a.block_timestamp).getTime() - new Date(b.block_timestamp).getTime()
+    );
 
-    txs.forEach((tx) => {
+    sortedTxs.forEach((tx) => {
       const valueEth = parseFloat(tx.value) / 1e18;
-      const isIncoming =
-        (tx.to_address ?? "").toLowerCase() ===
-        (walletAddress ?? "").toLowerCase();
+      const feeEth = parseFloat(tx.transaction_fee) / 1e18;
+      const isIncoming = (tx.to_address ?? "").toLowerCase() === walletLower;
+      const isOutgoing = (tx.from_address ?? "").toLowerCase() === walletLower;
 
-      if (isIncoming) gains += valueEth;
-      else expenses += valueEth;
+      if (isIncoming) {
+        cumulativeBalance += valueEth;
+        totalGainsCalc += valueEth;
+      } else if (isOutgoing) {
+        cumulativeBalance -= valueEth + feeEth;
+        totalExpensesCalc += valueEth + feeEth;
+      }
 
       snapshots.push({
         date: new Date(tx.block_timestamp),
-        balance: gains - expenses,
+        balance: cumulativeBalance,
       });
     });
 
-    setTotalExpenses(expenses);
-    setTotalGains(gains - expenses); // solde actuel - totalExpenses
-    setTotalSolde(gains);
     setBalanceHistory(snapshots);
-  };
+    setTotalGains(totalGainsCalc);
+    setTotalExpenses(totalExpensesCalc);
+    setTotalSolde(cumulativeBalance);
+  }, [transactions, walletAddress]); // déclenche seulement quand transactions ou walletAddress changent
 
-  useEffect(() => {
-    fetchTransactions();
-  }, [walletAddress, chain]);
 
-  useEffect(() => {
-    if (transactions.length) processTransactions();
-  }, [transactions, yearFilter]);
 
-  // données pour le graphique
   function getChartData(
     balanceHistory: { date: Date; balance: number }[],
     chain: string,
     timeGroup: "hour" | "day" | "month"
   ) {
-    if (!balanceHistory?.length) {
-      return {
-        labels: [],
-        datasets: [{ label: `Balance (${chain})`, data: [] }]
-      };
-    }
+    if (!balanceHistory?.length) return { labels: [], datasets: [{ label: `Balance (${chain})`, data: [] }] };
 
-    // Tri chronologique (ASC)
-    const sorted = [...balanceHistory].sort(
-      (a, b) => a.date.getTime() - b.date.getTime()
-    );
+    // Trier chronologiquement
+    const sorted = [...balanceHistory].sort((a, b) => a.date.getTime() - b.date.getTime());
 
+    // On regroupe par période mais **on prend le dernier solde de chaque groupe**
     const grouped: Record<string, number> = {};
-
     sorted.forEach((snap) => {
-      const d = snap.date;
-
       let key = "";
-
-      if (timeGroup === "hour") {
-        // 24 dernières heures → HH:mm
-        key = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-      }
-
-      if (timeGroup === "day") {
-        // Données du mois → groupées par jour
-        key = d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
-      }
-
-      if (timeGroup === "month") {
-        // Données de l'année → groupées par mois
-        key = d.toLocaleDateString("fr-FR", { month: "short", year: "numeric" });
-      }
-
-      grouped[key] = (grouped[key] || 0) + snap.balance;
+      const d = snap.date;
+      if (timeGroup === "hour") key = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+      if (timeGroup === "day") key = d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+      if (timeGroup === "month") key = d.toLocaleDateString("fr-FR", { month: "short", year: "numeric" });
+      grouped[key] = snap.balance; // <-- on **remplace**, pas on ajoute
     });
 
-    // Tri des labels
-    const labels = Object.keys(grouped).sort((a, b) => {
-      return new Date(a).getTime() - new Date(b).getTime();
-    });
-
+    const labels = Object.keys(grouped).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
     const data = labels.map((l) => grouped[l]);
-
 
     return {
       labels,
@@ -206,7 +185,8 @@ const UserFinanceDashboard = ({ walletAddress }: { walletAddress: string }) => {
         },
       ],
     };
-  };
+  }
+
 
   if (loading)
     return (
@@ -286,7 +266,7 @@ const UserFinanceDashboard = ({ walletAddress }: { walletAddress: string }) => {
         Solde:{" "}
         <Text
           as="span"
-          color={totalGains >= 0 ? "green.500" : "red.500"}
+          color={totalSolde >= 0 ? "green.500" : "red.500"}
         >
           {totalSolde.toFixed(4)} ETH
         </Text>

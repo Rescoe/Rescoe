@@ -8,6 +8,8 @@ import ABI from '../../ABI/ABIAdhesion.json'; // Votre ABI de contrat ici.
 import getRandomInsectGif from '../../../utils/GenInsect24'; // Importer la fonction
 import { useRouter } from "next/router";
 import { FaAward, FaWallet, FaClock, FaUserShield, FaStar } from "react-icons/fa";
+import { Canvas } from '@react-three/fiber';
+
 
 import {
     Box,
@@ -64,8 +66,10 @@ const RoleBasedNFTPage = () => {
     const roles = [
         { value: 'Artiste', label: 'Artiste' },
         { value: 'Poete', label: 'Poète' },
+        /*
         { value: 'Stagiaire', label: 'Stagiaire' },
         { value: 'Contributeur', label: 'Contributeur' },
+        */
     ];
 
     type RoleKey = 'Artiste' | 'Poete' | 'Stagiaire' | 'Contributeur';
@@ -279,7 +283,7 @@ const RoleBasedNFTPage = () => {
                   {isOpen ? "Masquer les détails" : "Voir les détails de l'adhésion"}
               </Button>
 
-              <Collapse in={isOpen && !isAuthenticated}>
+              <Collapse in={isOpen}>
 
 
 
@@ -398,10 +402,20 @@ const RoleBasedNFTPage = () => {
             )}
 
             {showBananas && (
-                <Box position="fixed" top={0} left={0} width="100%" height="100%" zIndex={-1}>
-                    <Bananas />
-                </Box>
+              <Box
+                position="fixed"
+                top={0}
+                left={0}
+                width="100%"
+                height="100%"
+                zIndex={-1}
+              >
+                <Canvas>
+                  <Bananas />
+                </Canvas>
+              </Box>
             )}
+
         </Box>
     );
 };

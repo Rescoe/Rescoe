@@ -6,7 +6,7 @@ import FAUCET_ABI from "@/components/ABI/Faucet.json";
 import { Box, Button } from '@chakra-ui/react'; // Assurez-vous que Chakra UI est installé
 
 
-const FAUCET_ADDRESS = "0x1093cba97d078F66931f87E756b35D17a485C3E9";
+const FAUCET_ADDRESS = "0xE14968f7ce8bE32ee79Aa37F82599fFADf55dDBa";
 const RPC_URL = process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string;
 
 export default function FaucetWidget() {

@@ -41,6 +41,21 @@ interface NFTData {
   image?: string;
 }
 
+const roles: { [key: number]: string } = {
+  0: "Artist",
+  1: "Poet",
+  2: "Contributor",
+  3: "Trainee",
+};
+
+const roleLabels: Record<string, string> = {
+  Artist: "Artiste",
+  Poet: "Poète",
+  Contributor: "Contributeur",
+  Trainee: "Formateur",
+};
+
+
 const contractAdhesionManagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGER as string;
 const contractAdhesion = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS as string;
 
@@ -134,7 +149,7 @@ const TokenPage = () => {
       //const finAdhesion = new Date((Number(mintTimestamp) + 365 * 24 * 60 * 60) * 1000).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' });
 
       const finAdhesion = new Date((Number(mintTimestamp) + Number(remainingTime)) * 1000).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' });
-      //console.log(finAdhesion);
+      console.log(finAdhesion);
 
       const nftData: NFTData = {
         ...metadata,
@@ -309,7 +324,9 @@ const TokenPage = () => {
               <VStack spacing={4} alignItems="start" mb={6}>
                 <Text fontSize="lg"><strong>Nom :</strong> {nftData.name}</Text>
                 <Text fontSize="lg"><strong>Addresse du propriétaire :</strong> {nftData.owner}</Text>
-                <Text fontSize="lg"><strong>Rôle :</strong> {nftData.role === 1 ? 'Artiste' : 'Poète'}</Text>
+                <Text fontSize="lg">
+                  <strong>Rôle :</strong> {roleLabels[roles[nftData.role]] || 'Inconnu'}
+                </Text>
                 <Text fontSize="lg"><strong>Bio :</strong> {nftData.bio}</Text>
                 {isForSale && (
                   <Text fontSize="lg">

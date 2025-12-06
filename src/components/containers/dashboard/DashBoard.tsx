@@ -27,7 +27,6 @@ const Dashboard = () => {
   const { address: authAddress } = useAuth();
   interface UserData {
     address: string;
-    ensName: string;
     name: string;
     biography: string;
     avatarSvg: string;
@@ -52,7 +51,6 @@ const Dashboard = () => {
 
   const [userData, setUserData] = useState<UserData>({
     address: authAddress || '',
-    ensName: '',
     name: '',
     biography: '',
     avatarSvg: '',
@@ -89,8 +87,7 @@ const Dashboard = () => {
       if (!authAddress) return; // Sortir si l'adresse est vide
       setLoading(true);
       try {
-        const [ens, rolesAndImages, adhesionPoints, nfts, stats] = await Promise.all([
-          fetchENS(authAddress),
+        const [rolesAndImages, adhesionPoints, nfts, stats] = await Promise.all([
           fetchRolesAndImages(authAddress),
           fetchAdhesionPoints(authAddress),
           fetchNFTs(authAddress),
@@ -101,7 +98,6 @@ const Dashboard = () => {
 
         const mergedUserData = {
           address: authAddress,
-          ensName: ens || '',
           name: rolesAndImages.name || '',
           avatarSvg: rolesAndImages.nfts?.[0]?.image || '',
           biography: rolesAndImages.biography || '',
@@ -126,23 +122,12 @@ const Dashboard = () => {
     fetchUserData();
   }, [authAddress]);
 
-  const fetchENS = async (userAddress: string) => {
-    const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
-    try {
-      const resolvedEnsName = await provider.lookupAddress(userAddress);
-      return resolvedEnsName || ''; // retourner la valeur
-    } catch (error) {
-      console.error("Error fetching ENS:", error);
-      return 'Erreur lors de la récupération de l\'ENS'; // fallback
-    }
-  };
-
   const fetchRolesAndImages = async (userAddress: string) => {
     const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
     const contract = new Contract(contratAdhesionManagement, ABI_ADHESION_MANAGEMENT, provider);
     const contractadhesion = new Contract(contractAdhesion, ABI, provider);
 
-    const tokenIds = await contract.getTokensByOwnerPaginated(userAddress, 0, 100);
+    const tokenIds = await contract.getTokensByOwnerPaginated(userAddress, 0, 20);
     const userInfos = await contractadhesion.getUserInfo(userAddress);
 
     const fetchedRolesAndImages = await Promise.all(tokenIds.map(async (tokenId: number) => {
@@ -420,9 +405,6 @@ const Dashboard = () => {
                         <strong>Bio :</strong> {userData.biography}
                       </Text>
 
-                      {userData.ensName && (
-                        <Text fontWeight="bold" mt={2}>ENS: {userData.ensName}</Text>
-                      )}
                       <Text
                         cursor="pointer"
                         onClick={() => {

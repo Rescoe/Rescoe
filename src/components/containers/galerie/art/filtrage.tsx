@@ -519,31 +519,33 @@ const CollectionsByType: React.FC<{ creator: string }> = ({ creator }) => {
   if (showEmpty && !isLoading) {
     return (
       <Box textAlign="center" py={12} bg="bg-subtle" borderRadius="xl">
-        <MotionBox
-          animate={{
-            scale: [1, 1.1, 1],
-            rotate: [0, 5, -5, 0]
-          }}
-          transition={{ duration: 2, repeat: Infinity }}
-          mb={4}
-        >
-          <Box
-            as="svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            h={16}
-            w={16}
-            color="gray.400"
+      <Flex justify="center" align="center" mb={4}>
+          <MotionBox
+            animate={{
+              scale: [1, 1.1, 1],
+              rotate: [0, 5, -5, 0]
+            }}
+            transition={{ duration: 2, repeat: Infinity }}
+            mb={4}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-            />
-          </Box>
-        </MotionBox>
+            <Box
+              as="svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              h={16}
+              w={16}
+              color="gray.400"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+              />
+            </Box>
+          </MotionBox>
+        </Flex>
         <Heading size="md" mb={2}>Aucune collection trouvée</Heading>
         <Text color="gray.500" mb={4}>
           Cet utilisateur n'a pas encore créé de collections NFT

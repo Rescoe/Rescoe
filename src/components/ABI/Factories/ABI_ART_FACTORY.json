@@ -1,9 +1,75 @@
 [
 	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_adhesion",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_association",
+				"type": "address"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
 		"anonymous": false,
 		"inputs": [
 			{
 				"indexed": false,
+				"internalType": "address",
+				"name": "oldAddress",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "newAddress",
+				"type": "address"
+			}
+		],
+		"name": "AdhesionContractUpdated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "name",
+				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "maxSupply",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "address[]",
+				"name": "collaborators",
+				"type": "address[]"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256[]",
+				"name": "percents",
+				"type": "uint256[]"
+			}
+		],
+		"name": "CollectionConfigured",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
 				"internalType": "uint256",
 				"name": "collectionId",
 				"type": "uint256"
@@ -37,48 +103,31 @@
 		"type": "event"
 	},
 	{
-		"inputs": [],
-		"name": "adhesionContractAddress",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "associationAddr",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [
 			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"name": "collections",
-		"outputs": [
+				"internalType": "string",
+				"name": "name",
+				"type": "string"
+			},
 			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
+				"internalType": "uint256",
+				"name": "maxSupply",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address[]",
+				"name": "collaborators",
+				"type": "address[]"
+			},
+			{
+				"internalType": "uint256[]",
+				"name": "percents",
+				"type": "uint256[]"
 			}
 		],
-		"stateMutability": "view",
+		"name": "configureCollection",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -118,12 +167,107 @@
 	{
 		"inputs": [
 			{
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "transferOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newAddr",
+				"type": "address"
+			}
+		],
+		"name": "updateAdhesionContract",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "adhesionContractAddress",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
 				"internalType": "uint256",
-				"name": "index",
+				"name": "",
 				"type": "uint256"
 			}
 		],
-		"name": "getCollectionAt",
+		"name": "allCollectionNames",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "associationAddr",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"name": "collectionConfigs",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "maxSupply",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bool",
+				"name": "exists",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "collections",
 		"outputs": [
 			{
 				"internalType": "address",
@@ -136,12 +280,46 @@
 	},
 	{
 		"inputs": [],
-		"name": "getCollectionCount",
+		"name": "getAllCollectionNames",
+		"outputs": [
+			{
+				"internalType": "string[]",
+				"name": "",
+				"type": "string[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "name",
+				"type": "string"
+			}
+		],
+		"name": "getCollectionConfig",
 		"outputs": [
 			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "maxSupply",
 				"type": "uint256"
+			},
+			{
+				"internalType": "address[]",
+				"name": "collaborators",
+				"type": "address[]"
+			},
+			{
+				"internalType": "uint256[]",
+				"name": "percents",
+				"type": "uint256[]"
+			},
+			{
+				"internalType": "bool",
+				"name": "exists",
+				"type": "bool"
 			}
 		],
 		"stateMutability": "view",
@@ -155,6 +333,19 @@
 				"internalType": "address[]",
 				"name": "",
 				"type": "address[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "owner",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
 			}
 		],
 		"stateMutability": "view",

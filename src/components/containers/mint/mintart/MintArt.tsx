@@ -5,9 +5,14 @@ import { JsonRpcProvider, Contract } from 'ethers';
 import detectEthereumProvider from "@metamask/detect-provider";
 import axios from "axios";
 import contractABI from '../../../ABI/ABI_ART.json';
+import factoryABI from '../../../ABI/Factories/ABI_ART_FACTORY.json';
+import ABIMasterFactory from '../../../ABI/Factories/ABI_MasterFactory.json';
+
 import ABIRESCOLLECTION from '../../../ABI/ABI_Collections.json';
 import { useAuth } from '../../../../utils/authContext';
 import { useRouter } from 'next/router';
+
+import CollaboratorsChart from "@/utils/ColabChart"
 
 import dynamic from 'next/dynamic';
 import { Canvas } from '@react-three/fiber';
@@ -50,6 +55,7 @@ interface Collection {
 interface CollectionDetails {
   collectionAddress: string;
   collectionType: string;
+
 }
 
 interface MintResult {
@@ -86,6 +92,8 @@ const Bananas = dynamic(() => import('../../../modules/Bananas'), { ssr: false }
 
 const MintArt: React.FC = () => {
   const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT as string;
+  const masterFactoryAddress = process.env.NEXT_PUBLIC_MASTERFACTORY_CONTRACT as string;
+
 
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -106,11 +114,23 @@ const MintArt: React.FC = () => {
   const [collectionMint, setCollectionMint] = useState<string>("");
   const [showPriceInput, setShowPriceInput] = useState(false);
   const [manualPrice, setManualPrice] = useState("");
+  const [editions, setEditions] = useState<number>(1);
+
+  const [selectedCollection, setSelectedCollection] = useState<string>("");
+const [maxSupply, setMaxSupply] = useState<number | null>(null);
+const [totalSupply, setTotalSupply] = useState<number | null>(null);
+const [remaining, setRemaining] = useState<number | null>(null);
+const [loadingInfo, setLoadingInfo] = useState(false);
+
+const [collab, setCollab] = useState<string[]>([]);
+const [percent, setPercent] = useState<number[]>([]);
+
 
   const { address, web3, provider } = useAuth();
   const toast = useToast();
   const router = useRouter();
 
+  const ETHERSCAN_PREFIX = "https://sepolia.basescan.org/address/"; // remplace par le réseau que tu utilises
 
 
   useEffect(() => {
@@ -171,6 +191,103 @@ const MintArt: React.FC = () => {
           setError(err instanceof Error ? err.message : 'Erreur inconnue');
       }
   };
+
+
+  const fetchCollectionSupplyInfo = async (collectionId: string) => {
+    try {
+      setLoadingInfo(true);
+
+      const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+      const resCollections = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
+
+      if (!masterFactoryAddress) {
+        throw new Error("NEXT_PUBLIC_MASTERFACTORY_CONTRACT non défini dans .env");
+      }
+
+      const masterFactory = new Contract(masterFactoryAddress, ABIMasterFactory, provider);
+
+      const artFactoryAddress = await masterFactory.collectionFactories("Art");
+      console.log(artFactoryAddress);
+
+
+      // 🔹 Récupère les détails de la collection via son ID
+      const collectionDetails = await resCollections.getCollection(collectionId);
+      console.log(collectionDetails);
+      const collectionAddress = collectionDetails.collectionAddress;
+      setSelectedCollection(collectionAddress);
+
+      const artFactory = new Contract(artFactoryAddress ,factoryABI, provider);
+      const collaborateurs = await artFactory.getCollectionConfig(collectionDetails.name);
+      console.log(collaborateurs);
+
+      if (!collectionAddress) {
+        console.error("Adresse de collection introuvable");
+        return;
+      }
+
+      // 🔹 Instancie le contrat de mint (ArtNFT)
+      const mintContract = new Contract(collectionAddress, contractABI, provider);
+
+      const asso = "0xFa6d6E36Da4acA3e6aa3bf2b4939165C39d83879";
+      const assoFees = 10; // % fixe
+      const artisteAddress = address; // l'artiste
+
+      // Pourcentages des collaborateurs récupérés (raw)
+      const collaborateursPercentsRaw = collaborateurs[2].map(Number); // ex: [50] si un seul collaborateur
+      const collaborateursAddresses = collaborateurs[1];
+
+      // On convertit ces pourcentages en fraction des 45% de l’artiste
+      const totalCollabRaw = collaborateursPercentsRaw.reduce((acc: number, p: number) => acc + p, 0);
+      const collabFactor = 45 / 100; // on veut que le pool soit sur 45% de l’artiste
+
+      // Pour chaque collaborateur, sa part finale = % du pool * 45
+      const collaborateursPercents = collaborateursPercentsRaw.map((p: number) => (p / 100) * 45);
+
+
+      // L’artiste récupère le reste : 45% de base - ce qui est déjà pris par les collaborateurs
+      const artistePercent = 45 - collaborateursPercents.reduce((acc: number, p: number) => acc + p, 0);
+
+      // Tableau final pour l’affichage
+      const finalCollabNames = [artisteAddress, asso, ...collaborateursAddresses];
+      const finalCollabPercents = [artistePercent + 45, assoFees, ...collaborateursPercents];
+      // Remarque : artistePercent + 45 car l’artiste a toujours 45% minimum
+
+      setCollab(finalCollabNames);
+      setPercent(finalCollabPercents);
+
+      // Appel correct en Ethers v6
+      const max = await mintContract._getCollectionMaxSupplyFallback();
+      const total = await mintContract.totalSupply();
+
+      setMaxSupply(Number(max));
+      setTotalSupply(Number(total));
+      setRemaining(Number(max) - Number(total));
+
+
+
+    } catch (err) {
+      console.error("Erreur récupération supply :", err);
+      setMaxSupply(null);
+      setTotalSupply(null);
+      setRemaining(null);
+    } finally {
+      setLoadingInfo(false);
+    }
+  };
+
+  const handleFetchCollection = async () => {
+  if (!selectedCollectionId) return;
+
+  setLoadingInfo(true);
+
+  try {
+    await fetchCollectionSupplyInfo(selectedCollectionId); // ta fonction existante
+  } catch (err) {
+    console.error("Erreur récupération supply :", err);
+  }
+
+  setLoadingInfo(false);
+};
 
 
 
@@ -235,75 +352,114 @@ const MintArt: React.FC = () => {
     }
   };
 
+
+
   const mintNFT = async (): Promise<void> => {
     if (!ipfsUrl || selectedCollectionId === null) {
-      alert("Veuillez télécharger les métadonnées sur IPFS et sélectionner une collection.");
+      alert("Veuillez uploader les métadonnées sur IPFS et choisir une collection.");
       return;
     }
 
     if (!web3) {
-      alert("Web3 non initialisé. Veuillez vous reconnecter.");
+      alert("Wallet non connecté.");
+      return;
+    }
+
+    if (!editions || editions <= 0) {
+      alert("Veuillez entrer un nombre d’éditions supérieur à 0.");
       return;
     }
 
     setIsMinting(true);
-    fetchLastTokenId();
 
     try {
-      const userAddress: string | null = address;
+      const userAddress = address;
+      const gasPrice = await web3.eth.getGasPrice();
 
-      const contractResCollection = new web3.eth.Contract(ABIRESCOLLECTION, contractRESCOLLECTION);
+      if (!userAddress) throw new Error("Adresse utilisateur invalide.");
 
-      // collectionDetails doit exister si tout va bien
-      const collectionDetails: CollectionDetails = await contractResCollection.methods.getCollection(selectedCollectionId).call();
+      const resCollection = new web3.eth.Contract(
+        ABIRESCOLLECTION,
+        contractRESCOLLECTION
+      );
 
-      if (!collectionDetails) {
-        throw new Error("Détails de la collection introuvables.");
-      }
+      const collectionDetails = await resCollection.methods
+        .getCollection(selectedCollectionId)
+        .call() as CollectionDetails;
+
+      if (!collectionDetails) throw new Error("Collection introuvable.");
 
       if (collectionDetails.collectionType !== "Art") {
-        alert("Vous ne pouvez pas minter une poésie. Veuillez sélectionner une collection d'art.");
+        alert("Impossible de minter une poésie ici.");
         return;
       }
 
-      const collectionMintAddress: string = collectionDetails.collectionAddress;
+      const collectionMintAddress = collectionDetails.collectionAddress;
       if (!web3.utils.isAddress(collectionMintAddress)) {
-        throw new Error(`Adresse de contrat invalide : ${collectionMintAddress}`);
+        throw new Error("Adresse de contrat invalide.");
       }
 
-      setCollectionMint(collectionMintAddress);
-
-      const editions: number = 1;
       const mintContract = new web3.eth.Contract(contractABI, collectionMintAddress);
 
-      if (!userAddress) {
-        throw new Error("L'adresse utilisateur est invalide ou non connectée.");
+      // =============================
+      // 🔍 1 — Vérification supply
+      // =============================
+      const maxSupply = await mintContract.methods._getCollectionMaxSupplyFallback().call();
+      const totalSupply = await mintContract.methods.totalSupply().call();
+
+      const remaining = Number(maxSupply) - Number(totalSupply);
+
+      if (editions > remaining) {
+        alert(
+          `Impossible : il ne reste que ${remaining} mint possible dans cette collection (maxSupply=${maxSupply}).`
+        );
+        return;
       }
 
-      const mintResult = await mintContract.methods.mint(ipfsUrl, editions).send({ from: userAddress });
+      // =============================
+      // 2 — Mint
+      // =============================
+      const mintResult = await mintContract.methods
+        .mint(ipfsUrl, editions)
+        .send({ from: userAddress,
+          gasPrice: gasPrice.toString(),  // <-- force string
+          maxFeePerGas: null as any,       // TS ok
+          maxPriorityFeePerGas: null as any
+        });
 
-      const lastTokenIdStr: string = await mintContract.methods.getLastMintedTokenId().call();
-      const currentTokenId: number = Number(lastTokenIdStr);
+      const lastTokenIdStr = await mintContract.methods
+        .getLastMintedTokenId()
+        .call();
+
+      const currentTokenId = Number(lastTokenIdStr);
       setTokenId(currentTokenId);
 
-      //console.log("tokenId lors du mint : ", currentTokenId);
+      // =============================
+      // 3 — Listing (optionnel)
+      // =============================
+      if (isSaleListing && salePrice && Number(salePrice) > 0) {
+        const priceWei = web3.utils.toWei(salePrice, "ether");
 
-      if (isSaleListing && salePrice && parseFloat(salePrice) > 0) {
-        const priceWei: string = web3.utils.toWei(salePrice, "ether");
-        //console.log(priceWei);
-
-        await mintContract.methods.listNFTForSale(currentTokenId, priceWei).send({ from: userAddress });
+        await mintContract.methods
+          .listNFTForSale(currentTokenId, priceWei)
+          .send({
+              from: userAddress,
+              gasPrice: gasPrice.toString(),  // <-- force string
+              maxFeePerGas: null as any,       // TS ok
+              maxPriorityFeePerGas: null as any
+              });
       }
 
       publishSuccess(currentTokenId, collectionMintAddress);
-
-    } catch (error: unknown) {
-      console.error("Erreur lors du minting NFT :", error);
-      alert("Erreur lors de la publication de l'œuvre. Vérifiez la console pour plus de détails.");
+    } catch (e) {
+      console.error("Erreur mint:", e);
+      alert("Erreur lors du mint. Vérifiez la console.");
     } finally {
       setIsMinting(false);
     }
   };
+
+
 
   const listForSale = async (salePrice: string): Promise<void> => {
     if (!web3) {
@@ -312,6 +468,7 @@ const MintArt: React.FC = () => {
     }
     try {
       //fetchLastTokenId();
+      const gasPrice = await web3.eth.getGasPrice();
 
       const userAddress: string | null = address;
 
@@ -337,7 +494,12 @@ const MintArt: React.FC = () => {
         const priceWei: string = web3.utils.toWei(salePrice, "ether");
         //console.log(priceWei);
 
-        await mintContract.methods.listNFTForSale(tokenId, priceWei).send({ from: userAddress });
+        await mintContract.methods.listNFTForSale(tokenId, priceWei).send({
+            from: userAddress,
+            gasPrice: gasPrice.toString(),  // <-- force string
+            maxFeePerGas: null as any,       // TS ok
+            maxPriorityFeePerGas: null as any
+           })
 
         toast({
           title: "✅ NFT listé à la vente !",
@@ -607,6 +769,23 @@ return (
         _placeholder={{ color: "gray.400" }}
         borderColor="purple.300"
       />
+
+      <Input
+        mt={4}
+        type="number"
+        placeholder="Nombre d’éditions"
+        value={editions}
+        max={remaining ?? undefined}     // 🔥 AJOUT
+        onChange={(e) => setEditions(Number(e.target.value))}
+        isDisabled={remaining !== null && remaining <= 0}
+        bg="blackAlpha.300"
+        color="white"
+        borderColor="purple.300"
+        _placeholder={{ color: "gray.400" }}
+      />
+
+
+
     </VStack>
 
     <Flex justify="center" mt={8}>
@@ -639,13 +818,21 @@ return (
     <Select
       placeholder="Sélectionnez une collection"
       onChange={(e) => {
-        setSelectedCollectionId(e.target.value);
+        const id = e.target.value;
+        setSelectedCollectionId(id);
       }}
       bg="blackAlpha.300"
       color="white"
       borderColor="purple.300"
       mb={4}
     >
+    {loadingInfo && (
+      <Flex align="center" mt={2}>
+        <Spinner size="sm" mr={2} />
+        <Text color="gray.300">Chargement des informations…</Text>
+      </Flex>
+    )}
+
       {collections.map((collection) => (
         <option
           key={collection.id}
@@ -657,12 +844,47 @@ return (
       ))}
     </Select>
 
-    <Text fontSize="sm" color="gray.300" mb={4}>
-  📁 Prochaine oeuvre crée dans cette collection : {" "}
-  <Text as="span" color="purple.200" fontWeight="semibold">
-    {tokenId || "aucune"}
-  </Text>
-</Text>
+    <Box>
+      <Button
+        onClick={handleFetchCollection}
+        isDisabled={!selectedCollectionId || loadingInfo}
+        colorScheme="purple"
+        mb={4}
+      >
+        {loadingInfo ? <Spinner size="sm" /> : "Voir détails de la collection"}
+      </Button>
+
+      {maxSupply !== null && totalSupply !== null && remaining !== null && (
+        <Box mt={3} p={3} borderWidth="1px" rounded="md" borderColor="purple.400">
+          <Text color="gray.200">
+            💠 Max Supply : <b>{maxSupply}</b>
+          </Text>
+          <Text color="gray.200">
+            🧮 Déjà minté : <b>{totalSupply}</b>
+          </Text>
+          <Text color="gray.200">
+            🟣 Éditions restantes :{" "}
+            <b style={{ color: remaining > 0 ? "lightgreen" : "red" }}>
+              {remaining}
+            </b>
+          </Text>
+
+          <CollaboratorsChart collab={collab} percent={percent} />
+
+          <Text fontSize="sm" mb={4}>
+                🔗 <a
+                  href={`${ETHERSCAN_PREFIX}${selectedCollection}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "#9F7AEA", fontWeight: "bold" }}
+                >
+                  Voir sur Etherscan
+                </a>
+              </Text>
+
+        </Box>
+      )}
+    </Box>
 
 
     <Checkbox

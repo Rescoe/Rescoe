@@ -157,7 +157,7 @@ const generateImage = () => {
 };
 
 const loadGifFromFile = async () => {
-  const response = await fetch('/gifs/Scarabe.gif');
+  const response = await fetch('/gifs/Chenille.gif');
   const blob = await response.blob();
   const gifURL = URL.createObjectURL(blob);
   setGeneratedImageUrl(gifURL);
