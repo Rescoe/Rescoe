@@ -130,6 +130,13 @@ const RoleBasedNFTPage = () => {
         setGeneratedImageUrl(gifUrl); // Met à jour l'état avec l'URL obtenue
     };
 
+    async function urlToBlob(url: string): Promise<Blob> {
+  const res = await fetch(url, { cache: "no-cache" });
+  if (!res.ok) throw new Error(`Impossible de charger l'image : ${res.status}`);
+  return await res.blob();
+}
+
+
     const handleConfirmRole = async () => {
         if (!name || !bio) {
             alert("Veuillez entrer un nom et une biographie.");
@@ -148,9 +155,10 @@ const RoleBasedNFTPage = () => {
                 return;
             }
 
+
             const formData = new FormData();
             const response = await fetch(imageUrl);
-            const blob = await response.blob();
+            const blob = await urlToBlob(imageUrl);
             formData.append("file", blob, "insect.gif");
 
             const imageResponse = await axios.post("https://api.pinata.cloud/pinning/pinFileToIPFS", formData, {
@@ -238,21 +246,20 @@ const RoleBasedNFTPage = () => {
     };
 
     const switchToSepolia = async () => {
-        if (web3 && web3.currentProvider) {
-            try {
-                await web3.currentProvider.request({
-                    method: 'wallet_switchEthereumChain',
-                    params: [{ chainId: '0xaa36a7' }],
-                });
-                window.location.reload();
-            } catch (error) {
-                console.error(error);
-                alert("Erreur lors du changement de réseau. Assurez-vous que Sepolia est ajouté à Metamask.");
-            }
-        } else {
-            console.error("Web3 n'est pas initialisé ou currentProvider est non défini.");
-            alert("Web3 n'est pas disponible. Veuillez vous assurer que vous avez une extension Ethereum installée.");
+      if (web3 && web3.currentProvider) {
+        try {
+          await web3.currentProvider.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0x14a74' }], // Base Sepolia ✔️
+          });
+          window.location.reload();
+        } catch (error) {
+          console.error(error);
+          alert("Impossible de switch vers Base Sepolia. Ajoutez-le dans MetaMask.");
         }
+      } else {
+        alert("Web3 non disponible.");
+      }
     };
 
     return (
