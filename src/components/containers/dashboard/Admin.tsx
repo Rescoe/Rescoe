@@ -187,15 +187,15 @@ const handleConfirmRole = async () => {
 
 };
 
+
 // Nouvelle fonction pour générer des images par adhésion
 const generateImageForAdhesion = async (adhesion: Adhesion) => {
     const response = await fetch('/gifs/Chenille.gif'); // Ou le chemin de votre image
     const blob = await response.blob();
     const gifURL = URL.createObjectURL(blob);
     setGeneratedImageUrl(gifURL); // Met à jour l'URL de l'image générée
-    return gifURL; // Retourne l'URL pour l'utiliser dans le téléversement
+    return blob;  // ✔️ renvoie le fichier réel
 };
-
 
 const uploadFileToIPFS = async (imageUrl: string, adhesion: Adhesion) => {
     setIsUploading(true);
@@ -232,6 +232,7 @@ const uploadFileToIPFS = async (imageUrl: string, adhesion: Adhesion) => {
         });
 
         const metadataIpfsUrl = `https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`;
+        console.log(metadataIpfsUrl);
         // Stocke les détails des métadonnées pour chaque adhérent
         setDetails((prevDetails) => [...prevDetails, { uri: metadataIpfsUrl, role: adhesion.role, name: adhesion.name, bio: adhesion.bio }]);
     } catch (error) {

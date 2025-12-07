@@ -26,7 +26,6 @@
     "@metamask/sdk": "^0.29.3",
     "@metamask/sdk-react": "^0.29.2",
     "@moralisweb3/next": "^2.27.2",
-    "@react-native-async-storage/async-storage": "^1.24.0",
     "@react-three/drei": "^9.115.0",
     "@react-three/fiber": "^8.17.10",
     "@react-three/postprocessing": "^2.16.3",
