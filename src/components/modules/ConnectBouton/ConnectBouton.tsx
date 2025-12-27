@@ -66,12 +66,14 @@ const ConnectBouton: React.FC = () => {
     initWeb3();
 
     // Vérifier l'authentification à la connexion
+    /*
     const storedAddress = localStorage.getItem("connectedAddress");
     const storedAuth = localStorage.getItem("isAuthenticated") === "true";
     if (storedAddress && storedAuth) {
       setAddress(storedAddress);
       setIsAuthenticated(true);
     }
+    */
   }, []);
 
   // Moralis EVM auth flow
@@ -83,8 +85,8 @@ const ConnectBouton: React.FC = () => {
 
       setAddress(account.toLowerCase());
       setIsAuthenticated(true);
-      localStorage.setItem("connectedAddress", account.toLowerCase());
-      localStorage.setItem("isAuthenticated", "true");
+      //localStorage.setItem("connectedAddress", account.toLowerCase());
+      //localStorage.setItem("isAuthenticated", "true");
     } catch (e) {
       console.error("Erreur lors de l'authentification:", e);
       toast({
@@ -104,8 +106,8 @@ const ConnectBouton: React.FC = () => {
     signOut({ callbackUrl: "/" });
     setIsAuthenticated(false);
     setAddress(null);
-    localStorage.removeItem("connectedAddress");
-    localStorage.removeItem("isAuthenticated");
+    //localStorage.removeItem("connectedAddress");
+    //localStorage.removeItem("isAuthenticated");
   };
 
   // Suppression de la sélection de chaîne dans le UI

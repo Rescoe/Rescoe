@@ -10,7 +10,6 @@ import { BigNumberish } from 'ethers';
 
 const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS as string;
 
-
 //Ce code fonctionne sur mobile chrome
 
 const SelectInsect = ({ onSelect }: { onSelect: (insect: Insect) => void }) => {
@@ -37,13 +36,24 @@ const SelectInsect = ({ onSelect }: { onSelect: (insect: Insect) => void }) => {
           const tokenURI = await contract.tokenURI(tokenId);
           const response = await fetch(tokenURI);
           //console.log("Token URI:", tokenURI);
+          const details = await contract.getTokenDetails(tokenId);
+
+          const level = Number(details[8]);
 
           if (!response.ok) {
             throw new Error('Erreur lors de la récupération de URI');
           }
 
           const metadata = await response.json();
-          return { id: Number(tokenId), image: metadata.image }; // Utilisation de BigNumber.from()
+
+
+          return {
+            id: Number(tokenId),
+            name: metadata.name || `Insecte ${tokenId}`,
+            image: metadata.image,
+            level,
+          };
+
         } catch (error) {
           console.error("Erreur lors de la récupération de l'insecte :", error);
           return null;
@@ -67,6 +77,7 @@ const SelectInsect = ({ onSelect }: { onSelect: (insect: Insect) => void }) => {
     localStorage.setItem('savedInsect', JSON.stringify(insect));
   };
 
+
   return (
     <VStack spacing={4}>
       {insects.map((insect) => (
@@ -85,6 +96,7 @@ export type Insect = {
   id: number;
   name: string;
   image: string;
+  level: number;
 };
 
 

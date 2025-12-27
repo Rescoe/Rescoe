@@ -51,6 +51,7 @@ const Header = () => {
   const handleSelectInsect = (insect: Insect) => {
     setSelectedInsect(insect);
     localStorage.setItem('savedInsect', JSON.stringify(insect));
+    console.log(selectedInsect);
     setInsectImage(insect.image);
   };
 
@@ -509,7 +510,17 @@ const Header = () => {
       {/* Affichage insecte */}
       {isAuthenticated && isInsectVisible && selectedInsect && (
         <Box mt={4} display="flex" justifyContent="center" aria-live="polite" aria-atomic="true">
-          <Insecte headerRef={headerRef} selectedInsect={selectedInsect.image} />
+        {isAuthenticated && isInsectVisible && selectedInsect && (
+          <Box mt={4} display="flex" justifyContent="center">
+            <Insecte
+              headerRef={headerRef}
+              selectedInsect={selectedInsect.image}
+              level={selectedInsect.level ?? 0}
+            />
+          </Box>
+        )}
+
+
         </Box>
       )}
 

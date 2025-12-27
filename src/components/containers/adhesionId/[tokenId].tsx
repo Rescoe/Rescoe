@@ -1,6 +1,5 @@
-// pages/.../TokenPage.tsx
 import { useEffect, useState } from 'react';
-import { JsonRpcProvider, Contract as EthersContract, formatUnits } from 'ethers';
+import { JsonRpcProvider, Contract as EthersContract, formatUnits, BigNumberish } from 'ethers';
 import Web3 from 'web3';
 
 import {
@@ -10,6 +9,7 @@ import {
   Image,
   Text,
   VStack,
+  HStack,
   Spinner,
   FormControl,
   FormLabel,
@@ -22,24 +22,62 @@ import {
   Divider,
 } from '@chakra-ui/react';
 import { useRouter } from 'next/router';
-import ABI from '../../../components/ABI/ABIAdhesion.json';
-import { useAuth } from '../../../utils/authContext';
-import ABI_Management from '../../../components/ABI/ABI_ADHESION_MANAGEMENT.json';
-import { PublicProfile } from "../../../components/containers/dashboard";
+
+import ABI from '@/components/ABI/ABIAdhesionEvolve.json'; // nouvelle ABI
+import ABI_Management from '@/components/ABI/ABI_ADHESION_MANAGEMENT.json';
+import { useAuth } from '@/utils/authContext';
+import { PublicProfile } from "@/components/containers/dashboard";
+import genInsect25 from '@/utils/GenInsect25';
+import { usePinataUpload } from '@/hooks/usePinataUpload';
+
+import { useTokenEvolution } from '@/hooks/useTokenEvolution';
+import { buildEvolutionHistory } from '@/utils/evolutionHistory';
+import CopyableAddress from "@/hooks/useCopyableAddress";
+
+import  EvolutionHistoryTimeline  from '@/utils/EvolutionHistoryTimeline'
+
 
 interface NFTData {
   owner: string;
   role: number;
   mintTimestamp: string;
-  price: string; // in ether (human readable)
+  price: string; // en ETH (string lisible)
   name: string;
   bio: string;
-  remainingTime: string;
+  remainingTime: string; // déjà formaté (Xj Yh...)
   fin: string;
   forSale: boolean;
   membership: string;
   image?: string;
 }
+
+interface MembershipInfo {
+  level: number;
+  autoEvolve: boolean;
+  startTimestamp: number;
+  expirationTimestamp: number;
+  totalYears: number;
+  locked: boolean;
+}
+
+interface EvolutionMetadata {
+  level: number;
+  family?: string;
+  sprite_name?: string;
+  image?: string;
+  attributes?: Array<{
+    trait_type: string;
+    value: string | number;
+  }>;
+  evolution_history?: Array<{
+    level: number;
+    image: string;
+    timestamp: number;
+  }>;
+  [key: string]: unknown;
+}
+
+
 
 const roles: { [key: number]: string } = {
   0: "Artist",
@@ -55,7 +93,6 @@ const roleLabels: Record<string, string> = {
   Trainee: "Formateur",
 };
 
-
 const contractAdhesionManagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGER as string;
 const contractAdhesion = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS as string;
 
@@ -63,8 +100,7 @@ const TokenPage = () => {
   const router = useRouter();
   const { tokenId } = router.query;
 
-  // USING THE AUTH PROVIDER FROM YOUR MINT PAGE
-  const { address: authAddress, web3: authWeb3, provider: authProvider } = useAuth();
+  const { address: authAddress, web3: authWeb3 } = useAuth();
 
   const [nftData, setNftData] = useState<NFTData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -76,7 +112,9 @@ const TokenPage = () => {
   const [isForSale, setIsForSale] = useState<boolean>(false);
   const [nftCache, setNFTCache] = useState<{ [key: string]: NFTData }>({});
 
-  // Helper formatters (tu avais déjà)
+  const [evolutionRefreshFlag, setEvolutionRefreshFlag] = useState<number>(0);
+
+
   function formatSeconds(seconds: number): string {
     const days = Math.floor(seconds / (24 * 60 * 60));
     const hours = Math.floor((seconds % (24 * 60 * 60)) / (60 * 60));
@@ -84,12 +122,16 @@ const TokenPage = () => {
     const remainingSeconds = seconds % 60;
     return `${days}j ${hours}h ${minutes}m ${remainingSeconds}s`;
   }
+
   function formatTimestamp(timestamp: number): string {
     const date = new Date(timestamp * 1000);
     return date.toLocaleString();
   }
 
-  // WHEN ROUTER READY -> fetch NFT data (read-only)
+  const formatDateTime = (ts: number) =>
+    new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' });
+
+  // FETCH NFT de base
   useEffect(() => {
     if (!router.isReady || !contractAdhesion || tokenId === undefined) return;
 
@@ -116,17 +158,48 @@ const TokenPage = () => {
     fetchNFT();
   }, [router.isReady, contractAdhesion, tokenId]);
 
-  // READ function: utilise ethers.JsonRpcProvider pour lecture depuis Moralis (comme dans ton mint fetchUserCollections)
-  const fetchNFTData = async (contractAdhesionAddress: string, tokenIdNumber: number) => {
+
+
+// Usage
+
+const {
+  membershipInfo,
+  evolvePriceEth,
+  isManualEvolveReady,
+  previewImageUrl,
+  evolveIpfsUrl,
+  isUploadingEvolve,
+  isEvolving,
+  prepareEvolution,
+  evolve,
+  refreshEvolution,
+  updateCurrentMetadata // ✅ AJOUTÉ
+} = useTokenEvolution({
+  contractAddress: contractAdhesion,
+  tokenId: tokenId !== undefined ? Number(tokenId) : undefined,
+  currentImage: nftData?.image,
+  currentName: nftData?.name || "",
+  currentBio: nftData?.bio || "",
+  currentRoleLabel: nftData ? (roles[nftData.role] || "Member") : "Member",
+  onMetadataLoaded: (metadata: EvolutionMetadata) => console.log("Metadata loaded:", metadata) // Optionnel
+});
+
+
+
+const fetchNFTData = async (
+  contractAdhesionAddress: string,
+  tokenIdNumber: number
+): Promise<NFTData> => {
+
     const cacheKey = `${contractAdhesionAddress}_${tokenIdNumber}`;
     if (nftCache[cacheKey]) return nftCache[cacheKey];
 
     try {
       const rpcProvider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+
       const contract = new EthersContract(contractAdhesionAddress, ABI, rpcProvider);
       const contractManagement = new EthersContract(contractAdhesionManagement, ABI_Management, rpcProvider);
 
-      // getTokenDetails retourne plusieurs champs (tu l'utilisais déjà)
       const [
         owner,
         role,
@@ -138,34 +211,62 @@ const TokenPage = () => {
         forSale,
       ] = await contract.getTokenDetails(tokenIdNumber);
 
-      // récupère infos utilisateurs dans le contract management
+      console.log(owner,
+      role,
+      mintTimestamp,
+      priceWei,
+      nameOnChain,
+      bioOnChain,
+      remainingTime,
+      forSale);
+
       const [membership, realName, realBio] = await contract.getUserInfo(owner);
 
-      // tokenURI + fetch via ton proxy pinata
       const uri = await contract.tokenURI(tokenIdNumber);
       const ipfsHash = uri.split('/').pop();
       const res = await fetch(`/api/proxyPinata?ipfsHash=${ipfsHash}`);
-      const metadata = await res.json();
-      //const finAdhesion = new Date((Number(mintTimestamp) + 365 * 24 * 60 * 60) * 1000).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' });
+      const metadata: EvolutionMetadata = await res.json();
 
-      const finAdhesion = new Date((Number(mintTimestamp) + Number(remainingTime)) * 1000).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' });
-      console.log(finAdhesion);
+      const finAdhesion = new Date(
+        (Number(mintTimestamp) + Number(remainingTime)) * 1000
+      ).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' });
 
       const nftData: NFTData = {
         ...metadata,
         owner,
         role: Number(role),
         mintTimestamp: formatTimestamp(Number(mintTimestamp)),
-        price: formatUnits(priceWei, 'ether'), // string (ether)
-        name: realName || nameOnChain,
-        bio: realBio || bioOnChain,
+        price: formatUnits(priceWei as BigNumberish, 'ether'),
+        name: (realName && realName.length > 0) ? realName : nameOnChain,
+        bio: (realBio && realBio.length > 0) ? realBio : bioOnChain,
         remainingTime: formatSeconds(Number(remainingTime)),
-        fin : finAdhesion,
+        fin: finAdhesion,
         forSale: Boolean(forSale),
         membership,
       };
 
+
+      console.log("uri");
+
+      console.log(uri);
+
+
+
       setNFTCache(prev => ({ ...prev, [cacheKey]: nftData }));
+
+      // À la fin de fetchNFTData, après setNFTCache
+      // À la fin de fetchNFTData, APRÈS setNFTCache
+      updateCurrentMetadata({
+        level: Number(metadata.level || 0),
+        family: metadata.family,
+        sprite_name: metadata.sprite_name,
+        attributes: metadata.attributes || [],
+        evolution_history: metadata.evolution_history || [],
+        image: metadata.image
+      });
+
+
+
       return nftData;
     } catch (err) {
       console.error('Erreur lors de la récupération des données NFT:', err);
@@ -173,8 +274,8 @@ const TokenPage = () => {
     }
   };
 
-  // TRANSACTION helpers: on utilise authWeb3 (fourni par useAuth) pour les envois, comme dans ton mint
-  // Important: vérifier que authWeb3 et authAddress existent avant d'envoyer
+
+  // Transactions
 
   const handleRenewMembership = async () => {
     if (!contractAdhesion || Array.isArray(contractAdhesion)) {
@@ -188,14 +289,18 @@ const TokenPage = () => {
 
     try {
       const contract = new (authWeb3 as Web3).eth.Contract(ABI as any, contractAdhesion);
-      // obtenir mintPrice via call (en wei)
       const mintPriceWei: string = await contract.methods.mintPrice().call();
-      // on envoie la tx en utilisant web3 (pattern identique à ton mint)
       await contract.methods.renewMembership(Number(tokenId)).send({
         from: authAddress,
         value: mintPriceWei,
       });
       alert('Adhésion renouvelée avec succès.');
+      const updated = await fetchNFTData(contractAdhesion, Number(tokenId));
+      setNftData(updated);
+
+      refreshEvolution();
+
+      setEvolutionRefreshFlag(prev => prev + 1);
     } catch (err) {
       console.error('Erreur lors du renouvellement de l\'adhésion:', err);
       alert('Erreur lors du renouvellement. Voir console.');
@@ -211,6 +316,8 @@ const TokenPage = () => {
       const contract = new (authWeb3 as Web3).eth.Contract(ABI as any, contractAdhesion);
       await contract.methods.setNameAndBio(Number(tokenId), name, bio).send({ from: authAddress });
       alert('Informations mises à jour avec succès.');
+      const updated = await fetchNFTData(contractAdhesion, Number(tokenId));
+      setNftData(updated);
     } catch (err) {
       console.error('Erreur lors de la mise à jour des informations:', err);
       alert('Erreur lors de la mise à jour. Voir console.');
@@ -252,19 +359,22 @@ const TokenPage = () => {
 
     try {
       const contract = new (authWeb3 as Web3).eth.Contract(ABI as any, contractAdhesion);
-      // nftData.price est en ETH (string), on convertit en wei
       const valueWei = (authWeb3 as Web3).utils.toWei(nftData.price, 'ether');
       await contract.methods.buyNFT(Number(tokenId)).send({ from: authAddress, value: valueWei });
       alert('NFT acheté avec succès.');
-      // Optionnel : rafraîchir les données
       const updated = await fetchNFTData(contractAdhesion, Number(tokenId));
       setNftData(updated);
+
+      refreshEvolution();
+
       setIsForSale(updated.forSale);
+      setEvolutionRefreshFlag(prev => prev + 1);
     } catch (err) {
       console.error('Erreur lors de l\'achat du NFT:', err);
       alert('Erreur lors de l\'achat. Voir console.');
     }
   };
+
 
   // UI
   if (isLoading) {
@@ -292,124 +402,221 @@ const TokenPage = () => {
   }
 
   const isOwner = authAddress && authAddress.toLowerCase() === nftData.owner.toLowerCase();
-  const isVendable = Number(nftData.remainingTime) === 0;
+  const isVendable = nftData.remainingTime.startsWith('0j'); // tu peux raffiner ce check
   const canPurchase = !isOwner && isForSale;
+  const isready = nftData.remainingTime.startsWith('0j');
+
+  // ET dans le JSX :
+  const evolutionHistory = nftData
+    ? buildEvolutionHistory(nftData)
+    : [];
+
+    const currentImage =
+  evolutionHistory.length > 0
+    ? evolutionHistory[evolutionHistory.length - 1].image
+    : nftData.image;
+
   return (
-      <Box textAlign="center" mt={10} p={6}>
+    <Box
+      textAlign="center"
+      mt={10}
+      p={6}
+      maxW="100vw"
+      overflowX="hidden"
+    >      <Heading as="h1" fontSize="3xl" mb={6}>
+        Carte d'adhésion de {nftData.name}
+      </Heading>
 
-        <Heading as="h1" fontSize="3xl" mb={6}>
-          Carte d'adhésion de {nftData.name}
-        </Heading>
+      <Image
+        src={nftData.image || '/fallback-image.png'}
+        alt={nftData.name}
+        maxWidth="400px"
+        mx="auto"
+        mb={6}
+      />
 
-        <Image
-          src={nftData.image || '/fallback-image.png'}
-          alt={nftData.name}
-          maxWidth="400px"
-          mx="auto"
-          mb={6}
-        />
+      <Tabs variant="enclosed" colorScheme="teal">
+        <TabList>
+          <Tab>Détails</Tab>
+          {isOwner && isVendable && <Tab>Mise en vente</Tab>}
+          {isOwner && <Tab>Mise à jour</Tab>}
+          {!isOwner && canPurchase && <Tab>Achat</Tab>}
+          {isOwner && <Tab>Évolutions</Tab>}
+        </TabList>
 
-        <Tabs variant="enclosed" colorScheme="teal">
-          <TabList>
-            <Tab>Détails</Tab>
-            {isOwner && isVendable && <Tab>Mise en vente</Tab>}
-            {isOwner && <Tab>Mise à jour</Tab>}
-            {!isOwner && canPurchase && <Tab>Achat</Tab>}
-          </TabList>
+        <TabPanels>
+          {/* Détails */}
+          <TabPanel>
+            <VStack spacing={4} alignItems="start" mb={6}>
+              <Text fontSize="lg"><strong>Nom :</strong> {nftData.name}</Text>
+              <Text fontSize="lg"><strong>Adresse du propriétaire :</strong> <CopyableAddress address={nftData.owner}/> </Text>
 
-          <TabPanels>
-            {/* --- Onglet Détails --- */}
-            <TabPanel>
-
-              <VStack spacing={4} alignItems="start" mb={6}>
-                <Text fontSize="lg"><strong>Nom :</strong> {nftData.name}</Text>
-                <Text fontSize="lg"><strong>Addresse du propriétaire :</strong> {nftData.owner}</Text>
+              <Text fontSize="lg">
+                <strong>Rôle :</strong> {roleLabels[roles[nftData.role]] || 'Inconnu'}
+              </Text>
+              <Text fontSize="lg"><strong>Bio :</strong> {nftData.bio}</Text>
+              {isForSale && (
                 <Text fontSize="lg">
-                  <strong>Rôle :</strong> {roleLabels[roles[nftData.role]] || 'Inconnu'}
+                  <strong>Prix :</strong> {nftData.price} ETH
                 </Text>
-                <Text fontSize="lg"><strong>Bio :</strong> {nftData.bio}</Text>
-                {isForSale && (
-                  <Text fontSize="lg">
-                    <strong>Prix :</strong> {nftData.price} ETH
+              )}
+              <Text fontSize="lg"><strong>Durée restante d'adhésion :</strong> {nftData.remainingTime}</Text>
+              <Text fontSize="lg"><strong>Soit le :</strong> {nftData.fin}</Text>
+              <Text>
+                <strong>Niveau actuel :</strong>{" "}
+                {membershipInfo ? membershipInfo.level : "—"}
+              </Text>
+              <Divider my={4} />
+              // Remplace ton ancien historique par :
+              {evolutionHistory.length > 0 && (
+                <EvolutionHistoryTimeline evolutionHistory={evolutionHistory} />
+              )}
+
+
+              {isOwner && (
+                <Button colorScheme="blue" mt={4} onClick={handleRenewMembership}>
+                  Renouveler adhésion
+                </Button>
+              )}
+
+              <Divider my={6} borderColor="purple.700" w="95%" mx="auto" />
+
+              {nftData && nftData.owner && <PublicProfile address={nftData.owner} />}
+            </VStack>
+          </TabPanel>
+
+          {/* Mise en vente */}
+          {isOwner && isVendable && (
+            <TabPanel>
+              <FormControl mt={4}>
+                <FormLabel htmlFor="price">Prix pour mise en vente</FormLabel>
+                <Input
+                  id="price"
+                  type="text"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="Ex: 0.01"
+                />
+                <Button
+                isDisabled={!isManualEvolveReady}
+                colorScheme="teal" mt={4} onClick={handleListForSale}>
+                  Mettre en vente
+                </Button>
+              </FormControl>
+            </TabPanel>
+          )}
+
+          {/* Mise à jour */}
+          {isOwner && (
+            <TabPanel>
+              <FormControl mt={4}>
+                <FormLabel htmlFor="name">Nom</FormLabel>
+                <Input
+                  id="name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Entrez votre nom"
+                />
+                <FormLabel htmlFor="bio">Biographie</FormLabel>
+                <Input
+                  id="bio"
+                  type="text"
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  placeholder="Entrez votre biographie"
+                />
+                <Button colorScheme="blue" mt={4} onClick={handleUpdateInfo}>
+                  Mettre à jour
+                </Button>
+              </FormControl>
+            </TabPanel>
+          )}
+
+          {/* Achat */}
+          {!isOwner && canPurchase && (
+            <TabPanel>
+              <Button colorScheme="green" mt={4} onClick={handlePurchase}>
+                Acheter ce NFT
+              </Button>
+            </TabPanel>
+          )}
+
+          {/* Évolutions */}
+          {isOwner && (
+            <TabPanel>
+              <Heading as="h2" fontSize="xl" mb={4}>Évolution du badge</Heading>
+
+              {membershipInfo ? (
+                <VStack align="start" spacing={3}>
+                <Text>
+                  <strong>Niveau actuel :</strong>{" "}
+                  {membershipInfo ? membershipInfo.level : "Chargement..."}
+                </Text>
+                  <Text><strong>Auto-évolution :</strong> {membershipInfo.autoEvolve ? "Oui" : "Non"}</Text>
+                  <Text><strong>Années cumulées :</strong> {membershipInfo.totalYears}</Text>
+                  <Text><strong>Début de ce niveau :</strong> {formatDateTime(membershipInfo.startTimestamp)}</Text>
+                  <Text><strong>Expiration actuelle :</strong> {formatDateTime(membershipInfo.expirationTimestamp)}</Text>
+                  <Text><strong>État :</strong> {membershipInfo.locked ? "Verrouillé" : "Ouvert"}</Text>
+
+                  <Divider my={4} />
+
+                  <Text>
+                    <strong>Prochaine étape :</strong>{" "}
+                    {membershipInfo.level < 3 ? `Niveau ${membershipInfo.level + 1}` : "Niveau max atteint"}
                   </Text>
-                )}
-                <Text fontSize="lg"><strong>Durée restante d'adhésion :</strong> {nftData.remainingTime}</Text>
-                <Text fontSize="lg"><strong>Soit le:</strong> {nftData.fin}</Text>
-                {isOwner && (
-                  <Button colorScheme="blue" mt={4} onClick={handleRenewMembership}>
-                    Renouveler adhésion
-                  </Button>
-                )}
+                  <Text><strong>Prêt à évoluer :</strong> {isready ? "Oui" : "Pas encore"}</Text>
+                  <Text><strong>Coût de l'évolution :</strong> {evolvePriceEth} ETH</Text>
 
-                <Divider my={6} borderColor="purple.700" w="95%" mx="auto" />
+                  {membershipInfo.level < 3 && (
+                    <>
+                      <Button
+                        colorScheme="purple"
+                        mt={2}
+                        //isDisabled={!isready}
+                        onClick={prepareEvolution}
+                        isLoading={isUploadingEvolve}
+                      >
+                        Préparer l’image d’évolution
+                      </Button>
 
-                {nftData && nftData.owner && <PublicProfile address={nftData.owner} />} {/* Passer l'adresse */}
+                      {previewImageUrl && (
+                        <>
+                          <Text mt={2}>Aperçu de la prochaine forme :</Text>
+                          <Image
+                            src={previewImageUrl}
+                            alt="Prévisualisation évolution"
+                            maxW="300px"
+                            borderRadius="md"
+                          />
+                        </>
+                      )}
 
+                      <Button
+                        colorScheme="teal"
+                        mt={4}
+                        onClick={evolve}
+                        isDisabled={!isManualEvolveReady || !evolveIpfsUrl}
+                        isLoading={isEvolving}
+                        loadingText="Évolution en cours..."
+                      >
+                        Faire évoluer le badge
+                      </Button>
 
+                    </>
+                  )}
 
-              </VStack>
+                </VStack>
+              ) : (
+                <Text>Chargement des informations d'évolution…</Text>
+              )}
             </TabPanel>
 
-            {/* --- Autres onglets --- */}
-            {isOwner && isVendable && (
-              <TabPanel>
-                {/* Mise en vente */}
-                <FormControl mt={4}>
-                  <FormLabel htmlFor="price">Prix pour mise en vente</FormLabel>
-                  <Input
-                    id="price"
-                    type="text"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    placeholder="Ex: 0.01"
-                  />
-                  <Button colorScheme="teal" mt={4} onClick={handleListForSale}>
-                    Mettre en vente
-                  </Button>
-                </FormControl>
-              </TabPanel>
-            )}
+          )}
+        </TabPanels>
+      </Tabs>
+    </Box>
+  );
+};
 
-            {isOwner && (
-              <TabPanel>
-                {/* Mise à jour */}
-                <FormControl mt={4}>
-                  <FormLabel htmlFor="name">Nom</FormLabel>
-                  <Input
-                    id="name"
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Entrez votre nom"
-                  />
-                  <FormLabel htmlFor="bio">Biographie</FormLabel>
-                  <Input
-                    id="bio"
-                    type="text"
-                    value={bio}
-                    onChange={(e) => setBio(e.target.value)}
-                    placeholder="Entrez votre biographie"
-                  />
-                  <Button colorScheme="blue" mt={4} onClick={handleUpdateInfo}>
-                    Mettre à jour
-                  </Button>
-                </FormControl>
-              </TabPanel>
-            )}
-
-            {!isOwner && canPurchase && (
-              <TabPanel>
-                {/* Achat */}
-                <Button colorScheme="green" mt={4} onClick={handlePurchase}>
-                  Acheter ce NFT
-                </Button>
-              </TabPanel>
-            )}
-
-          </TabPanels>
-        </Tabs>
-      </Box>
-    );
-  };
-
-  export default TokenPage;
+export default TokenPage;

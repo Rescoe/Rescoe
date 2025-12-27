@@ -10,7 +10,7 @@ export default async function handler(req, res) {
 
     const RPC_URL = process.env.NEXT_PUBLIC_URL_SERVER_MORALIS;
     const PRIVATE_KEY = process.env.RELAYER_PK;
-    const FAUCET_ADDRESS = "0x1093cba97d078F66931f87E756b35D17a485C3E9";
+    const FAUCET_ADDRESS = "0xE14968f7ce8bE32ee79Aa37F82599fFADf55dDBa";
 
     const provider = new ethers.JsonRpcProvider(RPC_URL);
     const wallet = new ethers.Wallet(PRIVATE_KEY, provider);

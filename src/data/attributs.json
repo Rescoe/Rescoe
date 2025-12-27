@@ -1,0 +1,130 @@
+{
+  "Niveau": [0, 1, 2, 3],
+
+  "Stade": [
+    "Oeuf",
+    "Larve",
+    "Chenille",
+    "Chrysalide",
+    "Insecte",
+    "Insecte bionique"
+  ],
+
+  "Type": [
+    "Oeuf",
+    "Chenille",
+    "Larve",
+    "Chrysalide",
+    "Mante religieuse",
+    "Papillon",
+    "Mouche",
+    "Scarabée",
+    "Abeille",
+    "Chauve-Souris",
+    "Moustique",
+    "Libellule",
+    "Hybride",
+    "Autre"
+  ],
+
+  "Cornes": [0, 1, 2, 3, 4],
+
+  "Forme": [
+    "Ovale",
+    "Ronde",
+    "Géométrique",
+    "Allongée",
+    "Asymétrique",
+    "Fragmentée",
+	"Triangulaire"
+  ],
+
+  "Corps": [
+    "Allongé",
+    "Allongé fin",
+    "Rond",
+    "Ovoïde",
+    "Segmenté",
+    "Trapus",
+    "Massif",
+    "Compact",
+    "Filiforme",
+	"Delta"
+  ],
+
+  "Pattes": [0, 2, 4, 6, 8, 10, 12, 14, 16],
+
+  "Ailes": [0, 1, 2, 3, 4, 5, 6],
+
+  "Taille": [
+    "Minuscule",
+    "Petit",
+    "Moyen",
+    "Grand",
+    "Gigantesque"
+  ],
+
+  "Poils": [
+    "Aucun",
+    "Quelques poils",
+    "Duveteux",
+    "Très poilu",
+    "Entièrement poilu"
+  ],
+
+  "Carapace": [
+    "Aucune",
+    "Souple",
+    "Lisse",
+    "Granuleuse",
+    "Épineuse",
+    "Plaques dures",
+    "Métallique"
+  ],
+
+  "Motif": [
+    "Uni",
+    "Rayures",
+    "Taches",
+    "Mosaïque",
+    "Translucide",
+    "Dégradé",
+    "Iridescent"
+  ],
+
+  "Yeux": [
+    "Aucun",
+    "Simples",
+    "Composés",
+    "Multiples",
+    "Fins",
+    "Globuleux",
+    "Saillants",
+    "Allongés",
+	"Grands"
+  ],
+
+  "Antennes": [
+    "Aucune",
+    "Unique",
+    "Courtes",
+    "Longues",
+    "Plumeuses",
+    "Claviformes",
+    "Articulées"
+  ],
+
+"Filtre": [
+  "Très fin",
+  "Fin",
+  "Moyen",
+  "Grossier",
+  "Très grossier"
+],
+
+
+  "Legendaire": [
+    "Non",
+    "Oui"
+  ]
+}

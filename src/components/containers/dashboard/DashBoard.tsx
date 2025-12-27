@@ -6,8 +6,8 @@ import { useAuth } from '../../../utils/authContext';
 import { JsonRpcProvider } from 'ethers';
 import { ethers } from "ethers";
 import { BrowserProvider, Eip1193Provider } from "ethers";
-import UserNFTFeed from "@/hooks/Moralis/userNFT"
-import UserTransactionsFeed from "@/hooks/Moralis/UserTransactionsFeed"
+import UserNFTFeed from "@/hooks/Moralis/userNFT";
+import UserTransactionsFeed from "@/hooks/Moralis/UserTransactionsFeed";
 
 import { Contract } from 'ethers';
 import ABI from '../../ABI/ABIAdhesion.json';
@@ -127,7 +127,7 @@ const Dashboard = () => {
     const contract = new Contract(contratAdhesionManagement, ABI_ADHESION_MANAGEMENT, provider);
     const contractadhesion = new Contract(contractAdhesion, ABI, provider);
 
-    const tokenIds = await contract.getTokensByOwnerPaginated(userAddress, 0, 20);
+    const tokenIds = await contractadhesion.getTokensByOwner(userAddress);
     const userInfos = await contractadhesion.getUserInfo(userAddress);
 
     const fetchedRolesAndImages = await Promise.all(tokenIds.map(async (tokenId: number) => {

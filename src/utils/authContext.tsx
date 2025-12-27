@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import Web3 from "web3";
 import detectEthereumProvider from "@metamask/detect-provider";
 import { Web3Auth } from "@web3auth/modal";
-import { CHAIN_NAMESPACES, IProvider } from "@web3auth/base";
+import { IProvider } from "@web3auth/base";
 import { useToast } from "@chakra-ui/react";
 import ABI from "../components/ABI/ABIAdhesion.json";
 import Loading from "./Loading";
@@ -29,17 +29,15 @@ interface AuthContextType {
   connectWallet: () => Promise<void>;
   connectWithEmail: () => Promise<void>;
   logout: () => Promise<void>;
-  roleLoading : boolean,
-  isLoading : boolean,
+  roleLoading: boolean;
+  isLoading: boolean;
 }
 
-// Interface représentant les informations du membre
 interface MemberInfo {
-  role: number; // ou string selon la structure retournée par votre contrat
+  role: number;
   exists: boolean;
   timestamp: number;
   isforSale: boolean;
-  // Ajoutez d'autres propriétés si nécessaire
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -84,177 +82,171 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const toast = useToast();
 
+  // ✅ INIT Web3Auth + RESTAURE SESSION
+  useEffect(() => {
+    let mounted = true;
 
-
-/*
-  const web3AuthNetwork =
-    process.env.NODE_ENV === "production"
-      ? "sapphire_mainnet"
-      : "sapphire_devnet";
-*/
-
-useEffect(() => {
-  const initWeb3Auth = async () => {
-    try {
-      // Configuration de Web3Auth avec walletServicesConfig
-      const instance = new Web3Auth({
-        clientId: WEB3AUTH_CLIENT_ID,
-        web3AuthNetwork: "sapphire_devnet",
-        uiConfig: {
-          loginMethodsOrder: ["google", "facebook", "email_passwordless", "metamask"],
-        },
-        walletServicesConfig: {
-          confirmationStrategy: "default", // Ou "default" selon votre choix
-          modalZIndex: 99999,
-          enableKeyExport: false,
-          whiteLabel: {
-            showWidgetButton: true,
-            buttonPosition: "bottom-right", // Modifiez selon vos préférences
-            hideNftDisplay: false,
-            hideTokenDisplay: false,
-            hideTransfers: false,
-            hideTopup: false,
-            hideReceive: false,
-            hideSwap: false,
-            hideShowAllTokens: false,
-            hideWalletConnect: false,
-            defaultPortfolio: 'token', // Ou "nft" selon vos besoins
+    const initWeb3Auth = async () => {
+      try {
+        const instance = new Web3Auth({
+          clientId: WEB3AUTH_CLIENT_ID,
+          web3AuthNetwork: "sapphire_devnet",
+          uiConfig: {
+            loginMethodsOrder: ["google", "facebook", "email_passwordless", "metamask"],
           },
-        },
-      });
+          walletServicesConfig: {
+            confirmationStrategy: "default",
+            modalZIndex: 99999,
+            enableKeyExport: false,
+            whiteLabel: {
+              showWidgetButton: true,
+              buttonPosition: "bottom-right",
+              hideNftDisplay: false,
+              hideTokenDisplay: false,
+              hideTransfers: false,
+              hideTopup: false,
+              hideReceive: false,
+              hideSwap: false,
+              hideShowAllTokens: false,
+              hideWalletConnect: false,
+              defaultPortfolio: 'token',
+            },
+          },
+        });
 
-      await instance.init();
+        await instance.init();
+        if (!mounted) return;
+        setWeb3auth(instance);
 
-      setWeb3auth(instance);
+        // ✅ WEB3AUTH v7+ : check session avec getUserInfo()
+        try {
+          const userInfo = await instance.getUserInfo();
+          if (userInfo && Object.keys(userInfo).length > 0) {
+            console.log("✅ Web3Auth session restaurée:", userInfo.name);
 
-      if (instance.provider) {
-        const web3Instance = new Web3(instance.provider as any);
-        setWeb3(web3Instance);
-        const accounts = await web3Instance.eth.getAccounts();
-        if (accounts.length > 0) {
-          setAddress(accounts[0]);
-          setIsAuthenticated(true);
+            const providerInstance = instance.provider;
+            if (providerInstance) {
+              const web3Instance = new Web3(providerInstance);
+              const accounts = await web3Instance.eth.getAccounts();
+
+              if (accounts.length > 0 && mounted) {
+                const userAddress = accounts[0].toLowerCase();
+                setWeb3(web3Instance);
+                setProvider(providerInstance);
+                setAddress(userAddress);
+                setIsAuthenticated(true);
+                await fetchRole(web3Instance, userAddress);
+              }
+            }
+          }
+        } catch (sessionErr) {
+          console.log("ℹ️ Aucune session active");
         }
+      } catch (err) {
+        console.error("Erreur init Web3Auth:", err);
+      } finally {
+        if (mounted) setIsLoading(false);
       }
-    } catch (err) {
-      console.error("Erreur init Web3Auth:", err);
+    };
+
+    initWeb3Auth();
+    return () => { mounted = false; };
+  }, []);
+
+  const fetchRole = async (web3Instance: Web3, userAddress: string) => {
+    if (!web3Instance || !userAddress) {
+      setRole(null);
+      return;
+    }
+
+    setRoleLoading(true);
+    try {
+      const contract = new web3Instance.eth.Contract(ABI as any, CONTRACT_ADDRESS);
+      const owner = (await contract.methods.owner().call()) as string;
+
+      if (owner && userAddress.toLowerCase() === owner.toLowerCase()) {
+        setRole("admin");
+        return;
+      }
+
+      const memberInfo: MemberInfo = await contract.methods.members(userAddress).call();
+      if (!memberInfo || !memberInfo.exists) {
+        setRole("non-member");
+        return;
+      }
+
+      const roleIndex = parseInt(String(memberInfo.role), 10);
+      setRole(roleMapping[roleIndex] || null);
+    } catch (error) {
+      console.error("[fetchRole] Error:", error);
+      setRole(null);
     } finally {
-      setIsLoading(false);
+      setRoleLoading(false);
     }
   };
-
-  initWeb3Auth();
-}, []);
-
-const fetchRole = async (web3Instance: Web3, userAddress: string) => {
-  //console.log(web3Instance);
-  //console.log("FetchRole");
-  //console.log(userAddress);
-
-  if (!web3Instance || !userAddress) {
-    console.error("[fetchRole] web3Instance or userAddress is missing", web3Instance, userAddress);
-    setRole(null);
-    return;
-  }
-
-  setRoleLoading(true);
-
-  try {
-    const contract = new web3Instance.eth.Contract(ABI as any, CONTRACT_ADDRESS);
-
-    const owner: string = await contract.methods.owner().call();
-    if (owner && typeof owner === "string" && userAddress.toLowerCase() === owner.toLowerCase()) {
-      setRole("admin");
-      return;
-    }
-
-    // Récupération des informations sur le membre
-    const memberInfo: MemberInfo = await contract.methods.members(userAddress).call();
-    //console.log("memberInfo");
-    //console.log(memberInfo);
-    const membreExist = memberInfo.exists;
-
-    // Vérification des informations du membre
-    if (!memberInfo || !membreExist) {
-      console.warn("[fetchRole] User does not exist, setting role to 'non-member'");
-      setRole("non-member"); // Définit le rôle pour les non-adhérents
-      return;
-    }
-
-    // Maintenant que le membre existe, on définit le rôle
-    const roleIndex = parseInt(String(memberInfo.role), 10);
-    const resolvedRole = roleMapping[roleIndex] || null;
-
-    // Set the resolved role or null if none found
-    setRole(resolvedRole === null ? null : resolvedRole);
-
-  } catch (error) {
-    console.error("[fetchRole] Error fetching role:", error);
-    setRole(null);
-  } finally {
-    setRoleLoading(false);
-  }
-};
-
-
 
   const connectWallet = async () => {
     try {
       const detectedProvider = await detectEthereumProvider();
       if (!detectedProvider) {
-        throw new Error("Wallet non détecté");
+        toast({ title: "Wallet requis", description: "MetaMask requis", status: "error" });
+        return;
       }
 
       const web3Instance = new Web3(detectedProvider);
       const accounts = await web3Instance.eth.requestAccounts();
-
-      if (accounts.length === 0) {
-        throw new Error("Aucun compte trouvé");
-      }
-
       const userAddress = accounts[0].toLowerCase();
+
       setWeb3(web3Instance);
       setProvider(detectedProvider as any);
       setAddress(userAddress);
-
-      await fetchRole(web3Instance, userAddress);
       setIsAuthenticated(true);
+      await fetchRole(web3Instance, userAddress);
 
-    } catch (error) {
-      console.error("[connectWallet] Erreur:", error);
+      toast({
+        title: "Wallet connecté",
+        description: userAddress.slice(0, 6) + "...",
+        status: "success"
+      });
+    } catch (error: any) {
+      toast({ title: "Erreur wallet", description: error.message, status: "error" });
     }
   };
 
   const connectWithEmail = async () => {
     try {
-      if (!web3auth) throw new Error("Web3Auth non initialisé");
+      if (!web3auth) throw new Error("Web3Auth non prêt");
 
-      const providerInstance = await web3auth.connect();
-      if (!providerInstance) throw new Error("Provider Web3Auth non retourné");
+      toast({ title: "Connexion...", status: "loading", duration: 5000 });
+
+      await web3auth.connect();
+      const providerInstance = web3auth.provider;
+
+      if (!providerInstance) throw new Error("Provider manquant");
 
       const web3Instance = new Web3(providerInstance);
       const accounts = await web3Instance.eth.getAccounts();
-
-      if (accounts.length === 0) {
-        throw new Error("Aucun compte trouvé");
-      }
-
       const userAddress = accounts[0].toLowerCase();
+
       setWeb3(web3Instance);
       setProvider(providerInstance);
       setAddress(userAddress);
       setIsAuthenticated(true);
-
       await fetchRole(web3Instance, userAddress);
-    } catch (error) {
-      console.error("[connectWithEmail] Erreur:", error);
+
+      toast({
+        title: "Connecté !",
+        description: userAddress.slice(0, 6) + "...",
+        status: "success"
+      });
+    } catch (error: any) {
+      toast({ title: "Erreur connexion", description: error.message, status: "error" });
     }
   };
 
   const logout = async () => {
     try {
-
-      if (web3auth?.provider) {
+      if (web3auth) {
         await web3auth.logout();
       }
 
@@ -264,12 +256,47 @@ const fetchRole = async (web3Instance: Web3, userAddress: string) => {
       setWeb3(null);
       setProvider(null);
 
+      toast({ title: "Déconnecté", status: "info" });
     } catch (error) {
-      console.error("Erreur imprévue lors de la déconnexion:", error);
+      console.error("Logout error:", error);
     }
   };
 
+  // ✅ SURVEILLE SESSION (✅ SANS isUserLoggedIn)
+  useEffect(() => {
+    if (!web3auth || isLoading) return;
 
+    const checkSession = async () => {
+      try {
+        // ✅ UNIQUEMENT getUserInfo()
+        const userInfo = await web3auth.getUserInfo();
+
+        if (userInfo && Object.keys(userInfo).length > 0 && !address) {
+          console.log("🔄 Session restaurée:", userInfo.name);
+
+          const providerInstance = web3auth.provider;
+          if (providerInstance) {
+            const web3Instance = new Web3(providerInstance);
+            const accounts = await web3Instance.eth.getAccounts();
+
+            if (accounts.length > 0) {
+              const userAddress = accounts[0].toLowerCase();
+              setWeb3(web3Instance);
+              setProvider(providerInstance);
+              setAddress(userAddress);
+              setIsAuthenticated(true);
+              await fetchRole(web3Instance, userAddress);
+            }
+          }
+        }
+      } catch (err) {
+        // Session expirée → ignore
+      }
+    };
+
+    const interval = setInterval(checkSession, 3000);
+    return () => clearInterval(interval);
+  }, [web3auth, address, isLoading]);
 
   const isMember = !!role;
 
@@ -296,7 +323,7 @@ const fetchRole = async (web3Instance: Web3, userAddress: string) => {
         isLoading,
       }}
     >
-    {(isLoading || roleLoading) ? <Loading /> : children}
+      {(isLoading || roleLoading) ? <Loading /> : children}
     </AuthContext.Provider>
   );
 };

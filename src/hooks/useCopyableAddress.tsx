@@ -26,11 +26,6 @@ const CopyableAddress: React.FC<Props> = ({
     const resolveAddress = async () => {
       try {
         // Résoudre le nom ENS si présent
-        const ensName = await provider.lookupAddress(address);
-        if (ensName) {
-          setDisplay(ensName);
-          return;
-        }
 
         // Vérifiez si l'adresse est un contrat
         const code = await provider.getCode(address);

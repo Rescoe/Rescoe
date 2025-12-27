@@ -1,12 +1,21 @@
 // components/AdminPage.js
 import React, { useState, useEffect } from 'react';
 import Web3 from 'web3';
-import getRandomInsectGif from '../../../utils/GenInsect24';
-import ABI from '../../ABI/ABIAdhesion.json';
-import ABICollection from '../../ABI/ABI_Collections.json';
-import ABIManagementAdhesion from '../../ABI/ABI_ADHESION_MANAGEMENT.json';
+//import getRandomInsectGif from '@/utils/GenInsect25';
+import ABI from '@/components/ABI/ABIAdhesion.json';
+import ABICollection from '@/components/ABI/ABI_Collections.json';
+import ABIManagementAdhesion from '@/components/ABI/ABI_ADHESION_MANAGEMENT.json';
 
-import { useAuth } from '../../../utils/authContext';
+// Ajoutez ces imports en haut
+import genInsect25 from '@/utils/GenInsect25'; // ✅ Nouveau générateur
+
+import colorProfilesJson from '@/data/gif_profiles_smart_colors.json';
+
+import { usePinataUpload, type OpenSeaAttribute } from '@/hooks/usePinataUpload'; // ✅ Hook Pinata
+
+// Dans le composant, ajoutez le hook après les useState existants :
+
+import { useAuth } from '@/utils/authContext';
 
 import axios from 'axios';
 import {
@@ -23,6 +32,7 @@ import {
     Divider,
     FormControl,
     FormLabel,
+    Textarea,
 } from '@chakra-ui/react';
 import detectEthereumProvider from '@metamask/detect-provider';
 import ManageContracts from './ManageSolidity/MasterFactoryManagement'
@@ -49,7 +59,39 @@ interface Adhesion {
     role: string;
     name: string;
     bio: string;
+    imageIpfsUrl?: string;
+    metadataUri?: string;
 }
+
+type ColorProfile = {
+  image_path: string;
+  filename: string;
+  visual_signature: string;
+
+  dominant_colors: {
+    hex: string[];
+    rgb?: number[][];
+  };
+
+  hsv: {
+    mean: number[];
+  };
+
+  metrics: {
+    colorfulness: number;
+    contrast: number;
+  };
+
+  frame_count: number;
+  total_pixels_analyzed: number;
+
+  brightness?: number;
+  contrast?: number;
+};
+
+type ColorProfilesJson = {
+  families: Record<string, ColorProfile[]>;
+};
 
 
 const AdminPage: React.FC = () => {
@@ -78,10 +120,21 @@ const AdminPage: React.FC = () => {
 
     const [activeNFTTab, setActiveNFTTab] = useState<string>('ManageFeatured');
 
+    const typedColorProfilesJson = colorProfilesJson as ColorProfilesJson;
 
     const [newPointPrice, setNewPointPrice] = useState<number>(0);
     const [numberOfAdhesions, setNumberOfAdhesions] = useState<number>(1); // Nombre par défaut
-    const [adhesionData, setAdhesionData] = useState<{ address: string; role: string; name: string; bio: string }[]>([{ address: '', role: '', name: '', bio: 'Biographie (modifiable)' }]);
+    const [adhesionData, setAdhesionData] = useState<{
+        address: string;
+        role: string;
+        name: string;
+        bio: string;
+        imageIpfsUrl?: string;
+        metadataUri?: string;
+    }[]>([{ address: '', role: '', name: '', bio: 'Biographie (modifiable)' }]);
+
+    const { uploadToIPFS, isUploading: pinataUploading, error: pinataError } = usePinataUpload();
+
 
     const [featuredCollections, setFeaturedCollections] = useState<number[]>([]);
     const [collectionId, setCollectionId] = useState<string>('');
@@ -131,20 +184,29 @@ const AdminPage: React.FC = () => {
 //########################################################################### Systeme de generation des badge d'adheion (images insectes) et upload IPFS
 const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const count = parseInt(e.target.value);
-    if (!isNaN(count) && count >= 1) {
+    if (!isNaN(count) && count >= 1 && count <= 100) { // ✅ Max 100
         setNumberOfAdhesions(count);
-        const updatedAdhesionData: Adhesion[] = Array.from({ length: count }, (_, index) => ({
+        setAdhesionData(Array.from({ length: count }, (_, index) => ({
+            address: '',
+            role: '',
+            name: `Membre ${index + 1}`,
+            bio: index === 0 ? 'Biographie (modifiable)' : '',
+            imageIpfsUrl: '',
+            metadataUri: ''
+        })));
+    } else {
+        setNumberOfAdhesions(1);
+        setAdhesionData([{
             address: '',
             role: '',
             name: '',
-            bio: index === 0 ? 'Biographie (modifiable)' : '',
-        }));
-        setAdhesionData(updatedAdhesionData);
-    } else {
-        setNumberOfAdhesions(1);
-        setAdhesionData([{ address: '', role: '', name: '', bio: 'Biographie (modifiable)' }]);
+            bio: 'Biographie (modifiable)',
+            imageIpfsUrl: '',
+            metadataUri: ''
+        }]);
     }
 };
+
 
 const handleAdhesionChange = (index: number, field: 'address' | 'role' | 'name' | 'bio', value: string) => {
   const updatedData = [...adhesionData];
@@ -152,95 +214,160 @@ const handleAdhesionChange = (index: number, field: 'address' | 'role' | 'name' 
   setAdhesionData(updatedData);
 };
 
-const generateImage = () => {
-  loadGifFromFile();
-};
 
-const loadGifFromFile = async () => {
-  const response = await fetch('/gifs/Chenille.gif');
-  const blob = await response.blob();
-  const gifURL = URL.createObjectURL(blob);
-  setGeneratedImageUrl(gifURL);
-};
 
-const handleConfirmRole = async () => {
-    const generatedImageUrls = await Promise.all(
-        adhesionData.map(async (adhesion) => {
-            await generateImageForAdhesion(adhesion); // Ajoutez cette ligne pour générer et stocker chaque image
-            return generatedImageUrl; // Retourne l'URL générée
-        })
-    );
-
-    // Ensuite, téléversez les images et les données pour chaque adhérent
-    for (let index = 0; index < adhesionData.length; index++) {
-        if (generatedImageUrls[index]) {
-            const imageUrl = generatedImageUrls[index];
-            if (imageUrl) {
-                await uploadFileToIPFS(imageUrl, adhesionData[index]);
-            } else {
-                alert("Erreur: l'URL de l'image générée est nulle.");
-            }
-        } else {
-            alert("Veuillez vous assurer que les images sont générées.");
-        }
+const handleConfirmRole = async (): Promise<void> => {
+    if (adhesionData.length === 0) {
+        alert('Aucune adhésion à traiter.');
+        return;
     }
 
-};
+    if (pinataError) {
+        alert(`Erreur Pinata: ${pinataError}`);
+        return;
+    }
 
-
-// Nouvelle fonction pour générer des images par adhésion
-const generateImageForAdhesion = async (adhesion: Adhesion) => {
-    const response = await fetch('/gifs/Chenille.gif'); // Ou le chemin de votre image
-    const blob = await response.blob();
-    const gifURL = URL.createObjectURL(blob);
-    setGeneratedImageUrl(gifURL); // Met à jour l'URL de l'image générée
-    return blob;  // ✔️ renvoie le fichier réel
-};
-
-const uploadFileToIPFS = async (imageUrl: string, adhesion: Adhesion) => {
     setIsUploading(true);
+
     try {
-        const response = await fetch(imageUrl);
-        const blob = await response.blob();
-        const formData = new FormData();
-        formData.append('file', blob, 'insect.gif');
+        console.log('🎨 1. Génération des insectes LVL0...');
 
-        const imageResponse = await axios.post('https://api.pinata.cloud/pinning/pinFileToIPFS', formData, {
-            headers: {
-                'Authorization': `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT}`,
-                'Content-Type': 'multipart/form-data',
-            },
+        // 1. GÉNÉRER insecte UNIQUE + DONNÉES COMPLÈTES pour CHAQUE adhésion
+        const generatedInsects = await Promise.all(
+            adhesionData.map(async (adhesion, index) => {
+                const insectData = genInsect25(0);  // ✅ Comme RoleBasedNFTPage
+                console.log(`✅ Insecte ${index + 1}:`, insectData.spriteName, insectData.family);
+                return {
+                    imageUrl: insectData.imageUrl,
+                    data: insectData  // Toutes les données pour attributs
+                };
+            })
+        );
+
+        console.log('📤 2. Upload Pinata 35+ attributs...');
+
+        // 2. UPLOAD avec COULEURS + MORPHO pour CHAQUE adhésion
+        const metadataUris = await Promise.all(
+            adhesionData.map(async (adhesion, index) => {
+                const { imageUrl, data: insectData } = generatedInsects[index];
+
+                // 🔥 PROFIL COULEUR EXACT
+                const spriteFilename = insectData.spriteName;
+                const familyKey: string | undefined =
+                  insectData.new_folder ?? insectData.key;
+
+                const familyProfiles = familyKey
+                  ? typedColorProfilesJson.families[familyKey]
+                  : undefined;
+
+                const colorProfile =
+                  familyProfiles?.find(
+                    (p) => p.filename === spriteFilename
+                  ) ?? familyProfiles?.[0];
+
+
+                // ✅ 35+ ATTRIBUTS (identique simple)
+                const insectAttributes = [
+                    ...insectData.attributes,  // 15 morpho
+                    { trait_type: "Famille", value: familyKey },
+                    { trait_type: "DisplayName", value: insectData.display_name },
+                    { trait_type: "Lore", value: insectData.lore },
+                    { trait_type: "TotalFamille", value: insectData.total_in_family },
+                    { trait_type: "Sprite", value: spriteFilename }
+                ];
+
+                const colorAttributes = colorProfile ? [
+                    // 20+ COULEURS
+                    { trait_type: "Couleur1", value: colorProfile.dominant_colors.hex[0] },
+                    { trait_type: "Couleur2", value: colorProfile.dominant_colors.hex[1] },
+                    { trait_type: "Couleur3", value: colorProfile.dominant_colors.hex[2] },
+                    { trait_type: "Teinte", value: Math.round(colorProfile.hsv.mean[0]) + "°" },
+                    { trait_type: "Saturation", value: Math.round(colorProfile.hsv.mean[1] * 100) + "%" },
+                    { trait_type: "Luminosité", value: Math.round(colorProfile.hsv.mean[2] * 100) + "%" },
+                    { trait_type: "Colorful", value: Math.round(colorProfile.metrics.colorfulness * 100) + "%" },
+                    { trait_type: "Contraste", value: Math.round(colorProfile.metrics.contrast) },
+                    { trait_type: "Frames", value: colorProfile.frame_count },
+                    { trait_type: "Pixels", value: colorProfile.total_pixels_analyzed.toLocaleString() }
+                ] : [];
+
+                const fullAttributes: OpenSeaAttribute[] = [
+                    ...insectAttributes.filter(attr => !["Niveau", "Level"].includes(attr.trait_type)),
+                    { trait_type: "Niveau", value: 0 },  // ✅ Admin format
+                    ...colorAttributes,
+                    // ✅ VOS ATTRIBUTS ADMIN
+                    { trait_type: "Role", value: parseInt(adhesion.role) || 0 },
+                    { trait_type: "Name", value: adhesion.name || "Membre" }
+                ];
+
+                console.log(`🎨 Adhésion ${index + 1}: ${fullAttributes.length} attributs`);
+
+                // 🔥 UPLOAD IDENTIQUE (gère tout)
+                const result = await uploadToIPFS({
+                    imageUrl,
+                    name: insectData.display_name || adhesion.name || `Membre ${index + 1}`,
+                    bio: adhesion.bio || "",
+                    role: adhesion.role,
+                    level: 0,
+                    attributes: fullAttributes,  // 35+ !
+                    family: familyKey,
+                    sprite_name: spriteFilename,
+                    previousImage: null,
+                    evolutionHistory: [],
+                    color_profile: colorProfile  // Backup
+                });
+
+                console.log(`✅ Metadata URI ${index + 1}:`, result.url);
+                return result.url;
+            })
+        );
+
+        // 3. STOCKE résultats
+        setAdhesionData(prev => prev.map((adhesion, index) => ({
+            ...adhesion,
+            imageIpfsUrl: generatedInsects[index].imageUrl,
+            metadataUri: metadataUris[index],
+            insectData: generatedInsects[index].data  // Bonus debug
+        })));
+
+        if (generatedInsects[0]?.imageUrl) {
+            setGeneratedImageUrl(generatedInsects[0].imageUrl);
+        }
+
+        console.log('🎉 MULTI-MINT PRÊT:', {
+            count: metadataUris.length,
+            attrsPerNFT: 35,  // 🔥
+            sample: metadataUris.slice(0, 2)
         });
 
-        const imageIpfsUrl = `https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${imageResponse.data.IpfsHash}`;
-        setIpfsUrl(imageIpfsUrl);
+        alert(`✅ ${adhesionData.length} NFTs OpenSea READY!\n35+ attributs couleur/morpho par NFT`);
 
-        const metadataJson = {
-            name: adhesion.name,
-            bio: adhesion.bio,
-            description: `Rescoe vous a attribué le rôle suivant : ${adhesion.role}`,
-            image: imageIpfsUrl,
-            role: adhesion.role,
-            tags: ["Adhesion", "Minted by Rescoe", adhesion.role],
-        };
-
-        const metadataResponse = await axios.post('https://api.pinata.cloud/pinning/pinJSONToIPFS', metadataJson, {
-            headers: {
-                'Authorization': `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT}`,
-                'Content-Type': 'application/json',
-            },
-        });
-
-        const metadataIpfsUrl = `https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`;
-        console.log(metadataIpfsUrl);
-        // Stocke les détails des métadonnées pour chaque adhérent
-        setDetails((prevDetails) => [...prevDetails, { uri: metadataIpfsUrl, role: adhesion.role, name: adhesion.name, bio: adhesion.bio }]);
-    } catch (error) {
-        console.error('Error uploading to IPFS:', error);
+    } catch (error: any) {
+        console.error('❌ Admin échoué:', error);
+        alert(`❌ Échec: ${error.message || 'Erreur inconnue'}`);
     } finally {
         setIsUploading(false);
     }
 };
+
+
+
+// Nouvelle fonction pour générer des images par adhésion
+// ✅ NOUVEAU : Utilise GenInsect25 (LVL 0 uniquement)
+const generateImageForAdhesion = async (adhesion: Adhesion): Promise<string> => {
+    try {
+        // Génère un insecte LVL0 unique avec GenInsect25
+        const insectData = await genInsect25(0); // level 0 obligatoire
+        console.log('🪲 Insect généré:', insectData);
+
+        // Retourne directement l'URL publique de l'insecte
+        return insectData.imageUrl;
+    } catch (error) {
+        console.error('❌ Erreur génération insecte:', error);
+        throw new Error(`Génération insecte échouée: ${error}`);
+    }
+};
+
+
 
 
 const handleMintMultiple = async (): Promise<void> => {
@@ -258,49 +385,82 @@ const handleMintMultiple = async (): Promise<void> => {
 
         try {
             const accounts: string[] = await web3.eth.getAccounts();
+
+            // Préparer les tableaux pour le contrat
             const recipientsArray: string[] = details.map(adhesion => adhesion.address);
             const rolesArray: number[] = details.map(adhesion => adhesion.role);
             const nameArray: string[] = details.map(adhesion => adhesion.name);
             const bioArray: string[] = details.map(adhesion => adhesion.bio);
 
             // Créer un tableau d'URIs basé sur ce qui a été préalablement généré
-            const urisArray: string[] = await Promise.all(adhesionData.map(async (adhesion, index) => {
-                const metadataResponse = await axios.post('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
-                    name: adhesion.name,
-                    bio: adhesion.bio,
-                    description: `Rescoe vous a attribué le rôle suivant : ${adhesion.role}`,
-                    image: ipfsUrl, // Assurez-vous que cette URL est déjà définie
-                    role: adhesion.role,
-                    tags: ["Adhesion", "Minted by Rescoe", adhesion.role],
-                }, {
-                    headers: {
-                        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT}`,
-                        'Content-Type': 'application/json',
-                    },
-                });
+            // ATTENTION: Utiliser les URIs déjà générées par handleConfirmRole
+            const urisArray: string[] = adhesionData
+              .map(adhesion => adhesion.metadataUri)
+              .filter((uri): uri is string => typeof uri === "string");
 
-                return `https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`;
-            }));
+            // Vérifications conformes au contrat Solidity
+            const length = recipientsArray.length;
 
-            // Vérifier que tous les tableaux ont la même longueur
+            if (length === 0) {
+                alert('Aucune adhésion à mint.');
+                return;
+            }
+
+            if (length > 100) {
+                alert('Maximum 100 adhésions par batch.');
+                return;
+            }
+
             if (recipientsArray.length !== rolesArray.length ||
                 recipientsArray.length !== urisArray.length ||
                 recipientsArray.length !== nameArray.length ||
                 recipientsArray.length !== bioArray.length) {
-                alert('Le nombre d\'adresses, d\'URIs, de rôles, de noms et de bios doit être le même.');
+                alert('Les tableaux ont des longueurs différentes.');
                 return;
             }
 
-            await contract.methods.mintMultiple(recipientsArray, urisArray, rolesArray, nameArray, bioArray).send({ from: accounts[0] });
-            alert('NFTs mintés avec succès !');
-        } catch (error) {
+            // Vérifier les adresses valides et rôles valides (0-3)
+            for (let i = 0; i < length; i++) {
+                if (!web3.utils.isAddress(recipientsArray[i])) {
+                    alert(`Adresse invalide à l'index ${i}: ${recipientsArray[i]}`);
+                    return;
+                }
+                if (rolesArray[i] > 3) {
+                    alert(`Rôle invalide à l'index ${i}: ${rolesArray[i]} (max 3)`);
+                    return;
+                }
+            }
+
+            console.log('Minting params:', {
+                recipients: recipientsArray.length,
+                uris: urisArray.length,
+                roles: rolesArray,
+                names: nameArray.length,
+                bios: bioArray.length
+            });
+
+            // Appel du contrat avec les paramètres exacts
+            const tx = await contract.methods
+                .mintMultiple(recipientsArray, urisArray, rolesArray, nameArray, bioArray)
+                .send({ from: accounts[0] });
+
+            console.log('Transaction hash:', tx.transactionHash);
+            alert(`✅ ${length} NFTs mintés avec succès!\nTX: ${tx.transactionHash}`);
+
+            // Optionnel: reset après succès
+            // setAdhesionData([]);
+            // setNumberOfAdhesions(0);
+
+        } catch (error: any) {
             console.error("Minting failed:", error);
-            alert('Minting failed: ');
+            const errorMsg = error.message || error.reason || 'Erreur inconnue';
+            alert(`❌ Mint échoué: ${errorMsg}`);
         }
     } else {
         alert('MetaMask ou un autre fournisseur Web3 n\'est pas installé.');
     }
 };
+
 
 
 //############################################################# => Gestion du prix des adhesion et des points de récompense
@@ -699,76 +859,116 @@ const ManageFeaturedCollections = () => {
 
     const ManageRoles = () => (
       <VStack>
-            <Heading size="md">Générer des adhésions</Heading>
-            <FormControl mt={4}>
-                <FormLabel htmlFor="adhesion-count">Nombre d'adhésions :</FormLabel>
-                <Input
-                    id="adhesion-count"
-                    type="number"
-                    value={numberOfAdhesions}
-                    onChange={handleNumberChange}
-                    min={1}
-                />
-            </FormControl>
+      <Heading size="md">Générer des adhésions</Heading>
 
-            {adhesionData.map((adhesion, index) => (
-                <VStack key={index} spacing={2} mt={4}>
-                    <FormControl>
-                        <FormLabel htmlFor={`address-${index}`}>Adresse</FormLabel>
-                        <Input
-                            id={`address-${index}`}
-                            value={adhesion.address}
-                            onChange={(e) => handleAdhesionChange(index, 'address', e.target.value)}
-                            placeholder="Entrez l'adresse du destinataire"
-                        />
-                    </FormControl>
-                    <FormControl>
-                        <FormLabel htmlFor={`role-${index}`}>Rôle</FormLabel>
-                        <Select
-                            id={`role-${index}`}
-                            value={adhesion.role}
-                            onChange={(e) => handleAdhesionChange(index, 'role', e.target.value)}
-                            placeholder="Choisir un rôle"
-                        >
-                            {Object.keys(roleMapping).map(role => (
-                                <option key={role} value={role}>
-                                    {role}
-                                </option>
-                            ))}
-                        </Select>
-                    </FormControl>
-                    <FormControl>
-                        <FormLabel htmlFor={`name-${index}`}>Nom</FormLabel>
-                        <Input
-                            id={`name-${index}`}
-                            value={adhesion.name}
-                            onChange={(e) => handleAdhesionChange(index, 'name', e.target.value)}
-                            placeholder="Entrez votre nom"
-                        />
-                    </FormControl>
-                    <FormControl>
-                        <FormLabel htmlFor={`bio-${index}`}>Biographie</FormLabel>
-                        <Input
-                            id={`bio-${index}`}
-                            value={adhesion.bio}
-                            onChange={(e) => handleAdhesionChange(index, 'bio', e.target.value)}
-                            placeholder="Entrez votre biographie"
-                        />
-                    </FormControl>
-                </VStack>
-            ))}
+      <FormControl mt={4}>
+          <FormLabel>Nombre d'adhésions (max 100):</FormLabel>
+          <Input
+              type="number"
+              value={numberOfAdhesions}
+              onChange={handleNumberChange}
+              min={1}
+              max={100}
+          />
+      </FormControl>
 
-            <Center>
-                {generatedImageUrl && <Image src={generatedImageUrl} alt="Generated Insect" boxSize="150px" />}
-            </Center>
+      {adhesionData.map((adhesion, index) => (
+          <VStack key={index} spacing={2} p={4} borderWidth={1} borderRadius="md" w="full">
+              <Text fontWeight="bold">Adhésion #{index + 1}</Text>
 
-            <Button onClick={handleConfirmRole} isLoading={isUploading} colorScheme="teal">
-                Confirmer les adhésions et téléverser sur IPFS
-            </Button>
-            <Button onClick={handleMintMultiple} isLoading={loading} colorScheme="teal">
-                Mint Multiple adhérents addresses
-            </Button>
-        </VStack>
+              <FormControl isInvalid={!web3?.utils.isAddress(adhesion.address)}>
+                  <FormLabel>Adresse</FormLabel>
+                  <Input
+                      value={adhesion.address}
+                      onChange={(e) => handleAdhesionChange(index, 'address', e.target.value)}
+                      placeholder="0x..."
+                  />
+              </FormControl>
+
+              <HStack spacing={4}>
+              <FormControl>
+                  <FormLabel htmlFor={`role-${index}`}>Rôle</FormLabel>
+                  <Select
+                      id={`role-${index}`}
+                      value={adhesion.role}
+                      onChange={(e) => handleAdhesionChange(index, 'role', e.target.value)}
+                      placeholder="Choisir un rôle"
+                  >
+                      {Object.keys(roleMapping).map(role => (
+                          <option key={role} value={role}>
+                              {role}
+                          </option>
+                      ))}
+                  </Select>
+              </FormControl>
+                  <FormControl w="50%">
+                      <FormLabel>URI IPFS</FormLabel>
+                      <Input
+                          value={adhesion.metadataUri || 'À générer...'}
+                          isReadOnly
+                          title={adhesion.metadataUri || ''}
+                      />
+                  </FormControl>
+              </HStack>
+
+              <FormControl>
+                  <FormLabel>Nom</FormLabel>
+                  <Input
+                      value={adhesion.name}
+                      onChange={(e) => handleAdhesionChange(index, 'name', e.target.value)}
+                  />
+              </FormControl>
+
+              <FormControl>
+                  <FormLabel>Bio</FormLabel>
+                  <Textarea
+                      value={adhesion.bio}
+                      onChange={(e) => handleAdhesionChange(index, 'bio', e.target.value)}
+                      placeholder="Biographie..."
+                      rows={3}
+                  />
+              </FormControl>
+          </VStack>
+      ))}
+
+      {generatedImageUrl && (
+          <Center mt={4}>
+              <Image src={generatedImageUrl} alt="Insecte" boxSize="150px" borderRadius="md" />
+          </Center>
+      )}
+
+      <HStack spacing={4} mt={6}>
+          <Button
+              onClick={handleConfirmRole}
+              isLoading={isUploading}
+              colorScheme="blue"
+          >
+              📤 Confirmer & IPFS
+          </Button>
+          <Button
+              onClick={handleMintMultiple}
+              isLoading={loading}
+              colorScheme="green"
+              isDisabled={adhesionData.some(ad => !ad.metadataUri)}
+          >
+              🪲 Mint Multiple ({adhesionData.length}/100)
+          </Button>
+          <Button
+              onClick={() => { setAdhesionData([]); setNumberOfAdhesions(0); }}
+              colorScheme="gray"
+              variant="outline"
+          >
+              🔄 Reset
+          </Button>
+      </HStack>
+
+      {adhesionData.length > 0 && (
+          <Text fontSize="sm" color="gray.500" mt={2}>
+              Prêt pour mint: {adhesionData.filter(ad => ad.metadataUri).length}/{adhesionData.length} URIs générées
+          </Text>
+      )}
+  </VStack>
+
     );
 
     const ManageNFT = () => {
