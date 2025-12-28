@@ -34,8 +34,6 @@ const CreateCollection: React.FC = () => {
   const [splitRoyalties, setSplitRoyalties] = useState<boolean>(true);
   const [royaltyData, setRoyaltyData] = useState<{ address: string; value: string }[]>([{ address: "", value: "" }]);
   const [maxEditions, setMaxEditions] = useState<number>(1);
-  const [estimatedCost, setEstimatedCost] = useState<string | null>(null);
-  const [isEstimating, setIsEstimating] = useState<boolean>(false);
 
 
   const canUpload =
@@ -153,17 +151,6 @@ const CreateCollection: React.FC = () => {
       );
 
 
-
-      if (tx && tx.transactionHash) {
-        // Estimer les coûts après la configuration
-        const gasConfig = await estimateGasConfig();
-        if (gasConfig) {
-          const gasPrice = BigInt(await web3.eth.getGasPrice());
-          const totalCost = (gasConfig * Number(gasPrice)) / 1e18; // Conversion en ETH
-          setEstimatedCost(totalCost.toFixed(6));
-        }
-      }
-
     } catch (err) {
       console.error('Erreur upload IPFS:', err);
       alert("Erreur lors de l'upload vers IPFS : ");
@@ -225,111 +212,6 @@ const CreateCollection: React.FC = () => {
   const removeRoyaltyLine = (index: number) => {
     setRoyaltyData(prev => prev.filter((_, i) => i !== index));
   };
-
-  const estimateGasConfig = async () => {
-  if (!web3 || !collectionType || !metadata.name) return;
-
-  const accounts = await web3.eth.getAccounts();
-  const from = accounts[0];
-  const factoryAddress = await fetchFactoryAddress(collectionType);
-  const factoryABI = collectionType === "Art" ? ABI_ART_FACTORY : ABI_POESIE_FACTORY;
-  const factoryContract = new web3.eth.Contract(factoryABI as any, factoryAddress);
-
-  let collaborators: string[] = [];
-  let percents: number[] = [];
-
-  if (collectionType === "Art") {
-    if (splitRoyalties) {
-      for (const r of royaltyData) {
-        if (!web3.utils.isAddress(r.address) || !r.value) return setEstimatedCost(null);
-        collaborators.push(r.address);
-        percents.push(Number(r.value));
-      }
-      const total = percents.reduce((a, b) => a + b, 0);
-      if (total > 90) return setEstimatedCost(null);
-    } else {
-      collaborators = [address || ""];
-      percents = [90];
-    }
-  }
-
-  try {
-    const configureData = factoryContract.methods
-      .configureCollection(metadata.name, maxEditions, collaborators, percents)
-      .encodeABI();
-    const gasConfig = Number(await web3.eth.estimateGas({ from, to: factoryAddress, data: configureData }));
-    return gasConfig;
-  } catch (err) {
-    console.error("Erreur lors de l'estimation des coûts de configuration :", err);
-    setEstimatedCost(null);
-  }
-};
-
-  const estimateGasCreate = async () => {
-
-    if (!address ||! web3) {
-      console.error("Erreur Web3 || Wallet");
-      return;
-    }
-
-
-      const accounts = await web3.eth.getAccounts();
-      const from = accounts[0];
-
-      const rescoeContract = new web3.eth.Contract(ABIRESCOLLECTION, contractRESCOLLECTION);
-
-      const gas = await rescoeContract.methods
-          .createCollection(metadata.name, ipfsUrl, collectionType)
-          .estimateGas({ from });
-
-      return gas;
-  };
-
-  const estimateTotalCollectionCost = async () => {
-    setIsEstimating(true);
-
-    if (!address ||! web3) {
-      console.error("Erreur Web3 || Wallet");
-      return;
-    }
-
-    try {
-      const gasConfig = await estimateGasConfig();
-      const gasCreate = await estimateGasCreate();
-
-      // Vérifier qu'on a bien des valeurs valides
-      if (
-        gasConfig === undefined || gasConfig === null ||
-        gasCreate === undefined || gasCreate === null
-      ) {
-        setEstimatedCost(null);
-        return;
-      }
-
-      // Convertir correctement
-      const gasTotalNumber = Math.floor((Number(gasConfig) + Number(gasCreate)) * 1.2);
-
-      // Tout en BigInt désormais
-      const gasTotal = BigInt(gasTotalNumber);
-      const gasPrice = BigInt(await web3.eth.getGasPrice());
-
-      const totalWei = gasTotal * gasPrice;
-
-      setEstimatedCost(
-        parseFloat(web3.utils.fromWei(totalWei.toString(), "ether")).toFixed(6)
-      );
-
-    } catch (err) {
-      console.error("Erreur estimation gas:", err);
-      setEstimatedCost(null);
-
-    } finally {
-      setIsEstimating(false);
-    }
-  };
-
-
-
 
   // Fetch the factory address by type
   const fetchFactoryAddress = async (type: string): Promise<string> => {
@@ -402,28 +284,6 @@ const CreateCollection: React.FC = () => {
       "Échec création"
     );
   };
-
-  useEffect(() => {
-    if (metadata.name && ipfsUrl && collectionType) {
-      estimateTotalCollectionCost();
-    } else {
-      setEstimatedCost(null);
-    }
-  }, [metadata.name, ipfsUrl, collectionType]);
-
-  // Appeler estimateGasConfig après chaque modification de metadata ou des royalties
-useEffect(() => {
-  if (metadata.name && ipfsUrl && collectionType && file) {
-    estimateGasConfig().then(gasConfig => {
-      if (gasConfig) {
-        // Mettez à jour le coût estimé ou d'autres manipulations ici.
-      }
-    });
-  } else {
-    setEstimatedCost(null);
-  }
-}, [metadata.name, ipfsUrl, collectionType, file, royaltyData, splitRoyalties]);
-
 
   // Render UI
   return (
@@ -499,10 +359,18 @@ useEffect(() => {
 
       <Flex justify="center">
         <VStack>
-          {estimatedCost && <Text mt={4} mb={2} fontSize="lg" color="purple.300" textAlign="center">💰 Coût estimé : ~{estimatedCost} ETH</Text>}
-          <Button onClick={handleCreateCollection} px={10} py={6} fontSize="lg" fontWeight="bold" borderRadius="full" bgGradient="linear(to-r, purple.700, pink.600)" color="white" boxShadow="lg" _hover={{ transform: "scale(1.05)", boxShadow: "2xl" }} isLoading={loading}>
-            {isEstimating ? "💰 Estimation du coût..." : "🎨 Créer la collection"}
+
+          <Button
+            onClick={handleCreateCollection}
+            px={10} py={6} fontSize="lg" fontWeight="bold"
+            borderRadius="full" bgGradient="linear(to-r, purple.700, pink.600)"
+            color="white" boxShadow="lg"
+            _hover={{ transform: "scale(1.05)", boxShadow: "2xl" }}
+            isLoading={loading}
+          >
+            🎨 Créer la collection
           </Button>
+
         </VStack>
       </Flex>
     </Box>
