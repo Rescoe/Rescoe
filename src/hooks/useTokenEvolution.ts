@@ -20,6 +20,7 @@ export interface MembershipInfo {
 export const useTokenEvolution = ({
   contractAddress,
   tokenId,
+  walletAddress,  // 🔥 AJOUTÉ
   currentImage,
   currentName,
   currentBio,
@@ -150,11 +151,16 @@ export const useTokenEvolution = ({
       taille: currentMetadataJson.attributes?.find((a: any) => a.trait_type === 'Taille')?.value
     });
 
-    // ✅ APPEL CORRECT
+    // 🔥 FIX : walletAddress OU account de useAuth
+    const finalWallet = walletAddress || account || '0x0000000000000000000000000000000000000000';
+
+    // ✅ APPEL CORRECT AVEC 5 PARAMS
     const evolutionData = evolutionEngine(
-      currentMetadataJson,     // IPFS 36 attrs
-      currentLevelOnChain,     // 0
-      targetLevel              // 1
+      currentMetadataJson,
+      currentLevelOnChain,
+      targetLevel,
+      finalWallet,  // ✅ WALLET
+      tokenId       // ✅ TOKEN_ID
     );
 
     setPreviewImageUrl(evolutionData.imageUrl);
@@ -239,7 +245,9 @@ export const useTokenEvolution = ({
   }
 }, [
   membershipInfo, currentName, currentBio, currentRoleLabel,
-  contractAddress, tokenId, uploadToIPFS, updateCurrentMetadata
+  contractAddress, tokenId, uploadToIPFS, updateCurrentMetadata,
+  walletAddress, account  // 🔥 AJOUTÉS
+
 ]);
 
   /* =======================

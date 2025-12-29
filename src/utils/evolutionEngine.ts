@@ -1,5 +1,4 @@
-// REMPLACEZ TOUT (copie-colle COMPLET)
-
+// REMPLACEZ TOUT (copie-colle COMPLET) - ✅ SEED WALLET + TOKEN_ID UNIQUEMENT
 import metadataJson from '@/data/nft_metadata_clean.json';
 import colorProfilesJson from '@/data/gif_profiles_smart_colors.json';
 
@@ -13,19 +12,34 @@ const PRIORITY_WEIGHTS = {
   familyBonus: 0.40, attrsScore: 0.35, colorScore: 0.15, lineageBonus: 0.10
 };
 
+// 🔥 SEED RANDOM (déterministe par wallet+token UNIQUEMENT)
+function createSeededRNG(walletAddress: string, tokenId: string | number): () => number {
+  // Hash simple wallet+token → seed fixe
+  const seedString = `${walletAddress.toLowerCase()}-${tokenId}`.replace(/0x/g, '');
+  let seed = 0;
+  for (let i = 0; i < seedString.length; i++) {
+    seed = ((seed << 5) + seedString.charCodeAt(i)) >>> 0;  // Hash 32bit
+  }
+
+  // Simple LCG PRNG (déterministe, rapide)
+  let state = seed >>> 0;
+  return function rng() {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 4294967296;  // [0,1)
+  };
+}
+
 // 🔥 INDEX PAR new_folder (Chronyx, Vesporyns...)
 const familiesByName: Record<string, any> = {};
 const colorProfilesByFamily: Record<string, any[]> = {};
 
 function initData() {
-  // Index nft_metadata_clean.json par new_folder
   Object.values(metadataJson).forEach((data: any) => {
     if (data.new_folder) {
       familiesByName[data.new_folder] = data;
     }
   });
 
-  // Index color profiles
   const colors = colorProfilesJson.families || {};
   for (const [family, profiles] of Object.entries(colors)) {
     if (Array.isArray(profiles)) colorProfilesByFamily[family] = profiles;
@@ -59,16 +73,15 @@ const attributeSimilarity = (a1: Record<string, any>, a2: Record<string, any>): 
   return s / Math.max(1, w);
 };
 
-// 🔥 EXTRACTION IPFS → REAL FAMILY
 function extractFromIPFS(ipfsMetadata: any): {
-  family: string;           // "Chronyx" (new_folder)
+  family: string;
   currentLevel: number;
   attributes: Record<string, any>;
+  tokenId?: string | number;
 } {
   const attributesArray = ipfsMetadata.attributes || [];
   const attributes = Object.fromEntries(attributesArray.map((a: any) => [a.trait_type, a.value]));
 
-  // ✅ new_folder = VRAIE family (Chronyx, Vesporyns)
   const familyKey = attributes.Famille || attributes.family || ipfsMetadata.family;
   const familyData = getFamilyData(familyKey);
   const realFamily = familyData?.new_folder || familyKey || 'Vesporyns';
@@ -76,11 +89,11 @@ function extractFromIPFS(ipfsMetadata: any): {
   return {
     family: realFamily,
     currentLevel: Number(ipfsMetadata.level) || 0,
-    attributes
+    attributes,
+    tokenId: ipfsMetadata.token_id || ipfsMetadata.tokenId
   };
 }
 
-// 🔥 PICK REAL IMAGE (new_path)
 function getRealImagePath(familyData: any, level: number): string {
   const path = familyData.new_path ?
     familyData.new_path.replace(/lvl\d+/, `lvl${level}`) :
@@ -89,21 +102,32 @@ function getRealImagePath(familyData: any, level: number): string {
   return `/insects/${path}${sprite}`;
 }
 
-// ✅ ENGINE = SIMULATEUR 100%
+// 🔥 ENGINE = SIMULATEUR 100% + SEED WALLET+TOKEN
 export default function evolutionEngine(
   ipfsMetadata: any,
   currentLevel: number,
-  targetLevel: number
+  targetLevel: number,
+  walletAddress: string,      // 🔥 ADRESSE WALLET
+  tokenId: string | number    // 🔥 TOKEN_ID UNIQUEMENT
 ): any {
-  console.log('🚀 evolutionEngine:', { currentLevel, targetLevel });
+  // Ligne 114 → Remplace par :
+  console.log('🚀 evolutionEngine SEEDÉ:', {
+    walletAddress: walletAddress ? walletAddress.slice(0,8)+'...' : 'undefined',
+    tokenId,
+    currentLevel,
+    targetLevel
 
-  // ✅ IPFS → REAL FAMILY DATA
-  const { family, attributes } = extractFromIPFS(ipfsMetadata);
+  });
+
+  // 🔥 EXTRACTION + SEED RNG UNIQUE (wallet+token)
+  const { family, attributes, tokenId: metadataTokenId } = extractFromIPFS(ipfsMetadata);
+  const finalTokenId = metadataTokenId || tokenId;
+  const rng = createSeededRNG(walletAddress, finalTokenId.toString());
+
   const currentFamilyData = getFamilyData(family);
-
   console.log('🔍 CURRENT:', { family, taille: attributes.Taille, new_folder: currentFamilyData?.new_folder });
 
-  // ✅ CANDIDATS LVL+1 (comme simulateur)
+  // ✅ CANDIDATS LVL+1 (SEEDÉS!)
   const familyCandidates: Record<string, any> = {};
 
   Object.values(metadataJson).forEach((familyData: any) => {
@@ -112,21 +136,25 @@ export default function evolutionEngine(
     const targetAttrs = getAttributes(familyData);
     const attrsScore = attributeSimilarity(attributes, targetAttrs);
 
-    // ✅ Simple couleur (comme simulateur)
-    const colorScore = 0.85 + Math.random() * 0.15; // 85-100%
+    // 🔥 RNG SEEDÉ → UNIQUES PAR WALLET+TOKEN!
+    const colorScore = 0.7 + rng() * 0.3;           // 70-100% (plus varié)
+    const lineageBonus = ipfsMetadata.parent_token_id ? 0.1 * rng() : 0;
+    const familyBonus = familyData.new_folder === family ? 0.45 : 0.02 * rng(); // Bonus faible random
 
-    // ✅ Bonus famille
-    const familyBonus = familyData.new_folder === family ? 0.45 : 0;
-
+    // 🔥 SCORE COMPLET + BRUIT
+    const noise = 0.05 * (rng() - 0.5);  // ±2.5%
     const score = familyBonus * PRIORITY_WEIGHTS.familyBonus +
                   attrsScore * PRIORITY_WEIGHTS.attrsScore +
-                  colorScore * PRIORITY_WEIGHTS.colorScore;
+                  colorScore * PRIORITY_WEIGHTS.colorScore +
+                  lineageBonus * PRIORITY_WEIGHTS.lineageBonus + noise;
 
     familyCandidates[familyData.new_folder] = {
       score: Math.max(0.01, score),
       attrsScore,
       colorScore,
       familyBonus,
+      lineageBonus,
+      noise,
       bestProfile: {
         family: familyData.new_folder,
         filename: `001_${familyData.new_folder}.gif`,
@@ -137,88 +165,74 @@ export default function evolutionEngine(
     };
   });
 
-  console.log(`🎯 ${Object.keys(familyCandidates).length} candidats LVL${targetLevel}`);
+  console.log(`🎯 ${Object.keys(familyCandidates).length} candidats LVL${targetLevel} (SEED: ${walletAddress.slice(0,8)}-${finalTokenId})`);
 
-  // ✅ TOP 1 (comme simulateur)
+  // ✅ TOP 1 (déterministe par seed → unique!)
   const sorted = Object.entries(familyCandidates)
     .sort((a: any, b: any) => b[1].score - a[1].score);
   const [selectedFamilyKey, selectedData] = sorted[0];
   const selectedFamilyData = selectedData.metadata;
 
-  // 🔥 RETOUR 35+ ATTRIBUTS (comme admin)
-const spriteFilename = `001_${selectedFamilyData.new_folder}.gif`;
-const familyKey = selectedFamilyData.new_folder;
+  // 🔥 RETOUR 35+ ATTRIBUTS
+  const spriteFilename = `001_${selectedFamilyData.new_folder}.gif`;
+  const familyKey = selectedFamilyData.new_folder;
 
-// 🔥 PROFIL COULEUR EXACT (comme admin)
-const colorProfile = colorProfilesByFamily[familyKey]?.find(
-  (p: any) => p.filename === spriteFilename
-) || colorProfilesByFamily[familyKey]?.[0];
+  const colorProfile = colorProfilesByFamily[familyKey]?.find(
+    (p: any) => p.filename === spriteFilename
+  ) || colorProfilesByFamily[familyKey]?.[0];
 
-// ✅ ATTRIBUTS MORPHO (15 traits)
-const morphoAttributes = selectedFamilyData.attributes || [];
+  const morphoAttributes = selectedFamilyData.attributes || [];
+  const insectAttributes = [
+    ...morphoAttributes,
+    { trait_type: "Famille", value: familyKey },
+    { trait_type: "DisplayName", value: selectedFamilyData.display_name },
+    { trait_type: "Lore", value: selectedFamilyData.lore },
+    { trait_type: "TotalFamille", value: selectedFamilyData.total_in_family },
+    { trait_type: "Sprite", value: spriteFilename }
+  ];
 
-// 🔥 MÉTAS INSECTE
-const insectAttributes = [
-  ...morphoAttributes,
-  { trait_type: "Famille", value: familyKey },
-  { trait_type: "DisplayName", value: selectedFamilyData.display_name },
-  { trait_type: "Lore", value: selectedFamilyData.lore },
-  { trait_type: "TotalFamille", value: selectedFamilyData.total_in_family },
-  { trait_type: "Sprite", value: spriteFilename }
-];
+  const colorAttributes = colorProfile ? [
+    { trait_type: "Couleur1", value: colorProfile.dominant_colors.hex[0] },
+    { trait_type: "Couleur2", value: colorProfile.dominant_colors.hex[1] },
+    { trait_type: "Couleur3", value: colorProfile.dominant_colors.hex[2] },
+    { trait_type: "Couleur4", value: colorProfile.dominant_colors.hex[3] },
+    { trait_type: "Couleur5", value: colorProfile.dominant_colors.hex[4] },
+    { trait_type: "Teinte", value: Math.round(colorProfile.hsv.mean[0]) + "°" },
+    { trait_type: "Saturation", value: Math.round(colorProfile.hsv.mean[1] * 100) + "%" },
+    { trait_type: "Luminosité", value: Math.round(colorProfile.hsv.mean[2] * 100) + "%" },
+    { trait_type: "Colorful", value: Math.round(colorProfile.metrics.colorfulness * 100) + "%" },
+    { trait_type: "Contraste", value: Math.round(colorProfile.metrics.contrast) },
+    { trait_type: "Nettete", value: Math.round(colorProfile.metrics.sharpness || 0) },
+    { trait_type: "Entropie", value: Math.round((colorProfile.metrics.entropy || 0) * 10) / 10 },
+    { trait_type: "Frames", value: colorProfile.frame_count || 2 },
+    { trait_type: "Pixels", value: (colorProfile.total_pixels_analyzed || 60000).toLocaleString() },
+    { trait_type: "TailleBytes", value: ((colorProfile.gif_info?.size_bytes || 35000) / 1000).toFixed(1) + "KB" }
+  ] : [];
 
-// 🔥 COULEURS MAX (20+ traits OpenSea)
-const colorAttributes = colorProfile ? [
-  // 🎨 COULEURS DOMINANTES (Top 5)
-  { trait_type: "Couleur1", value: colorProfile.dominant_colors.hex[0] },
-  { trait_type: "Couleur2", value: colorProfile.dominant_colors.hex[1] },
-  { trait_type: "Couleur3", value: colorProfile.dominant_colors.hex[2] },
-  { trait_type: "Couleur4", value: colorProfile.dominant_colors.hex[3] },
-  { trait_type: "Couleur5", value: colorProfile.dominant_colors.hex[4] },
+  const fullAttributes = [
+    ...insectAttributes.filter(attr => !["Niveau"].includes(attr.trait_type as string)),
+    { trait_type: "Niveau", value: targetLevel },
+    ...colorAttributes
+  ];
 
-  // 🌈 HSV COMPLET
-  { trait_type: "Teinte", value: Math.round(colorProfile.hsv.mean[0]) + "°" },
-  { trait_type: "Saturation", value: Math.round(colorProfile.hsv.mean[1] * 100) + "%" },
-  { trait_type: "Luminosité", value: Math.round(colorProfile.hsv.mean[2] * 100) + "%" },
+  console.log(`🚀 LVL${targetLevel}: ${fullAttributes.length} attributs (SEED ${walletAddress.slice(0,8)}-${finalTokenId})`);
 
-  // 📊 MÉTRIQUES TECHNIQUES
-  { trait_type: "Colorful", value: Math.round(colorProfile.metrics.colorfulness * 100) + "%" },
-  { trait_type: "Contraste", value: Math.round(colorProfile.metrics.contrast) },
-  { trait_type: "Nettete", value: Math.round(colorProfile.metrics.sharpness || 0) },
-  { trait_type: "Entropie", value: Math.round((colorProfile.metrics.entropy || 0) * 10) / 10 },
+  const imageUrl = getRealImagePath(selectedFamilyData, targetLevel);
 
-  // 🎬 TECH GIF
-  { trait_type: "Frames", value: colorProfile.frame_count || 2 },
-  { trait_type: "Pixels", value: (colorProfile.total_pixels_analyzed || 60000).toLocaleString() },
-  { trait_type: "TailleBytes", value: ((colorProfile.gif_info?.size_bytes || 35000) / 1000).toFixed(1) + "KB" }
-] : [];
-
-const fullAttributes = [
-  ...insectAttributes.filter(attr => !["Niveau"].includes(attr.trait_type as string)),
-  { trait_type: "Niveau", value: targetLevel },
-  ...colorAttributes
-];
-
-console.log(`🚀 LVL${targetLevel}: ${fullAttributes.length} attributs OpenSea générés !`);
-
-const imageUrl = getRealImagePath(selectedFamilyData, targetLevel);
-
-return {
-  success: true,
-  imageUrl,
-  level: targetLevel,
-  family: familyKey,                           // ✅ "Chronyx"
-  sprite_name: spriteFilename,                 // ✅ "001_Chronyx.gif"
-  display_name: selectedFamilyData.display_name,
-  lore: selectedFamilyData.lore,
-
-  // 🔥 35+ ATTRIBUTS PRÊTS OpenSea
-  attributes: fullAttributes,                  // ✅ Morpho + 20+ couleur
-  color_profile: colorProfile,                 // ✅ Full HSV/RGB/HEX
-
-  evolution_score: selectedData.score,
-  best_profile: selectedData.bestProfile,
-  all_candidates: familyCandidates,
-  probability: selectedData.score / Object.values(familyCandidates).reduce((sum: number, c: any) => sum + c.score, 0)
-};
+  return {
+    success: true,
+    imageUrl,
+    level: targetLevel,
+    family: familyKey,
+    sprite_name: spriteFilename,
+    display_name: selectedFamilyData.display_name,
+    lore: selectedFamilyData.lore,
+    attributes: fullAttributes,
+    color_profile: colorProfile,
+    evolution_score: selectedData.score,
+    best_profile: selectedData.bestProfile,
+    all_candidates: familyCandidates,
+    seed_info: { wallet: walletAddress.slice(0,8), tokenId: finalTokenId },
+    probability: selectedData.score / Object.values(familyCandidates).reduce((sum: number, c: any) => sum + c.score, 0)
+  };
 }

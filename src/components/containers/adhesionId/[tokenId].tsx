@@ -111,6 +111,8 @@ const TokenPage = () => {
   const [price, setPrice] = useState<string>('');
   const [isForSale, setIsForSale] = useState<boolean>(false);
   const [nftCache, setNFTCache] = useState<{ [key: string]: NFTData }>({});
+  const [renewPriceEth, setRenewPriceEth] = useState<string | null>(null);
+
 
   const [evolutionRefreshFlag, setEvolutionRefreshFlag] = useState<number>(0);
 
@@ -130,6 +132,30 @@ const TokenPage = () => {
 
   const formatDateTime = (ts: number) =>
     new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' });
+
+
+//recupération du prix de renouvellement
+useEffect(() => {
+  if (!contractAdhesion || !router.isReady) return;
+
+  const loadRenewPrice = async () => {
+    try {
+      const provider = new JsonRpcProvider(
+        process.env.NEXT_PUBLIC_URL_SERVER_MORALIS
+      );
+
+      const contract = new EthersContract(contractAdhesion, ABI, provider);
+
+      const priceWei = await contract.mintPrice();
+      setRenewPriceEth(formatUnits(priceWei, "ether"));
+    } catch (err) {
+      console.error("Erreur chargement prix renouvellement", err);
+      setRenewPriceEth(null);
+    }
+  };
+
+  loadRenewPrice();
+}, [contractAdhesion, router.isReady]);
 
   // FETCH NFT de base
   useEffect(() => {
@@ -290,10 +316,19 @@ const fetchNFTData = async (
     try {
       const contract = new (authWeb3 as Web3).eth.Contract(ABI as any, contractAdhesion);
       const mintPriceWei: string = await contract.methods.mintPrice().call();
+      const gas = await contract.methods
+        .renewMembership(Number(tokenId))
+        .estimateGas({
+          from: authAddress,
+          value: mintPriceWei,
+        });
+
       await contract.methods.renewMembership(Number(tokenId)).send({
         from: authAddress,
         value: mintPriceWei,
+        gas: Math.floor(Number(gas) * 1.2).toString(),
       });
+
       alert('Adhésion renouvelée avec succès.');
       const updated = await fetchNFTData(contractAdhesion, Number(tokenId));
       setNftData(updated);
@@ -474,10 +509,15 @@ const fetchNFTData = async (
 
 
               {isOwner && (
-                <Button colorScheme="blue" mt={4} onClick={handleRenewMembership}>
-                  Renouveler adhésion
+                <Button
+                  colorScheme="blue"
+                  mt={4}
+                  onClick={handleRenewMembership}
+                >
+                  Renouveler adhésion – {renewPriceEth} ETH
                 </Button>
               )}
+
 
               <Divider my={6} borderColor="purple.700" w="95%" mx="auto" />
 

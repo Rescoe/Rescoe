@@ -7,11 +7,15 @@ import ABIRESCOLLECTION from '@/components/ABI/ABI_Collections.json';
 import ABIMasterFactory from '@/components/ABI/Factories/ABI_MasterFactory.json';
 import ABI_ART_FACTORY from '@/components/ABI/Factories/ABI_ART_FACTORY.json';
 import ABI_POESIE_FACTORY from '@/components/ABI/Factories/ABI_POESIE_FACTORY.json';
+import ABI_Adhesion from '@/components/ABI/ABIAdhesion.json';
+
 import axios from "axios";
 import Web3 from "web3";
 
 const CreateCollection: React.FC = () => {
   const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT as string;
+  const contratAdhesion = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS as string;
+
   const masterFactoryAddress = process.env.NEXT_PUBLIC_MASTERFACTORY_CONTRACT as string;
   const { web3, address, isAuthenticated } = useAuth();
   const toast = useToast();
@@ -115,45 +119,75 @@ const CreateCollection: React.FC = () => {
       return;
     }
 
-    if (!address ||! web3) {
-      console.error("Erreur Web3 || Wallet");
+    if (!address || !web3) {
+      console.error("Erreur Web3 Wallet");
       return;
     }
 
     setIsUploading(true);
-    const factoryAddress = await fetchFactoryAddress(collectionType);
-    const factoryABI = collectionType === "Art" ? ABI_ART_FACTORY : ABI_POESIE_FACTORY;
-    const factoryContract = new web3.eth.Contract(factoryABI as any, factoryAddress);
-
-    const gasPrice = await web3.eth.getGasPrice();
 
     try {
+      // 1. Récupère l'adresse de la factory
+      const factoryAddress = await fetchFactoryAddress(collectionType!);
+      console.log("🏭 Factory address:", factoryAddress);
+
+      // 2. ABI selon le type
+      const factoryABI = collectionType === "Art" ? ABI_ART_FACTORY : ABI_POESIE_FACTORY;
+      const factoryContract = new web3.eth.Contract(factoryABI as any, factoryAddress);
+
+      // 3. Upload image → IPFS
       const imageUrl = await uploadFile(file);
-      const metadataUrl = await uploadMetadata({ ...metadata, image: imageUrl, maxEditions: collectionType === "Art" ? maxEditions : null });
 
-      setIpfsUrl(metadataUrl);
+      // 4. Prépare royalties
+      const collaborators = splitRoyalties
+        ? royaltyData.map(r => r.address)
+        : [address!]; // 100% créateur si pas de split
 
-      // Handle royalties
-      const collaborators = splitRoyalties ? royaltyData.map(r => r.address) : [address || ""];
-      const percents = splitRoyalties ? royaltyData.map(r => Number(r.value)) : [90];
+      const percents = splitRoyalties
+        ? royaltyData.map(r => Number(r.value))
+        : [90]; // 90% max (reste association)
 
+      console.log("👥 Royalties:", { collaborators, percents });
+
+      // 5. ✅ CONFIGURE COLLECTION (CORRECT !)
       const tx = await handleMessageTransactions(
         factoryContract.methods
-          .configureCollection(metadata.name, maxEditions, collaborators, percents)
-          .send({ from: address,
-            gasPrice: gasPrice.toString(),  // <-- force string
-            maxFeePerGas: null as any,       // TS ok
-            maxPriorityFeePerGas: null as any
-           }),
+          .configureCollection(  // ← CORRECT : configureCollection PAS configureUserCollection
+            metadata.name,
+            Number(maxEditions),
+            collaborators,
+            percents
+          )
+          .send({ from: address! }),
         toast,
-        "Configuration temporaire appliquée ✅",
-        "Échec configuration"
+        "Configuration appliquée"
       );
 
+      console.log("✅ Configuration TX:", tx.transactionHash);
 
-    } catch (err) {
-      console.error('Erreur upload IPFS:', err);
-      alert("Erreur lors de l'upload vers IPFS : ");
+      // 6. Upload metadata → IPFS
+      const fullMetadata = {
+        ...metadata,
+        image: imageUrl,
+        maxEditions: collectionType === "Art" ? maxEditions : null
+      };
+
+      const metadataUrl = await uploadMetadata(fullMetadata);
+      setIpfsUrl(metadataUrl);
+
+      toast({
+        title: "✅ Configuration sauvegardée",
+        description: `IPFS: ${metadataUrl.slice(0, 50)}...`,
+        status: "success"
+      });
+
+    } catch (err: any) {
+      console.error("❌ Erreur upload IPFS:", err);
+      toast({
+        title: "❌ Erreur configuration",
+        description: err.message || "Upload échoué",
+        status: "error"
+      });
     } finally {
       setIsUploading(false);
     }
@@ -237,53 +271,143 @@ const CreateCollection: React.FC = () => {
     });
   };
 
-
   const handleCreateCollection = async (): Promise<void> => {
-    if (!metadata.name || !ipfsUrl) {
-      toast({ title: "Erreur", description: "Nom et image requis", status: "error" });
-      return;
-    }
+    if (!address || !web3) throw new Error("Web3 non disponible");
 
-    setLoading(true);
+    const rescoeContract = new web3.eth.Contract(ABIRESCOLLECTION as any, contractRESCOLLECTION);
+    const adhesionContract = new web3.eth.Contract(ABI_Adhesion as any, contratAdhesion);
+    const toastPrefix = "🚨 [handleCreateCollection]";
+/*
+    console.log("=== 🔍 DEBUG COMPLET createCollection ===");
+    console.log("1. collectionName:", metadata.name);
+    console.log("2. ipfsUrl:", ipfsUrl);
+    console.log("3. collectionType:", collectionType);
+    console.log("4. address:", address);
+    console.log("5. ResCollections:", contractRESCOLLECTION);
+*/
     try {
-      const tx = await createCollection();
-      toast({ title: "Succès", description: `Collection créée ! TX: ${tx.transactionHash}`, status: "success" });
-    } catch (err) {
-      console.error("Erreur création : ", err);
+      // 🔹 1. VÉRIF ADHÉSION EXTERNE (via getUserInfo direct)
+      console.log("🔹 1. ADHÉSION EXTERNE...");
+      const userInfo: [boolean, any, any] = await adhesionContract.methods.getUserInfo(address).call() as any;
+
+      console.log("✅ getUserInfo:", userInfo[0]);
+      if (!userInfo[0]) throw new Error("❌ NO ADHESION");
+
+      // 🔹 2. VÉRIF COMPTEURS EXACTS (fonctions PUBLIQUES)
+      console.log("🔹 2. COMPTEURS PUBLICS...");
+      const balance = await rescoeContract.methods.checkUserAdhesionNumber(address).call();
+      const count = await rescoeContract.methods.getNumberOfCollectionsByUser(address).call();
+      const remaining = await rescoeContract.methods.getRemainingCollections(address).call();
+
+/*
+      console.log("💰 checkUserAdhesionNumber:", balance);
+      console.log("📊 getNumberOfCollectionsByUser:", count);
+      console.log("🎯 getRemainingCollections:", remaining);
+      console.log("✅ balance > count?", Number(balance) > Number(count));
+*/
+      if (Number(balance) <= Number(count)) throw new Error(`❌ NO REMAINING: ${balance} <= ${count}`);
+
+      // 🔹 3. VÉRIF TYPE (PUBLIC mapping)
+      const typeOK = await rescoeContract.methods.allowedCollectionTypes(collectionType).call();
+      console.log("✅ allowedCollectionTypes:", typeOK);
+      if (!typeOK) throw new Error("❌ INVALID TYPE");
+
+      // 🔹 4. VÉRIF FACTORY + CONFIG (Art seulement)
+      let artFactoryAddr: string;
+      if (collectionType === "Art") {
+        artFactoryAddr = await fetchFactoryAddress("Art");
+        console.log("🏭 MasterFactory:", masterFactoryAddress);
+        console.log("🎨 ArtFactory (front):", artFactoryAddr);
+
+        const artFactory = new web3.eth.Contract(ABI_ART_FACTORY as any, artFactoryAddr);
+
+        const cfg: [bigint, string[], bigint[], boolean] = await artFactory.methods.getUserCollectionConfig(address, metadata.name).call() as any;
+
+
+
+        if (!cfg[3]) throw new Error("❌ CONFIG MANQUANTE");
+      }
+
+      // 🔹 5. FACTORY DANS RESCOE (CRITIQUE !)
+      const rescoeFactoryAddr: string = await rescoeContract.methods.factoryContractAddress().call() as string;
+
+
+      if (!metadata.name || !ipfsUrl) throw new Error("❌ Nom et IPFS requis");
+
+      // 🔹 6. SIMULATION CALL (seulement les fonctions PUBLIQUES)
+      web3.eth.handleRevert = true;
+
+      // Estimate gas (simulation sans exécution complète)
+      const gasEstimate = await rescoeContract.methods.createCollection(metadata.name, ipfsUrl, collectionType)
+        .estimateGas({ from: address });
+      console.log("⛽ Gas estimate:", gasEstimate.toString());
+
+      console.log(`${toastPrefix} ✅ ALL PRE-CHECKS PASSED → CREATE COLLECTION`);
+      setLoading(true);
+
+      const gasPrice = await web3.eth.getGasPrice();
+/*
+console.log("💡 TX PARAMS:");
+console.log("- From (EOA):", address);
+console.log("- ResCollections:", contractRESCOLLECTION);
+console.log("- MasterFactory:", masterFactoryAddress);
+console.log("- Gas:", Math.floor(Number(gasEstimate) * 1.2));
+console.log("- Gas price:", gasPrice.toString());
+
+// 🔹 DEBUG CALLER ATTENDU
+console.log("🔍 QUI EST APPELÉ PAR QUI ?");
+console.log("1. EOA (toi) → ResCollections.createCollection()");
+console.log("2. ResCollections →", await rescoeContract.methods.factoryContractAddress().call());
+console.log("3. ???? → ArtFactory.createDynamicCollection()");
+console.log("   ↓ msg.sender dans ArtFactory sera ÇA");
+
+console.log("\n🎯 Dans ArtFactory, require(msg.sender == X):");
+console.log("✅ X = ResCollections:", contractRESCOLLECTION);
+console.log("❌ X ≠ EOA:", address);
+console.log("❌ X ≠ MasterFactory:", masterFactoryAddress);
+*/
+// 🔹 7. TRANSACTION REELLE
+const tx = await handleMessageTransactions(
+  rescoeContract.methods.createCollection(metadata.name, ipfsUrl, collectionType)
+    .send({
+      from: address,
+      gas: Math.floor(Number(gasEstimate) * 1.2).toString(),
+      gasPrice: gasPrice.toString()
+    }),
+  toast,
+  "Collection créée ✅"
+);
+
+
+      console.log("🎉 TX SUCCESS:", tx.transactionHash);
+      toast({
+        title: "🎉 Succès",
+        description: `Collection "${metadata.name}" créée ! TX: ${tx.transactionHash.slice(0, 10)}...`,
+        status: "success",
+      });
+
+      // 🔹 8. REFRESH
+      await Promise.all([fetchCollections(address), fetchStatsCollection(address)]);
+      setIpfsUrl(null);
+      setMetadata({ name: "", description: "", tags: "" });
+
+    } catch (err: any) {
+      console.error(`${toastPrefix} ❌ FULL ERROR STACK:`);
+      console.error("- message:", err.message);
+      console.error("- reason:", err.reason);
+      console.error("- code:", err.code);
+      console.error("- data:", err.data);
+
+      toast({
+        title: "❌ Erreur création",
+        description: err.reason || err.message || "Erreur inconnue",
+        status: "error",
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const createCollection = async (): Promise<any> => {
-
-    if (!address ||! web3) {
-      console.error("Erreur Web3 || Wallet");
-      throw new Error("Web3 non disponible");
-    }
-
-
-    const accounts = await web3.eth.getAccounts();
-    const from = accounts[0];
-    const factoryAddress = await fetchFactoryAddress(collectionType);
-    const factoryABI = collectionType === "Art" ? ABI_ART_FACTORY : ABI_POESIE_FACTORY;
-    const factoryContract = new web3.eth.Contract(factoryABI as any, factoryAddress);
-    const rescoeContract = new web3.eth.Contract(ABIRESCOLLECTION as any, contractRESCOLLECTION);
-
-    const gasPrice = await web3.eth.getGasPrice();
-
-    return handleMessageTransactions(
-      rescoeContract.methods.createCollection(metadata.name, ipfsUrl, collectionType)
-      .send({ from: address,
-        gasPrice: gasPrice.toString(),  // <-- force string
-        maxFeePerGas: null as any,       // TS ok
-        maxPriorityFeePerGas: null as any
-       }),
-      toast,
-      "Collection créée 🎉",
-      "Échec création"
-    );
-  };
 
   // Render UI
   return (
