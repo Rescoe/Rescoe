@@ -382,7 +382,17 @@ const handleConfirmRole = async () => {
           objectFit="cover"
           mx="auto"
         />
-
+        {/*
+        <Image
+          src="/OEUFS/OEUF1.gif"
+          alt="Badge d'adhésion animé"
+          borderRadius="md"
+          mb={4}
+          boxSize="300px"
+          objectFit="cover"
+          mx="auto"
+        />
+        */}
         <Button onClick={onToggle} width="full" mb={4}>
           {isOpen ? "Masquer les détails" : "Voir les détails de l'adhésion"}
         </Button>

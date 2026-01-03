@@ -20,7 +20,15 @@ import {
   TabPanels,
   TabPanel,
   Divider,
+  SimpleGrid,
+  Center,        // ← AJOUTE ÇA
+  Alert,
+  AlertIcon,
+  Icon,
+  Link,
 } from '@chakra-ui/react';
+import { FaCheckCircle } from 'react-icons/fa';
+
 import { useRouter } from 'next/router';
 
 import ABI from '@/components/ABI/ABIAdhesionEvolve.json'; // nouvelle ABI
@@ -30,9 +38,16 @@ import { PublicProfile } from "@/components/containers/dashboard";
 import genInsect25 from '@/utils/GenInsect25';
 import { usePinataUpload } from '@/hooks/usePinataUpload';
 
+import { useHatchEgg } from '@/hooks/useHatchEgg';
+
 import { useTokenEvolution } from '@/hooks/useTokenEvolution';
 import { buildEvolutionHistory } from '@/utils/evolutionHistory';
 import CopyableAddress from "@/hooks/useCopyableAddress";
+
+import { useReproduction } from '@/hooks/useReproduction';
+import { ReproductionPanel, ParentSelector } from '@/components/Reproduction';
+
+
 
 import  EvolutionHistoryTimeline  from '@/utils/EvolutionHistoryTimeline'
 
@@ -41,15 +56,17 @@ interface NFTData {
   owner: string;
   role: number;
   mintTimestamp: string;
-  price: string; // en ETH (string lisible)
+  price: string;
   name: string;
   bio: string;
-  remainingTime: string; // déjà formaté (Xj Yh...)
+  remainingTime: string;
   fin: string;
   forSale: boolean;
   membership: string;
   image?: string;
+  membershipInfo?: MembershipInfo;  // ✅ AJOUTÉ
 }
+
 
 interface MembershipInfo {
   level: number;
@@ -58,6 +75,7 @@ interface MembershipInfo {
   expirationTimestamp: number;
   totalYears: number;
   locked: boolean;
+  isEgg: boolean;
 }
 
 interface EvolutionMetadata {
@@ -77,7 +95,16 @@ interface EvolutionMetadata {
   [key: string]: unknown;
 }
 
-
+interface TokenWithMeta {
+  tokenId: number;
+  owner: string;
+  membershipInfo: MembershipInfo;
+  metadata: EvolutionMetadata | null;
+  tokenURI: string;
+  image: string | undefined;
+  name: string;
+  roleLabel: string;
+}
 
 const roles: { [key: number]: string } = {
   0: "Artist",
@@ -100,6 +127,8 @@ const TokenPage = () => {
   const router = useRouter();
   const { tokenId } = router.query;
 
+
+
   const { address: authAddress, web3: authWeb3 } = useAuth();
 
   const [nftData, setNftData] = useState<NFTData | null>(null);
@@ -113,8 +142,21 @@ const TokenPage = () => {
   const [nftCache, setNFTCache] = useState<{ [key: string]: NFTData }>({});
   const [renewPriceEth, setRenewPriceEth] = useState<string | null>(null);
 
-
   const [evolutionRefreshFlag, setEvolutionRefreshFlag] = useState<number>(0);
+  const [reproRefreshFlag, setReproRefreshFlag] = useState<number>(0);
+
+  // Dans le composant, après useTokenEvolution :
+  const reproduction = useReproduction({
+    contractAddress: contractAdhesion,
+    roleLabelResolver: (role: number) => roleLabels[roles[role]] || "Member",
+  });
+
+  // Hook UNIQUEMENT si œuf (évite appel inutile)
+const hatch = nftData?.membershipInfo?.isEgg
+  ? useHatchEgg(contractAdhesion, Number(tokenId))
+  : null;
+
+//  const hatch = useHatchEgg(contractAdhesion, Number(tokenId));
 
 
   function formatSeconds(seconds: number): string {
@@ -186,6 +228,7 @@ useEffect(() => {
 
 
 
+
 // Usage
 
 const {
@@ -209,6 +252,7 @@ const {
   currentRoleLabel: nftData ? (roles[nftData.role] || "Member") : "Member",
   onMetadataLoaded: (metadata: EvolutionMetadata) => console.log("Metadata loaded:", metadata) // Optionnel
 });
+
 
 
 
@@ -237,14 +281,6 @@ const fetchNFTData = async (
         forSale,
       ] = await contract.getTokenDetails(tokenIdNumber);
 
-      console.log(owner,
-      role,
-      mintTimestamp,
-      priceWei,
-      nameOnChain,
-      bioOnChain,
-      remainingTime,
-      forSale);
 
       const [membership, realName, realBio] = await contract.getUserInfo(owner);
 
@@ -271,6 +307,12 @@ const fetchNFTData = async (
         membership,
       };
 
+
+
+            console.log("membership", membership);
+
+      console.log("nftData");
+      console.log(nftData);
 
       console.log("uri");
 
@@ -451,6 +493,84 @@ const fetchNFTData = async (
     ? evolutionHistory[evolutionHistory.length - 1].image
     : nftData.image;
 
+
+    const HatchEggPanel = ({ tokenId, hatch, contractAddress }: any) => {
+  if (hatch.error) {
+    return (
+      <Alert status="warning" mb={4}>
+        <AlertIcon />
+        {hatch.error}
+      </Alert>
+    );
+  }
+
+  return (
+    <Box p={6} bg="yellow.50" borderRadius="lg">
+      <Heading size="lg" mb={6}>🥚 ÉCLORE L'ŒUF #{tokenId}</Heading>
+
+      {/* 3 OPTIONS */}
+      <SimpleGrid columns={3} spacing={6} mb={8}>
+        {hatch.evolutionOptions.map((opt: any) => (
+          <Box key={opt.id}
+            borderWidth={3}
+            borderColor={hatch.selectedEvolution?.id === opt.id ? "green.400" : "gray.300"}
+            borderRadius="lg"
+            p={6}
+            cursor="pointer"
+            _hover={{ shadow: "xl", transform: "scale(1.05)" }}
+            transition="all 0.2s"
+            onClick={() => hatch.setSelectedEvolution(opt)}
+            bg="white"
+          >
+            <Image
+              src={opt.imageUrl}
+              w="full"
+              h={28}
+              objectFit="cover"
+              borderRadius="md"
+              mb={3}
+            />
+            <Heading size="sm" noOfLines={1}>{opt.displayName}</Heading>
+            <Text fontSize="xs" color="gray.500">{opt.family}</Text>
+          </Box>
+        ))}
+      </SimpleGrid>
+
+      <Button
+        colorScheme="green"
+        size="xl"
+        h={16}
+        fontSize="lg"
+        isLoading={hatch.isHatching}
+        loadingText="Éclosion en cours..."
+        onClick={hatch.hatchEgg}
+        disabled={!hatch.isReady}
+        w="full"
+        boxShadow="lg"
+      >
+        {hatch.isHatching
+          ? "Éclosion..."
+          : `ÉCLORE INSECTE → ${hatch.selectedEvolution?.displayName || "Choisir"}`
+        }
+      </Button>
+
+      {hatch.txHash && (
+        <HStack mt={6} p={4} bg="green.50" borderRadius="md">
+          <Icon as={FaCheckCircle} color="green.500" boxSize={6} />
+          <Text fontWeight="bold" color="green.700">Succès !</Text>
+          <Link href={`https://sepolia.etherscan.io/tx/${hatch.txHash}`} isExternal>
+            <Text fontSize="sm" color="blue.500" fontFamily="mono">
+              {hatch.txHash.slice(0,20)}...
+            </Text>
+          </Link>
+        </HStack>
+      )}
+    </Box>
+  );
+};
+
+
+
   return (
     <Box
       textAlign="center"
@@ -477,6 +597,9 @@ const fetchNFTData = async (
           {isOwner && <Tab>Mise à jour</Tab>}
           {!isOwner && canPurchase && <Tab>Achat</Tab>}
           {isOwner && <Tab>Évolutions</Tab>}
+          {isOwner && <Tab>Reproduction</Tab>}
+          {nftData?.membershipInfo?.isEgg && <Tab>🥚 Éclosion</Tab>}
+
         </TabList>
 
         <TabPanels>
@@ -506,7 +629,6 @@ const fetchNFTData = async (
               {evolutionHistory.length > 0 && (
                 <EvolutionHistoryTimeline evolutionHistory={evolutionHistory} />
               )}
-
 
               {isOwner && (
                 <Button
@@ -598,6 +720,7 @@ const fetchNFTData = async (
                   <Text><strong>Début de ce niveau :</strong> {formatDateTime(membershipInfo.startTimestamp)}</Text>
                   <Text><strong>Expiration actuelle :</strong> {formatDateTime(membershipInfo.expirationTimestamp)}</Text>
                   <Text><strong>État :</strong> {membershipInfo.locked ? "Verrouillé" : "Ouvert"}</Text>
+                  <Text><strong>Oeuf :</strong> {nftData?.membershipInfo?.isEgg ? "Oui" : "Non"}</Text>
 
                   <Divider my={4} />
 
@@ -651,8 +774,41 @@ const fetchNFTData = async (
                 <Text>Chargement des informations d'évolution…</Text>
               )}
             </TabPanel>
-
           )}
+
+          {/* Reproduction */}
+          {isOwner && (
+            <TabPanel>
+              <Heading as="h2" fontSize="xl" mb={6}>Reproduction</Heading>
+
+              {reproduction.isLoadingEligible ? (
+                <Center p={12}>
+                  <Spinner size="lg" />
+                  <Text ml={4}>Chargement tokens éligibles...</Text>
+                </Center>
+              ) : (
+
+
+                  <ReproductionPanel
+                    reproduction={reproduction}
+                    renewPriceEth={renewPriceEth}
+                  />
+
+              )}
+            </TabPanel>
+          )}
+
+          {/* Éclosion ŒUF */}
+{nftData?.membershipInfo?.isEgg && (
+  <TabPanel>
+    <HatchEggPanel
+      tokenId={Number(tokenId)}
+      hatch={hatch}
+      contractAddress={contractAdhesion}
+    />
+  </TabPanel>
+)}
+
         </TabPanels>
       </Tabs>
     </Box>
