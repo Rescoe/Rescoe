@@ -85,6 +85,8 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
     const randomNft = nfts[Math.floor(Math.random() * nfts.length)];
     const randomHaiku = haikus[Math.floor(Math.random() * haikus.length)];
 
+    console.log(randomHaiku);
+    
     setSelectedNft(randomNft);
     setSelectedHaiku(randomHaiku);
 

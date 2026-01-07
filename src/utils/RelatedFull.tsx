@@ -51,7 +51,7 @@ const RelatedFull: React.FC<Props> = ({ nft, allNFTs, title }) => {
         justifyItems="center"
         maxW="1200px"
         mx="auto"
-      > 
+      >
         {relatedNFTs.map((item, i) => (
           <VStack
           key={`${item.content.mintContractAddress}-${item.content.tokenId}-${i}`}

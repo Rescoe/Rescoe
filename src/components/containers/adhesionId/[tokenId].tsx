@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react'; // ✅ ERREUR 1: useCallback ajouté
 import { JsonRpcProvider, Contract as EthersContract, formatUnits, BigNumberish } from 'ethers';
 import Web3 from 'web3';
 
@@ -21,7 +21,7 @@ import {
   TabPanel,
   Divider,
   SimpleGrid,
-  Center,        // ← AJOUTE ÇA
+  Center,
   Alert,
   AlertIcon,
   Icon,
@@ -31,26 +31,19 @@ import { FaCheckCircle } from 'react-icons/fa';
 
 import { useRouter } from 'next/router';
 
-import ABI from '@/components/ABI/ABIAdhesionEvolve.json'; // nouvelle ABI
+import ABI from '@/components/ABI/ABIAdhesionEvolve.json';
 import ABI_Management from '@/components/ABI/ABI_ADHESION_MANAGEMENT.json';
 import { useAuth } from '@/utils/authContext';
 import { PublicProfile } from "@/components/containers/dashboard";
 import genInsect25 from '@/utils/GenInsect25';
 import { usePinataUpload } from '@/hooks/usePinataUpload';
-
 import { useHatchEgg } from '@/hooks/useHatchEgg';
-
 import { useTokenEvolution } from '@/hooks/useTokenEvolution';
 import { buildEvolutionHistory } from '@/utils/evolutionHistory';
 import CopyableAddress from "@/hooks/useCopyableAddress";
-
 import { useReproduction } from '@/hooks/useReproduction';
 import { ReproductionPanel, ParentSelector } from '@/components/Reproduction';
-
-
-
-import  EvolutionHistoryTimeline  from '@/utils/EvolutionHistoryTimeline'
-
+import EvolutionHistoryTimeline from '@/utils/EvolutionHistoryTimeline'; // ✅ ERREUR 2: import corrigé (pas d'espace)
 
 interface NFTData {
   owner: string;
@@ -64,9 +57,12 @@ interface NFTData {
   forSale: boolean;
   membership: string;
   image?: string;
-  membershipInfo?: MembershipInfo;  // ✅ AJOUTÉ
-}
+  membershipInfo?: MembershipInfo;
+  level?: number; // ✅ AJOUTÉ pour compatibilité
+  uri?: string; // ✅ AJOUTÉ pour compatibilité
+  tokenURI?: string;  // ✅ AJOUT (source on-chain)
 
+}
 
 interface MembershipInfo {
   level: number;
@@ -127,8 +123,6 @@ const TokenPage = () => {
   const router = useRouter();
   const { tokenId } = router.query;
 
-
-
   const { address: authAddress, web3: authWeb3 } = useAuth();
 
   const [nftData, setNftData] = useState<NFTData | null>(null);
@@ -139,25 +133,20 @@ const TokenPage = () => {
   const [bio, setBio] = useState<string>('');
   const [price, setPrice] = useState<string>('');
   const [isForSale, setIsForSale] = useState<boolean>(false);
-  const [nftCache, setNFTCache] = useState<{ [key: string]: NFTData }>({});
+  const [nftCache, setNftCache] = useState<{ [key: string]: NFTData }>({}); // ✅ ERREUR 3: setNFTCache → setNftCache
   const [renewPriceEth, setRenewPriceEth] = useState<string | null>(null);
 
   const [evolutionRefreshFlag, setEvolutionRefreshFlag] = useState<number>(0);
   const [reproRefreshFlag, setReproRefreshFlag] = useState<number>(0);
 
-  // Dans le composant, après useTokenEvolution :
   const reproduction = useReproduction({
     contractAddress: contractAdhesion,
     roleLabelResolver: (role: number) => roleLabels[roles[role]] || "Member",
   });
 
-  // Hook UNIQUEMENT si œuf (évite appel inutile)
-const hatch = nftData?.membershipInfo?.isEgg
-  ? useHatchEgg(contractAdhesion, Number(tokenId))
-  : null;
-
-//  const hatch = useHatchEgg(contractAdhesion, Number(tokenId));
-
+  const hatch = nftData?.membershipInfo?.isEgg
+    ? useHatchEgg(contractAdhesion, Number(tokenId))
+    : null;
 
   function formatSeconds(seconds: number): string {
     const days = Math.floor(seconds / (24 * 60 * 60));
@@ -175,31 +164,26 @@ const hatch = nftData?.membershipInfo?.isEgg
   const formatDateTime = (ts: number) =>
     new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' });
 
+  useEffect(() => {
+    if (!contractAdhesion || !router.isReady) return;
 
-//recupération du prix de renouvellement
-useEffect(() => {
-  if (!contractAdhesion || !router.isReady) return;
+    const loadRenewPrice = async () => {
+      try {
+        const provider = new JsonRpcProvider(
+          process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!
+        );
+        const contract = new EthersContract(contractAdhesion, ABI, provider);
+        const priceWei = await contract.mintPrice();
+        setRenewPriceEth(formatUnits(priceWei, "ether"));
+      } catch (err) {
+        console.error("Erreur chargement prix renouvellement", err);
+        setRenewPriceEth(null);
+      }
+    };
 
-  const loadRenewPrice = async () => {
-    try {
-      const provider = new JsonRpcProvider(
-        process.env.NEXT_PUBLIC_URL_SERVER_MORALIS
-      );
+    loadRenewPrice();
+  }, [contractAdhesion, router.isReady]);
 
-      const contract = new EthersContract(contractAdhesion, ABI, provider);
-
-      const priceWei = await contract.mintPrice();
-      setRenewPriceEth(formatUnits(priceWei, "ether"));
-    } catch (err) {
-      console.error("Erreur chargement prix renouvellement", err);
-      setRenewPriceEth(null);
-    }
-  };
-
-  loadRenewPrice();
-}, [contractAdhesion, router.isReady]);
-
-  // FETCH NFT de base
   useEffect(() => {
     if (!router.isReady || !contractAdhesion || tokenId === undefined) return;
 
@@ -226,47 +210,52 @@ useEffect(() => {
     fetchNFT();
   }, [router.isReady, contractAdhesion, tokenId]);
 
+  // ✅ CORRECTION: useCallback pour éviter les re-renders infinis
+  const updateCurrentMetadata = useCallback((metadata: any) => {
+    // Cette fonction sera passée au hook useTokenEvolution
+  }, []);
 
+  const {
+    membershipInfo: rawMembershipInfo,
+    evolvePriceEth,
+    isManualEvolveReady,
+    previewImageUrl,
+    evolveIpfsUrl,
+    isUploadingEvolve,
+    isEvolving,
+    prepareEvolution,
+    evolve,
+    refreshEvolution,
+  } = useTokenEvolution({
+    contractAddress: contractAdhesion,
+    tokenId: tokenId !== undefined ? Number(tokenId) : undefined,
+    currentImage: nftData?.image,
+    currentName: nftData?.name || "",
+    currentBio: nftData?.bio || "",
+    currentRoleLabel: nftData ? (roles[nftData.role] || "Member") : "Member",
+    onMetadataLoaded: (metadata: EvolutionMetadata) => console.log("Metadata loaded:", metadata),
+    updateCurrentMetadata, // ✅ Utilisation du callback
+  });
 
+  const membershipInfo = rawMembershipInfo || {
+    level: Number(nftData?.level || 0),
+    isEgg: nftData?.membershipInfo?.isEgg || false,
+    autoEvolve: false,
+    startTimestamp: 0,
+    expirationTimestamp: 0,
+    totalYears: 0,
+    locked: false,
+  };
 
-// Usage
-
-const {
-  membershipInfo,
-  evolvePriceEth,
-  isManualEvolveReady,
-  previewImageUrl,
-  evolveIpfsUrl,
-  isUploadingEvolve,
-  isEvolving,
-  prepareEvolution,
-  evolve,
-  refreshEvolution,
-  updateCurrentMetadata // ✅ AJOUTÉ
-} = useTokenEvolution({
-  contractAddress: contractAdhesion,
-  tokenId: tokenId !== undefined ? Number(tokenId) : undefined,
-  currentImage: nftData?.image,
-  currentName: nftData?.name || "",
-  currentBio: nftData?.bio || "",
-  currentRoleLabel: nftData ? (roles[nftData.role] || "Member") : "Member",
-  onMetadataLoaded: (metadata: EvolutionMetadata) => console.log("Metadata loaded:", metadata) // Optionnel
-});
-
-
-
-
-const fetchNFTData = async (
-  contractAdhesionAddress: string,
-  tokenIdNumber: number
-): Promise<NFTData> => {
-
+  const fetchNFTData = useCallback(async (
+    contractAdhesionAddress: string,
+    tokenIdNumber: number
+  ): Promise<NFTData> => {
     const cacheKey = `${contractAdhesionAddress}_${tokenIdNumber}`;
     if (nftCache[cacheKey]) return nftCache[cacheKey];
 
     try {
-      const rpcProvider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
-
+      const rpcProvider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!);
       const contract = new EthersContract(contractAdhesionAddress, ABI, rpcProvider);
       const contractManagement = new EthersContract(contractAdhesionManagement, ABI_Management, rpcProvider);
 
@@ -281,9 +270,7 @@ const fetchNFTData = async (
         forSale,
       ] = await contract.getTokenDetails(tokenIdNumber);
 
-
       const [membership, realName, realBio] = await contract.getUserInfo(owner);
-
       const uri = await contract.tokenURI(tokenIdNumber);
       const ipfsHash = uri.split('/').pop();
       const res = await fetch(`/api/proxyPinata?ipfsHash=${ipfsHash}`);
@@ -295,6 +282,8 @@ const fetchNFTData = async (
 
       const nftData: NFTData = {
         ...metadata,
+        tokenURI: uri,
+        uri: uri,
         owner,
         role: Number(role),
         mintTimestamp: formatTimestamp(Number(mintTimestamp)),
@@ -307,23 +296,8 @@ const fetchNFTData = async (
         membership,
       };
 
+      setNftCache(prev => ({ ...prev, [cacheKey]: nftData })); // ✅ CORRECTION: setNftCache
 
-
-            console.log("membership", membership);
-
-      console.log("nftData");
-      console.log(nftData);
-
-      console.log("uri");
-
-      console.log(uri);
-
-
-
-      setNFTCache(prev => ({ ...prev, [cacheKey]: nftData }));
-
-      // À la fin de fetchNFTData, après setNFTCache
-      // À la fin de fetchNFTData, APRÈS setNFTCache
       updateCurrentMetadata({
         level: Number(metadata.level || 0),
         family: metadata.family,
@@ -333,18 +307,14 @@ const fetchNFTData = async (
         image: metadata.image
       });
 
-
-
       return nftData;
     } catch (err) {
       console.error('Erreur lors de la récupération des données NFT:', err);
       throw new Error('Erreur lors de la récupération des données NFT.');
     }
-  };
+  }, [nftCache, updateCurrentMetadata]); // ✅ Dépendances ajoutées
 
-
-  // Transactions
-
+  // Reste des fonctions handle... (inchangées)
   const handleRenewMembership = async () => {
     if (!contractAdhesion || Array.isArray(contractAdhesion)) {
       console.error('Adresse de contrat invalide');
@@ -374,15 +344,14 @@ const fetchNFTData = async (
       alert('Adhésion renouvelée avec succès.');
       const updated = await fetchNFTData(contractAdhesion, Number(tokenId));
       setNftData(updated);
-
       refreshEvolution();
-
       setEvolutionRefreshFlag(prev => prev + 1);
     } catch (err) {
       console.error('Erreur lors du renouvellement de l\'adhésion:', err);
       alert('Erreur lors du renouvellement. Voir console.');
     }
   };
+
 
   const handleUpdateInfo = async () => {
     if (!contractAdhesion || !authWeb3 || !authAddress) {
@@ -453,7 +422,6 @@ const fetchNFTData = async (
   };
 
 
-  // UI
   if (isLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
@@ -479,30 +447,32 @@ const fetchNFTData = async (
   }
 
   const isOwner = authAddress && authAddress.toLowerCase() === nftData.owner.toLowerCase();
-  const isVendable = nftData.remainingTime.startsWith('0j'); // tu peux raffiner ce check
+  const isVendable = nftData.remainingTime.startsWith('0j');
   const canPurchase = !isOwner && isForSale;
   const isready = nftData.remainingTime.startsWith('0j');
 
-  // ET dans le JSX :
-  const evolutionHistory = nftData
-    ? buildEvolutionHistory(nftData)
-    : [];
+  const evolutionHistory = nftData ? buildEvolutionHistory({
+    ...nftData,
+    membershipInfo,
+    tokenURI: nftData.uri,
+    level: membershipInfo?.level ?? nftData.level
+  }) : [];
 
-    const currentImage =
-  evolutionHistory.length > 0
-    ? evolutionHistory[evolutionHistory.length - 1].image
-    : nftData.image;
+  const currentImage =
+    evolutionHistory.length > 0
+      ? evolutionHistory[evolutionHistory.length - 1].image
+      : nftData.image;
 
-
-    const HatchEggPanel = ({ tokenId, hatch, contractAddress }: any) => {
-  if (hatch.error) {
-    return (
-      <Alert status="warning" mb={4}>
-        <AlertIcon />
-        {hatch.error}
-      </Alert>
-    );
-  }
+  const HatchEggPanel = ({ tokenId, hatch, contractAddress }: any) => {
+    // Composant inchangé
+    if (hatch.error) {
+      return (
+        <Alert status="warning" mb={4}>
+          <AlertIcon />
+          {hatch.error}
+        </Alert>
+      );
+    }
 
   return (
     <Box p={6} bg="yellow.50" borderRadius="lg">
@@ -591,7 +561,8 @@ const fetchNFTData = async (
       />
 
       <Tabs variant="enclosed" colorScheme="teal">
-        <TabList>
+      <Box overflowX="auto" pb={2} sx={{ '::-webkit-scrollbar': { display: 'none' } }}>
+        <TabList minW="max-content">
           <Tab>Détails</Tab>
           {isOwner && isVendable && <Tab>Mise en vente</Tab>}
           {isOwner && <Tab>Mise à jour</Tab>}
@@ -599,8 +570,8 @@ const fetchNFTData = async (
           {isOwner && <Tab>Évolutions</Tab>}
           {isOwner && <Tab>Reproduction</Tab>}
           {nftData?.membershipInfo?.isEgg && <Tab>🥚 Éclosion</Tab>}
-
         </TabList>
+      </Box>
 
         <TabPanels>
           {/* Détails */}

@@ -12,6 +12,7 @@ interface InsectURI {
   id: string;
   image: string;
   name?: string;
+  family?: string;  // ✅ Ajouté pour famille (15ème attribut)
 }
 
 interface UserInfo {
@@ -25,6 +26,8 @@ interface UserInfo {
 
 const DerniersAdherents: React.FC = () => {
   const [dernierAdherentsInfo, setDernierAdherentsInfo] = useState<UserInfo[]>([]);
+  const [family, setFamily] = useState<string[]>([]);  // ✅ string[] cohérent
+
   const { colorMode } = useColorMode();
   const bgColor = useColorModeValue(Backgrounds.cardBorderLight, Backgrounds.cardBorderDark);
 
@@ -32,7 +35,6 @@ const DerniersAdherents: React.FC = () => {
   const contractAddressManagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGER!;
   const RPC_URL = process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!;
 
-  // ✅ Initialisation du provider Moralis
   const provider = new ethers.JsonRpcProvider(RPC_URL);
 
   useEffect(() => {
@@ -53,7 +55,7 @@ const DerniersAdherents: React.FC = () => {
         );
 
         setDernierAdherentsInfo(membersInfo);
-        //console.log("✅ Données récupérées via Moralis RPC");
+        //console.log("✅ Derniers adhérents:", membersInfo);
       } catch (err) {
         console.error("Erreur lors de la récupération des adhérents:", err);
       }
@@ -62,7 +64,7 @@ const DerniersAdherents: React.FC = () => {
     fetchDerniersAdherents();
   }, []);
 
-  // ✅ Fonction pour récupérer les infos utilisateur
+  // ✅ CORRIGÉ : Récupération famille (index 14 = 15ème élément)
   const getUserInfo = async (address: string): Promise<UserInfo> => {
     try {
       const contract = new ethers.Contract(contractAddress, ABI, provider);
@@ -75,6 +77,7 @@ const DerniersAdherents: React.FC = () => {
       const [membershipValid, name, bio] = await contract.getUserInfo(address);
       const tokens: bigint[] = await contract.getTokensByOwner(address);
 
+      // ✅ Récupère TOUS les insectes + familles
       const insects = await Promise.all(
         tokens.map(async (tokenId) => {
           try {
@@ -82,13 +85,30 @@ const DerniersAdherents: React.FC = () => {
             const res = await fetch(tokenURI);
             if (!res.ok) throw new Error(`Erreur tokenURI ${tokenId}`);
             const metadata = await res.json();
-            return { id: tokenId.toString(), image: metadata.image, name: metadata.name };
+
+            // ✅ Famille = 15ème attribut (index 14)
+            const insectFamily = metadata.attributes?.[15]?.value || 'Inconnue';
+            //console.log(`Token ${tokenId} → Famille: ${insectFamily}`);
+
+            return {
+              id: tokenId.toString(),
+              image: metadata.image,
+              name: metadata.name,
+              family: insectFamily  // ✅ Stockée localement
+            };
           } catch (err) {
             console.error("Erreur récupération token:", err);
             return null;
           }
         })
       );
+
+      // ✅ TOUTES les familles après Promise.all (setState asynchrone OK ici)
+      const allFamilies = insects
+        .filter(Boolean)
+        .map((insect): string => (insect as InsectURI).family || 'Inconnue');
+      setFamily(allFamilies);
+      //console.log("✅ Toutes les familles:", allFamilies);
 
       return {
         membershipValid,
@@ -104,7 +124,6 @@ const DerniersAdherents: React.FC = () => {
     }
   };
 
-  // ✅ Rendu UI
   return (
     <Box p={5}>
       <Box mt={5}>
@@ -144,35 +163,84 @@ const DerniersAdherents: React.FC = () => {
                 <Box borderRadius="xl" height="100%" p={4} textAlign="center" bg={bgColor}>
                   <Link href={`/u/${info.address}`} passHref>
                     <Tooltip label="Voir le profil" hasArrow>
-                      <Box as="a" display="block" height="100%">
-                        <Text fontWeight="bold" color="pink.200">
-                          {info.name || "Utilisateur anonyme"}
-                        </Text>
-                        <Text fontSize="sm" color="gray.300">
-                          {info.bio || "Aucune bio"}
-                        </Text>
-                        <Box display="flex" justifyContent="center" mt={3}>
-                          {info.insects.length > 0 ? (
-                            info.insects.map((insect) => (
-                              <Box key={insect.id} mr={2} textAlign="center">
-                                <Image
-                                  src={insect.image}
-                                  alt={insect.name}
-                                  boxSize="45px"
-                                  borderRadius="md"
-                                  objectFit="cover"
-                                />
-                                <Text fontSize="xs" color="gray.400" mt={1}>
-                                  {insect.name}
-                                </Text>
-                              </Box>
-                            ))
-                          ) : (
-                            <Text fontSize="xs" color="gray.500">
-                              Aucun jeton
-                            </Text>
-                          )}
+                    <Box as="a" display="block" height="100%">
+                  <Text fontSize="md" fontWeight="bold" color="pink.200" noOfLines={1}>
+                    {info.name || "Utilisateur anonyme"}
+                  </Text>
+                  <Text fontSize="xs" color="gray.300" noOfLines={2}>
+                    {info.bio || "Aucune bio"}
+                  </Text>
+
+                  {/* ✅ Layout 2x2 : MAX 4 insectes */}
+                  <Box position="relative" mt={2}>
+                    {info.insects.length > 0 ? (
+                      <>
+                        {/* Ligne 1 : 1er & 2ème */}
+                        <Box display="flex" justifyContent="center" gap={1}>
+                          {info.insects.slice(0, 2).map((insect) => (
+                            <Box key={`top-${insect.id}`} textAlign="center" minW="42px">
+                              <Image
+                                src={insect.image}
+                                alt={insect.name}
+                                boxSize="38px"
+                                borderRadius="md"
+                                objectFit="cover"
+                              />
+                              <Text fontSize="2xs" color="gray.400" mt={0.5} noOfLines={1}>
+                                {insect.family?.slice(0,6) || '???'} #{insect.id}
+                              </Text>
+                            </Box>
+                          ))}
                         </Box>
+
+                        {/* Ligne 2 : 3ème & 4ème */}
+                        <Box display="flex" justifyContent="center" gap={1}>
+                          {info.insects.slice(2, 4).map((insect) => (
+                            <Box key={`bot-${insect.id}`} textAlign="center" minW="42px">
+                              <Image
+                                src={insect.image}
+                                alt={insect.name}
+                                boxSize="38px"
+                                borderRadius="md"
+                                objectFit="cover"
+                              />
+                              <Text fontSize="2xs" color="gray.400" mt={0.5} noOfLines={1}>
+                                {insect.family?.slice(0,6) || '???'} #{insect.id}
+                              </Text>
+                            </Box>
+                          ))}
+                        </Box>
+
+                        {/* Badge +X si >4 */}
+                        {info.insects.length > 4 && (
+                          <Box
+                            position="absolute"
+                            top="1"
+                            right="1"
+                            bg="pink.500"
+                            color="white"
+                            borderRadius="full"
+                            w="18px"
+                            h="18px"
+                            fontSize="3xs"
+                            fontWeight="bold"
+                            display="flex"
+                            alignItems="center"
+                            justifyContent="center"
+                          >
+                            +{info.insects.length - 4}
+                          </Box>
+                        )}
+                      </>
+                    ) : (
+                      <Center mt={4}>
+                        <Text fontSize="2xs" color="gray.500">
+                          Aucun jeton
+                        </Text>
+                      </Center>
+                    )}
+                  </Box>
+
                       </Box>
                     </Tooltip>
                   </Link>

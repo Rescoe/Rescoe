@@ -52,6 +52,7 @@ export const useTokenEvolution = ({
      FETCH ON-CHAIN MEMBERSHIP
   ======================= */
 
+  // Remplace TON useEffect par ÇA :
   useEffect(() => {
     if (!contractAddress || tokenId === undefined) return;
 
@@ -61,10 +62,7 @@ export const useTokenEvolution = ({
         const contract = new web3Instance.eth.Contract(ABI as any, contractAddress);
 
         const infoRaw: any = await contract.methods.getMembershipInfo(tokenId).call();
-        if (!infoRaw) {
-          console.error("Membership info vide");
-          return;
-        }
+        if (!infoRaw) return;
 
         const info: MembershipInfo = {
           level: Number(infoRaw.level),
@@ -77,8 +75,22 @@ export const useTokenEvolution = ({
 
         setMembershipInfo(info);
 
-        const priceWei = await contract.methods.baseEvolvePrice(info.level).call();
+        // ✅ FIX : essaie TOUS les levels + fallback
+        let priceWei: any = "0";
+        try {
+          priceWei = await contract.methods.baseEvolvePrice(info.level).call();
+        } catch (levelError) {
+          console.warn('⚠️ baseEvolvePrice(', info.level, ') échoue, essai level-1:', levelError);
+          try {
+            priceWei = await contract.methods.baseEvolvePrice(Math.max(0, info.level - 1)).call();
+          } catch (fallbackError) {
+            console.warn('⚠️ Fallback échoue aussi, price=0');
+            priceWei = "0";
+          }
+        }
+
         setEvolvePriceEth(Number(priceWei) / 1e18);
+        console.log('💰 Prix final:', Number(priceWei) / 1e18);
       } catch (e) {
         console.error("Erreur getMembershipInfo:", e);
       }

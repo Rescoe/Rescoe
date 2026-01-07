@@ -8,6 +8,8 @@ import haikuContractABI from '../../ABI/HaikuEditions.json';
 import nftContractABI from '../../ABI/ABI_ART.json';
 import DynamicCarousel from '../../../utils/DynamicCarousel'; // Assurez-vous d'importer le bon chemin
 import HeroSection from '../../../utils/HeroSection'; // Assurez-vous d'importer le bon chemin
+import {useRescoeData} from './useRescoeData'; // Assurez-vous d'importer le bon chemin
+
 import ABIRESCOLLECTION from '../../ABI/ABI_Collections.json';
 import { useRouter } from 'next/router';
 import { motion } from "framer-motion";
@@ -18,6 +20,8 @@ import FaucetWidget from '@/utils/Faucet/Faucet'; // Assurez-vous d'importer le 
 
 
 import RelatedFull from '../../../utils/RelatedFull'; // Assurez-vous d'importer le bon chemin
+import RelatedFullPoems from '../../../utils/RelatedFullPoemes'; // Assurez-vous d'importer le bon chemin
+
 import DerniersAdherents from '../association/Adherents/DerniersAdherents'; // Votre ABI de contrat ici.
 import FeaturedMembers from '../association/Adherents/FeaturedMembers'; // Votre ABI de contrat ici.
 import AteliersCalendarView from '../association/Formations/AteliersCalendarView'; // Votre ABI de contrat ici.
@@ -68,7 +72,6 @@ const benefits = [
 ];
 
 const Home = () => {
-const [isLoading, setIsLoading] = useState(false);
 const router = useRouter();
 const theme = useTheme();
 
@@ -125,7 +128,6 @@ interface Nft {
 
 // Typage de l'état `nfts` avec `Nft[]` (un tableau d'objets de type Nft)
 const [nfts, setNfts] = useState<Nft[]>([]);
-const [collections, setCollections] = useState<Collection[]>([]);
 const [openIndex, setOpenIndex] = useState<number | null>(null);
 
 const [nftsByCollection, setNftsByCollection] = useState<Record<string, Nft[]>>({});
@@ -143,194 +145,14 @@ const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS)
 const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
 
 
-// Charger uniquement les collections FEATURED
-const fetchCollections = useCallback(async () => {
-  setIsLoading(true);
-  const cachedCollections = localStorage.getItem('featuredCollections');
-
-  if (cachedCollections) {
-    setCollections(JSON.parse(cachedCollections));
-    setIsLoading(false);
-    return;
-  }
-
-  try {
-    const total = await contract.getTotalCollectionsMinted();
-    const collectionsPaginated = await contract.getCollectionsPaginated(0, total);
-
-    type CollectionTuple = [number, string, string, string, string[], boolean, boolean];
-
-    const collectionsData = await Promise.all(
-      collectionsPaginated.map(async (tuple: CollectionTuple | null) => {
-        if (!tuple) return null;
-
-        const [id, name, collectionType, creator, associatedAddresses, isActive, isFeatured] = tuple;
-
-        if (!isFeatured) return null;
-
-        const uri = await contract.getCollectionURI(id);
-        const mintContractAddress = associatedAddresses;
-
-        let metadata;
-        const cachedMetadata = localStorage.getItem(uri);
-
-        if (cachedMetadata) {
-          metadata = JSON.parse(cachedMetadata);
-        } else {
-          const response = await fetch(`/api/proxyPinata?ipfsHash=${uri.split('/').pop()}`);
-          metadata = await response.json();
-          localStorage.setItem(uri, JSON.stringify(metadata));
-        }
-
-        return {
-          id: id.toString(),
-          name,
-          collectionType,
-          imageUrl: metadata?.image || "",
-          mintContractAddress,
-          isFeatured,
-          creator,
-        };
-      })
-    );
-
-    const featured = collectionsData.filter((col): col is Collection => col !== null);
-    localStorage.setItem('featuredCollections', JSON.stringify(featured)); // Cache les collections
-    setCollections(featured);
-  } catch (error) {
-    console.error("Erreur lors du chargement des collections featured :", error);
-  } finally {
-    setIsLoading(false);
-  }
-}, [contract]);
-
-const fetchPoems = async (collectionId: string, associatedAddress: string): Promise<void> => {
-  setIsLoading(true);
-  const cacheKey = `poems_${collectionId}`;
-  const cachedPoems = sessionStorage.getItem(cacheKey);
-
-  if (cachedPoems) {
-    setHaikusByCollection(prev => ({ ...prev, [collectionId]: JSON.parse(cachedPoems) }));
-    setIsLoading(false);
-    return;
-  }
-
-  try {
-    const collectionContract = new Contract(associatedAddress, haikuContractABI, provider);
-    const uniqueTokenCount = await collectionContract.getLastUniqueHaikusMinted();
-
-    if (uniqueTokenCount === 0) {
-      setHaikusByCollection(prev => ({ ...prev, [collectionId]: [] }));
-      return;
-    }
-
-    const tokenIds = Array.from({ length: Number(uniqueTokenCount) }, (_, i) => i + 1);
-
-    const poemsData = await Promise.all(
-      tokenIds.map(async (tokenId) => {
-        const haikuText = await collectionContract.getTokenFullDetails(tokenId);
-        if (!Array.isArray(haikuText) || haikuText.length < 7) return null;
-
-        const uniqueIdAssociated = await collectionContract.tokenIdToHaikuId(tokenId);
-
-        return {
-          tokenId: tokenId.toString(),
-          poemText: haikuText.map(text => text.toString()), // Convertir chaque texte en chaîne
-          mintContractAddress: associatedAddress,
-          uniqueIdAssociated: uniqueIdAssociated.toString(), // Assurez-vous que c'est une chaîne
-        };
-      })
-    ).then(results => results.filter(result => result !== null));
-
-    // Stocker les poèmes dans le cache
-    sessionStorage.setItem(cacheKey, JSON.stringify(poemsData)); // Assurez-vous que poemsData ne contient pas de BigInt
-    setHaikusByCollection(prev => ({ ...prev, [collectionId]: poemsData }));
-
-  } catch (error) {
-    console.error('Error fetching poems:', error);
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-
-
-const fetchNFTs = async (collectionId: string, associatedAddress: string): Promise<void> => {
-  setIsLoading(true);
-  const cacheKey = `nfts_${collectionId}`;
-  const cachedNfts = sessionStorage.getItem(cacheKey);
-
-  if (cachedNfts) {
-    setNftsByCollection(prev => ({
-      ...prev,
-      [collectionId]: JSON.parse(cachedNfts),
-    }));
-    setIsLoading(false);
-    return;
-  }
-
-  try {
-    const collectionContract = new Contract(associatedAddress, nftContractABI, provider);
-    let max = await collectionContract.getLastMintedTokenId();
-    if (max > 9) max = 9;
-    const pagination = Number(max) + 1;
-    const tokenIds = await collectionContract.getTokenPaginated(0, pagination);
-
-    const nftsData = await Promise.all(
-      tokenIds.map(async (tokenId: string) => {
-        try {
-          const owner = await collectionContract.ownerOf(tokenId).catch(() => null);
-          if (!owner || owner === "0x0000000000000000000000000000000000000000") {
-            return null;
-          }
-
-          let tokenURI = await collectionContract.tokenURI(tokenId);
-          const cachedMetadata = localStorage.getItem(tokenURI);
-          const metadata = cachedMetadata
-            ? JSON.parse(cachedMetadata)
-            : await (await fetch(`/api/proxyPinata?ipfsHash=${tokenURI.split('/').pop()}`)).json();
-
-          return {
-            image: metadata.image,
-            name: metadata.name,
-            artist: metadata.artist || "her",
-            content: {
-              tokenId: tokenId.toString(),
-              mintContractAddress: associatedAddress,
-            }
-          };
-
-        } catch (error) {
-          console.warn(`⚠️ Erreur pour le tokenId ${tokenId}:`, error);
-          return null;
-        }
-      })
-    );
-
-    sessionStorage.setItem(cacheKey, JSON.stringify(nftsData.filter(nft => nft !== null))); // Stocker dans le cache
-    setNftsByCollection(prev => ({
-      ...prev,
-      [collectionId]: nftsData.filter(nft => nft !== null),
-    }));
-  } catch (error) {
-    console.error('Erreur lors de la récupération des NFTs:', error);
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-
-
-
-
-//Use effetc appelé deux fois, probleme récurrent. On Evite les doublons ici :
-const hasFetched = useRef(false);
-useEffect(() => {
-  if (!hasFetched.current) {
-    fetchCollections();
-    hasFetched.current = true;
-  }
-}, [fetchCollections]);
+//Récupération des données de collection, poemes et NFT featured
+const {
+  isLoading,
+  collections,
+  collectionsWithNfts,  // ✅ NOUVEAU - Prêt à l'emploi !
+  allNfts,     // ✅ Tous les NFTs
+  allHaikus,   // ✅ Tous les poèmes
+} = useRescoeData();
 
 
 // Fonction pour obtenir des éléments aléatoires
@@ -339,67 +161,6 @@ const getRandomItems = <T,>(array: T[], count: number): T[] => {
     ? array.sort(() => 0.5 - Math.random()).slice(0, Math.min(count, array.length))
     : [];
 };
-
-
-const fetchedCollections = useRef(new Set()); // Utilisation de useRef pour garder les collections déjà récupérées
-
-const fetchAllNFTsAndPoems = useCallback(async () => {
-  const artCollections = collections.filter(col => col.collectionType === 'Art');
-  const poetryCollections = collections.filter(col => col.collectionType === 'Poesie');
-
-  // Récupérez 5 collections randomisées pour art et poésie
-  const randomArtCollections = getRandomItems(artCollections, 5);
-  const randomPoetryCollections = getRandomItems(poetryCollections, 5);
-
-  //////console.log("Collections d'art sélectionnées :", randomArtCollections.map(c => c.id));
-  //////console.log("Collections de poésie sélectionnées :", randomPoetryCollections.map(c => c.id));
-
-  // Récupérer les NFTs pour les collections d'art
-  for (const collection of randomArtCollections) {
-    if (collection && !fetchedCollections.current.has(collection.id)) {
-      //////console.log(`Récupération des NFTs pour la collection d'art ${collection.id}...`);
-      const nftsBefore = nfts.length;
-      await fetchNFTs(collection.id, collection.mintContractAddress);
-      const nftsAfter = nfts.length;
-      //////console.log(`Collection ${collection.id} récupérée : ${nftsAfter - nftsBefore} NFTs ajoutés`);
-      fetchedCollections.current.add(collection.id); // Marquez comme récupérée
-    }
-  }
-
-  // Récupérer les poèmes pour les collections de poésie
-  for (const collection of randomPoetryCollections) {
-    if (collection && !fetchedCollections.current.has(collection.id)) {
-      //////console.log(`Récupération des poèmes pour la collection ${collection.id}...`);
-      const poemsBefore = haikus.length; // si tu as un state "poems"
-      await fetchPoems(collection.id, collection.mintContractAddress);
-      const poemsAfter = haikus.length;
-      //////console.log(`Collection ${collection.id} récupérée : ${poemsAfter - poemsBefore} poèmes ajoutés`);
-      fetchedCollections.current.add(collection.id); // Marquez comme récupérée
-    }
-  }
-
-  //////console.log("Récupération terminée. NFTs totaux :", nfts.length);
-  //////console.log("Poèmes totaux :", haikus.length);
-}, [collections]);
-
-// Appel de la fonction dans useEffect
-useEffect(() => {
-  if (collections.length > 0) {
-    fetchAllNFTsAndPoems();
-  }
-}, [collections]);
-
-const allNfts = useMemo(
-  () => collections.flatMap(col => nftsByCollection[col.id] || []),
-  [collections, nftsByCollection]
-);
-
-const allHaikus = useMemo(
-  () => collections.flatMap(col => haikusByCollection[col.id] || []),
-  [collections, haikusByCollection]
-);
-
-
 
     const maxBoxHeight = "150px"; // Hauteur max pour toutes les boîtes
 
@@ -728,28 +489,40 @@ const allHaikus = useMemo(
 
         {/* ===== SECTION COLLECTIONS DU JOUR ===== */}
 
-          <Box py={10} w="100%" maxW="1100px" mx="auto" px={{ base: 6, md: 10 }}>
-            <Heading
-              size="lg"
-              mb={6}
-              bgClip="text"
-              textAlign="center"
-            >
-              Parmi les mêmes collections
-            </Heading>
+        {/* ===== ŒUVRES (NFTs) ===== */}
+        <Box py={10} w="100%" maxW="1100px" mx="auto" px={{ base: 6, md: 10 }}>
+          <Heading size="lg" mb={6} bgClip="text" textAlign="center">
+            Parmi les mêmes collections
+          </Heading>
+          {collectionsWithNfts.map((collection) =>
+            collection.nfts.length > 0 && (
+              <RelatedFull
+                key={collection.id}
+                nft={collection.nfts[0]}
+                allNFTs={collection.nfts}  // ✅ MAX 5
+                title={collection.name}
+              />
+            )
+          )}
+        </Box>
 
-            {collections.map((collection) => {
-              const collectionNFTs = nftsByCollection[collection.id];
-              return collectionNFTs && collectionNFTs.length > 0 ? (
-                <RelatedFull
-                  key={collection.id}
-                  nft={collectionNFTs[0]}          // NFT “vedette” (le premier)
-                  allNFTs={collectionNFTs}         // tous les NFTs
-                  title={collection.name}
-                />
-              ) : null;
-            })}
-          </Box>
+        {/* ===== POÈMES ===== */}
+        <Box py={10} w="100%" maxW="1100px" mx="auto" px={{ base: 6, md: 10 }}>
+          <Heading size="lg" mb={6} bgClip="text" textAlign="center">
+            Poèmes de la même collection
+          </Heading>
+          {collectionsWithNfts.map((collection) =>
+            collection.haikus.length > 0 && (
+              <RelatedFullPoems  // À créer (copie RelatedFull)
+                key={`${collection.id}-poems`}
+                haiku={collection.haikus[0]}
+                allHaikus={collection.haikus}  // ✅ MAX 5
+                title={collection.name}
+              />
+            )
+          )}
+        </Box>
+
         </motion.div>
 
 
