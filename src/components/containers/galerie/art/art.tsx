@@ -10,6 +10,7 @@ import { useMediaQuery } from '@chakra-ui/react';
 
 import ABIRESCOLLECTION from '../../../ABI/ABI_Collections.json';
 import ABI_MINT_CONTRACT from '../../../ABI/ABI_ART.json';
+import ABI_IReward from  '../../../ABI/ABIAdhesion.json';
 
 import NFTCard from '../NFTCard';
 
@@ -57,7 +58,7 @@ const UniqueArtGalerie: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState<string>(''); // État pour stocker le terme de recherche
 
   const router = useRouter();
-  const { web3, address } = useAuth(); 
+  const { web3, address } = useAuth();
 
   const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!;
 
@@ -181,32 +182,78 @@ const UniqueArtGalerie: React.FC = () => {
   };
 
 
-
   const buyNFT = async (nft: NFT) => {
+    if (!web3 || !address) {
+      console.error("Web3 n'est pas initialisé ou l'utilisateur n'est pas connecté.");
+      return;
+    }
 
-      if (!web3 || !address) {
-          console.error("Web3 n'est pas initialisé ou l'utilisateur n'est pas connecté.");
-          return;
-      }
+    const contract = new web3.eth.Contract(ABI_MINT_CONTRACT, nft.mintContractAddress);
 
-      const contract = new web3.eth.Contract(ABI_MINT_CONTRACT, nft.mintContractAddress);
+    // 🔍 DEBUG LOGS AVANT TX
+    //console.log("=== 🔍 DEBUG BUY NFT ===");
+    //console.log("nft:", { tokenId: nft.tokenId, priceInWei: nft.priceInWei, forSale: nft.forSale, address });
 
-      try {
-          const priceInWei = nft.priceInWei; // Assurez-vous que questo est le prix en Wei
+    const artNFT = new web3.eth.Contract(ABI_MINT_CONTRACT, nft.mintContractAddress);
 
-          // Envoyer la transaction
-          const transaction = await contract.methods.buyNFT(nft.tokenId)
-              .send({ from: address, value: priceInWei });
+    // 1️⃣ EXISTS ?
+    const exists = await artNFT.methods.doesTokenExist(nft.tokenId).call();
+    //console.log("✅ 1. exists:", exists);
 
-          // Obtenir le reçu de la transaction
-          const receipt = await web3.eth.getTransactionReceipt(transaction.transactionHash);
+    // 2️⃣ FOR SALE ?
+    const forSale = await artNFT.methods.isNFTForSale(nft.tokenId).call();
+    //console.log("✅ 2. forSale:", forSale);
 
-          // Vous pouvez valider ou traiter le reçu ici
-          //console.log(`NFT avec ID ${nft.tokenId} acheté avec succès !`, receipt);
+    // 3️⃣ PRICE
+    const price = await artNFT.methods.getTokenPrice(nft.tokenId).call();
+    //console.log("✅ 3. price contract:", price.toString(), "envoyé:", nft.priceInWei);
 
-      } catch (error) {
-          console.error("Erreur lors de l'achat du NFT:", error);
-      }
+    // 4️⃣ OWNER
+    let owner;
+    try {
+      owner = await artNFT.methods.ownerOf(nft.tokenId).call();
+      //console.log("✅ 4. owner:", owner, "!= buyer?", owner.toLowerCase() !== address.toLowerCase());
+    } catch(e) {
+      //console.log("❌ 4. ownerOf FAIL:", e.message);
+    }
+
+    // 5️⃣ ARTIST
+    const artist = await artNFT.methods.tokenCreator(nft.tokenId).call();
+    //console.log("✅ 5. artist:", artist);
+
+    // 6️⃣ ASSOCIATION
+    const association = await artNFT.methods.associationAddress().call();
+    //console.log("✅ 6. association:", association);
+
+    // 7️⃣ EXTRAS LENGTH (getter extraPercents[0] pour test length)
+    try {
+      const extra0 = await artNFT.methods.extraRecipients(0).call();
+      //console.log("✅ 7. extra[0]:", extra0);
+    } catch(e) {
+      //console.log("✅ 7. extra vide/OK");
+    }
+
+    // 8️⃣ REWARD CONTRACT
+    const rewardContractAddr = "0xE66583156B665A9B125b34A18Ec57F5Effd197D0"; // ResCoeManager
+      //const pendingTest = await new web3.eth.Contract(ABI_IReward, rewardContractAddr).methods.getPendingPoints("0xFa6d6E36Da4acA3e6aa3bf2b4939165C39d83879").call();
+      //console.log("✅ ResCoeManager pending OK");
+
+
+    try {
+      const priceInWei = nft.priceInWei;
+      //console.log("🚀 TX avec gas=600k");
+
+      const transaction = await contract.methods.buyNFT(nft.tokenId)
+        .send({
+          from: address,
+          value: priceInWei,
+          gas: "600000",
+        });
+
+      //console.log("✅ BUY SUCCESS:", transaction.transactionHash);
+    } catch (error: any) {
+      console.error("❌ BUY FAIL:", error.message);
+    }
   };
 
 
