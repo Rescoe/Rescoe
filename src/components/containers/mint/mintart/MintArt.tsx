@@ -1,6 +1,8 @@
 import React, { useState, useEffect, ChangeEvent } from "react";
 import Web3 from "web3";
 import { JsonRpcProvider, Contract } from 'ethers';
+import { ethers } from "ethers";
+
 
 import detectEthereumProvider from "@metamask/detect-provider";
 import axios from "axios";
@@ -212,12 +214,13 @@ const [percent, setPercent] = useState<number[]>([]);
 
       // 🔹 Récupère les détails de la collection via son ID
       const collectionDetails = await resCollections.getCollection(collectionId);
-      console.log(collectionDetails);
+      const artiste = collectionDetails[3].toString();
+      console.log(artiste);
       const collectionAddress = collectionDetails.collectionAddress;
       setSelectedCollection(collectionAddress);
 
       const artFactory = new Contract(artFactoryAddress ,factoryABI, provider);
-      const collaborateurs = await artFactory.getCollectionConfig(collectionDetails.name);
+      const collaborateurs = await artFactory.getUserCollectionConfig(artiste, collectionDetails.name);
       console.log(collaborateurs);
 
       if (!collectionAddress) {
@@ -230,7 +233,7 @@ const [percent, setPercent] = useState<number[]>([]);
 
       const asso = "0xFa6d6E36Da4acA3e6aa3bf2b4939165C39d83879";
       const assoFees = 10; // % fixe
-      const artisteAddress = address; // l'artiste
+      //const artisteAddress = address; // l'artiste
 
       // Pourcentages des collaborateurs récupérés (raw)
       const collaborateursPercentsRaw = collaborateurs[2].map(Number); // ex: [50] si un seul collaborateur
@@ -248,7 +251,7 @@ const [percent, setPercent] = useState<number[]>([]);
       const artistePercent = 45 - collaborateursPercents.reduce((acc: number, p: number) => acc + p, 0);
 
       // Tableau final pour l’affichage
-      const finalCollabNames = [artisteAddress, asso, ...collaborateursAddresses];
+      const finalCollabNames = [artiste, asso, ...collaborateursAddresses];
       const finalCollabPercents = [artistePercent + 45, assoFees, ...collaborateursPercents];
       // Remarque : artistePercent + 45 car l’artiste a toujours 45% minimum
 
@@ -330,7 +333,7 @@ const [percent, setPercent] = useState<number[]>([]);
         );
 
         setIpfsUrl(`https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`);
-
+        console.log(ipfsUrl);
         toast({
           title: "Oeuvre uploadée",
           description: ipfsUrl,
@@ -355,109 +358,196 @@ const [percent, setPercent] = useState<number[]>([]);
 
 
   const mintNFT = async (): Promise<void> => {
-    if (!ipfsUrl || selectedCollectionId === null) {
-      alert("Veuillez uploader les métadonnées sur IPFS et choisir une collection.");
-      return;
+  if (!ipfsUrl || selectedCollectionId === null) {
+    toast({
+      title: "Erreur",
+      description: "Veuillez uploader les métadonnées sur IPFS et choisir une collection.",
+      status: "error",
+      duration: 3000,
+      isClosable: true,
+    });
+    return;
+  }
+
+  if (!web3) {
+    toast({
+      title: "Erreur",
+      description: "Wallet non connecté.",
+      status: "error",
+      duration: 3000,
+      isClosable: true,
+    });
+    return;
+  }
+
+  if (!editions || editions <= 0) {
+    toast({
+      title: "Erreur",
+      description: "Veuillez entrer un nombre d'éditions supérieur à 0.",
+      status: "error",
+      duration: 3000,
+      isClosable: true,
+    });
+    return;
+  }
+
+  if (editions > 5) {
+    toast({
+      title: "Limite",
+      description: "Maximum 5 éditions par mint pour éviter les limites gas Web3Auth.",
+      status: "warning",
+      duration: 4000,
+      isClosable: true,
+    });
+    return;
+  }
+
+  setIsMinting(true);
+  setError(null);
+
+  try {
+    const userAddress = address!;
+    const gasPrice = await web3.eth.getGasPrice();
+
+    // Récup collection details
+    const resCollection = new web3.eth.Contract(ABIRESCOLLECTION, contractRESCOLLECTION);
+    const collectionDetails = await resCollection.methods
+      .getCollection(selectedCollectionId)
+      .call() as CollectionDetails;
+
+    if (!collectionDetails || collectionDetails.collectionType !== "Art") {
+      throw new Error("Collection Art introuvable.");
     }
 
-    if (!web3) {
-      alert("Wallet non connecté.");
-      return;
+    const collectionMintAddress = collectionDetails.collectionAddress;
+    if (!web3.utils.isAddress(collectionMintAddress)) {
+      throw new Error("Adresse de contrat invalide.");
     }
 
-    if (!editions || editions <= 0) {
-      alert("Veuillez entrer un nombre d’éditions supérieur à 0.");
-      return;
+    const mintContract = new web3.eth.Contract(contractABI, collectionMintAddress);
+
+    // 🔍 Vérification supply
+    const maxSupply = await mintContract.methods._getCollectionMaxSupplyFallback().call();
+    const totalSupply = await mintContract.methods.totalSupply().call();
+    const remaining = Number(maxSupply) - Number(totalSupply);
+
+    if (editions > remaining) {
+      throw new Error(`Il ne reste que ${remaining} slots (maxSupply=${maxSupply}).`);
     }
 
-    setIsMinting(true);
+    // 🔥 ESTIMATION GAS + VALIDATION
+    toast({
+      title: "Estimation gas...",
+      description: "Calcul en cours...",
+      status: "info",
+      duration: 2000,
+      isClosable: false,
+    });
 
-    try {
-      const userAddress = address;
-      const gasPrice = await web3.eth.getGasPrice();
+    const gasEstimate = await mintContract.methods.mint(ipfsUrl, editions).estimateGas({
+      from: userAddress,
+    });
 
-      if (!userAddress) throw new Error("Adresse utilisateur invalide.");
+    console.log('✅ Gas estimé:', gasEstimate.toString(), 'pour', editions, 'éditions');
 
-      const resCollection = new web3.eth.Contract(
-        ABIRESCOLLECTION,
-        contractRESCOLLECTION
-      );
+    if (gasEstimate > 4500000n) {
+      throw new Error(`Gas trop élevé (${gasEstimate}): réduisez éditions ou réessayez.`);
+    }
 
-      const collectionDetails = await resCollection.methods
-        .getCollection(selectedCollectionId)
-        .call() as CollectionDetails;
+    const gasLimit = (gasEstimate * BigInt(130n) / 100n).toString(); // +30% buffer
 
-      if (!collectionDetails) throw new Error("Collection introuvable.");
+    // 🔄 MINT AVEC RETRY
+    const mintWithRetry = async (retries = 3): Promise<any> => {
+      for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+          toast({
+            title: `Mint en cours... (essai ${attempt}/${retries})`,
+            status: "loading",
+            duration: 5000,
+            isClosable: false,
+          });
 
-      if (collectionDetails.collectionType !== "Art") {
-        alert("Impossible de minter une poésie ici.");
-        return;
+          return await mintContract.methods
+            .mint(ipfsUrl, editions)
+            .send({
+              from: userAddress,
+              gas: gasLimit,
+              gasPrice: (BigInt(gasPrice) * 110n / 100n).toString(),
+            });
+        } catch (error: any) {
+          console.warn(`Tentative ${attempt} échouée:`, error.message);
+
+          if (attempt === retries) throw error;
+
+          if (error.message.includes('gas limit') || error.message.includes('insufficient funds')) {
+            await new Promise(resolve => setTimeout(resolve, 3000 * attempt)); // Backoff
+            continue;
+          }
+          throw error;
+        }
       }
+    };
 
-      const collectionMintAddress = collectionDetails.collectionAddress;
-      if (!web3.utils.isAddress(collectionMintAddress)) {
-        throw new Error("Adresse de contrat invalide.");
-      }
+    const mintResult = await mintWithRetry();
 
-      const mintContract = new web3.eth.Contract(contractABI, collectionMintAddress);
+    toast({
+      title: "✅ Mint réussi!",
+      description: `TX: ${mintResult.transactionHash}`,
+      status: "success",
+      duration: 5000,
+      isClosable: true,
+    });
 
-      // =============================
-      // 🔍 1 — Vérification supply
-      // =============================
-      const maxSupply = await mintContract.methods._getCollectionMaxSupplyFallback().call();
-      const totalSupply = await mintContract.methods.totalSupply().call();
+    // Récup tokenId
+    const lastTokenIdStr = await mintContract.methods.getLastMintedTokenId().call();
+    const currentTokenId = Number(lastTokenIdStr);
+    setTokenId(currentTokenId);
 
-      const remaining = Number(maxSupply) - Number(totalSupply);
+    // 🔥 LISTING OPTIONNEL
+    if (isSaleListing && salePrice && Number(salePrice) > 0) {
+      toast({ title: "Listing en cours...", status: "loading" });
 
-      if (editions > remaining) {
-        alert(
-          `Impossible : il ne reste que ${remaining} mint possible dans cette collection (maxSupply=${maxSupply}).`
-        );
-        return;
-      }
+      const priceWei = web3.utils.toWei(salePrice, "ether");
+      const listGasEstimate = await mintContract.methods
+        .listNFTForSale(currentTokenId, priceWei)
+        .estimateGas({ from: userAddress });
 
-      // =============================
-      // 2 — Mint
-      // =============================
-      const mintResult = await mintContract.methods
-        .mint(ipfsUrl, editions)
-        .send({ from: userAddress,
-          gasPrice: gasPrice.toString(),  // <-- force string
-          maxFeePerGas: null as any,       // TS ok
-          maxPriorityFeePerGas: null as any
+      await mintContract.methods
+        .listNFTForSale(currentTokenId, priceWei)
+        .send({
+          from: userAddress,
+          gas: (listGasEstimate * BigInt(120n) / 100n).toString(),
+          gasPrice: gasPrice.toString(),
         });
 
-      const lastTokenIdStr = await mintContract.methods
-        .getLastMintedTokenId()
-        .call();
-
-      const currentTokenId = Number(lastTokenIdStr);
-      setTokenId(currentTokenId);
-
-      // =============================
-      // 3 — Listing (optionnel)
-      // =============================
-      if (isSaleListing && salePrice && Number(salePrice) > 0) {
-        const priceWei = web3.utils.toWei(salePrice, "ether");
-
-        await mintContract.methods
-          .listNFTForSale(currentTokenId, priceWei)
-          .send({
-              from: userAddress,
-              gasPrice: gasPrice.toString(),  // <-- force string
-              maxFeePerGas: null as any,       // TS ok
-              maxPriorityFeePerGas: null as any
-              });
-      }
-
-      publishSuccess(currentTokenId, collectionMintAddress);
-    } catch (e) {
-      console.error("Erreur mint:", e);
-      alert("Erreur lors du mint. Vérifiez la console.");
-    } finally {
-      setIsMinting(false);
+      toast({
+        title: "✅ Listé à la vente!",
+        status: "success",
+        duration: 3000,
+      });
     }
-  };
+
+    publishSuccess(currentTokenId, collectionMintAddress);
+
+  } catch (e: any) {
+    console.error("❌ Erreur mint:", e);
+
+    const msg = e.message || 'Erreur inconnue';
+    setError(msg);
+
+    toast({
+      title: "❌ Mint échoué",
+      description: msg.includes('gas')
+        ? 'Gas trop élevé. Réduisez éditions ou réessayez.'
+        : msg.slice(0, 100) + '...',
+      status: "error",
+      duration: 6000,
+      isClosable: true,
+    });
+  } finally {
+    setIsMinting(false);
+  }
+};
 
 
 

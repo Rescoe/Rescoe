@@ -169,7 +169,7 @@ const CreateCollection: React.FC = () => {
       const fullMetadata = {
         ...metadata,
         image: imageUrl,
-        maxEditions: collectionType === "Art" ? maxEditions : null
+        maxEditions: maxEditions
       };
 
       const metadataUrl = await uploadMetadata(fullMetadata);
@@ -277,56 +277,95 @@ const CreateCollection: React.FC = () => {
     const rescoeContract = new web3.eth.Contract(ABIRESCOLLECTION as any, contractRESCOLLECTION);
     const adhesionContract = new web3.eth.Contract(ABI_Adhesion as any, contratAdhesion);
     const toastPrefix = "🚨 [handleCreateCollection]";
-/*
+
+    const artFactoryAddr = await fetchFactoryAddress("Art");
+const artFactoryContract = new web3.eth.Contract(ABI_ART_FACTORY as any, artFactoryAddr);
+const resCollectionsAuth = await artFactoryContract.methods.resCollectionsAuthorized().call();
+const masterFactoryAuth = await artFactoryContract.methods.masterFactoryAuthorized().call();
+console.log("📍 ArtFactory autorisations attendues:", resCollectionsAuth, masterFactoryAuth);
+console.log("📍 ResCoellectionManager réelle:", contractRESCOLLECTION.toLowerCase());
+//console.log("✅ Match ResCollections?", resCollectionsAuth.toLowerCase() === contractRESCOLLECTION.toLowerCase());
+
     console.log("=== 🔍 DEBUG COMPLET createCollection ===");
     console.log("1. collectionName:", metadata.name);
     console.log("2. ipfsUrl:", ipfsUrl);
     console.log("3. collectionType:", collectionType);
     console.log("4. address:", address);
     console.log("5. ResCollections:", contractRESCOLLECTION);
-*/
+
+    // 🔍 QUI EST APPELÉ ?
+    const rescoeFactory = await rescoeContract.methods.factoryContractAddress().call();
+    console.log("📍 ResCoellectionManager.factoryContractAddress =", rescoeFactory);
+
+    const masterFactory = new web3.eth.Contract(ABIMasterFactory as any, masterFactoryAddress);
+    const artFactoryFromMaster = await masterFactory.methods.collectionFactories("Art").call();
+    console.log("🎨 ArtFactory VIA Master =", artFactoryFromMaster);
+
+    const authorized1 = await artFactoryContract.methods.resCollectionsAuthorized().call();
+    const authorized2 = await artFactoryContract.methods.masterFactoryAuthorized().call();
+    //console.log("🔑 ArtFactory autorisés:", { resCollectionsAuthorized: authorized1, masterFactoryAuthorized: authorized2 });
+    //console.log("❌ Master OK?", authorized2.toLowerCase() === masterFactoryAddress.toLowerCase());
+
     try {
       // 🔹 1. VÉRIF ADHÉSION EXTERNE (via getUserInfo direct)
-      console.log("🔹 1. ADHÉSION EXTERNE...");
+      //console.log("🔹 1. ADHÉSION EXTERNE...");
       const userInfo: [boolean, any, any] = await adhesionContract.methods.getUserInfo(address).call() as any;
 
-      console.log("✅ getUserInfo:", userInfo[0]);
+      //console.log("✅ getUserInfo:", userInfo[0]);
       if (!userInfo[0]) throw new Error("❌ NO ADHESION");
 
       // 🔹 2. VÉRIF COMPTEURS EXACTS (fonctions PUBLIQUES)
-      console.log("🔹 2. COMPTEURS PUBLICS...");
+      //console.log("🔹 2. COMPTEURS PUBLICS...");
       const balance = await rescoeContract.methods.checkUserAdhesionNumber(address).call();
       const count = await rescoeContract.methods.getNumberOfCollectionsByUser(address).call();
       const remaining = await rescoeContract.methods.getRemainingCollections(address).call();
 
-/*
-      console.log("💰 checkUserAdhesionNumber:", balance);
-      console.log("📊 getNumberOfCollectionsByUser:", count);
-      console.log("🎯 getRemainingCollections:", remaining);
-      console.log("✅ balance > count?", Number(balance) > Number(count));
-*/
+
+      //console.log("💰 checkUserAdhesionNumber:", balance);
+      //console.log("📊 getNumberOfCollectionsByUser:", count);
+      //console.log("🎯 getRemainingCollections:", remaining);
+      //console.log("✅ balance > count?", Number(balance) > Number(count));
+
       if (Number(balance) <= Number(count)) throw new Error(`❌ NO REMAINING: ${balance} <= ${count}`);
 
       // 🔹 3. VÉRIF TYPE (PUBLIC mapping)
       const typeOK = await rescoeContract.methods.allowedCollectionTypes(collectionType).call();
-      console.log("✅ allowedCollectionTypes:", typeOK);
+      //console.log("✅ allowedCollectionTypes:", typeOK);
       if (!typeOK) throw new Error("❌ INVALID TYPE");
 
       // 🔹 4. VÉRIF FACTORY + CONFIG (Art seulement)
       let artFactoryAddr: string;
-      if (collectionType === "Art") {
-        artFactoryAddr = await fetchFactoryAddress("Art");
-        console.log("🏭 MasterFactory:", masterFactoryAddress);
-        console.log("🎨 ArtFactory (front):", artFactoryAddr);
+      // 🔹 4. VÉRIF FACTORY + CONFIG (Art seulement)
+  if (collectionType === "Art") {
+    artFactoryAddr = await fetchFactoryAddress("Art");
+    //console.log("🏭 MasterFactory:", masterFactoryAddress);
+    //console.log("🎨 ArtFactory:", artFactoryAddr);
 
-        const artFactory = new web3.eth.Contract(ABI_ART_FACTORY as any, artFactoryAddr);
+    const artFactory = new web3.eth.Contract(ABI_ART_FACTORY as any, artFactoryAddr);
 
-        const cfg: [bigint, string[], bigint[], boolean] = await artFactory.methods.getUserCollectionConfig(address, metadata.name).call() as any;
+    // 🔍 NOM EXACT
+    const exactName = metadata.name.trim();
+    console.log("📝 NOM POUR CHECK:", `"${exactName}"`, "length:", exactName.length);
 
+    try {
+      const cfg: any = await artFactory.methods.getUserCollectionConfig(address, exactName).call();
+      console.log("🔍 FULL CFG:", {
+        exists: cfg[3],
+        maxSupply: cfg[0]?.toString() || "0",
+        collaboratorsLen: cfg[1]?.length || 0,
+        percentsLen: cfg[2]?.length || 0,
+        lengthsMatch: (cfg[1]?.length || 0) === (cfg[2]?.length || 0),
+        totalPercentOK: cfg[2]?.reduce((a: any, b: any) => Number(a) + Number(b), 0) <= 100
+      });
 
+      if (!cfg[3]) throw new Error("❌ CFG EXISTS=false");
+      if ((cfg[1]?.length || 0) !== (cfg[2]?.length || 0)) throw new Error("❌ LENGTHS MISMATCH");
+    } catch (cfgErr: any) {
+      console.error("💥 CFG FAIL:", cfgErr.message);
+      throw new Error(`❌ getUserCollectionConfig FAIL: ${exactName}`);
+    }
+  }
 
-        if (!cfg[3]) throw new Error("❌ CONFIG MANQUANTE");
-      }
 
       // 🔹 5. FACTORY DANS RESCOE (CRITIQUE !)
       const rescoeFactoryAddr: string = await rescoeContract.methods.factoryContractAddress().call() as string;
@@ -346,7 +385,7 @@ const CreateCollection: React.FC = () => {
       setLoading(true);
 
       const gasPrice = await web3.eth.getGasPrice();
-/*
+
 console.log("💡 TX PARAMS:");
 console.log("- From (EOA):", address);
 console.log("- ResCollections:", contractRESCOLLECTION);
@@ -365,7 +404,11 @@ console.log("\n🎯 Dans ArtFactory, require(msg.sender == X):");
 console.log("✅ X = ResCollections:", contractRESCOLLECTION);
 console.log("❌ X ≠ EOA:", address);
 console.log("❌ X ≠ MasterFactory:", masterFactoryAddress);
-*/
+
+
+
+
+
 // 🔹 7. TRANSACTION REELLE
 const tx = await handleMessageTransactions(
   rescoeContract.methods.createCollection(metadata.name, ipfsUrl, collectionType)
@@ -443,9 +486,9 @@ const tx = await handleMessageTransactions(
         <option style={{ backgroundColor: "#1A202C" }} value="Poesie">Poésie</option>
       </Select>
 
-      {collectionType === "Art" && (
+       {/*royalties*/}
         <Box mt={6} p={4} border="1px solid" borderColor="purple.300" borderRadius="xl">
-          <Heading size="md" mb={4} color="purple.300">Paramètres spécifiques ART</Heading>
+          <Heading size="md" mb={4} color="purple.300">Partage de royalties sur la collection :</Heading>
           <FormLabel color="gray.300" fontWeight="bold">Nombre maximum d’éditions</FormLabel>
           <Input type="number" min={1} value={maxEditions} onChange={(e) => setMaxEditions(Number(e.target.value))} bg="blackAlpha.300" color="white" borderColor="purple.300" mb={4} />
 
@@ -472,7 +515,7 @@ const tx = await handleMessageTransactions(
             </VStack>
           )}
         </Box>
-      )}
+
 
       <Button mt={4} w="full" bgGradient="linear(to-r, teal.500, green.400)" color="white" fontWeight="bold" _hover={{ transform: "scale(1.03)" }} onClick={uploadFileToIPFS} isLoading={isUploading} isDisabled={!canUpload}>
         🚀 Enregistrez votre collection

@@ -418,6 +418,25 @@
 			{
 				"indexed": true,
 				"internalType": "address",
+				"name": "oldManager",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "newManager",
+				"type": "address"
+			}
+		],
+		"name": "RescoeManagerUpdated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
 				"name": "user",
 				"type": "address"
 			},
@@ -596,24 +615,6 @@
 			}
 		],
 		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "points",
-				"type": "uint256"
-			}
-		],
-		"name": "addPendingPoints",
-		"outputs": [],
-		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -801,13 +802,6 @@
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "claimAllPendingPoints",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"inputs": [
 			{
 				"internalType": "uint256",
@@ -956,12 +950,12 @@
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
 			}
 		],
-		"name": "getPendingPoints",
+		"name": "getRemainingMembershipTime",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -975,12 +969,12 @@
 	{
 		"inputs": [
 			{
-				"internalType": "uint256",
-				"name": "tokenId",
-				"type": "uint256"
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
 			}
 		],
-		"name": "getRemainingMembershipTime",
+		"name": "getRewardPoints",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -1620,6 +1614,19 @@
 		"type": "function"
 	},
 	{
+		"inputs": [],
+		"name": "rescoeManager",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
 		"inputs": [
 			{
 				"internalType": "address",
@@ -1774,24 +1781,6 @@
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "collection",
-				"type": "address"
-			},
-			{
-				"internalType": "bool",
-				"name": "allowed",
-				"type": "bool"
-			}
-		],
-		"name": "setAuthorizedCollection",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "uint256[]",
 				"name": "prices",
 				"type": "uint256[]"
@@ -1899,16 +1888,11 @@
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "rewarder",
+				"name": "_rescoeManager",
 				"type": "address"
-			},
-			{
-				"internalType": "bool",
-				"name": "allowed",
-				"type": "bool"
 			}
 		],
-		"name": "setRewarder",
+		"name": "setRescoeManager",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"

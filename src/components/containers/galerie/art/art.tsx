@@ -181,81 +181,54 @@ const UniqueArtGalerie: React.FC = () => {
       }
   };
 
-
   const buyNFT = async (nft: NFT) => {
-    if (!web3 || !address) {
-      console.error("Web3 n'est pas initialisé ou l'utilisateur n'est pas connecté.");
-      return;
-    }
-
-    const contract = new web3.eth.Contract(ABI_MINT_CONTRACT, nft.mintContractAddress);
-
-    // 🔍 DEBUG LOGS AVANT TX
-    //console.log("=== 🔍 DEBUG BUY NFT ===");
-    //console.log("nft:", { tokenId: nft.tokenId, priceInWei: nft.priceInWei, forSale: nft.forSale, address });
+    if (!web3 || !address) return;
 
     const artNFT = new web3.eth.Contract(ABI_MINT_CONTRACT, nft.mintContractAddress);
+    const rescoeManager = new web3.eth.Contract(ABIRESCOLLECTION, contractRESCOLLECTION); // ← TON .env adresse !
 
-    // 1️⃣ EXISTS ?
-    const exists = await artNFT.methods.doesTokenExist(nft.tokenId).call();
-    //console.log("✅ 1. exists:", exists);
+    console.log("=== BUY DEBUG COMPLET ===");
+    console.log("ArtNFT:", nft.mintContractAddress);
+    console.log("Token:", nft.tokenId);
+    console.log("Buyer:", address);
 
-    // 2️⃣ FOR SALE ?
-    const forSale = await artNFT.methods.isNFTForSale(nft.tokenId).call();
-    //console.log("✅ 2. forSale:", forSale);
-
-    // 3️⃣ PRICE
-    const price = await artNFT.methods.getTokenPrice(nft.tokenId).call();
-    //console.log("✅ 3. price contract:", price.toString(), "envoyé:", nft.priceInWei);
-
-    // 4️⃣ OWNER
-    let owner;
-    try {
-      owner = await artNFT.methods.ownerOf(nft.tokenId).call();
-      //console.log("✅ 4. owner:", owner, "!= buyer?", owner.toLowerCase() !== address.toLowerCase());
-    } catch(e) {
-      //console.log("❌ 4. ownerOf FAIL:", e.message);
-    }
-
-    // 5️⃣ ARTIST
+    // 1. GETTERS ARTNFT
     const artist = await artNFT.methods.tokenCreator(nft.tokenId).call();
-    //console.log("✅ 5. artist:", artist);
+    console.log("1. tokenCreator:", artist);
 
-    // 6️⃣ ASSOCIATION
     const association = await artNFT.methods.associationAddress().call();
-    //console.log("✅ 6. association:", association);
+    console.log("2. associationAddress:", association);
 
-    // 7️⃣ EXTRAS LENGTH (getter extraPercents[0] pour test length)
+    // 3. extraRecipients (index 0, car tes logs montrent ça)
+    const extra0 = await artNFT.methods.extraRecipients(0).call().catch(() => "empty");
+    console.log("3. extraRecipients[0]:", extra0);
+
+    // 🔥 NOUVEAU : rewardContract DANS ArtNFT (CRITIQUE !)
     try {
-      const extra0 = await artNFT.methods.extraRecipients(0).call();
-      //console.log("✅ 7. extra[0]:", extra0);
-    } catch(e) {
-      //console.log("✅ 7. extra vide/OK");
+      const rewardAddr = await artNFT.methods.rewardContract().call(); // ← TON INTERFACE IReward
+      console.log("🔥 4. ArtNFT.rewardContract():", rewardAddr);
+    } catch (e) {
+      console.log("❌ NO rewardContract() dans ArtNFT ABI");
     }
 
-    // 8️⃣ REWARD CONTRACT
-    const rewardContractAddr = "0xE66583156B665A9B125b34A18Ec57F5Effd197D0"; // ResCoeManager
-      //const pendingTest = await new web3.eth.Contract(ABI_IReward, rewardContractAddr).methods.getPendingPoints("0xFa6d6E36Da4acA3e6aa3bf2b4939165C39d83879").call();
-      //console.log("✅ ResCoeManager pending OK");
+    // 🔥 NOUVEAU : VÉRIF MANAGER ACTUEL
+    console.log("🔥 5. ResCoeManager utilisé:", contractRESCOLLECTION);
+    const isAuth = await rescoeManager.methods.authorizedCollections(nft.mintContractAddress).call();
+    console.log("🔥 6. authorizedCollections[ArtNFT]:", isAuth);
 
-
+    // 🔥 STATIC SIMULATE buyNFT (exacte tx)
     try {
-      const priceInWei = nft.priceInWei;
-      //console.log("🚀 TX avec gas=600k");
-
-      const transaction = await contract.methods.buyNFT(nft.tokenId)
-        .send({
-          from: address,
-          value: priceInWei,
-          gas: "600000",
-        });
-
-      //console.log("✅ BUY SUCCESS:", transaction.transactionHash);
-    } catch (error: any) {
-      console.error("❌ BUY FAIL:", error.message);
+      await artNFT.methods.buyNFT(nft.tokenId).call({
+        from: address,
+        value: nft.priceInWei
+      });
+      console.log("✅ STATIC CALL OK → problème gas/network seulement");
+    } catch (staticError: any) {
+      console.error("❌ STATIC FAIL:", staticError.message);
+      console.error("Revert data:", staticError.data || "no data");
+      console.error("Full error:", JSON.stringify(staticError, null, 2));
     }
   };
-
 
   // Pour déclencher une recherche manuelle (formulaire)
   const handleSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {

@@ -1,121 +1,157 @@
-import React, { useEffect, useState } from "react";
-import dynamic from "next/dynamic";
+import { useEffect, useRef, useState } from "react";
 
-// Dynamically import components
-const HeroSection = dynamic(() => import("./HeroSection"), { ssr: false });
-const DynamicCarousel = dynamic(() => import("./DynamicCarousel"), { ssr: false });
+type GenesisLoaderProps = {
+  progress?: number; // optionnel : si tu veux piloter depuis l’extérieur
+  seed?: number;
+  onFinish?: () => void;
+};
 
-const Loading = ({ onFinish }: { onFinish?: () => void }) => {
-  const [visible, setVisible] = useState(true);
-  const insectCount = 40;
+const GenesisLoader = ({
+  progress: externalProgress,
+  seed = 1337,
+  onFinish,
+}: GenesisLoaderProps) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [progress, setProgress] = useState(0);
+
+  // PRNG déterministe
+  const random = (() => {
+    let s = seed;
+    return () => {
+      s = Math.sin(s) * 10000;
+      return s - Math.floor(s);
+    };
+  })();
 
   useEffect(() => {
-    const timeout = setTimeout(async () => {
-      await Promise.all([HeroSection, DynamicCarousel]);
-      setVisible(false);
-      if (onFinish) onFinish();
-    }, 4000);
-
-    for (let i = 0; i < insectCount; i++) {
-      createFirefly();
+    if (externalProgress !== undefined) {
+      setProgress(externalProgress);
     }
+  }, [externalProgress]);
 
-    return () => clearTimeout(timeout);
+  useEffect(() => {
+    if (externalProgress !== undefined) return;
+
+    const interval = setInterval(() => {
+      setProgress((p) => {
+        if (p >= 100) {
+          clearInterval(interval);
+          setTimeout(() => onFinish?.(), 300);
+          return 100;
+        }
+        return p + 1;
+      });
+    }, 28);
+
+    return () => clearInterval(interval);
   }, []);
 
-  const createFirefly = () => {
-    const firefly = document.createElement("div");
-    firefly.className = "firefly";
-    document.body.appendChild(firefly);
-    animateFirefly(firefly);
-  };
+  useEffect(() => {
+    const canvas = canvasRef.current!;
+    const ctx = canvas.getContext("2d")!;
+    const dpr = window.devicePixelRatio || 1;
 
-  const animateFirefly = (firefly: HTMLDivElement) => {
-    const move = () => {
-      const x = Math.random() * window.innerWidth;
-      const y = Math.random() * window.innerHeight;
-      const scale = 0.5 + Math.random() * 1.2;
-
-      firefly.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
-      firefly.style.opacity = `${0.4 + Math.random() * 0.5}`;
+    const resize = () => {
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = window.innerHeight * dpr;
+      ctx.scale(dpr, dpr);
     };
 
-    move();
-    const interval = setInterval(move, 1000 + Math.random() * 1500);
+    resize();
+    window.addEventListener("resize", resize);
 
-    setTimeout(() => {
-      clearInterval(interval);
-      firefly.remove();
-    }, 4000);
-  };
+    const center = {
+      x: window.innerWidth / 2,
+      y: window.innerHeight / 2,
+    };
 
-  if (!visible) return null;
+    const points = Array.from({ length: 420 }, () => ({
+      x: random() * window.innerWidth,
+      y: random() * window.innerHeight,
+      ox: 0,
+      oy: 0,
+      alpha: 0,
+    }));
+
+    points.forEach((p) => {
+      p.ox = center.x + (random() - 0.5) * 180;
+      p.oy = center.y + (random() - 0.5) * 180;
+    });
+
+    const render = () => {
+      ctx.fillStyle = "#0b0b10";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      points.forEach((p, i) => {
+        const t = progress / 100;
+
+        if (t < 0.4) {
+          p.alpha = Math.min(p.alpha + 0.01, 0.6);
+        } else {
+          p.x += (p.ox - p.x) * 0.02;
+          p.y += (p.oy - p.y) * 0.02;
+          p.alpha = Math.min(p.alpha + 0.02, 1);
+        }
+
+        ctx.fillStyle = `rgba(190,190,255,${p.alpha})`;
+        ctx.fillRect(p.x, p.y, 2, 2);
+      });
+
+      requestAnimationFrame(render);
+    };
+
+    render();
+
+    return () => window.removeEventListener("resize", resize);
+  }, [progress]);
 
   return (
-    <div className="loader-overlay">
-      <div className="loader-text">Les insectes s'activent...</div>
-      <style jsx>{`
-        .loader-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          z-index: 9999;
-          width: 100%;
-          height: 100%;
-          background: linear-gradient(160deg, #0f0f23, #1a1a2f, #0d0d1b);
-          animation: pulseBG 6s ease-in-out infinite;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          overflow: hidden;
-        }
-
-        .loader-text {
-          position: absolute;
-          bottom: 8%;
-          font-size: 1.5rem;
-          color: #f0e6ff;
-          font-weight: bold;
-          font-family: 'Courier New', monospace;
-          animation: waveText 3s ease-in-out infinite;
-          text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
-        }
-
-        @keyframes pulseBG {
-          0% {
-            background-position: 0% 50%;
-          }
-          50% {
-            background-position: 100% 50%;
-          }
-          100% {
-            background-position: 0% 50%;
-          }
-        }
-
-        @keyframes waveText {
-          0%, 100% {
-            transform: translateY(0px);
-          }
-          50% {
-            transform: translateY(-6px);
-          }
-        }
-
-        .firefly {
-          position: absolute;
-          width: 8px;
-          height: 8px;
-          background: rgba(255, 255, 200, 0.85);
-          border-radius: 50%;
-          pointer-events: none;
-          filter: blur(1px);
-          box-shadow: 0 0 12px rgba(255, 255, 150, 0.9), 0 0 20px rgba(255, 255, 150, 0.7);
-          transition: transform 1.8s ease-in-out, opacity 1.8s ease-in-out;
-        }
-      `}</style>
+    <div style={overlay}>
+      <canvas ref={canvasRef} />
+      <div style={ui}>
+        <div style={title}>GENESIS</div>
+        <div style={status}>
+          {progress < 40 && "initializing structure"}
+          {progress >= 40 && progress < 80 && "resolving fragments"}
+          {progress >= 80 && "sealing form"}
+        </div>
+        <div style={percent}>{progress}%</div>
+      </div>
     </div>
   );
 };
 
-export default Loading;
+export default GenesisLoader;
+
+const overlay: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "#0b0b10",
+  zIndex: 9999,
+};
+
+const ui: React.CSSProperties = {
+  position: "absolute",
+  bottom: "10%",
+  width: "100%",
+  textAlign: "center",
+  fontFamily: "monospace",
+  letterSpacing: "0.2em",
+  color: "#e0e0ff",
+};
+
+const title: React.CSSProperties = {
+  fontSize: "1.4rem",
+  marginBottom: "0.6rem",
+};
+
+const status: React.CSSProperties = {
+  opacity: 0.7,
+  fontSize: "0.8rem",
+  marginBottom: "0.4rem",
+};
+
+const percent: React.CSSProperties = {
+  opacity: 0.4,
+  fontSize: "0.7rem",
+};

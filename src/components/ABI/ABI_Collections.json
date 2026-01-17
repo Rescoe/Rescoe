@@ -377,7 +377,70 @@
 				"type": "uint256"
 			}
 		],
+		"name": "PendingPointsClaimed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "points",
+				"type": "uint256"
+			}
+		],
+		"name": "PointsDistributed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "points",
+				"type": "uint256"
+			}
+		],
 		"name": "PointsPending",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "points",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "ethSpent",
+				"type": "uint256"
+			}
+		],
+		"name": "PointsPurchased",
 		"type": "event"
 	},
 	{
@@ -423,6 +486,19 @@
 		],
 		"name": "Transfer",
 		"type": "event"
+	},
+	{
+		"inputs": [],
+		"name": "POINT_PRICE",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
 	},
 	{
 		"inputs": [
@@ -497,7 +573,7 @@
 		"name": "adhesionContract",
 		"outputs": [
 			{
-				"internalType": "contract IAdhesionContract",
+				"internalType": "contract IReward",
 				"name": "",
 				"type": "address"
 			}
@@ -628,6 +704,19 @@
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "pointsAmount",
+				"type": "uint256"
+			}
+		],
+		"name": "buyPendingPoints",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
 				"internalType": "address",
 				"name": "user",
 				"type": "address"
@@ -642,6 +731,13 @@
 			}
 		],
 		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "claimPendingToRewards",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -699,19 +795,6 @@
 				"internalType": "address",
 				"name": "user",
 				"type": "address"
-			}
-		],
-		"name": "confirmPointsDistributed",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
 			},
 			{
 				"internalType": "string",
@@ -753,6 +836,19 @@
 			}
 		],
 		"name": "createCollection",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			}
+		],
+		"name": "distributeToAdhesion",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -1086,25 +1182,6 @@
 			}
 		],
 		"name": "getPendingPoints",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			}
-		],
-		"name": "getPointsReadyForDistribution",
 		"outputs": [
 			{
 				"internalType": "uint256",
