@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { InfoOutlineIcon } from "@chakra-ui/icons";
 import { Box, Tooltip, Icon, Image, Heading, VStack, Stack, Button, Text, Link, HStack, Grid, Tab, TabList, TabPanel, TabPanels, Tabs, FormLabel, Spinner, Divider, useToast } from '@chakra-ui/react';
 import * as jdenticon from 'jdenticon';
-import { useAuth } from '../../../utils/authContext';
+
+import { useAuth } from "@/utils/authContext";
 import { JsonRpcProvider } from 'ethers';
 import { ethers } from "ethers";
+
 import { BrowserProvider, Eip1193Provider } from "ethers";
 import UserNFTFeed from "@/hooks/Moralis/userNFT";
 import UserTransactionsFeed from "@/hooks/Moralis/UserTransactionsFeed";
@@ -25,6 +27,7 @@ const contratAdhesionManagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGE
 
 const Dashboard = () => {
   const { address: authAddress } = useAuth();
+
   interface UserData {
     address: string;
     name: string;
@@ -35,6 +38,7 @@ const Dashboard = () => {
     nfts: Array<{ tokenId: string; image: string; role?: string; finAdhesion?: string }>;
     collections: any[];
     rewardPoints: number;
+    pendingPoints: number;
     userCollections?: number;
     remainingCollections?: number;
   }
@@ -59,12 +63,16 @@ const Dashboard = () => {
     nfts: [],
     collections: [],
     rewardPoints: 0,
+    pendingPoints: 0, // ✅ Initialisation
+
   });
 
 
   const [loading, setLoading] = useState<boolean>(true);
   const [pointsToBuy, setPointsToBuy] = useState<number>(0); // État pour les points à acheter
   const toast = useToast();
+  const { address: account, web3, isAuthenticated } = useAuth();
+
 
   useEffect(() => {
     const setupWeb3 = async () => {
@@ -87,9 +95,10 @@ const Dashboard = () => {
       if (!authAddress) return; // Sortir si l'adresse est vide
       setLoading(true);
       try {
-        const [rolesAndImages, adhesionPoints, nfts, stats] = await Promise.all([
+        const [rolesAndImages, adhesionPoints, pendingsPoints, nfts, stats] = await Promise.all([
           fetchRolesAndImages(authAddress),
           fetchAdhesionPoints(authAddress),
+          fetchPendingPoints(authAddress),
           fetchNFTs(authAddress),
           fetchStatsCollection(authAddress),
         ]);
@@ -104,6 +113,7 @@ const Dashboard = () => {
           roles: rolesAndImages.roles,
           finAdhesion: rolesAndImages.finAdhesion,
           rewardPoints: adhesionPoints,
+          pendingPoints: pendingsPoints,
           nfts: allNFTs,
           collections: stats.collections,
           userCollections: stats.userCollections,
@@ -219,26 +229,71 @@ const Dashboard = () => {
     }
   };
 
+  const fetchPendingPoints = async (userAddress: string) => {
+    const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
+    const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
+    try {
+      const Pendingpoints = await contract.getPendingPoints(userAddress);
+      return Number(Pendingpoints);
+    } catch (error) {
+      console.error("Erreur lors de la récupération des points:", error);
+      return 0; // fallback
+    }
+  };
+
+
   const buyAdhesionPoints = async (userAddress: string) => {
     if (!window.ethereum) {
       throw new Error("Wallet non détecté.");
     }
 
-    const ethereum = window.ethereum as Eip1193Provider;
-    await ethereum.request({ method: "eth_requestAccounts" });
 
-    const provider = new BrowserProvider(ethereum);
-    const signer = await provider.getSigner();
-    const contract = new ethers.Contract(contractAdhesion, ABI, signer);
+    if (!web3) {
+      throw new Error("Web3 non initialisé");
+    }
+
+    if (!account) throw new Error("Compte non connecté");
+
+
+    const contract = new web3.eth.Contract(ABIRESCOLLECTION as any, contractRESCOLLECTION);
+
+    const gasPrice = await web3.eth.getGasPrice(); // ✅ IDENTIQUE
 
     try {
       const prixParPoint = await fetchPointPrice();
       const totalPrice = BigInt(prixParPoint) * BigInt(pointsToBuy);
-      const tx = await contract.buyRewardPoints(userAddress, pointsToBuy, { value: totalPrice });
-      await tx.wait();
+
+
+      // ✅ COPIE EXACTE de ton code qui marche
+      const tx = await contract.methods
+        .buyPendingPoints(pointsToBuy)
+        .send({
+          from: account,
+          value: totalPrice.toString(),
+          gasPrice: gasPrice.toString(),      // ✅ force string
+          maxFeePerGas: null as any,           // ✅ TS ok
+          maxPriorityFeePerGas: null as any    // ✅ legacy tx
+        });
+
+
+
       // Met à jour le nombre de points après l'achat
       const updatedPoints = await fetchAdhesionPoints(userAddress);
-      setUserData(prev => ({ ...prev, rewardPoints: updatedPoints }));
+
+      const updatedPointspending = await fetchPendingPoints(userAddress);
+      setUserData(prev => ({ ...prev, rewardPoints: updatedPoints, pendingPoints: updatedPointspending }));
+
+
+      // Après tx.send() de l'achat
+      const claimResponse = await fetch('/api/claim-reward', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user: account })
+      });
+
+      const claimData = await claimResponse.json();
+      console.log('Points distribués:', claimData);
+
     } catch (error) {
       console.error("Erreur lors de l'achat des points:", error);
     }
@@ -425,6 +480,9 @@ const Dashboard = () => {
                       <Text>
                         <strong>Collections restantes :</strong> {userData.remainingCollections}
                       </Text>
+
+                      <strong>Points RESCOE en attente</strong>
+                      {userData.pendingPoints && userData.pendingPoints > 0n ? `${userData.pendingPoints} 🐝` : '0 🐝'}
 
                       <Text>
                         <strong>Points RESCOE :</strong> {userData.rewardPoints || 'Chargement...'} 🐝

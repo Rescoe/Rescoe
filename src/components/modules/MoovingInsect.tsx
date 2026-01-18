@@ -18,7 +18,7 @@ const Insecte = ({ headerRef, selectedInsect, level }: InsecteProps) => {
   // Effect to handle the position updates
   useEffect(() => {
     const headerHeight = headerRef.current ? headerRef.current.getBoundingClientRect().height : 0;
-    const newTopPosition = headerHeight - 57;
+    const newTopPosition = headerHeight - 52;
     setInsectPosition(newTopPosition);
 
     const windowWidth = window.innerWidth;
@@ -57,7 +57,7 @@ const Insecte = ({ headerRef, selectedInsect, level }: InsecteProps) => {
           alt="Insecte"
           boxSize="100px"
           objectFit="contain"
-          transform={isLevel2 ? 'none' : 'rotate(20deg) scaleY(0.98)'}
+          transform={isLevel2 ? 'none' : 'rotate(27deg) scaleY(0.98)'}
         />
       </Box>
 

@@ -236,11 +236,18 @@ export const useTokenEvolution = ({
         maxPriorityFeePerGas: null as any
       });
 
-      const newTokenId =
-        receipt.events?.EvolveCompleted?.returnValues?.newTokenId ??
-        tokenId + 1;
 
-      window.location.href = `/AdhesionId/${contractAddress}/${newTokenId}`;
+        console.log("✅ ÉVOLUTION OK - Gas utilisé:", receipt.gasUsed);
+
+        // ✅ newTokenId (contrat modifié ou fallback)
+        const newTokenId = receipt.events?.EvolveCompleted?.returnValues?.newTokenId ||
+                          receipt.events?.LevelEvolved?.returnValues?.tokenId ||
+                          tokenId + 1; // fallback si contrat pas encore updaté
+
+        console.log("✅ Nouveau Token ID:", newTokenId);
+        window.location.href = `/AdhesionId/${contractAddress}/${newTokenId}`;
+
+
     } catch (e) {
       console.error("❌ evolve error:", e);
       alert("Erreur transaction");
