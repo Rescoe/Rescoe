@@ -82,17 +82,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const toast = useToast();
 
-  // ✅ INIT Web3Auth + RESTAURE SESSION
+  // ✅ INIT Web3Auth + RESTAURE SESSION (MODIFIÉ : loading persistant + mobile detection)
   useEffect(() => {
     let mounted = true;
 
     const initWeb3Auth = async () => {
       try {
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
         const instance = new Web3Auth({
           clientId: WEB3AUTH_CLIENT_ID,
           web3AuthNetwork: "sapphire_devnet",
           uiConfig: {
-            loginMethodsOrder: ["google", "facebook", "email_passwordless", "metamask"],
+            loginMethodsOrder: isMobile
+              ? ["google", "facebook", "email_passwordless"]  // ✅ Sans metamask mobile
+              : ["google", "facebook", "email_passwordless", "metamask"],
           },
           walletServicesConfig: {
             confirmationStrategy: "default",
@@ -118,33 +122,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!mounted) return;
         setWeb3auth(instance);
 
-        // ✅ WEB3AUTH v7+ : check session avec getUserInfo()
-        try {
-          const userInfo = await instance.getUserInfo();
-          if (userInfo && Object.keys(userInfo).length > 0) {
-            console.log("✅ Web3Auth session restaurée:", userInfo.name);
+        // ✅ Check session + setup complet AVANT fin loading
+        const providerInstance = instance.provider;
+        if (providerInstance) {
+          const web3Instance = new Web3(providerInstance);
+          const accounts = await web3Instance.eth.getAccounts();
 
-            const providerInstance = instance.provider;
-            if (providerInstance) {
-              const web3Instance = new Web3(providerInstance);
-              const accounts = await web3Instance.eth.getAccounts();
-
-              if (accounts.length > 0 && mounted) {
-                const userAddress = accounts[0].toLowerCase();
-                setWeb3(web3Instance);
-                setProvider(providerInstance);
-                setAddress(userAddress);
-                setIsAuthenticated(true);
-                await fetchRole(web3Instance, userAddress);
-              }
-            }
+          if (accounts.length > 0 && mounted) {
+            const userAddress = accounts[0].toLowerCase();
+            setWeb3(web3Instance);
+            setProvider(providerInstance);
+            setAddress(userAddress);
+            setIsAuthenticated(true);
+            await fetchRole(web3Instance, userAddress);  // ✅ Fetch rôle AVANT fin loading
           }
-        } catch (sessionErr) {
-          console.log("ℹ️ Aucune session active");
         }
+        // ✅ Fin loading UNIQUEMENT quand tout est prêt
+        if (mounted) setIsLoading(false);
       } catch (err) {
         console.error("Erreur init Web3Auth:", err);
-      } finally {
         if (mounted) setIsLoading(false);
       }
     };
@@ -262,41 +258,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // ✅ SURVEILLE SESSION (✅ SANS isUserLoggedIn)
-  useEffect(() => {
-    if (!web3auth || isLoading) return;
-
-    const checkSession = async () => {
-      try {
-        // ✅ UNIQUEMENT getUserInfo()
-        const userInfo = await web3auth.getUserInfo();
-
-        if (userInfo && Object.keys(userInfo).length > 0 && !address) {
-          console.log("🔄 Session restaurée:", userInfo.name);
-
-          const providerInstance = web3auth.provider;
-          if (providerInstance) {
-            const web3Instance = new Web3(providerInstance);
-            const accounts = await web3Instance.eth.getAccounts();
-
-            if (accounts.length > 0) {
-              const userAddress = accounts[0].toLowerCase();
-              setWeb3(web3Instance);
-              setProvider(providerInstance);
-              setAddress(userAddress);
-              setIsAuthenticated(true);
-              await fetchRole(web3Instance, userAddress);
-            }
-          }
-        }
-      } catch (err) {
-        // Session expirée → ignore
-      }
-    };
-
-    const interval = setInterval(checkSession, 3000);
-    return () => clearInterval(interval);
-  }, [web3auth, address, isLoading]);
+  // ✅ SUPPRIMÉ : useEffect checkSession interval (cause doubles fetchRole)
 
   const isMember = !!role;
 
@@ -323,7 +285,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isLoading,
       }}
     >
-      {(isLoading || roleLoading) ? <Loading /> : children}
+      {(isLoading || roleLoading) ? <Loading /> : children}  {/* ✅ ET roleLoading */}
     </AuthContext.Provider>
   );
 };

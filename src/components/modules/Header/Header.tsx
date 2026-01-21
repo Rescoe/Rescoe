@@ -25,6 +25,7 @@ const Header = () => {
   const headerRef = useRef<HTMLDivElement>(null);
   const theme = useTheme();
 
+  // Dans Header.tsx - REMPLACE TES 2 useEffect par ÇA (complet + safe)
   const {
     isAuthenticated,
     isAdmin,
@@ -35,7 +36,61 @@ const Header = () => {
     address,
     isMember,
     role,
+    web3,
+    provider,        // ✅ Ajouté
+    connectWallet,   // ✅ Ajouté
+    connectWithEmail,// ✅ Ajouté
+    logout,          // ✅ Ajouté
+    roleLoading,     // ✅ Ajouté
+    isLoading,       // ✅ Ajouté
   } = useAuth();
+
+  useEffect(() => {
+    // ✅ INIT COMPLÈTE avec TOUS tes champs
+    window.RESCOE_AUTH = window.RESCOE_AUTH || {
+      isAuthenticated: false,
+      address: null,
+      role: null,
+      isAdmin: false,
+      isArtist: false,
+      isPoet: false,
+      isTrainee: false,
+      isContributor: false,
+      isMember: false,
+      web3: null,
+      provider: null,
+      connectWallet: undefined,
+      connectWithEmail: undefined,
+      logout: undefined,
+      roleLoading: false,
+      isLoading: false
+    };
+
+    // ✅ UPDATE avec tes vraies variables
+    window.RESCOE_AUTH.address = address;
+    window.RESCOE_AUTH.role = role;
+    window.RESCOE_AUTH.isAuthenticated = isAuthenticated;
+    window.RESCOE_AUTH.isAdmin = isAdmin;
+    window.RESCOE_AUTH.isArtist = isArtist;
+    window.RESCOE_AUTH.isPoet = isPoet;
+    window.RESCOE_AUTH.isTrainee = isTrainee;
+    window.RESCOE_AUTH.isContributor = isContributor;
+    window.RESCOE_AUTH.isMember = isMember;
+    window.RESCOE_AUTH.web3 = web3;
+    window.RESCOE_AUTH.provider = provider;
+    window.RESCOE_AUTH.connectWallet = connectWallet;
+    window.RESCOE_AUTH.connectWithEmail = connectWithEmail;
+    window.RESCOE_AUTH.logout = logout;
+    window.RESCOE_AUTH.roleLoading = roleLoading;
+    window.RESCOE_AUTH.isLoading = isLoading;
+
+    console.log("🔗 HEADER FULL:", window.RESCOE_AUTH);
+  }, [
+    address, isAuthenticated, role, isAdmin, isArtist, isPoet,
+    isTrainee, isContributor, isMember, web3, provider,
+    roleLoading, isLoading, connectWallet, connectWithEmail, logout
+  ]);
+
 
   //console.log(role);
 

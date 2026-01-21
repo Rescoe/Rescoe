@@ -2,7 +2,8 @@
   "compilerOptions": {
     "typeRoots": [
       "./src/@types",
-      "./node_modules/@types"
+      "./node_modules/@types",
+      "./types"
     ],
     "target": "es2020",
     "lib": [

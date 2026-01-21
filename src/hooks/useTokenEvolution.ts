@@ -5,6 +5,8 @@ import evolutionEngine from "../utils/evolutionEngine";
 import { usePinataUpload } from "./usePinataUpload";
 import ABI from "../components/ABI/ABIAdhesionEvolve.json";
 import { useAuth } from "@/utils/authContext";
+import { useRouter } from 'next/router';
+
 
 interface MembershipRaw {
   level: string | number;
@@ -49,6 +51,8 @@ export const useTokenEvolution = ({
 
   const { uploadToIPFS, ipfsUrl } = usePinataUpload();
   const { address: account, web3, isAuthenticated } = useAuth();
+  const router = useRouter();
+
 
   /* =======================
      FETCH ON-CHAIN MEMBERSHIP
@@ -229,24 +233,36 @@ export const useTokenEvolution = ({
       const contract = new web3.eth.Contract(ABI as any, contractAddress);
 
       const receipt = await contract.methods.evolve(tokenId, ipfsUrl).send({
-        from: account,                    // ✅ account de useAuth()
+        from: account,
         value: web3.utils.toWei(evolvePriceEth.toString(), "ether"),
-        gasPrice: gasPrice.toString(),    // ✅ recette low gas
-        maxFeePerGas: null as any,        // ✅ legacy tx
-        maxPriorityFeePerGas: null as any
+        gasPrice: gasPrice.toString(),
       });
 
+      // ✅ GESTION NOUVEAU TOKEN ID
+      console.log("✅ ÉVOLUTION OK - Gas:", receipt.gasUsed.toString());
 
-        console.log("✅ ÉVOLUTION OK - Gas utilisé:", receipt.gasUsed);
+      let newTokenId = null;
 
-        // ✅ newTokenId (contrat modifié ou fallback)
-        const newTokenId = receipt.events?.EvolveCompleted?.returnValues?.newTokenId ||
-                          receipt.events?.LevelEvolved?.returnValues?.tokenId ||
-                          tokenId + 1; // fallback si contrat pas encore updaté
+      // 1️⃣ Event LevelEvolved (PRIORITÉ)
+      if (receipt.events?.LevelEvolved) {
+        newTokenId = receipt.events.LevelEvolved.returnValues.tokenId;
+      }
 
-        console.log("✅ Nouveau Token ID:", newTokenId);
-        window.location.href = `/AdhesionId/${contractAddress}/${newTokenId}`;
+      // 2️⃣ Fallback totalSupply
+      if (!newTokenId) {
+        const totalSupply = await contract.methods.totalSupply().call();
+        newTokenId = totalSupply;
+      }
 
+      // 3️⃣ Ultime fallback
+      if (!newTokenId) {
+        newTokenId = (Number(tokenId) + 1).toString();
+      }
+
+      console.log("🎉 Nouveau token ID:", newTokenId);
+
+      // ✅ SPA REDIRECTION
+      router.push(`/AdhesionId/${contractAddress}/${newTokenId}`);
 
     } catch (e) {
       console.error("❌ evolve error:", e);
@@ -255,6 +271,7 @@ export const useTokenEvolution = ({
       setIsEvolving(false);
     }
   }, [ipfsUrl, contractAddress, tokenId, evolvePriceEth, account, web3, isAuthenticated]);
+
 
   const refreshEvolution = useCallback(() => {
     setPreviewImageUrl(null);

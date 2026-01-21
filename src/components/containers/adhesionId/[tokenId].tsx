@@ -123,7 +123,16 @@ const TokenPage = () => {
   const router = useRouter();
   const { tokenId } = router.query;
 
-  const { address: authAddress, web3: authWeb3 } = useAuth();
+
+  //const { address: authAddress, web3: authWeb3 } = useAuth();
+  // Au début du composant
+  const auth = typeof window !== 'undefined' ?
+    (window as any).RESCOE_AUTH || {
+      isAuthenticated: false, address: null, role: null,
+      isAdmin: false, web3: null, provider: null
+    } : { isAuthenticated: false, address: null, role: null, isAdmin: false, web3: null, provider: null };
+
+  const { isAuthenticated, address : authAddress, role, web3: authWeb3, provider, connectWallet, logout } = auth;
 
   const [nftData, setNftData] = useState<NFTData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -138,6 +147,32 @@ const TokenPage = () => {
 
   const [evolutionRefreshFlag, setEvolutionRefreshFlag] = useState<number>(0);
   const [reproRefreshFlag, setReproRefreshFlag] = useState<number>(0);
+
+
+  useEffect(() => {
+    // ✅ RESTAURE AUTH APRÈS NAVIGATION
+    if (typeof window !== 'undefined') {
+      const restoreAuth = () => {
+        if (!auth.isAuthenticated && (window as any).RESCOE_AUTH?.isAuthenticated) {
+          console.log('🔄 Restauration auth...');
+          // Force refresh de l'objet global
+          (window as any).RESCOE_AUTH = {
+            ...auth,
+            ...(window as any).RESCOE_AUTH
+          };
+        }
+      };
+
+      restoreAuth();
+
+      // Listener pour reconnexion
+      const handleFocus = () => restoreAuth();
+      window.addEventListener('focus', handleFocus);
+
+      return () => window.removeEventListener('focus', handleFocus);
+    }
+  }, [auth.isAuthenticated]);
+
 
   const reproduction = useReproduction({
     contractAddress: contractAdhesion,
@@ -631,7 +666,7 @@ const TokenPage = () => {
                   placeholder="Ex: 0.01"
                 />
                 <Button
-                isDisabled={!isManualEvolveReady}
+                isDisabled={!rawMembershipInfo?.expirationTimestamp}
                 colorScheme="teal" mt={4} onClick={handleListForSale}>
                   Mettre en vente
                 </Button>

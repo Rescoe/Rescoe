@@ -25,11 +25,15 @@ import {
   Radio,
   Stack,
   Checkbox,
+  Alert, AlertIcon, AlertTitle,
+  Link,
 } from "@chakra-ui/react";
 import { Canvas } from "@react-three/fiber";
 import { FaAward, FaWallet, FaClock, FaUserShield, FaStar } from "react-icons/fa";
+import { WarningIcon, LockIcon } from '@chakra-ui/icons';  // ✅ AJOUT ICI
 
-import ABI from "@/components/ABI/ABIAdhesionEvolve.json";
+
+import ABI from "@/components/ABI/ABIAdhesion.json";
 import getRandomInsectGif  from "@/utils/GenInsect25";
 import useEthToEur from "@/hooks/useEuro";
 import { useAuth } from "@/utils/authContext";
@@ -42,7 +46,7 @@ import colorProfilesJson from '@/data/gif_profiles_smart_colors.json';
 type FamilyKey = keyof typeof colorProfilesJson.families;
 
 const RoleBasedNFTPage = () => {
-  const { address: account, web3, isAuthenticated } = useAuth();
+  const { address: account, web3, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const { convertEthToEur, loading: loadingEthPrice } = useEthToEur();
   const { ipfsUrl, isUploading, uploadToIPFS } = usePinataUpload();
@@ -69,7 +73,9 @@ const RoleBasedNFTPage = () => {
   const [isMinting, setIsMinting] = useState<boolean>(false);
   const [nftId, setNftId] = useState<string>("");
 
-  const [isOnSepolia, setIsOnSepolia] = useState<boolean>(false);
+  const [mintRestant, setMintRestant] = useState<number>(0);
+  const [maxMint, setMaxMint] = useState<number>(0);
+
   const [isReadyToMint, setIsReadyToMint] = useState<boolean>(false);
 
   const [insectData, setInsectData] = useState<any>(null);
@@ -100,26 +106,40 @@ const [simulatedInsect, setSimulatedInsect] = useState<any | null>(null);
 
   // Vérif réseau + prochain tokenId
   useEffect(() => {
-    if (!account || !web3) return;
+    if (!account || !web3 || isLoading) return;
 
     const checkNetworkAndId = async () => {
       const chainId = await web3.eth.getChainId();
-      setIsOnSepolia(Number(chainId) === 11155111);
 
       const contract = new web3.eth.Contract(ABI as any, contractAddress);
       const totalMinted = await contract.methods.getTotalMinted().call();
+      // même formule que dans le contrat
+      const currentYearIndex = Math.floor(Date.now() / 1000 / (365 * 24 * 60 * 60)); //comme ans le contrat, on cheerche l'année a partir du genesis block d'eth
+
+      const maxMints = Number(await contract.methods.maxMintsPerYear().call());
+      setMaxMint(maxMints);
+      const adhesionRestantes: string = await contract.methods
+        .mintsPerYear(account, currentYearIndex)
+        .call();
+
+      console.log("mints this year:", adhesionRestantes);
+
+      const used = Number(adhesionRestantes);
+      const remaining = Number(maxMints) - used; // récupère maxMintsPerYear avec un call aussi
+      setMintRestant(remaining); // récupère maxMintsPerYear avec un call aussi
+
+console.log("mints restants:", mintRestant);
+
       setNftId(Number(totalMinted).toString());
     };
 
-    checkNetworkAndId();
-  }, [account, web3, contractAddress]);
-
-  // Chargement des prix depuis le contrat
-  useEffect(() => {
-    if (!account || loadingEthPrice) return;
+    if (loadingEthPrice) return;
+    else{
     fetchPrices();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [account, loadingEthPrice]);
+    }
+    checkNetworkAndId();
+  }, [account, web3, contractAddress, isLoading, loadingEthPrice]);
+
 
   const fetchPrices = async () => {
     try {
@@ -162,6 +182,7 @@ const [simulatedInsect, setSimulatedInsect] = useState<any | null>(null);
     } else {
       if (nextAutoEvolve) {
         const autoPremium = baseEvolve[0] + baseEvolve[1] + baseEvolve[2];
+
         required = mintPrice + autoPremium;
       } else {
         required = mintPrice;
@@ -359,6 +380,11 @@ const handleConfirmRole = async () => {
     }
   };
 
+  // ✅ CALCUL autoPremium pour évolution automatique
+const baseEvolvePrices = [0.0001, 0.00015, 0.0002]; // tes prix en ETH
+const autoPremiumEth = baseEvolvePrices.reduce((sum, price) => sum + price, 0);
+
+
   return (
     <Box p={5} textAlign="center">
       <Box p={5} borderRadius="lg" boxShadow="md" mb={4} maxWidth="800px" mx="auto">
@@ -484,102 +510,166 @@ mb={4}
 
       </Box>
 
-      {isAuthenticated && (
+      {isAuthenticated ? (
         <>
-          <FormControl mb={3}>
-            <FormLabel>Choisissez un rôle</FormLabel>
-            <Select
-              placeholder="Sélectionnez votre rôle"
-              onChange={(e) => {
-                setSelectedRole(e.target.value);
-                generateImage();
-              }}
-              value={selectedRole}
-            >
-              {roles.map((role) => (
-                <option key={role.value} value={role.value}>
-                  {role.label}
-                </option>
-              ))}
-            </Select>
-          </FormControl>
-
-          <FormControl mb={3}>
-            <FormLabel>Nom</FormLabel>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Entrez votre nom"
-            />
-          </FormControl>
-
-          <FormControl mb={3}>
-            <FormLabel>Biographie</FormLabel>
-            <Input
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              placeholder="Entrez votre biographie"
-            />
-          </FormControl>
-
-          <FormControl mb={3}>
-            <FormLabel>Type d’adhésion</FormLabel>
-            <RadioGroup
-              onChange={(val) => recomputeRequiredPrice(val === "annual", autoEvolve)}
-              value={isAnnual ? "annual" : "trial"}
-            >
-              <Stack direction="row">
-                <Radio value="trial">Essai découverte</Radio>
-                <Radio value="annual">Adhésion annuelle</Radio>
-              </Stack>
-            </RadioGroup>
-          </FormControl>
-
-          <FormControl mb={3}>
-            <Checkbox
-              isChecked={autoEvolve}
-              isDisabled={!isAnnual}
-              onChange={(e) =>
-                recomputeRequiredPrice(isAnnual, e.target.checked)
+          {/* INFO MINTS RESTANTS - TOUJOURS VISIBLE */}
+          <Alert status={mintRestant > 0 ? "success" : "warning"} mb={4} borderRadius="md">
+            <AlertIcon />
+            <AlertTitle mr={2}>
+              {mintRestant > 0
+                ? `🎉 ${mintRestant} adhésion${mintRestant > 1 ? 's' : ''} restante${mintRestant > 1 ? 's' : ''} cette année !`
+                : "❌ Quota annuel atteint"
               }
-            >
-              Activer l’évolution automatique
-            </Checkbox>
-          </FormControl>
+            </AlertTitle>
+          </Alert>
 
-          <Button
-            colorScheme="blue"
-            onClick={handleConfirmRole}
-            isDisabled={!selectedRole || roleConfirmed || !generatedImageUrl}
-            mb={3}
-          >
-            Confirmer le rôle et générer le badge
-          </Button>
+          {/* FORMULAIRE UNIQUEMENT si mints disponibles */}
+          {mintRestant > 0 && (
+            <>
+              <FormControl mb={4}>
+                <FormLabel>👤 Rôle d’adhésion</FormLabel>
+                <Select
+                  placeholder="Choisissez votre rôle..."
+                  value={selectedRole || ""}  // ✅ FIX BUG RÔLE
+                  onChange={(e) => {
+                    const newRole = e.target.value || "";  // ✅ Prise en compte immédiate
+                    setSelectedRole(newRole);
+                    if (newRole) generateImage();  // Génère seulement si rôle valide
+                  }}
+                >
+                  {roles.map((role) => (
+                    <option key={role.value} value={role.value}>
+                      {role.label}
+                    </option>
+                  ))}
+                </Select>
+              </FormControl>
 
-          {generatedImageUrl && (
-            <Text mb={3}>
-              Votre insecte animé est prêt, il sera associé à votre badge.
-            </Text>
+              <FormControl mb={4}>
+                <FormLabel>✏️ Nom complet</FormLabel>
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Votre nom d'adhérent"
+                />
+              </FormControl>
+
+              <FormControl mb={4}>
+                <FormLabel>📝 Biographie</FormLabel>
+                <Input
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  placeholder="Décrivez votre parcours..."
+                />
+              </FormControl>
+
+              <FormControl mb={4}>
+                <FormLabel>📅 Type d’adhésion</FormLabel>
+                <RadioGroup
+                  onChange={(val) => recomputeRequiredPrice(val === "annual", autoEvolve)}
+                  value={isAnnual ? "annual" : "trial"}
+                >
+                  <Stack direction="row" spacing={6}>
+                    <Radio value="trial">
+                      <Text fontSize="sm">🧪 Essai découverte <Text as="span" color="gray.500" fontSize="xs">(prix / 10)</Text></Text>
+                    </Radio>
+                    <Radio value="annual">
+                      <Text fontSize="sm">📆 Annuel complet <Text as="span" color="gray.500" fontSize="xs">(365 jours)</Text></Text>
+                    </Radio>
+                  </Stack>
+                </RadioGroup>
+              </FormControl>
+
+              <FormControl mb={6}>
+                <Checkbox
+                  isChecked={autoEvolve}
+                  isDisabled={!isAnnual}
+                  onChange={(e) => recomputeRequiredPrice(isAnnual, e.target.checked)}
+                >
+                  🚀 Activer l’évolution automatique
+                  <Text as="span" color="gray.500" fontSize="sm" ml={2}>
+                    (+ {autoPremiumEth.toFixed(4)} ETH)
+                  </Text>
+                </Checkbox>
+              </FormControl>
+
+              {/* PRIX AFFICHÉ */}
+              <Box bg="gray.50" p={4} borderRadius="lg" mb={6}>
+                <Text fontSize="lg" fontWeight="bold" mb={1}>
+                  💰 {requiredPriceEth.toFixed(4)} ETH (~{priceEur.toFixed(2)} €)
+                </Text>
+                {generatedImageUrl && (
+                  <Text color="green.600" fontSize="sm">
+                    ✅ Badge animé prêt !
+                  </Text>
+                )}
+              </Box>
+
+              {/* BOUTONS */}
+              <VStack spacing={3}>
+                <Button
+                  w="full"
+                  colorScheme="blue"
+                  size="lg"
+                  onClick={handleConfirmRole}
+                  isDisabled={!selectedRole || roleConfirmed || !generatedImageUrl}
+                >
+                  🎨 Confirmer rôle & générer badge
+                </Button>
+
+                <Button
+                  w="full"
+                  colorScheme="teal"
+                  size="lg"
+                  onClick={handleMint}
+                  isLoading={isMinting || isUploading}
+                  loadingText="🔄 Création du badge ResCoe..."
+                  isDisabled={!ipfsUrl || !roleConfirmed || mintRestant <= 0}
+                >
+                  {mintRestant > 1 ? `Adhérer (${mintRestant} restantes)` : "Adhérer (dernière !)"}
+                </Button>
+              </VStack>
+            </>
           )}
 
-          <Text mb={3}>
-            Prix de l'adhésion : {requiredPriceEth.toFixed(4)} ETH (~
-            {priceEur.toFixed(2)} €)
-          </Text>
+          {/* QUOTA ÉPUISÉ - ACHAT SECONDAIRE */}
+          {mintRestant <= 0 && (
+            <Box p={6} borderRadius="xl" textAlign="center" border="2px solid" borderColor="orange.200">
+              <Icon as={WarningIcon} boxSize={12}mb={3} />
+              <Heading size="md" color="orange.100" mb={2}>
+                Quota annuel atteint
+              </Heading>
+              <Text fontSize="lg" mb={4}>
+                Vous avez épuisé vos {maxMint} adhésions possibles cette année.
+              </Text>
+              <Text fontSize="md" mb={6}>
+                💡 Solution : Achetez un badge d’adhésion mis en vente par un autre membre sur le marché secondaire.
+              </Text>
+              <Button
+                as={Link}
+                href="/association/adherent#marketplace"  // ✅ Hash #marketplace
+                colorScheme="orange"
+                size="lg"
+                variant="outline"
+              >
+                🛒 Explorer le marché
+              </Button>
 
-          <Button
-            colorScheme="teal"
-            onClick={handleMint}
-            isLoading={isMinting || isUploading}
-            loadingText="Création du badge..."
-            isDisabled={!ipfsUrl || !roleConfirmed}
-          >
-            Adhérer
-          </Button>
-
-
+            </Box>
+          )}
         </>
+      ) : (
+        <Box bg="red.50" p={8} borderRadius="xl" textAlign="center" border="2px solid" borderColor="red.200">
+          <Icon as={LockIcon} boxSize={16} color="red.500" mb={4} />
+          <Heading size="lg" color="red.800" mb={3}>
+            🔐 Connectez votre wallet
+          </Heading>
+          <Text fontSize="lg" color="gray.700">
+            Authentifiez-vous avec MetaMask pour adhérer à ResCoé.
+          </Text>
+        </Box>
       )}
+
 
       {showBananas && (
         <Box position="fixed" top={0} left={0} width="100%" height="100%" zIndex={-1}>

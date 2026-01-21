@@ -20,6 +20,7 @@ import { FilteredCollectionsCarousel } from '../galerie/art';
 import detectEthereumProvider from '@metamask/detect-provider';
 import Web3 from "web3";
 
+import { useRouter } from 'next/router';
 
 const contractAdhesion = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS as string;
 const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT as string;
@@ -73,6 +74,13 @@ const Dashboard = () => {
   const toast = useToast();
   const { address: account, web3, isAuthenticated } = useAuth();
 
+  const router = useRouter();
+
+  const goToToken = (tokenId: string | number) => {  // ✅ Accepte string OU number
+    router.push(`/AdhesionId/${contractAdhesion}/${tokenId}`,
+               undefined,
+               { shallow: true }); // ✅ Pas de re-render global
+  };
 
   useEffect(() => {
     const setupWeb3 = async () => {
@@ -380,7 +388,9 @@ const Dashboard = () => {
                     <HStack spacing={4} flexWrap="wrap">
                       {userData.nfts.length > 0 ? (
                         userData.nfts.map((nft, index) => (
-                          <Link key={nft.tokenId} href={`/AdhesionId/${contractAdhesion}/${nft.tokenId}`}>
+
+                          <Button onClick={() => goToToken(Number(nft.tokenId))}>
+
                             <Image
                               src={nft.image}
                               alt={`Jeton ${index}`}
@@ -391,7 +401,7 @@ const Dashboard = () => {
                             <Text fontSize="sm" mt={2}>
                               #{nft.tokenId} - {userData.name}
                             </Text>
-                          </Link>
+                          </Button>
                         ))
                       ) : (
                         <Box>
