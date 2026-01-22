@@ -1,12 +1,12 @@
 // hooks/useHatchEgg.ts
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Web3 from "web3";
 import { JsonRpcProvider, Contract as EthersContract } from "ethers";
-import ABI from "@/components/ABI/ABIAdhesionEvolve.json";
+import ABI from "@/components/ABI/ABIAdhesion.json";
 import { useAuth } from "@/utils/authContext";
 import axios from "axios";
 import getRandomInsectGif from "@/utils/GenInsect25";
-import colorProfilesJson from '@/data/gif_profiles_smart_colors.json';
+import colorProfilesJson from "@/data/gif_profiles_smart_colors.json";
 
 type FamilyKey = keyof typeof colorProfilesJson.families;
 
@@ -26,12 +26,16 @@ interface TokenInfo {
   metadata?: any;
 }
 
-interface EvolutionOption {
-  id: number;
+interface InsectData {
   imageUrl: string;
-  displayName: string;
+  display_name: string;
   attributes: any[];
   spriteName: string;
+}
+
+interface EvolutionOption {
+  id: string;
+  insect: InsectData;
   family: string;
   colorProfile?: any;
 }
@@ -46,154 +50,141 @@ export const useHatchEgg = (contractAddress: string, eggTokenId: number) => {
   const [evolutionOptions, setEvolutionOptions] = useState<EvolutionOption[]>([]);
   const [selectedEvolution, setSelectedEvolution] = useState<EvolutionOption | null>(null);
 
-  // 🔍 1. VÉRIF ŒUF + DEBUG MAX
-  const checkIsEggReady = useCallback(async (): Promise<TokenInfo | null> => {
-    console.log("🔍 CHECK ŒUF #", eggTokenId);
+  const eggInfoRef = useRef<TokenInfo | null>(null);
 
-    const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!);
-    const contract = new EthersContract(contractAddress, ABI, provider);
+  /* ------------------------------------------------------------------ */
+  /* 1. CHECK ŒUF                                                        */
+  /* ------------------------------------------------------------------ */
+  const checkIsEggReady = useCallback(async (): Promise<TokenInfo | null> => {
+    if (eggInfoRef.current) return eggInfoRef.current;
 
     try {
-      // CONTRAT RAW
-      const infoRaw = await contract.getMembershipInfo(eggTokenId);
-      console.log("🔍 RAW contrat:", infoRaw);
+      const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!);
+      const contract = new EthersContract(contractAddress, ABI, provider);
+
+      const raw = await contract.getMembershipInfo(eggTokenId);
+      const TT = contract.getMembershipInfo(25);
+      console.log("coucou");
+      console.log(raw);
+      console.log(TT);
 
       const info: MembershipInfo = {
-        level: Number(infoRaw.level),
-        autoEvolve: Boolean(infoRaw.autoEvolve),
-        startTimestamp: Number(infoRaw.startTimestamp),
-        expirationTimestamp: Number(infoRaw.expirationTimestamp),
-        totalYears: Number(infoRaw.totalYears),
-        locked: Boolean(infoRaw.locked),
-        isEgg: Boolean(infoRaw.isEgg)  // ← CLÉ !
+        level: Number(raw.level),
+        autoEvolve: Boolean(raw.autoEvolve),
+        startTimestamp: Number(raw.startTimestamp),
+        expirationTimestamp: Number(raw.expirationTimestamp),
+        totalYears: Number(raw.totalYears),
+        locked: Boolean(raw.locked),
+        isEgg: Boolean(raw.isEgg),
       };
 
-      console.log("🔍 PARSED info:", info);
+      if (!info.isEgg) throw new Error("Token n'est pas un œuf");
+      if (info.level !== 0) throw new Error("Niveau invalide");
 
-      // VÉRIFS
-      if (!info.isEgg) {
-        const msg = `❌ #${eggTokenId} isEgg=${info.isEgg} (contrat)`;
-        console.error(msg);
-        setError(msg);
-        return null;
-      }
-
-      if (info.level !== 0) {
-        setError(`❌ Niveau ${info.level} (attendu 0)`);
-        return null;
-      }
-
-      // TIMER 2min DEV
       const readyTime = info.startTimestamp + 120;
       const now = Date.now() / 1000;
-      if (now < readyTime) {
-        setError(`⏳ ${Math.ceil(readyTime - now)}s`);
-        return null;
-      }
+      if (now < readyTime) throw new Error(`Œuf pas encore prêt (${Math.ceil(readyTime - now)}s)`);
 
-      // METADATA BONUS
       const uri = await contract.tokenURI(eggTokenId);
-      console.log("🔍 URI:", uri);
-
-      const ipfsHash = uri.split("/").pop() || "";
+      const ipfsHash = uri.split("/").pop();
       const res = await fetch(`/api/proxyPinata?ipfsHash=${ipfsHash}`);
       const metadata = await res.json();
-      console.log("📄 Metadata:", metadata.name);
 
-      console.log("✅ ŒUF PRÊT #", eggTokenId);
-      return { tokenId: eggTokenId, membershipInfo: info, metadata };
+      const tokenInfo = { tokenId: eggTokenId, membershipInfo: info, metadata };
+      eggInfoRef.current = tokenInfo;
 
+      return tokenInfo;
     } catch (e: any) {
-      console.error("🔥 CHECK ERROR:", e);
-      setError(`Erreur contrat: ${e.message}`);
+      setError(e.message);
       return null;
     }
   }, [contractAddress, eggTokenId]);
 
-  // 2. 3 ÉVOLUTIONS lvl0
-  const generateEvolutionOptions = useCallback(async (family: string) => {
-    console.log("🐛 Génération options:", family);
-
+  /* ------------------------------------------------------------------ */
+  /* 2. GÉNÉRATION DES 3 ÉVOLUTIONS (FIGÉES & UNIQUES)                   */
+  /* ------------------------------------------------------------------ */
+  const generateEvolutionOptions = useCallback((family: string) => {
     const options: EvolutionOption[] = [];
-    for (let i = 0; i < 3; i++) {
-      const insectData = getRandomInsectGif(0);
-      const spriteFilename = insectData.spriteName;
-      const colorProfile = colorProfilesJson.families[family as FamilyKey]
-        ?.find(p => p.filename === spriteFilename);
+    const usedSprites = new Set<string>();
+
+    while (options.length < 3) {
+
+      const insect = getRandomInsectGif(0);
+
+      if (usedSprites.has(insect.spriteName)) continue;
+      usedSprites.add(insect.spriteName);
+
+      const colorProfile =
+        colorProfilesJson.families[family as FamilyKey]?.find(
+          p => p.filename === insect.spriteName
+        );
 
       options.push({
-        id: i,
-        imageUrl: insectData.imageUrl,
-        displayName: insectData.display_name,
-        attributes: insectData.attributes,
-        spriteName: spriteFilename,
+        id: crypto.randomUUID(),
+        insect,
         family,
-        colorProfile
+        colorProfile,
       });
     }
 
-    console.log("🐛 OPTIONS:", options.length);
     setEvolutionOptions(options);
-    return options;
-  }, []);
+  }, [eggTokenId]);
 
-  // 3. URI lvl0 complète
+  /* ------------------------------------------------------------------ */
+  /* 3. MÉTADATA FINAL (1 SOURCE DE VÉRITÉ)                              */
+  /* ------------------------------------------------------------------ */
   const generateInsectMetadata = useCallback(async (evolution: EvolutionOption) => {
-    console.log("🛠️ Génération metadata:", evolution.displayName);
+    const { insect, family, colorProfile } = evolution;
 
-    const colorProfile = evolution.colorProfile;
-    const fullAttributes = [
-      ...evolution.attributes.filter(a => !["Niveau"].includes(a.trait_type)),
+    const attributes = [
+      ...insect.attributes.filter(a => a.trait_type !== "Niveau"),
       { trait_type: "Niveau", value: 0 },
-      { trait_type: "Famille", value: evolution.family },
-      { trait_type: "DisplayName", value: evolution.displayName },
+      { trait_type: "Famille", value: family },
+      { trait_type: "DisplayName", value: insect.display_name },
+      { trait_type: "Sprite", value: insect.spriteName },
       { trait_type: "Lore", value: `Insecte F1 #${eggTokenId}` },
-      { trait_type: "TotalFamille", value: 42 },
-      { trait_type: "Sprite", value: evolution.spriteName },
-
-      ...(colorProfile ? [
-        { trait_type: "Couleur1", value: colorProfile.dominant_colors.hex[0] },
-        { trait_type: "Couleur2", value: colorProfile.dominant_colors.hex[1] },
-        // ... 15+ couleur traits
-      ] : [])
+      ...(colorProfile
+        ? [
+            { trait_type: "Couleur1", value: colorProfile.dominant_colors.hex[0] },
+            { trait_type: "Couleur2", value: colorProfile.dominant_colors.hex[1] },
+          ]
+        : []),
     ];
 
     const metadata = {
-      name: evolution.displayName,
-      bio: `Insecte F1 éclos #${eggTokenId}`,
-      description: `Insecte lvl0 prêt à évoluer`,
-      image: evolution.imageUrl,
+      name: insect.display_name,
+      description: "Insecte lvl0 éclos",
+      image: insect.imageUrl,
       level: 0,
-      attributes: fullAttributes,
+      attributes,
       evolutionHistory: [],
-      eggOrigin: eggTokenId
+      eggOrigin: eggTokenId,
     };
 
-    const pinataJwt = process.env.NEXT_PUBLIC_PINATA_JWT!;
-    const res = await axios.post("https://api.pinata.cloud/pinning/pinJSONToIPFS",
+    const res = await axios.post(
+      "https://api.pinata.cloud/pinning/pinJSONToIPFS",
       metadata,
-      { headers: { Authorization: `Bearer ${pinataJwt}` } }
+      { headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT}` } }
     );
 
-    const uri = `https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${res.data.IpfsHash}`;
-    console.log("✅ URI lvl0:", uri);
-    return uri;
+    return `https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${res.data.IpfsHash}`;
   }, [eggTokenId]);
 
-  // 4. HATCH
+  /* ------------------------------------------------------------------ */
+  /* 4. HATCH                                                           */
+  /* ------------------------------------------------------------------ */
   const hatchEgg = useCallback(async () => {
     if (!account || !selectedEvolution) {
-      setError("Sélectionnez évolution");
+      setError("Évolution non sélectionnée");
       return;
     }
 
-    console.log("🚀 HATCH START");
     setIsHatching(true);
     setError(null);
 
     try {
-      const eggInfo = await checkIsEggReady();
-      if (!eggInfo) return;
+      const egg = await checkIsEggReady();
+      if (!egg) throw new Error("Œuf invalide");
 
       const insectUri = await generateInsectMetadata(selectedEvolution);
 
@@ -204,34 +195,45 @@ export const useHatchEgg = (contractAddress: string, eggTokenId: number) => {
         .hatchEgg(eggTokenId, insectUri)
         .send({ from: account });
 
-      console.log("🎉 HATCH OK:", tx.transactionHash);
       setTxHash(tx.transactionHash);
-
     } catch (e: any) {
-      console.error("💥 HATCH:", e);
       setError(e.message);
     } finally {
       setIsHatching(false);
     }
-  }, [account, contractAddress, eggTokenId, checkIsEggReady, generateInsectMetadata, selectedEvolution]);
+  }, [
+    account,
+    contractAddress,
+    eggTokenId,
+    selectedEvolution,
+    checkIsEggReady,
+    generateInsectMetadata,
+  ]);
 
-  // 5. INIT
+  /* ------------------------------------------------------------------ */
+  /* 5. INIT                                                            */
+  /* ------------------------------------------------------------------ */
   useEffect(() => {
-    console.log("🔄 INIT HATCH #", eggTokenId);
-    const init = async () => {
-      const eggInfo = await checkIsEggReady();
-      if (eggInfo?.metadata) {
-        const family = eggInfo.metadata.attributes?.find((a: any) => a.trait_type === "Famille")?.value || "Thalorydes";
-        await generateEvolutionOptions(family);
-      }
-    };
-    init();
-  }, [checkIsEggReady, generateEvolutionOptions, eggTokenId]);
+    (async () => {
+      const egg = await checkIsEggReady();
+      if (!egg?.metadata) return;
+
+      const family =
+        egg.metadata.attributes?.find((a: any) => a.trait_type === "Famille")?.value
+        || "Thalorydes";
+
+      generateEvolutionOptions(family);
+    })();
+  }, [checkIsEggReady, generateEvolutionOptions]);
 
   return {
-    isHatching, txHash, error,
-    evolutionOptions, selectedEvolution, setSelectedEvolution,
-    checkIsEggReady, hatchEgg,
-    isReady: !!selectedEvolution && !error
+    isHatching,
+    txHash,
+    error,
+    evolutionOptions,
+    selectedEvolution,
+    setSelectedEvolution,
+    hatchEgg,
+    isReady: !!selectedEvolution && !error,
   };
 };

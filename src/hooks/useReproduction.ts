@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Web3 from "web3";
 import { JsonRpcProvider, Contract as EthersContract } from "ethers";
-import ABI from "@/components/ABI/ABIAdhesionEvolve.json";
+import ABI from "@/components/ABI/ABIAdhesion.json";
 import { useAuth } from "@/utils/authContext";
 //import { usePinataUpload } from "@/hooks/usePinataUpload";
 import axios from "axios";
@@ -21,6 +21,8 @@ export type UseReproductionReturn = {
   error: string | null;
   startScanning: () => void;
   hasScanned: boolean;
+  userPoints: number;  // ✅ AJOUTÉ
+
 };
 
 // Helpers analyse couleurs (AVANT le hook)
@@ -100,12 +102,15 @@ export const useReproduction = ({
   const [isReproducing, setIsReproducing] = useState(false);
   const [lastTxHash, setLastTxHash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [userPoints, setUserPoints] = useState<number>(0);
+
 
   // ✅ ANTI-BOUCLE : lazy loading + pagination
   const [shouldLoad, setShouldLoad] = useState(false);
   const [scanStart, setScanStart] = useState(0);
   const BATCH_SIZE = 50;
   const MAX_PARENTS = 10;
+
 
   const cacheRef = useRef<Record<number, TokenWithMeta>>({});
 
@@ -462,7 +467,7 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
 
 
 
-
+/*
   const PINATA_GATEWAY_BASE = "https://purple-managerial-ermine-688.mypinata.cloud/ipfs/";
 
   const uploadEggImageToPinata = useCallback(async (eggFile: File): Promise<string> => {
@@ -521,12 +526,48 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
   }, []);
 
 
-  // Reproduction
+  const generateAndUploadEgg = useCallback(async (pa: TokenWithMeta, pb: TokenWithMeta) => {
+    // Dummy pour test (remplace par ton GIF generator)
+    const dummyFile = new File(["egg"], "egg.gif", { type: "image/gif" });
+    const imgUrl = await uploadEggImageToPinata(dummyFile);
+    const colors = { Couleur1: "rgb(255,0,0)", };
+    const metadata = buildEggMetadata(pa, pb, imgUrl, colors, 1);
+    return await uploadEggMetadataToPinata(metadata);
+  }, [uploadEggImageToPinata, uploadEggMetadataToPinata, buildEggMetadata]);
+*/
+
+  // ✅ VÉRIF POINTS AVANT REPRO (ajoute après states)
+
+  const fetchUserPoints = useCallback(async () => {
+    if (!account || !contractAddress) return;
+
+    try {
+      const contract = fetchContractRead();
+      const points = await contract.rewardPoints(account);
+      setUserPoints(Number(points));
+      console.log(`💰 POINTS utilisateur: ${points}`);
+    } catch (e) {
+      console.error("Points fetch error:", e);
+    }
+  }, [account, contractAddress, fetchContractRead]);
+
+  // ✅ Au montage
+  useEffect(() => {
+    fetchUserPoints();
+  }, [fetchUserPoints]);
+
+
   const reproduce = useCallback(async () => {
   console.log("🐣 REPRODUCTION START");
 
   if (!parentA || !parentB || parentA.tokenId === parentB.tokenId) {
     setError("Choisissez 2 parents différents");
+    return;
+  }
+
+  // ✅ NOUVEAU : check points
+  if (userPoints < 100) {
+    setError(`Points insuffisants: ${userPoints}/100`);
     return;
   }
 
@@ -584,15 +625,12 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
     const eggImageIpfsUrl = `${PINATA_GATEWAY_BASE}${eggImageHash}`;
     console.log("✅ IPFS IMAGE ŒUF:", eggImageIpfsUrl);
 
-
-
-    // ✅ APRÈS (ajoute analyse + 5 params) :
+    // ✅ APRÈS : analyse + 5 params
     console.log("🎨 ANALYSE COULEURS avant metadata...");
     const eggColors = await analyzeEggGif(eggLocalPath);
     console.log("🔍 eggColors:", eggColors);
 
     // 📄 2. METADATA JSON pour l'œuf
-
     const eggMetadata = buildEggMetadata(
       parentA,           // 1
       parentB,           // 2
@@ -644,6 +682,8 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
 
     console.log(`🎉 TX SUCCÈS: ${tx.transactionHash}`);
     setLastTxHash(tx.transactionHash);
+    setParentA(null);
+    setParentB(null);
   } catch (e: any) {
     console.error("💥 REPRO ERROR:", e);
     setError(e.message);
@@ -658,7 +698,11 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
   buildEggMetadata,
   fetchContractRead,
   fetchContractWrite,
+  analyzeEggGif,
+  userPoints
 ]);
+
+
 
 return {
   eligibleTokens,
@@ -671,9 +715,7 @@ return {
   error,
   startScanning,
   hasScanned: eligibleTokens.length > 0 || !shouldLoad,
+  userPoints,  // ✅ AJOUTÉ
+
 } as UseReproductionReturn;  // ✅ Type explicite
-
-
-
-
 };

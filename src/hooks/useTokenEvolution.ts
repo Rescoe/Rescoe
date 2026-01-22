@@ -3,10 +3,13 @@ import { useState, useEffect, useCallback } from "react";
 import Web3 from "web3";
 import evolutionEngine from "../utils/evolutionEngine";
 import { usePinataUpload } from "./usePinataUpload";
-import ABI from "../components/ABI/ABIAdhesionEvolve.json";
+import ABI from "../components/ABI/ABIAdhesion.json";
 import { useAuth } from "@/utils/authContext";
 import { useRouter } from 'next/router';
-
+import {
+  buildEvolutionHistory,
+  EvolutionStep
+} from '@/utils/evolutionHistory';  // Votre fichier
 
 interface MembershipRaw {
   level: string | number;
@@ -15,7 +18,10 @@ interface MembershipRaw {
   expirationTimestamp: string | number;
   totalYears: string | number;
   locked: boolean;
+  isEgg: boolean;           // ✅ AJOUT
+  isAnnual: boolean;        // ✅ AJOUT
 }
+
 
 interface MembershipInfo {
   level: number;
@@ -24,7 +30,10 @@ interface MembershipInfo {
   expirationTimestamp: number;
   totalYears: number;
   locked: boolean;
+  isEgg: boolean;           // ✅ AJOUT
+  isAnnual: boolean;        // ✅ AJOUT
 }
+
 
 
 
@@ -53,6 +62,8 @@ export const useTokenEvolution = ({
   const { address: account, web3, isAuthenticated } = useAuth();
   const router = useRouter();
 
+  const [hatchPriceEth, setHatchPriceEth] = useState(0);  // ✅ AJOUT
+
 
   /* =======================
      FETCH ON-CHAIN MEMBERSHIP
@@ -66,8 +77,15 @@ export const useTokenEvolution = ({
         const web3Instance = new Web3((window as any).ethereum);
         const contract = new web3Instance.eth.Contract(ABI as any, contractAddress);
 
-        const infoRaw: MembershipRaw = await contract.methods.getMembershipInfo(tokenId).call() as unknown as MembershipRaw;
-        if (!infoRaw || typeof infoRaw !== "object") return;
+        // ✅ FIX : Try spécifique + fallback
+        let infoRaw: MembershipRaw = { level: '0', autoEvolve: false, startTimestamp: '0',
+          expirationTimestamp: '0', totalYears: '0', locked: false, isEgg: false, isAnnual: false };
+
+        try {
+          infoRaw = await contract.methods.getMembershipInfo(tokenId).call();
+        } catch (membershipErr) {
+          console.warn('⚠️ getMembershipInfo échoué → fallback lvl 0:', membershipErr);
+        }
 
         const info: MembershipInfo = {
           level: Number(infoRaw.level),
@@ -76,23 +94,33 @@ export const useTokenEvolution = ({
           expirationTimestamp: Number(infoRaw.expirationTimestamp),
           totalYears: Number(infoRaw.totalYears),
           locked: Boolean(infoRaw.locked),
+          isEgg: Boolean(infoRaw.isEgg),
+          isAnnual: Boolean(infoRaw.isAnnual),
         };
 
-
         setMembershipInfo(info);
+        console.log('🧬 TOKEN INFO OK:', info);
 
+        // Prix (inchangé)
         let priceWei = "0";
-        try {
-          priceWei = await contract.methods.baseEvolvePrice(info.level).call();
-        } catch {
-          priceWei = "0";
+        if (info.isEgg) {
+          setHatchPriceEth(0);
+        } else {
+          try {
+            priceWei = await contract.methods.baseEvolvePrice(info.level).call();
+            setEvolvePriceEth(Number(priceWei) / 1e18);
+          } catch {
+            setEvolvePriceEth(0);
+          }
         }
-
-        setEvolvePriceEth(Number(priceWei) / 1e18);
       } catch (e) {
-        console.error("❌ getMembershipInfo error:", e);
+        console.error("❌ fetchMembership TOTAL error:", e);
+        // Fallback safe
+        setMembershipInfo({ level: 0, autoEvolve: false, startTimestamp: 0, expirationTimestamp: 0,
+          totalYears: 0, locked: false, isEgg: false, isAnnual: false });
       }
     };
+
 
     fetchMembership();
   }, [contractAddress, tokenId]);
@@ -112,7 +140,6 @@ export const useTokenEvolution = ({
   /* =======================
      PREPARE EVOLUTION (CLEAN)
   ======================= */
-
   const prepareEvolution = useCallback(async () => {
     if (isUploadingEvolve || isManualEvolveReady) return;
     if (!membershipInfo || !contractAddress || tokenId === undefined) {
@@ -130,22 +157,45 @@ export const useTokenEvolution = ({
         throw new Error("Niveau maximum atteint");
       }
 
-      // 🔗 SOURCE DE VÉRITÉ : BLOCKCHAIN
+      // 🔗 TOKENURI → METADATA DÉJÀ CHARGÉE (logs confirment)
       const web3Instance = new Web3((window as any).ethereum);
       const contract = new web3Instance.eth.Contract(ABI as any, contractAddress);
+      const tokenUriRaw: any = await contract.methods.tokenURI(tokenId).call();
+      let tokenUri: string | null = null;
 
-      const tokenUri: string = await contract.methods.tokenURI(tokenId).call();
+      if (Array.isArray(tokenUriRaw)) {
+        tokenUri = tokenUriRaw[0] as string;
+      } else if (typeof tokenUriRaw === 'string') {
+        tokenUri = tokenUriRaw;
+      }
+
+      if (!tokenUri) {
+        console.warn('⚠️ tokenURI invalide:', tokenUriRaw);
+        return;  // Skip si pas d'URI
+      }
+
       const response = await fetch(tokenUri);
+
       const currentMetadata = await response.json();
 
-      const finalWallet =
-        walletAddress ||
-        account ||
-        "0x0000000000000000000000000000000000000000";
+      // ✅ EXTRACTION DIRECTE (NO extractIPFS, NO history async)
+      const currentFamily = currentMetadata.family || currentMetadata.famille || 'unknown';
+      const currentAttrs = Object.fromEntries(
+        (currentMetadata.attributes || []).map((a: any) => [a.trait_type, a.value])
+      );
 
-      // 🔥 ENGINE (sera refactoré ensuite)
+      console.log('🚀 CURRENT DIRECT:', {
+        family: currentFamily,
+        level: currentLevel,
+        attrsKeys: Object.keys(currentAttrs).slice(0,5),
+        image: currentMetadata.image?.slice(-30)
+      });
+
+      const finalWallet = walletAddress || account || "0x0000000000000000000000000000000000";
+
+      // 🔥 ENGINE (NO undefined → DIRECT attrs)
       const evolutionData = evolutionEngine(
-        currentMetadata,
+        { family: currentFamily, attributes: currentAttrs }, // ✅ SANS extractIPFS
         currentLevel,
         targetLevel,
         finalWallet,
@@ -154,11 +204,10 @@ export const useTokenEvolution = ({
 
       setPreviewImageUrl(evolutionData.imageUrl);
 
-      // 📜 HISTORIQUE
-      const history =
-        Array.isArray(currentMetadata.evolutionHistory)
-          ? [...currentMetadata.evolutionHistory]
-          : [];
+      // 📜 HISTORIQUE (votre logique existante)
+      const history = Array.isArray(currentMetadata.evolutionHistory)
+        ? [...currentMetadata.evolutionHistory]
+        : [];
 
       history.push({
         niveau: currentLevel,
@@ -169,7 +218,7 @@ export const useTokenEvolution = ({
         horodatage: Math.floor(Date.now() / 1000),
       });
 
-      // ☁️ IPFS
+      // ☁️ IPFS (IDENTIQUE)
       const pinataResult = await uploadToIPFS({
         imageUrl: evolutionData.imageUrl,
         name: evolutionData.display_name || currentName,
@@ -197,6 +246,7 @@ export const useTokenEvolution = ({
       });
 
       setIsManualEvolveReady(true);
+
     } catch (e: any) {
       console.error("❌ prepareEvolution error:", e);
       alert(e.message || "Erreur évolution");
@@ -213,7 +263,11 @@ export const useTokenEvolution = ({
     updateCurrentMetadata,
     isUploadingEvolve,
     isManualEvolveReady,
+    currentName,
+    currentBio,
+    currentRoleLabel
   ]);
+
 
   /* =======================
      EVOLVE ON-CHAIN
@@ -278,17 +332,68 @@ export const useTokenEvolution = ({
     setIsManualEvolveReady(false);
   }, []);
 
+
+  // ✅ AJOUT À LA FIN (avant return)
+  const hatchEgg = useCallback(async () => {
+    if (!ipfsUrl || !contractAddress || tokenId === undefined) return;
+    if (!isAuthenticated || !account || !web3) {
+      alert("Connexion requise");
+      return;
+    }
+
+    try {
+      setIsEvolving(true);
+      const gasPrice = await web3.eth.getGasPrice();
+      const contract = new web3.eth.Contract(ABI as any, contractAddress);
+
+      const receipt = await contract.methods.hatchEgg(tokenId, ipfsUrl).send({
+        from: account,
+        value: '0',  // ✅ GRATUIT
+        gasPrice: gasPrice.toString(),
+      });
+
+      console.log("🥚 ÉCLOS OK:", receipt);
+
+      // Même logique newTokenId qu'evolve
+      let newTokenId = (Number(tokenId) + 1).toString();
+
+      if (receipt.events?.EggHatched?.returnValues) {
+        const eventData = receipt.events.EggHatched.returnValues;
+        newTokenId = eventData.newTokenId?.toString() || newTokenId;
+      }
+
+      if (receipt.events?.LevelEvolved?.returnValues) {
+        const eventData = receipt.events.LevelEvolved.returnValues;
+        newTokenId = eventData.tokenId?.toString() || newTokenId;
+      }
+
+
+      router.push(`/AdhesionId/${contractAddress}/${newTokenId}`);
+    } catch (e) {
+      console.error("❌ hatch error:", e);
+      alert("Erreur éclosion");
+    } finally {
+      setIsEvolving(false);
+    }
+  }, [ipfsUrl, contractAddress, tokenId, account, web3, isAuthenticated]);
+
+
+
   return {
     membershipInfo,
     evolvePriceEth,
+    hatchPriceEth,        // ✅
     isManualEvolveReady,
     previewImageUrl,
     evolveIpfsUrl: ipfsUrl,
     isUploadingEvolve,
     isEvolving,
-    prepareEvolution,
-    evolve,
+    prepareEvolution,     // Utilise pour œufs ET évolutions
+    evolve,               // UNIQUEMENT évolutions
+    hatchEgg,             // ✅ NOUVEAU
     refreshEvolution,
     updateCurrentMetadata,
+    isEgg: membershipInfo?.isEgg || false,  // ✅
   };
+
 };

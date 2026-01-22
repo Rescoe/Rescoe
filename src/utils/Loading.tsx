@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 
-type GenesisLoaderProps = {
-  progress?: number; // optionnel : si tu veux piloter depuis l’extérieur
+type RescoeNetworkLoaderProps = {
+  progress?: number;
   seed?: number;
   onFinish?: () => void;
 };
 
-const GenesisLoader = ({
+const RescoeNetworkLoader = ({
   progress: externalProgress,
   seed = 1337,
   onFinish,
-}: GenesisLoaderProps) => {
+}: RescoeNetworkLoaderProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [progress, setProgress] = useState(0);
 
@@ -41,7 +41,7 @@ const GenesisLoader = ({
         }
         return p + 1;
       });
-    }, 28);
+    }, 26);
 
     return () => clearInterval(interval);
   }, []);
@@ -54,44 +54,73 @@ const GenesisLoader = ({
     const resize = () => {
       canvas.width = window.innerWidth * dpr;
       canvas.height = window.innerHeight * dpr;
-      ctx.scale(dpr, dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
 
     resize();
     window.addEventListener("resize", resize);
 
-    const center = {
-      x: window.innerWidth / 2,
-      y: window.innerHeight / 2,
-    };
+    const width = window.innerWidth;
+    const height = window.innerHeight;
 
-    const points = Array.from({ length: 420 }, () => ({
-      x: random() * window.innerWidth,
-      y: random() * window.innerHeight,
-      ox: 0,
-      oy: 0,
-      alpha: 0,
+    // Nœuds du réseau
+    const nodes = Array.from({ length: 5 }, () => ({
+      x: width * (0.2 + random() * 0.6),
+      y: height * (0.2 + random() * 0.6),
     }));
 
-    points.forEach((p) => {
-      p.ox = center.x + (random() - 0.5) * 180;
-      p.oy = center.y + (random() - 0.5) * 180;
+    // Insectes / fragments
+    const insects = Array.from({ length: 320 }, () => {
+      const target = nodes[Math.floor(random() * nodes.length)];
+      return {
+        x: random() * width,
+        y: random() * height,
+        vx: (random() - 0.5) * 0.3,
+        vy: (random() - 0.5) * 0.3,
+        target,
+        alpha: 0,
+      };
     });
 
     const render = () => {
       ctx.fillStyle = "#0b0b10";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      points.forEach((p, i) => {
-        const t = progress / 100;
+      const t = progress / 100;
 
-        if (t < 0.4) {
-          p.alpha = Math.min(p.alpha + 0.01, 0.6);
+      // Connexions réseau (émergent après 40%)
+      if (t > 0.4) {
+        ctx.strokeStyle = "rgba(140,150,255,0.08)";
+        ctx.lineWidth = 1;
+        nodes.forEach((a, i) => {
+          nodes.slice(i + 1).forEach((b) => {
+            if (random() < 0.02) {
+              ctx.beginPath();
+              ctx.moveTo(a.x, a.y);
+              ctx.lineTo(b.x, b.y);
+              ctx.stroke();
+            }
+          });
+        });
+      }
+
+      insects.forEach((p) => {
+        // Phase 1 : apparition diffuse
+        if (t < 0.3) {
+          p.alpha = Math.min(p.alpha + 0.01, 0.4);
         } else {
-          p.x += (p.ox - p.x) * 0.02;
-          p.y += (p.oy - p.y) * 0.02;
-          p.alpha = Math.min(p.alpha + 0.02, 1);
+          // Attraction douce vers le nœud
+          p.vx += (p.target.x - p.x) * 0.0005;
+          p.vy += (p.target.y - p.y) * 0.0005;
+          p.alpha = Math.min(p.alpha + 0.02, 0.9);
         }
+
+        // Micro errance (effet insecte)
+        p.vx += (random() - 0.5) * 0.02;
+        p.vy += (random() - 0.5) * 0.02;
+
+        p.x += p.vx;
+        p.y += p.vy;
 
         ctx.fillStyle = `rgba(190,190,255,${p.alpha})`;
         ctx.fillRect(p.x, p.y, 2, 2);
@@ -109,11 +138,12 @@ const GenesisLoader = ({
     <div style={overlay}>
       <canvas ref={canvasRef} />
       <div style={ui}>
-        <div style={title}>GENESIS</div>
+        <div style={title}>RESCOE NETWORK</div>
         <div style={status}>
-          {progress < 40 && "initializing structure"}
-          {progress >= 40 && progress < 80 && "resolving fragments"}
-          {progress >= 80 && "sealing form"}
+          {progress < 30 && "indexing contributors"}
+          {progress >= 30 && progress < 60 && "binding works"}
+          {progress >= 60 && progress < 90 && "verifying authorship"}
+          {progress >= 90 && "activating network"}
         </div>
         <div style={percent}>{progress}%</div>
       </div>
@@ -121,7 +151,9 @@ const GenesisLoader = ({
   );
 };
 
-export default GenesisLoader;
+export default RescoeNetworkLoader;
+
+// Styles
 
 const overlay: React.CSSProperties = {
   position: "fixed",
@@ -136,22 +168,22 @@ const ui: React.CSSProperties = {
   width: "100%",
   textAlign: "center",
   fontFamily: "monospace",
-  letterSpacing: "0.2em",
+  letterSpacing: "0.18em",
   color: "#e0e0ff",
 };
 
 const title: React.CSSProperties = {
-  fontSize: "1.4rem",
+  fontSize: "1.2rem",
   marginBottom: "0.6rem",
 };
 
 const status: React.CSSProperties = {
   opacity: 0.7,
-  fontSize: "0.8rem",
+  fontSize: "0.75rem",
   marginBottom: "0.4rem",
 };
 
 const percent: React.CSSProperties = {
-  opacity: 0.4,
-  fontSize: "0.7rem",
+  opacity: 0.35,
+  fontSize: "0.65rem",
 };

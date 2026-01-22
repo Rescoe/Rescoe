@@ -489,7 +489,6 @@ mb={4}
             p={4}
             mb={6}
             border="1px solid"
-            borderColor="gray.200"
             borderRadius="md"
           >
             <Heading size="sm" mb={3}>
@@ -571,10 +570,10 @@ mb={4}
                 >
                   <Stack direction="row" spacing={6}>
                     <Radio value="trial">
-                      <Text fontSize="sm">🧪 Essai découverte <Text as="span" color="gray.500" fontSize="xs">(prix / 10)</Text></Text>
+                      <Text fontSize="sm">🧪 Essai découverte <Text as="span" fontSize="xs">(prix / 10)</Text></Text>
                     </Radio>
                     <Radio value="annual">
-                      <Text fontSize="sm">📆 Annuel complet <Text as="span" color="gray.500" fontSize="xs">(365 jours)</Text></Text>
+                      <Text fontSize="sm">📆 Annuel complet <Text as="span" fontSize="xs">(365 jours)</Text></Text>
                     </Radio>
                   </Stack>
                 </RadioGroup>
@@ -587,14 +586,14 @@ mb={4}
                   onChange={(e) => recomputeRequiredPrice(isAnnual, e.target.checked)}
                 >
                   🚀 Activer l’évolution automatique
-                  <Text as="span" color="gray.500" fontSize="sm" ml={2}>
+                  <Text as="span" fontSize="sm" ml={2}>
                     (+ {autoPremiumEth.toFixed(4)} ETH)
                   </Text>
                 </Checkbox>
               </FormControl>
 
               {/* PRIX AFFICHÉ */}
-              <Box bg="gray.50" p={4} borderRadius="lg" mb={6}>
+              <Box p={4} borderRadius="lg" mb={6}>
                 <Text fontSize="lg" fontWeight="bold" mb={1}>
                   💰 {requiredPriceEth.toFixed(4)} ETH (~{priceEur.toFixed(2)} €)
                 </Text>

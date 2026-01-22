@@ -26,6 +26,17 @@ const contractAdhesion = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS as string;
 const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT as string;
 const contratAdhesionManagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGER as string;
 
+
+function formatSeconds(seconds: number): string {
+  const days = Math.floor(seconds / (24 * 60 * 60));
+  const hours = Math.floor((seconds % (24 * 60 * 60)) / (60 * 60));
+  const minutes = Math.floor((seconds % (60 * 60)) / 60);
+  const remainingSeconds = seconds % 60;
+  return `${days}j ${hours}h ${minutes}m ${remainingSeconds}s`;
+}
+
+
+
 const Dashboard = () => {
   const { address: authAddress } = useAuth();
 
@@ -36,7 +47,13 @@ const Dashboard = () => {
     avatarSvg: string;
     roles: string[];
     finAdhesion: string;
-    nfts: Array<{ tokenId: string; image: string; role?: string; finAdhesion?: string }>;
+    nfts: Array<{
+      tokenId: string;
+      image: string;
+      role?: string;
+      finAdhesion?: string;
+      remainingTime?: string;  // ✅ AJOUTÉ
+    }>;
     collections: any[];
     rewardPoints: number;
     pendingPoints: number;
@@ -52,6 +69,8 @@ const Dashboard = () => {
       finAdhesion?: string;
       [key: string]: any; // pour tout autre champ présent dans le JSON
     };
+    remainingTime?: string;  // ✅ AJOUTÉ
+
   }
 
   const [userData, setUserData] = useState<UserData>({
@@ -164,6 +183,7 @@ const Dashboard = () => {
         image: metadata.image,
         tokenId: Number(tokenId),
         finAdhesion,
+        remainingTime: formatSeconds(remainingTime),  // ✅ AJOUTÉ (comme TokenPage)
       };
     }));
 
@@ -385,30 +405,80 @@ const Dashboard = () => {
                 <Grid templateColumns={{ base: "1fr", md: "1fr 1fr" }} gap={6}>
                   <Box borderWidth="1px" borderRadius="xl" p={4} shadow="md" w="100%">
                     <Heading size="md" mb={3}>Jetons d'Adhésion</Heading>
-                    <HStack spacing={4} flexWrap="wrap">
+                    <HStack spacing={4} flexWrap="wrap" w="full">
                       {userData.nfts.length > 0 ? (
                         userData.nfts.map((nft, index) => (
+                          <Box
+                            key={nft.tokenId}                    // ✅ key stable
+                            w="140px"
+                            h="180px"
+                            borderRadius="lg"
+                            shadow="md"
+                            borderWidth={2}
+                            p={3}
+                            textAlign="center"
+                            cursor="pointer"
+                            _hover={{
+                              shadow: "xl",
+                              transform: "translateY(-2px)",
+                              borderColor: "blue.400",
+                            }}
+                            transition="all 0.2s ease-in-out"
+                            onClick={() => goToToken(Number(nft.tokenId))}
+                            flexShrink={0}                       // ✅ Pas de rétrécissement
+                          >
+                            {/* IMAGE CARRÉE */}
+                            <Box
+                              w="80px"
+                              h="80px"
+                              mx="auto"
+                              mb={2}
+                              borderRadius="lg"
+                              overflow="hidden"
+                            >
+                              <Image
+                                src={nft.image}
+                                alt={`Jeton ${nft.tokenId}`}
+                                w="full"
+                                h="full"
+                                objectFit="cover"
+                                transition="transform 0.2s"
+                              />
+                            </Box>
 
-                          <Button onClick={() => goToToken(Number(nft.tokenId))}>
+                            {/* INFO */}
+                            <Heading size="xs" fontWeight="bold" mb={1} noOfLines={1}>
+                              #{nft.tokenId}
+                            </Heading>
 
-                            <Image
-                              src={nft.image}
-                              alt={`Jeton ${index}`}
-                              borderRadius="md"
-                              boxSize="100px"
-                              objectFit="cover"
-                            />
-                            <Text fontSize="sm" mt={2}>
-                              #{nft.tokenId} - {userData.name}
+                            <Text fontSize="xs" color="gray.600" noOfLines={1}>
+                              {userData.name}
                             </Text>
-                          </Button>
+
+                            {/* STATUS */}
+                            <HStack justify="center" mt={1} spacing={1}>
+                              <Box
+                                w={2.5}
+                                h={2.5}
+                                borderRadius="full"
+                                bg={(nft as any).remainingTime && (nft as any).remainingTime !== '0j 0h 0m 0s' ? "green.400" : "orange.400"}
+                                boxShadow="0 0 0 2px white"
+                              />
+                              <Text fontSize="9px" color="gray.500" fontWeight="500">
+                                {nft.remainingTime?.slice(0, 4) || '0j'}
+                              </Text>
+                            </HStack>
+                          </Box>
                         ))
                       ) : (
-                        <Box>
-                          <Text color="gray.500">Aucun jeton trouvé.</Text>
+                        <Box p={8} textAlign="center" w="full">
+                          <Text color="gray.500" fontSize="sm">
+                            Aucun jeton trouvé.
+                          </Text>
                         </Box>
                       )}
                     </HStack>
+
 
                     <Divider my={4} />
 

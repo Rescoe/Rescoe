@@ -31,7 +31,7 @@ import { FaCheckCircle } from 'react-icons/fa';
 
 import { useRouter } from 'next/router';
 
-import ABI from '@/components/ABI/ABIAdhesionEvolve.json';
+import ABI from '@/components/ABI/ABIAdhesion.json';
 import ABI_Management from '@/components/ABI/ABI_ADHESION_MANAGEMENT.json';
 import { useAuth } from '@/utils/authContext';
 import { PublicProfile } from "@/components/containers/dashboard";
@@ -71,8 +71,10 @@ interface MembershipInfo {
   expirationTimestamp: number;
   totalYears: number;
   locked: boolean;
-  isEgg: boolean;
+  isEgg: boolean;     // ✅ AJOUT
+  isAnnual: boolean;  // ✅ AJOUT
 }
+
 
 interface EvolutionMetadata {
   level: number;
@@ -179,9 +181,11 @@ const TokenPage = () => {
     roleLabelResolver: (role: number) => roleLabels[roles[role]] || "Member",
   });
 
-  const hatch = nftData?.membershipInfo?.isEgg
-    ? useHatchEgg(contractAdhesion, Number(tokenId))
-    : null;
+
+  const effectiveTokenId = tokenId ? Number(tokenId) : 0;
+  const hatch = useHatchEgg(contractAdhesion, effectiveTokenId);
+
+
 
   function formatSeconds(seconds: number): string {
     const days = Math.floor(seconds / (24 * 60 * 60));
@@ -315,6 +319,23 @@ const TokenPage = () => {
         (Number(mintTimestamp) + Number(remainingTime)) * 1000
       ).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' });
 
+
+
+      const membershipInfoRaw = await contract.getMembershipInfo(tokenIdNumber);
+
+              const membershipInfo: MembershipInfo = {  // ✅ AJOUT
+              level: Number(membershipInfoRaw.level),
+              autoEvolve: Boolean(membershipInfoRaw.autoEvolve),
+              startTimestamp: Number(membershipInfoRaw.startTimestamp),
+              expirationTimestamp: Number(membershipInfoRaw.expirationTimestamp),
+              totalYears: Number(membershipInfoRaw.totalYears),
+              locked: Boolean(membershipInfoRaw.locked),
+              isEgg: Boolean(membershipInfoRaw.isEgg),      // ✅
+              isAnnual: Boolean(membershipInfoRaw.isAnnual),
+            };
+
+
+
       const nftData: NFTData = {
         ...metadata,
         tokenURI: uri,
@@ -329,7 +350,9 @@ const TokenPage = () => {
         fin: finAdhesion,
         forSale: Boolean(forSale),
         membership,
+        membershipInfo,
       };
+
 
       setNftCache(prev => ({ ...prev, [cacheKey]: nftData })); // ✅ CORRECTION: setNftCache
 
@@ -597,15 +620,30 @@ const TokenPage = () => {
 
       <Tabs variant="enclosed" colorScheme="teal">
       <Box overflowX="auto" pb={2} sx={{ '::-webkit-scrollbar': { display: 'none' } }}>
-        <TabList minW="max-content">
-          <Tab>Détails</Tab>
-          {isOwner && isVendable && <Tab>Mise en vente</Tab>}
-          {isOwner && <Tab>Mise à jour</Tab>}
-          {!isOwner && canPurchase && <Tab>Achat</Tab>}
-          {isOwner && <Tab>Évolutions</Tab>}
-          {isOwner && <Tab>Reproduction</Tab>}
-          {nftData?.membershipInfo?.isEgg && <Tab>🥚 Éclosion</Tab>}
-        </TabList>
+      <TabList minW="max-content">
+        <Tab>Détails</Tab>
+        {isOwner && isVendable && <Tab>Mise en vente</Tab>}
+        {isOwner && <Tab>Mise à jour</Tab>}
+        {!isOwner && canPurchase && <Tab>Achat</Tab>}
+
+        {/* ✅ 1 ONGLETT DYNAMIQUE */}
+        {isOwner && (
+          <Tab
+            color={
+              nftData?.membershipInfo?.isEgg ? "yellow.400" :
+              membershipInfo?.level === 0 ? "yellow.500" :
+              membershipInfo?.level === 1 ? "blue.400" :
+              membershipInfo?.level === 2 ? "blue.600" : "green.400"
+            }
+            fontWeight="extrabold"
+          >
+            {nftData?.membershipInfo?.isEgg ? "🥚 Éclosion" :
+             membershipInfo?.level < 3 ? `🧬 Évolutions LVL${membershipInfo.level}` : "🐛 Reproduction"}
+          </Tab>
+        )}
+      </TabList>
+
+
       </Box>
 
         <TabPanels>
@@ -710,110 +748,78 @@ const TokenPage = () => {
             </TabPanel>
           )}
 
-          {/* Évolutions */}
           {isOwner && (
             <TabPanel>
-              <Heading as="h2" fontSize="xl" mb={4}>Évolution du badge</Heading>
+              {/* ✅ HEADER DYNAMIQUE + COULEUR INTENSITÉ */}
+              <Heading as="h2" fontSize="xl" mb={6} color={
+                nftData?.membershipInfo?.isEgg ? "yellow.600" :
+                membershipInfo?.level === 0 ? "yellow.700" :
+                membershipInfo?.level === 1 ? "blue.500" :
+                membershipInfo?.level === 2 ? "blue.700" : "green.600"
+              }>
+                {nftData?.membershipInfo?.isEgg ? "🥚 Éclosion de l'œuf" :
+                 membershipInfo?.level < 3 ? `🧬 Évolution vers niveau ${membershipInfo.level + 1}` :
+                 "🐛 Création d'œufs"}
+              </Heading>
 
-              {membershipInfo ? (
+              {/* ✅ CONTENU DYNAMIQUE */}
+              {nftData?.membershipInfo?.isEgg ? (
+                /* ÉCLOSION */
+                <HatchEggPanel
+                  tokenId={Number(tokenId)}
+                  hatch={hatch}
+                  contractAddress={contractAdhesion}
+                />
+              ) : membershipInfo?.level < 3 ? (
+                /* ÉVOLUTIONS (TON CODE EXACT) */
                 <VStack align="start" spacing={3}>
-                <Text>
-                  <strong>Niveau actuel :</strong>{" "}
-                  {membershipInfo ? membershipInfo.level : "Chargement..."}
-                </Text>
+                  <Text><strong>Niveau actuel :</strong> {membershipInfo.level}</Text>
                   <Text><strong>Auto-évolution :</strong> {membershipInfo.autoEvolve ? "Oui" : "Non"}</Text>
                   <Text><strong>Années cumulées :</strong> {membershipInfo.totalYears}</Text>
                   <Text><strong>Début de ce niveau :</strong> {formatDateTime(membershipInfo.startTimestamp)}</Text>
                   <Text><strong>Expiration actuelle :</strong> {formatDateTime(membershipInfo.expirationTimestamp)}</Text>
                   <Text><strong>État :</strong> {membershipInfo.locked ? "Verrouillé" : "Ouvert"}</Text>
-                  <Text><strong>Oeuf :</strong> {nftData?.membershipInfo?.isEgg ? "Oui" : "Non"}</Text>
 
                   <Divider my={4} />
 
-                  <Text>
-                    <strong>Prochaine étape :</strong>{" "}
-                    {membershipInfo.level < 3 ? `Niveau ${membershipInfo.level + 1}` : "Niveau max atteint"}
-                  </Text>
+                  <Text><strong>Prochaine étape :</strong> Niveau {membershipInfo.level + 1}</Text>
                   <Text><strong>Prêt à évoluer :</strong> {isready ? "Oui" : "Pas encore"}</Text>
-                  <Text><strong>Coût de l'évolution :</strong> {evolvePriceEth} ETH</Text>
+                  <Text><strong>Coût :</strong> {evolvePriceEth} ETH</Text>
 
-                  {membershipInfo.level < 3 && (
+                  <Button
+                    colorScheme="purple"
+                    mt={2}
+                    onClick={prepareEvolution}
+                    isLoading={isUploadingEvolve}
+                  >
+                    Préparer l'image d'évolution
+                  </Button>
+
+                  {previewImageUrl && (
                     <>
-                      <Button
-                        colorScheme="purple"
-                        mt={2}
-                        //isDisabled={!isready}
-                        onClick={prepareEvolution}
-                        isLoading={isUploadingEvolve}
-                      >
-                        Préparer l’image d’évolution
-                      </Button>
-
-                      {previewImageUrl && (
-                        <>
-                          <Text mt={2}>Aperçu de la prochaine forme :</Text>
-                          <Image
-                            src={previewImageUrl}
-                            alt="Prévisualisation évolution"
-                            maxW="300px"
-                            borderRadius="md"
-                          />
-                        </>
-                      )}
-
-                      <Button
-                        colorScheme="teal"
-                        mt={4}
-                        onClick={evolve}
-                        isDisabled={!isManualEvolveReady || !evolveIpfsUrl}
-                        isLoading={isEvolving}
-                        loadingText="Évolution en cours..."
-                      >
-                        Faire évoluer le badge
-                      </Button>
-
+                      <Text mt={2}>Aperçu prochaine forme :</Text>
+                      <Image src={previewImageUrl} alt="Preview" maxW="300px" borderRadius="md" />
                     </>
                   )}
 
+                  <Button
+                    colorScheme="teal"
+                    mt={4}
+                    onClick={evolve}
+                    isDisabled={!isManualEvolveReady || !evolveIpfsUrl}
+                    isLoading={isEvolving}
+                    loadingText="Évolution en cours..."
+                  >
+                    Faire évoluer le badge
+                  </Button>
                 </VStack>
               ) : (
-                <Text>Chargement des informations d'évolution…</Text>
+                /* REPRODUCTION */
+                <ReproductionPanel reproduction={reproduction} renewPriceEth={renewPriceEth} />
               )}
             </TabPanel>
           )}
 
-          {/* Reproduction */}
-          {isOwner && (
-            <TabPanel>
-              <Heading as="h2" fontSize="xl" mb={6}>Reproduction</Heading>
-
-              {reproduction.isLoadingEligible ? (
-                <Center p={12}>
-                  <Spinner size="lg" />
-                  <Text ml={4}>Chargement tokens éligibles...</Text>
-                </Center>
-              ) : (
-
-
-                  <ReproductionPanel
-                    reproduction={reproduction}
-                    renewPriceEth={renewPriceEth}
-                  />
-
-              )}
-            </TabPanel>
-          )}
-
-          {/* Éclosion ŒUF */}
-{nftData?.membershipInfo?.isEgg && (
-  <TabPanel>
-    <HatchEggPanel
-      tokenId={Number(tokenId)}
-      hatch={hatch}
-      contractAddress={contractAdhesion}
-    />
-  </TabPanel>
-)}
 
         </TabPanels>
       </Tabs>
