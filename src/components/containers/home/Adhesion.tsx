@@ -110,13 +110,16 @@ const [simulatedInsect, setSimulatedInsect] = useState<any | null>(null);
 
     const checkNetworkAndId = async () => {
       const chainId = await web3.eth.getChainId();
+      console.log("chainId : ", chainId);
 
       const contract = new web3.eth.Contract(ABI as any, contractAddress);
       const totalMinted = await contract.methods.getTotalMinted().call();
       // même formule que dans le contrat
       const currentYearIndex = Math.floor(Date.now() / 1000 / (365 * 24 * 60 * 60)); //comme ans le contrat, on cheerche l'année a partir du genesis block d'eth
+      console.log(currentYearIndex);
 
       const maxMints = Number(await contract.methods.maxMintsPerYear().call());
+      console.log(maxMints);
       setMaxMint(maxMints);
       const adhesionRestantes: string = await contract.methods
         .mintsPerYear(account, currentYearIndex)
@@ -126,6 +129,7 @@ const [simulatedInsect, setSimulatedInsect] = useState<any | null>(null);
 
       const used = Number(adhesionRestantes);
       const remaining = Number(maxMints) - used; // récupère maxMintsPerYear avec un call aussi
+      console.log(remaining);
       setMintRestant(remaining); // récupère maxMintsPerYear avec un call aussi
 
 //console.log("mints restants:", mintRestant);
@@ -177,13 +181,13 @@ const [simulatedInsect, setSimulatedInsect] = useState<any | null>(null);
 
     if (!nextIsAnnual) {
       // Essai court manuel : mintPrice / 10, sans auto-evolve
-      required = mintPrice / 10;
+      required = mintPrice / 2;
       autoFlag = false;
     } else {
       if (nextAutoEvolve) {
-        const autoPremium = baseEvolve[0] + baseEvolve[1] + baseEvolve[2];
+        //const autoPremium = baseEvolve[0] + baseEvolve[1] + baseEvolve[2];
 
-        required = mintPrice + autoPremium;
+        required = mintPrice;// + autoPremium;
       } else {
         required = mintPrice;
       }
@@ -364,6 +368,7 @@ const handleConfirmRole = async () => {
     }, 5000);
   };
 
+/*
   const switchToSepolia = async () => {
     if (web3 && (web3.currentProvider as any)) {
       try {
@@ -382,10 +387,12 @@ const handleConfirmRole = async () => {
       alert("Web3 non disponible.");
     }
   };
-
+*/
   // ✅ CALCUL autoPremium pour évolution automatique
-const baseEvolvePrices = [0.0001, 0.00015, 0.0002]; // tes prix en ETH
-const autoPremiumEth = baseEvolvePrices.reduce((sum, price) => sum + price, 0);
+  const autoPremiumEth = baseEvolve
+    ? baseEvolve.reduce((sum, price) => sum + price, 0)
+    : 0;
+
 
 
   return (
@@ -576,7 +583,7 @@ mb={4}
                 >
                   <Stack direction="row" spacing={6}>
                     <Radio value="trial">
-                      <Text fontSize="sm">🧪 Essai découverte <Text as="span" fontSize="xs">(prix / 10)</Text></Text>
+                      <Text fontSize="sm">🧪 Essai découverte <Text as="span" fontSize="xs">(prix / 2)</Text></Text>
                     </Radio>
                     <Radio value="annual">
                       <Text fontSize="sm">📆 Annuel complet <Text as="span" fontSize="xs">(365 jours)</Text></Text>
@@ -670,7 +677,7 @@ mb={4}
           Connectez votre wallet
           </Heading>
           <Text fontSize="lg" >
-            Authentifiez-vous avec MetaMask pour adhérer à ResCoé.
+            Authentifiez-vous avec MetaMask pour adhérer à ResCoe.
           </Text>
         </Box>
       )}

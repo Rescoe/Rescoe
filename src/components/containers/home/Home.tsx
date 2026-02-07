@@ -220,9 +220,9 @@ const getRandomItems = <T,>(array: T[], count: number): T[] => {
                 <Divider my={4} borderColor="purple.600" w="15%" mx="auto" />
                 */}
 
-                
+                {/*
                           <FaucetWidget />
-
+                */}
                 <Heading
                   size={{ base: "2xl", md: "4xl" }}
                   bgClip="text"

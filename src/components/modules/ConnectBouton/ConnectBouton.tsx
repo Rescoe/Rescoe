@@ -39,8 +39,8 @@ const ConnectBouton: React.FC = () => {
   } = useAuth();
 
   const [isConnecting, setIsConnecting] = useState(false);
-  const selectedChainId = 84532;  // ID de Base Sepolia
-  const chainName = "Base Sepolia"; // Nom du réseau
+  const selectedChainId = 8453;  // ID de Base Sepolia
+  const chainName = "Base"; // Nom du réseau
   const [web3, setWeb3] = useState<Web3 | null>(null);
 
   // Init Web3 instance
