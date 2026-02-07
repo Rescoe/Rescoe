@@ -96,7 +96,7 @@ const UniqueArtGalerie: React.FC = () => {
             };
           }
 
-          const response = await fetch(`/api/proxyPinata?ipfsHash=${uri.split('/').pop()}`);
+          const response = await fetch(`/api/proxyPinata_Oeuvres?ipfsHash=${uri.split('/').pop()}`);
           const metadata = await response.json();
           localStorage.setItem(uri, JSON.stringify(metadata));
           return {
@@ -142,7 +142,7 @@ const UniqueArtGalerie: React.FC = () => {
                       const cachedMetadata = localStorage.getItem(tokenURI);
                       const metadata = cachedMetadata
                           ? JSON.parse(cachedMetadata)
-                          : await (await fetch(`/api/proxyPinata?ipfsHash=${tokenURI.split('/').pop()}`)).json();
+                          : await (await fetch(`/api/proxyPinata_Oeuvres?ipfsHash=${tokenURI.split('/').pop()}`)).json();
 
                       const priceInWei: BigNumberish = await collectionContract.getTokenPrice(tokenId);
                       const isForSale: boolean = await collectionContract.isNFTForSale(tokenId);

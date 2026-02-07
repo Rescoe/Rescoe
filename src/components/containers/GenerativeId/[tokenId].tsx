@@ -102,7 +102,7 @@ const TokenPage: React.FC = () => {
                 // Récupérer les métadonnées de l'IPFS
         const IndexLoad = "https://ipfs.io/ipfs/" + CIID + "/index.html";
         //console.log(IndexLoad);
-        const res = await fetch(`/api/proxyPinata?ipfsHash=${uri.split('/').pop()}`);
+        const res = await fetch(`/api/proxyPinata_Oeuvres?ipfsHash=${uri.split('/').pop()}`);
         const data = await res.json();
 
         const owner: string = fullDetails[0];

@@ -476,6 +476,7 @@ const autoPremiumEth = baseEvolvePrices.reduce((sum, price) => sum + price, 0);
           <Divider mb="10" />
         </Collapse>
 
+{/*
         <Button
 onClick={onToggleSim}
 variant="outline"
@@ -509,8 +510,10 @@ mb={4}
 
           </Box>
         </Collapse>
-
+*/}
       </Box>
+
+
 
       {isAuthenticated ? (
         <>
@@ -661,12 +664,12 @@ mb={4}
           )}
         </>
       ) : (
-        <Box bg="red.50" p={8} borderRadius="xl" textAlign="center" border="2px solid" borderColor="red.200">
-          <Icon as={LockIcon} boxSize={16} color="red.500" mb={4} />
-          <Heading size="lg" color="red.800" mb={3}>
-            🔐 Connectez votre wallet
+        <Box p={8} borderRadius="xl" textAlign="center" border="2px solid" borderColor="red.200">
+          <Icon as={LockIcon} boxSize={16} mb={4} />
+          <Heading size="lg" mb={3}>
+          Connectez votre wallet
           </Heading>
-          <Text fontSize="lg" color="gray.700">
+          <Text fontSize="lg" >
             Authentifiez-vous avec MetaMask pour adhérer à ResCoé.
           </Text>
         </Box>

@@ -120,7 +120,7 @@ const CreateSocialCollection: React.FC = () => {
 
   const createPinataHeaders = (isJson = false) => ({
     headers: {
-      Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT}`,
+      Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT_OEUVRES}`,
       "Content-Type": isJson ? "application/json" : "multipart/form-data",
     },
   });

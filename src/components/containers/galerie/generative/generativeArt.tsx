@@ -98,7 +98,7 @@ const UniqueGenerativeArtGallery: React.FC = () => {
             const cachedMetadata = localStorage.getItem(tokenURI);
             const metadata = cachedMetadata
               ? JSON.parse(cachedMetadata)
-              : await (await fetch(`/api/proxyPinata?ipfsHash=${tokenURI.split('/').pop()}`)).json();
+              : await (await fetch(`/api/proxyPinata_Oeuvres?ipfsHash=${tokenURI.split('/').pop()}`)).json();
 
             if (!cachedMetadata) {
               localStorage.setItem(tokenURI, JSON.stringify(metadata));

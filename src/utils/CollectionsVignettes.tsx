@@ -40,7 +40,7 @@ const CollectionsVignettes: React.FC<{ creator: string }> = ({ creator }) => {
             }
             const ipfsHash = uri?.split("/").pop();
             if (!ipfsHash) return col;
-            const res = await fetch(`/api/proxyPinata?ipfsHash=${ipfsHash}`);
+            const res = await fetch(`/api/proxyPinata_Oeuvres?ipfsHash=${ipfsHash}`);
             if (!res.ok) return col;
             const metadata = await res.json();
             return { ...col, imageUrl: metadata.image || "" };

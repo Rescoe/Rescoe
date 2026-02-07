@@ -273,7 +273,7 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
         const uri = await contract.tokenURI(tokenId);
         if (!uri) throw new Error("URI invalide.");
 
-        const res = await fetch(`/api/proxyPinata?ipfsHash=${uri.split("/").pop()}`);
+        const res = await fetch(`/api/proxyPinata_Oeuvres?ipfsHash=${uri.split("/").pop()}`);
         if (!res.ok) throw new Error("Erreur lors de la récupération des données d'image.");
 
         const data = await res.json();

@@ -176,11 +176,11 @@ const CreateSocialCollection: React.FC = () => {
 
       const fileRes = await axios.post("https://api.pinata.cloud/pinning/pinFileToIPFS", formData, {
         headers: {
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT}`,
+          Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT_OEUVRES}`,
         },
       });
 
-      const imageUrl = `https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${fileRes.data.IpfsHash}`;
+      const imageUrl = `https://harlequin-key-marmot-538.mypinata.cloud/ipfs/${fileRes.data.IpfsHash}`;
 
       const meta = {
         name: metadata.name,
@@ -190,11 +190,11 @@ const CreateSocialCollection: React.FC = () => {
 
       const metaRes = await axios.post("https://api.pinata.cloud/pinning/pinJSONToIPFS", meta, {
         headers: {
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT}`,
+          Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT_OEUVRES}`,
         },
       });
 
-      const url = `https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${metaRes.data.IpfsHash}`;
+      const url = `https://harlequin-key-marmot-538.mypinata.cloud/ipfs/${metaRes.data.IpfsHash}`;
       setIpfsUrl(url);
 
       toast({

@@ -306,13 +306,13 @@ const [percent, setPercent] = useState<number[]>([]);
           formData,
           {
             headers: {
-              Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT}`,
+              Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT_OEUVRES}`,
               'Content-Type': 'multipart/form-data',
             },
           }
         );
 
-        const imageUrl = `https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${imageResponse.data.IpfsHash}`;
+        const imageUrl = `https://harlequin-key-marmot-538.mypinata.cloud/ipfs/${imageResponse.data.IpfsHash}`;
         const metadataJson = {
           artist: address,
           name: metadata.name,
@@ -326,13 +326,13 @@ const [percent, setPercent] = useState<number[]>([]);
           metadataJson,
           {
             headers: {
-              Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT}`,
+              Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT_OEUVRES}`,
               'Content-Type': 'application/json',
             },
           }
         );
 
-        setIpfsUrl(`https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`);
+        setIpfsUrl(`https://harlequin-key-marmot-538.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`);
         //console.log(ipfsUrl);
         toast({
           title: "Oeuvre uploadée",

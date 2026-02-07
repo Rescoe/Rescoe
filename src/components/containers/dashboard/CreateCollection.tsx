@@ -210,18 +210,20 @@ const CreateCollection: React.FC = () => {
   const uploadFile = async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append('file', file);
+    console.log(process.env.NEXT_PUBLIC_PINATA_JWT_OEUVRES?.slice(0,10));
+
     const response = await axios.post('https://api.pinata.cloud/pinning/pinFileToIPFS', formData, createPinataHeaders());
-    return `https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${response.data.IpfsHash}`;
+    return `https://harlequin-key-marmot-538.mypinata.cloud/ipfs/${response.data.IpfsHash}`;
   };
 
   const uploadMetadata = async (metadata: any): Promise<string> => {
     const response = await axios.post('https://api.pinata.cloud/pinning/pinJSONToIPFS', metadata, createPinataHeaders(true));
-    return `https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${response.data.IpfsHash}`;
+    return `https://harlequin-key-marmot-538.mypinata.cloud/ipfs/${response.data.IpfsHash}`;
   };
 
   const createPinataHeaders = (isJson: boolean = false) => ({
     headers: {
-      'Authorization': `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT}`,
+      'Authorization': `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT_OEUVRES}`,
       'Content-Type': isJson ? 'application/json' : 'multipart/form-data'
     }
   });
@@ -521,7 +523,10 @@ const tx = await handleMessageTransactions(
         🚀 Enregistrez votre collection
       </Button>
 
+{/*
       {ipfsUrl && <Text mt={3} wordBreak="break-word">IPFS URL: {ipfsUrl}</Text>}
+*/}
+
       <Divider my={10} borderColor="purple.300" />
 
       <Flex justify="center">

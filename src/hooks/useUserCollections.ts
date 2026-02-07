@@ -37,7 +37,7 @@ export function useUserCollections(userAddress?: string) {
               return { id: id.toString(), name, imageUrl: metadata.image };
             }
 
-            const response = await fetch(`/api/proxyPinata?ipfsHash=${uri.split("/").pop()}`);
+            const response = await fetch(`/api/proxyPinata_Oeuvres?ipfsHash=${uri.split("/").pop()}`);
             const metadata = await response.json();
             localStorage.setItem(uri, JSON.stringify(metadata));
 

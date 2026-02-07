@@ -115,7 +115,7 @@ export const useRescoeData = (): UseRescoeDataReturn => {
           let metadata: any = {};
 
           try {
-            const res = await fetch(`/api/proxyPinata?ipfsHash=${uri.split('/').pop()}`);
+            const res = await fetch(`/api/proxyPinata_Oeuvres?ipfsHash=${uri.split('/').pop()}`);
             metadata = await res.json();
           } catch {}
 
@@ -209,7 +209,7 @@ export const useRescoeData = (): UseRescoeDataReturn => {
         tokenIds.map(async (id) => {
           try {
             const uri = await contract.tokenURI(id);
-            const meta = await fetch(`/api/proxyPinata?ipfsHash=${uri.split('/').pop()}`).then(r => r.json());
+            const meta = await fetch(`/api/proxyPinata_Oeuvres?ipfsHash=${uri.split('/').pop()}`).then(r => r.json());
             return {
               id: id.toString(),
               image: meta.image,

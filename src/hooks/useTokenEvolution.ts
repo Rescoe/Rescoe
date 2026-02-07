@@ -379,8 +379,9 @@ export const useTokenEvolution = ({
         newTokenId = eventData.tokenId?.toString() || newTokenId;
       }
 
+      router.push(`/u/dashboard`);
 
-      router.push(`/AdhesionId/${contractAddress}/${newTokenId}`);
+      //router.push(`/AdhesionId/${contractAddress}/${newTokenId}`);
     } catch (e) {
       console.error("❌ hatch error:", e);
       alert("Erreur éclosion");

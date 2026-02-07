@@ -213,10 +213,16 @@ const getRandomItems = <T,>(array: T[], count: number): T[] => {
               transition={{ duration: 0.9, ease: "easeOut" }}
             >
               <Box textAlign="center" maxW="1100px" mx="auto" py={12}>
+              {/*
                 <Heading size="3xl" fontWeight="extrabold" mb={4}>
                   RESCOE
                 </Heading>
                 <Divider my={4} borderColor="purple.600" w="15%" mx="auto" />
+                */}
+
+                
+                          <FaucetWidget />
+
                 <Heading
                   size={{ base: "2xl", md: "4xl" }}
                   bgClip="text"

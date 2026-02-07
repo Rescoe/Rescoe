@@ -394,7 +394,7 @@ const CollectionsByType: React.FC<{ creator: string }> = ({ creator }) => {
             const ipfsHash = uri?.split("/").pop();
             if (!ipfsHash) return null;
 
-            const response = await fetch(`/api/proxyPinata?ipfsHash=${ipfsHash}`);
+            const response = await fetch(`/api/proxyPinata_Oeuvres?ipfsHash=${ipfsHash}`);
             if (!response.ok) return null;
 
             const metadata = await response.json();

@@ -526,7 +526,7 @@ const TokenPage = () => {
     <Box p={6} bg="yellow.50" borderRadius="lg">
       <Heading size="lg" mb={6}>🥚 ÉCLORE L'ŒUF #{tokenId}</Heading>
 
-      {/* 3 OPTIONS */}
+      {/*
       <SimpleGrid columns={3} spacing={6} mb={8}>
         {hatch.evolutionOptions.map((opt: any) => (
           <Box key={opt.id}
@@ -553,6 +553,9 @@ const TokenPage = () => {
           </Box>
         ))}
       </SimpleGrid>
+
+   */}
+
 
       <Button
         colorScheme="green"
@@ -784,14 +787,14 @@ const TokenPage = () => {
                   >
                     Préparer l'image d'évolution
                   </Button>
-
+{/*
                   {previewImageUrl && (
                     <>
                       <Text mt={2}>Aperçu prochaine forme :</Text>
                       <Image src={previewImageUrl} alt="Preview" maxW="300px" borderRadius="md" />
                     </>
                   )}
-
+*/}
                   <Button
                     colorScheme="teal"
                     mt={4}

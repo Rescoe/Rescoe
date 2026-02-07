@@ -164,10 +164,10 @@ export const useHatchEgg = (contractAddress: string, eggTokenId: number) => {
     const res = await axios.post(
       "https://api.pinata.cloud/pinning/pinJSONToIPFS",
       metadata,
-      { headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT}` } }
+      { headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT_OEUVRES}` } }
     );
 
-    return `https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${res.data.IpfsHash}`;
+    return `https://harlequin-key-marmot-538.mypinata.cloud/ipfs/${res.data.IpfsHash}`;
   }, [eggTokenId]);
 
   /* ------------------------------------------------------------------ */

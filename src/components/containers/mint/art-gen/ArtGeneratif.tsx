@@ -9,7 +9,7 @@ import ABIRESCOLLECTION from '../../../ABI/ABI_Collections.json';
 import html2canvas from 'html2canvas';
 
 // Constantes de l'API Pinata
-const PINATA_GATEWAY = "https://purple-managerial-ermine-688.mypinata.cloud/ipfs/";
+const PINATA_GATEWAY = "https://harlequin-key-marmot-538.mypinata.cloud/ipfs/";
 const PINATA_API_URL = "https://api.pinata.cloud/pinning";
 
 interface Collection {
@@ -282,7 +282,7 @@ const GenerativeArtUploader: React.FC = () => {
               formData,
               {
                 headers: {
-                  Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT}`,
+                  Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT_OEUVRES}`,
                   "Content-Type": "multipart/form-data",
                 },
               }
