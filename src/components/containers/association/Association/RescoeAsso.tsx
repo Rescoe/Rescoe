@@ -1,4 +1,230 @@
 import React from 'react';
+import {
+  Box, Container, VStack, Heading, Text, Grid, Button, Icon,
+  Flex, SimpleGrid, useBreakpointValue, Progress, SlideFade,
+  Tag, TagLabel, TagLeftIcon
+} from '@chakra-ui/react';
+import { FaHandsHelping, FaCalendarAlt, FaStore, FaRoad } from 'react-icons/fa';
+import NextLink from 'next/link';
+
+
+// ✅ AJOUTE ÇA avant le composant (ligne 9)
+interface RoadmapItemProps {
+  period: string;
+  title: string;
+  description: string;
+  progress: number;
+}
+
+// ✅ CHANGE ligne 11
+const RoadmapItem = ({ period, title, description, progress }: RoadmapItemProps) => (
+
+  <Box
+    p={6}
+    borderRadius="2xl"
+    bg="rgba(1, 28, 57, 0.85)"
+    border="1px solid"
+    borderColor="brand.mauve"
+    transition="all 0.3s ease"
+    _hover={{ transform: 'translateY(-4px)', boxShadow: '0 0 25px rgba(180,166,213,0.35)' }}
+  >
+    <Text fontSize="sm" color="brand.gold" mb={1}>{period}</Text>
+    <Text fontSize="lg" fontWeight="bold" color="brand.cream" mb={2}>{title}</Text>
+    <Text fontSize="sm" color="brand.cream" opacity={0.85} mb={4}>{description}</Text>
+    <Progress value={progress} size="sm" borderRadius="full" colorScheme="purple" />
+  </Box>
+);
+
+const AssociationPage = () => {
+  const isMobile = useBreakpointValue({ base: true, md: false });
+
+  return (
+    <Box minH="100vh" bg="brand.navy" color="brand.cream" overflow="hidden">
+      {/* Decorative gradients */}
+      <Box position="absolute" top="-120px" right="-120px" w="320px" h="320px" borderRadius="full"
+        bgGradient="radial(brand.mauve, transparent 70%)" opacity={0.12} />
+      <Box position="absolute" bottom="-160px" left="-120px" w="420px" h="420px" borderRadius="full"
+        bgGradient="radial(brand.gold, transparent 70%)" opacity={0.08} />
+
+      <Container maxW="container.xl" py={{ base: 10, md: 20 }} position="relative">
+
+        {/* HERO */}
+        <SlideFade in offsetY={-20}>
+          <VStack spacing={6} textAlign="center" mb={20}>
+            <Heading size={{ base: '2xl', md: '4xl' }}
+              bgGradient="linear(to-r, brand.gold, brand.mauve)" bgClip="text">
+              RESCOE
+            </Heading>
+            <Heading size={{ base: 'md', md: 'xl' }} color="brand.gold" fontWeight="medium">
+              Réseau Expérimental Solidaire de Crypto-Œuvres Émergentes
+            </Heading>
+            <Text maxW="3xl" fontSize={{ base: 'md', md: 'lg' }} lineHeight="tall">
+              Depuis 2018, RESCOE explore les liens entre art, technologie et collectif.
+              Aujourd’hui, l’application est fonctionnelle : mint de poésie et d’œuvres visuelles,
+              architecture blockchain modulaire, contrats robustes et système d’évolution opérationnel.
+            </Text>
+            {/*}
+            <Flex gap={4} direction={{ base: 'column', sm: 'row' }}>
+              <Button size="lg" px={10} borderRadius="full"
+                bgGradient="linear(to-r, brand.mauve, brand.blue)" color="white">
+                Découvrir le projet
+              </Button>
+              <Button size="lg" px={10} borderRadius="full" variant="outline" borderColor="brand.mauve">
+                Devenir membre
+              </Button>
+            </Flex>
+            */}
+          </VStack>
+        </SlideFade>
+
+        {/* STORY */}
+        <SlideFade in offsetY={20} delay={0.1}>
+          <Box mb={20} maxW="4xl" mx="auto" textAlign="center">
+            <Heading size="2xl" mb={6}
+              bgGradient="linear(to-r, brand.gold, brand.mauve)" bgClip="text">
+              8 ans d’histoire, sans raccourci
+            </Heading>
+            <Text fontSize="md" lineHeight="tall" opacity={0.9}>
+              RESCOE est né en 2018 d’une idée simple portée par deux amis étudiants :
+              créer du lien, tester, apprendre. Le projet a évolué, parfois échoué,
+              parfois bifurqué. Du réseau étudiant à la galerie associative,
+              puis au pivot blockchain après le COVID, chaque étape a laissé des traces.
+
+              En 2022, une attaque a détruit notre site et nos canaux sociaux.
+              Plutôt que d’abandonner, nous avons pris le temps de repenser les fondations.
+              En 2023, le choix est clair : tout reconstruire à la main,
+              sans base de données centrale, avec une architecture plus résiliente.
+
+              En février 2026, RESCOE atteint une date symbolique : 8 ans d’existence.
+              Le projet est sobre, imparfait, mais vivant.
+              Il est prêt à être partagé à nouveau.
+            </Text>
+          </Box>
+        </SlideFade>
+
+        {/* ROADMAP */}
+        <SlideFade in offsetY={20} delay={0.2}>
+          <Box mb={24} p={10} borderRadius="3xl"
+            bg="rgba(1, 28, 57, 0.85)" border="1px solid" borderColor="brand.mauve">
+            <Flex align="center" mb={8} gap={4} flexWrap="wrap">
+              <Tag size="lg" borderRadius="full" bg="brand.gold" color="brand.navy">
+                <TagLeftIcon as={FaHandsHelping} />
+                <TagLabel>Bénévoles bienvenus</TagLabel>
+              </Tag>
+              <Heading size="xl" bgGradient="linear(to-r, brand.gold, brand.mauve)" bgClip="text">
+                Roadmap réaliste
+              </Heading>
+            </Flex>
+
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+              <RoadmapItem
+                period="2026"
+                title="Stabilisation & ouverture"
+                description="Corrections ciblées, reprise progressive des ateliers et ouverture contrôlée aux nouveaux membres."
+                progress={35}
+              />
+              <RoadmapItem
+                period="2027"
+                title="Œuvres hybrides"
+                description="Fusion poésie / visuel, premières briques d’art génératif et résidences numériques."
+                progress={10}
+              />
+              <RoadmapItem
+                period="2028"
+                title="Ancrage physique"
+                description="Lieu expérimental à Bordeaux : expositions, ateliers, médiation numérique."
+                progress={5}
+              />
+              <RoadmapItem
+                period="Long terme"
+                title="Transmission"
+                description="Documentation, pédagogie et passage de relais progressif."
+                progress={2}
+              />
+            </SimpleGrid>
+          </Box>
+        </SlideFade>
+
+        {/* ACTIVITIES */}
+        <SlideFade in offsetY={20} delay={0.3}>
+          <Box mb={24}>
+            <Heading size="2xl" textAlign="center" mb={12}
+              bgGradient="linear(to-r, brand.gold, brand.mauve)" bgClip="text">
+              Ce que fait RESCOE
+            </Heading>
+            <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }} gap={8}>
+              <Box p={8} borderRadius="2xl" bg="rgba(1, 28, 57, 0.75)" border="1px solid" borderColor="brand.mauve">
+                <Flex align="center" mb={4}>
+                  <Icon as={FaCalendarAlt} boxSize={8} color="brand.mauve" mr={3} />
+                  <Heading size="md" color="brand.gold">Ateliers & transmission</Heading>
+                </Flex>
+                <Text fontSize="sm" lineHeight="tall" opacity={0.9}>
+                  Initiations Web3, mint poétique et artistique,
+                  accompagnement d’artistes éloignés des outils numériques.
+                </Text>
+              </Box>
+              <Box p={8} borderRadius="2xl" bg="rgba(1, 28, 57, 0.75)" border="1px solid" borderColor="brand.mauve">
+                <Flex align="center" mb={4}>
+                  <Icon as={FaStore} boxSize={8} color="brand.mauve" mr={3} />
+                  <Heading size="md" color="brand.gold">Galerie hybride</Heading>
+                </Flex>
+                <Text fontSize="sm" lineHeight="tall" opacity={0.9}>
+                  Œuvres numériques, impressions, expositions physiques
+                  et ponts entre artistes traditionnels et numériques.
+                </Text>
+              </Box>
+            </Grid>
+          </Box>
+        </SlideFade>
+
+        {/* CTA */}
+        <SlideFade in offsetY={20} delay={0.4}>
+          <Box textAlign="center" p={14} borderRadius="3xl"
+            bgGradient="linear(to-r, rgba(1,28,57,0.85), brand.navy)"
+            border="1px solid" borderColor="brand.mauve">
+            <Heading size="2xl" mb={6}
+              bgGradient="linear(to-r, brand.gold, brand.mauve)" bgClip="text">
+              Et maintenant ?
+            </Heading>
+            <Text maxW="2xl" mx="auto" mb={10} fontSize="lg" lineHeight="tall">
+              RESCOE n’est pas qu'une simple galerie d'art associative.
+              C’est un espace en construction, porté par le temps long,
+              la sincérité et l’envie de faire ensemble.
+            </Text>
+            <Flex justify="center" gap={6} direction={{ base: 'column', sm: 'row' }}>
+              <Button
+              as={NextLink}
+              href="/adhesion"
+              size="lg"
+              px={12}
+              borderRadius="full"
+              bgGradient="linear(to-r, brand.mauve, brand.blue)" color="white">
+                Rejoignez nous
+              </Button>
+              <Button
+              as={NextLink}
+              href="/association/contact"
+              size="lg"
+              px={12}
+              borderRadius="full"
+              bgGradient="linear(to-r, brand.mauve, brand.blue)" color="white">
+                Contactez nous
+              </Button>
+
+            </Flex>
+          </Box>
+        </SlideFade>
+
+      </Container>
+    </Box>
+  );
+};
+
+export default AssociationPage;
+
+
+/*
+import React from 'react';
 import { keyframes } from "@emotion/react";
 
 import {
@@ -523,7 +749,6 @@ const AssociationPage = () => {
       position="relative"
       overflowX="hidden"
     >
-      {/* Animated background elements */}
       <Box
         position="absolute"
         top="-100px"
@@ -548,7 +773,6 @@ const AssociationPage = () => {
       />
 
       <Container maxW="container.xl" py={{ base: 8, md: 16 }} position="relative" zIndex={1}>
-        {/* Hero Section */}
         <SlideFade in={true} offsetY={-20}>
           <Box textAlign="center" mb={16}>
             <Heading
@@ -622,7 +846,6 @@ const AssociationPage = () => {
           </Box>
         </SlideFade>
 
-        {/* Stats Section */}
         <SlideFade in={true} offsetY={20} delay={0.2}>
           <StatGroup
             mb={16}
@@ -643,7 +866,6 @@ const AssociationPage = () => {
           </StatGroup>
         </SlideFade>
 
-        {/* Mission & Vision */}
         <SlideFade in={true} offsetY={20} delay={0.3}>
           <Box mb={20}>
             <Heading
@@ -736,7 +958,6 @@ const AssociationPage = () => {
           </Box>
         </SlideFade>
 
-        {/* Technical Architecture */}
         <SlideFade in={true} offsetY={20} delay={0.4}>
           <Box mb={20}>
             <Heading
@@ -754,7 +975,6 @@ const AssociationPage = () => {
           </Box>
         </SlideFade>
 
-        {/* Activities Section */}
         <SlideFade in={true} offsetY={20} delay={0.5}>
           <Box mb={20}>
             <Heading
@@ -794,7 +1014,6 @@ const AssociationPage = () => {
           </Box>
         </SlideFade>
 
-        {/* Tech Stack Section */}
         <SlideFade in={true} offsetY={20} delay={0.6}>
           <Box mb={20}>
             <Heading
@@ -848,7 +1067,6 @@ const AssociationPage = () => {
           </Box>
         </SlideFade>
 
-        {/* How to Join Section */}
         <SlideFade in={true} offsetY={20} delay={0.7}>
           <Box
             mb={20}
@@ -984,7 +1202,6 @@ const AssociationPage = () => {
           </Box>
         </SlideFade>
 
-        {/* SAS Partnership Section */}
         <SlideFade in={true} offsetY={20} delay={0.8}>
           <Box mb={20}>
             <Heading
@@ -1169,7 +1386,6 @@ const AssociationPage = () => {
           </Box>
         </SlideFade>
 
-        {/* Call to Action */}
         <SlideFade in={true} offsetY={20} delay={0.9}>
           <Box
             textAlign="center"
@@ -1248,7 +1464,6 @@ const AssociationPage = () => {
         </SlideFade>
       </Container>
 
-      {/* Modal for ecosystem details */}
       <Modal isOpen={isOpen} onClose={onClose} size="xl">
         <ModalOverlay />
         <ModalContent
@@ -1361,3 +1576,4 @@ const AssociationPage = () => {
 };
 
 export default AssociationPage;
+*/

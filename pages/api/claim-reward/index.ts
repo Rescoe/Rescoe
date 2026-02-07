@@ -13,7 +13,7 @@ export default async function handler(
   try {
     const { user } = req.body as { user: string }; // ✅ Type body
 
-    console.log('Claim request for user:', user);
+    //console.log('Claim request for user:', user);
 
     if (!ethers.isAddress(user)) {
       return res.status(400).json({ error: "Adresse invalide" });
@@ -35,7 +35,7 @@ export default async function handler(
     const provider = new ethers.JsonRpcProvider(RPC_URL);
     const relayerWallet = new ethers.Wallet(PRIVATE_KEY!, provider); // ✅ Non-null
 
-    console.log('Relayer address:', await relayerWallet.getAddress());
+    //console.log('Relayer address:', await relayerWallet.getAddress());
 
     const manager = new ethers.Contract(
       MANAGER_ADDRESS,
@@ -49,7 +49,7 @@ export default async function handler(
 
     // 1. Vérif pending
     const pending = await manager.getPendingPoints(user);
-    console.log(`Pending points for ${user}: ${pending.toString()}`);
+    //console.log(`Pending points for ${user}: ${pending.toString()}`);
 
     if (pending === 0n) {
       return res.status(400).json({ error: "Aucun point pending", pending: 0 });
@@ -58,26 +58,26 @@ export default async function handler(
     // 2. Vérif relayer autorisé
     const currentRelayer = await manager.rewardRelayer();
     const relayerAddress = await relayerWallet.getAddress();
-    console.log(`Contract relayer: ${currentRelayer}, Caller: ${relayerAddress}`);
+    //console.log(`Contract relayer: ${currentRelayer}, Caller: ${relayerAddress}`);
 
     if (currentRelayer.toLowerCase() !== relayerAddress.toLowerCase()) {
       return res.status(403).json({ error: "Relayer non autorisé", expected: currentRelayer });
     }
 
     // 3. Execute
-    console.log('Calling distributeToAdhesion...');
+    //console.log('Calling distributeToAdhesion...');
     const tx = await manager.distributeToAdhesion(user, {
       gasLimit: 300_000
     });
 
-    console.log('TX sent:', tx.hash);
+    //console.log('TX sent:', tx.hash);
 
     const receipt = await tx.wait();
     if (!receipt) {
       throw new Error("Transaction receipt manquant");
     }
 
-    console.log('TX confirmed:', receipt.blockNumber);
+    //console.log('TX confirmed:', receipt.blockNumber);
 
     res.status(200).json({
       success: true,

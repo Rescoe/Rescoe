@@ -320,7 +320,7 @@ const Dashboard = () => {
       });
 
       const claimData = await claimResponse.json();
-      console.log('Points distribués:', claimData);
+      //console.log('Points distribués:', claimData);
 
     } catch (error) {
       console.error("Erreur lors de l'achat des points:", error);

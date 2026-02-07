@@ -7,10 +7,8 @@ function randomItem(arr) {
 }
 
 // Sprite selector : génère un nom de fichier de type 001_Family.gif
-function spriteSelector(family, totalInFamily) {
-  const index = Math.floor(Math.random() * totalInFamily) + 1;
-  const indexStr = index.toString().padStart(3, '0');
-  return `${indexStr}_${family}.gif`;
+function spriteSelector(family) {
+  return `${family}.gif`;
 }
 
 function genInsect25(level) {
@@ -20,7 +18,7 @@ function genInsect25(level) {
 
   // 1️⃣ Filtrer toutes les familles LVL0 depuis nft_metadata.json
   const lvl0Families = Object.entries(metadataJson)
-    .filter(([key, data]) => data.level === 'lvl0')
+    .filter(([key, data]) => data.level === 0)
     .map(([key, data]) => ({ key, data }));
 
   if (!lvl0Families.length) {
@@ -30,21 +28,25 @@ function genInsect25(level) {
   // 2️⃣ Choix aléatoire d'une famille LVL0
   const randomFamily = randomItem(lvl0Families);
   const familyData = { ...randomFamily.data }; // copie des données complètes
-  console.log(familyData);
-  const familyName = familyData.new_folder || randomFamily.key;
-  const totalInFamily = familyData.total_in_family || 10;
-  console.log(totalInFamily);
-  const newPath = familyData.new_path || `lvl0/${familyName}/`;
-
+  //console.log(familyData);
+  const folder = familyData.family_name
+  const name =  familyData.name || randomFamily.key;
   // 3️⃣ Sélection du sprite via spriteSelector
-  const spriteName = spriteSelector(familyName, totalInFamily);
-  const imageUrl = `/insects/${newPath}${spriteName}`;
+  const spriteName = spriteSelector(name);
+  //console.log("newPath", folder);
 
+  //console.log("spriteName", spriteName);
+
+  const imageUrl = `/insects/lvl0/${folder}/${spriteName}`;
+//console.log(imageUrl);
   // 4️⃣ On ajoute l'URL de l'image sélectionnée et le sprite utilisé
+  //console.log(familyData);
+
   return {
     ...familyData,
     imageUrl,
-    spriteName
+    spriteName,
+    folder
   };
 }
 

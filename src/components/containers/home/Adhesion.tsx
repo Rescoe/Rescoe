@@ -122,13 +122,13 @@ const [simulatedInsect, setSimulatedInsect] = useState<any | null>(null);
         .mintsPerYear(account, currentYearIndex)
         .call();
 
-      console.log("mints this year:", adhesionRestantes);
+      //console.log("mints this year:", adhesionRestantes);
 
       const used = Number(adhesionRestantes);
       const remaining = Number(maxMints) - used; // récupère maxMintsPerYear avec un call aussi
       setMintRestant(remaining); // récupère maxMintsPerYear avec un call aussi
 
-console.log("mints restants:", mintRestant);
+//console.log("mints restants:", mintRestant);
 
       setNftId(Number(totalMinted).toString());
     };
@@ -221,7 +221,7 @@ const handleConfirmRole = async () => {
 
     // 🔥 PROFIL COULEUR EXACT
     const spriteFilename = insectData.spriteName;
-    const familyKey = (insectData.new_folder || insectData.key) as FamilyKey;
+    const familyKey = (insectData.folder) as FamilyKey;
 
     const profiles = colorProfilesJson.families[familyKey];
 
@@ -231,11 +231,12 @@ const handleConfirmRole = async () => {
 
     // ✅ ATTRIBUTS INSECTE + COULEUR COMPLÈTES
     const insectAttributes = [
-      ...insectData.attributes,  // 15 traits morpho
+      ...insectData.attributes,  //  15 traits morpho
 
       // 🔥 MÉTAS INSECTE
       { trait_type: "Famille", value: familyKey },
-      { trait_type: "DisplayName", value: insectData.display_name },
+      { trait_type: "1er Propriétaire", value: name },
+      { trait_type: "Insect name", value: insectData.display_name },
       { trait_type: "Lore", value: insectData.lore },
       { trait_type: "TotalFamille", value: insectData.total_in_family },
       { trait_type: "Sprite", value: spriteFilename }
@@ -273,11 +274,13 @@ const handleConfirmRole = async () => {
       ...colorAttributes  // 🔥 20+ couleur traits
     ];
 
-    console.log(`🚀 ${fullAttributes.length} attributs OpenSea générés !`);
+    //console.log(`🚀 ${insectAttributes} attributs générés !`);
+
+    //console.log(`🚀 ${fullAttributes.length} attributs OpenSea générés !`);
 
     await uploadToIPFS({
       imageUrl: generatedImageUrl!,
-      name: insectData.display_name || name,
+      name: name,
       bio,
       role: selectedRole,
       level: 0,
@@ -329,7 +332,7 @@ const handleConfirmRole = async () => {
             maxPriorityFeePerGas: null as any    // ✅ legacy tx
           });
 
-        console.log('✅ Mint OK - Gas utilisé:', tx.gasUsed);
+        //console.log('✅ Mint OK - Gas utilisé:', tx.gasUsed);
 
         setShowBananas(true);
         startLoadingAndRedirect();

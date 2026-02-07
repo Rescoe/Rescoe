@@ -13,56 +13,73 @@ const PRIORITY_WEIGHTS = {
 
 const REPETITION_PENALTY = 0.4;
 
-/* =======================
-INDEX RÉEL : 1 DOSSIER = 1 FAMILLE
-======================== */
 interface ImageCandidate {
-  sprite_name: string;  // "023_Tenebroryns.gif"
+  sprite_name: string;
   imageUrl: string;
-  family: string;       // "Tenebroryns" (new_folder)
-  folder_path: string;  // "lvl2/Tenebroryns/"
+  family: string;
+  folder_path: string;
+  name: string;
+  display_name?: string;
+  lore?: string;
+  attributes?: any[];
+  image: string;
   metadata: any;
 }
 
-const familiesByLevel: Record<number, Record<string, ImageCandidate[]>> = {
+const familiesByLevel: Record<number, Record<string, Record<string, ImageCandidate>>> = {
   1: {}, 2: {}, 3: {}
 };
 
 const colorProfilesByFamily: Record<string, any[]> = {};
 
 (function indexRealFamilies() {
+  //console.log('🔄 Indexation métadonnées réelles...');
+
   // Color profiles
   Object.entries(colorProfilesJson.families || {}).forEach(([fam, profiles]: any) => {
     colorProfilesByFamily[fam] = profiles;
   });
 
-  // ✅ SCAN RÉEL : new_folder → dossier + vraies images 001-999
-  Object.values(metadataJson).forEach((famData: any) => {
-    const level = parseInt(famData.level?.replace('lvl', '') || '0');
+  // ✅ INDEX PAR NOMS RÉELS DES SPRITES
+  let totalIndexed = 0;
+  Object.entries(metadataJson).forEach(([spriteName, famData]: [string, any]) => {
+    const level = parseInt(famData.level?.toString() || '0');
     if (level < 1 || level > 3) return;
 
-    const family = famData.new_folder;  // "Tenebroryns"
-    const folderPath = famData.new_path || `lvl${level}/${family}/`;  // "lvl1/Tenebroryns/"
+    const family = famData.family_name;
+    if (!family) return;
 
-    if (!familiesByLevel[level][family]) familiesByLevel[level][family] = [];
+    const imagePath = famData.image || famData.image_path || '';
+    const folderPath = imagePath
+      ? imagePath.replace(/[^/\\]+\.gif$/i, '').replace(/\\\\/g, '/')
+      : `lvl${level}/${family}/`;
 
-    // Génération limitée par total_in_family ou max 200
-    const maxImages = Math.min(200, famData.total_in_family || 999);
-    for (let i = 1; i <= maxImages; i++) {
-      const num = i.toString().padStart(3, '0');
-      const spriteName = `${num}_${family}.gif`;
-      const imageUrl = `/insects/${folderPath}${spriteName}`;
-
-      familiesByLevel[level][family].push({
-        sprite_name: spriteName,
-        imageUrl,
-        family,
-        folder_path: folderPath,
-        metadata: famData
-      });
+    if (!familiesByLevel[level][family]) {
+      familiesByLevel[level][family] = {};
     }
+
+    familiesByLevel[level][family][spriteName] = {
+      sprite_name: `${spriteName}.gif`,
+      imageUrl: `/insects/${imagePath.replace(/\\\\/g, '/')}`,
+      family,
+      folder_path: folderPath,
+      name: famData.name || spriteName,
+      display_name: famData.display_name,
+      lore: famData.lore,
+      attributes: famData.attributes || [],
+      image: imagePath,
+      metadata: famData
+    };
+
+    totalIndexed++;
   });
 
+  /*console.log(`✅ ${totalIndexed} sprites indexés:`, {
+    lvl1: Object.keys(familiesByLevel[1]).length,
+    lvl2: Object.keys(familiesByLevel[2]).length,
+    lvl3: Object.keys(familiesByLevel[3]).length
+  });
+  */
 })();
 
 function createSeededRNG(seed: string): () => number {
@@ -98,60 +115,65 @@ function similarity(currentAttrs: Record<string, string>, targetAttrs: Record<st
 }
 
 /* =======================
-ENGINE PRINCIPAL - 100% SUCCÈS
+ENGINE PRINCIPAL - 100% FONCTIONNEL
 ======================== */
 export default function evolutionEngine(
-  currentData: any,  // {family, attributes} DIRECT
+  currentData: any,
   currentLevel: number,
   targetLevel: number,
   wallet: string,
   tokenId: string | number
 ) {
-  const currentFamily = currentData.family || 'unknown';
-  const currentAttrs = currentData.attributes || {};
-  const history = currentData.history || [];
+  const currentAttrs = Array.isArray(currentData.attributes)
+    ? Object.fromEntries(currentData.attributes.map((a: any) => [a.trait_type, a.value]))
+    : currentData.attributes || {};
 
-  // History précis : familles + sprites vus
+  const currentFamily = currentData.family_name ||
+                       currentAttrs.Famille ||
+                       currentAttrs.family ||
+                       currentData.source_folder ||
+                       'unknown';
+
+  const history = currentData.evolutionHistory || [];
+
   const historyFamilies = new Set<string>();
   const historySprites = new Set<string>();
   history.forEach((h: any) => {
-    if (h.family || h.from_family) historyFamilies.add(h.family || h.from_family);
+    if (h.family || h.family_name || h.from_family) {
+      historyFamilies.add(h.family || h.family_name || h.from_family);
+    }
     if (h.sprite_name) historySprites.add(h.sprite_name);
   });
 
-  // ✅ SEED INCLUS SPRITES VUS
   const seedStr = [wallet.toLowerCase(), tokenId, targetLevel,
                   [...historyFamilies].join('|'), [...historySprites].join('|')].join('::');
   const rng = createSeededRNG(seedStr);
 
-  console.log(`🎯 LVL${targetLevel} depuis ${currentFamily} (hist fam:${historyFamilies.size}, sprites:${historySprites.size})`);
+  //console.log(`🎯 LVL${targetLevel} depuis ${currentFamily} (hist fam:${historyFamilies.size}, sprites:${historySprites.size})`);
 
-  // ✅ TOUTES FAMILLES DISPONIBLES LVL cible
   const targetFamilies = familiesByLevel[targetLevel];
   if (!targetFamilies || Object.keys(targetFamilies).length === 0) {
-    throw new Error(`Aucune famille lvl${targetLevel}`);
+    throw new Error(`❌ Aucune famille lvl${targetLevel}. Vérifiez nft_metadata_clean.json`);
   }
 
   const familyScores: Array<{family: string, score: number}> = [];
 
-  // Score chaque famille
-  Object.entries(targetFamilies).forEach(([familyName, images]: any) => {
-    const famData = images[0].metadata;
-    const targetAttrs = getAttributes(famData);
+  Object.entries(targetFamilies).forEach(([familyName, images]: [string, Record<string, ImageCandidate>]) => {
+    // Prendre le 1er sprite pour les attrs famille
+    const firstImageKey = Object.keys(images)[0];
+    const famData = images[firstImageKey];
+    const targetAttrs = getAttributes(famData.metadata);
 
     let familyScore = similarity(currentAttrs, targetAttrs);
 
-    // Bonus/Pénalités
-    if (familyName === currentFamily) familyScore *= 1.3;  // Lineage
-    if (historyFamilies.has(familyName)) familyScore *= REPETITION_PENALTY;  // Anti-repeat
-
-    // Noise RNG pour diversité
+    if (familyName === currentFamily) familyScore *= 1.3;
+    if (historyFamilies.has(familyName)) familyScore *= REPETITION_PENALTY;
     familyScore += (rng() - 0.5) * 0.1;
 
-    familyScores.push({ family: familyName as string, score: Math.max(0.01, familyScore) });
+    familyScores.push({ family: familyName, score: Math.max(0.01, familyScore) });
   });
 
-  // 🎯 TIRAGE FAMILLE PONDERÉ
+  // Tirage famille pondéré
   const totalScore = familyScores.reduce((sum, f) => sum + f.score, 0);
   let pick = rng() * totalScore;
   let selectedFamily = familyScores[0]?.family;
@@ -169,19 +191,31 @@ export default function evolutionEngine(
     selectedFamily = familyScores[0]?.family || Object.keys(targetFamilies)[0];
   }
 
-  // 🎲 SPRITE ALÉATOIRE dans famille sélectionnée
+  // ✅ SÉLECTION SPRITE CORRIGÉE
   const familyImages = targetFamilies[selectedFamily];
-  const spritePick = Math.floor(rng() * familyImages.length);
-  const selectedImage = familyImages[spritePick];
+  if (!familyImages || Object.keys(familyImages).length === 0) {
+    throw new Error(`❌ Aucune image famille ${selectedFamily} lvl${targetLevel}`);
+  }
 
-  console.log(`✅ ${selectedImage.sprite_name} (${selectedFamily}) score=${familyScores.find(f => f.family === selectedFamily)?.score?.toFixed(2)}`);
+  const imageKeys = Object.keys(familyImages);
+  const spritePick = Math.floor(rng() * imageKeys.length);
+  const selectedImageKey = imageKeys[spritePick];
+  const selectedImage = familyImages[selectedImageKey];
 
-  // ✅ OUTPUT COHÉRENT
-  const colorProfile = colorProfilesByFamily[selectedFamily]?.[0] || null;
+  //console.log(`✅ ${selectedImage.name} (${selectedFamily}) score=${familyScores.find(f => f.family === selectedFamily)?.score?.toFixed(2)} (${imageKeys.length} sprites)`);
+
+  // Color profile MATCH
+  const dominantColor = selectedImage.metadata.dominant_color || 'default';
+  const colorProfile = colorProfilesByFamily[selectedFamily]?.find((p: any) =>
+    p.filename?.includes(selectedImage.name.replace(selectedFamily, '')) ||
+    p.filename?.includes(dominantColor) ||
+    p.filename === `${selectedFamily}_${dominantColor}.gif`
+  ) || colorProfilesByFamily[selectedFamily]?.[0] || null;
+
   const outputAttrs = [
-    ...selectedImage.metadata.attributes,
+    ...(selectedImage.attributes || []),
     { trait_type: 'Famille', value: selectedFamily },
-    { trait_type: 'Sprite', value: selectedImage.sprite_name },
+    { trait_type: 'Sprite', value: selectedImage.name },
     { trait_type: 'Niveau', value: targetLevel }
   ];
 
@@ -189,13 +223,19 @@ export default function evolutionEngine(
     success: true,
     level: targetLevel,
     family: selectedFamily,
+    family_name: selectedFamily,
     sprite_name: selectedImage.sprite_name,
-    display_name: selectedImage.metadata.display_name,
-    lore: selectedImage.metadata.lore,
+    display_name: selectedImage.display_name || `${selectedImage.name} | ${selectedFamily}`,
+    lore: selectedImage.lore,
     imageUrl: selectedImage.imageUrl,
     attributes: outputAttrs,
     color_profile: colorProfile,
     evolution_score: familyScores.find(f => f.family === selectedFamily)?.score || 0.5,
-    seed_debug: seedStr
+    seed_debug: seedStr,
+    debug: {
+      totalFamilies: Object.keys(targetFamilies).length,
+      spritesInFamily: imageKeys.length,
+      selectedSpriteIndex: spritePick
+    }
   };
 }

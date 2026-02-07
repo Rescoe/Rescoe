@@ -85,10 +85,12 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
     const randomNft = nfts[Math.floor(Math.random() * nfts.length)];
     const randomHaiku = haikus[Math.floor(Math.random() * haikus.length)];
 
-    console.log(randomHaiku);
-    
+    //console.log(randomHaiku);
+
     setSelectedNft(randomNft);
     setSelectedHaiku(randomHaiku);
+    //console.log("selectedNft :", selectedNft);
+    //console.log("selectedHaiku :", selectedHaiku);
 
     const addrs: string[] = [];
     if (randomNft.artist) addrs.push(randomNft.artist);
@@ -115,163 +117,181 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
   };
 
   const handleOverlayClick = () => setShowOverlay(prev => !prev);
-
   return (
     <Box
       display="flex"
       flexDirection="column"
       alignItems="center"
-      justifyContent="flex-start" // start au lieu de center
+      justifyContent="flex-start"
       w="100%"
       maxW="100%"
-      pb={{ base: "2rem", md: "3rem" }} // padding plus raisonnable
+      pb={{ base: "2rem", md: "3rem" }}
       overflow="hidden"
     >
-
-        {selectedNft && selectedHaiku && (
-          <>
+      {selectedNft && selectedHaiku && (
+        <>
           <Box
             position="relative"
-            w={{ base: "95%", md: "80%", lg: "70%" }}  // largeur responsive
-            h={{ base: "350px", md: "450px", lg: "550px" }} // hauteur responsive
-            mx="auto" // centre horizontalement
+            w={{ base: "95%", md: "80%", lg: "70%" }}
+            h={{ base: "350px", md: "450px", lg: "550px" }}
+            mx="auto"
             borderRadius="md"
             cursor="pointer"
             onClick={handleOverlayClick}
           >
-              <Image
-                src={selectedNft.image}
-                alt={selectedNft.name || "NFT"}
-                objectFit="cover"
-                w="100%"
-                h="100%"
-                borderRadius="md"
-              />
+            <Image
+              src={selectedNft.image}
+              alt={selectedNft.name || "NFT"}
+              objectFit="cover"
+              w="100%"
+              h="100%"
+              borderRadius="md"
+            />
 
-              {/* Poème overlay */}
-
-              <Box
-                position="absolute"
-                top="0"
-                left="0"
-                w="100%"
-                h="100%"
-                display="flex"
-                justifyContent="center"
-                alignItems="center"
-                zIndex={1}
-              >
+            {/* Poème COMPLET adaptatif */}
+            <Box
+              position="absolute"
+              top="0"
+              left="0"
+              w="100%"
+              h="100%"
+              display="flex"
+              justifyContent="center"
+              alignItems="center"
+              zIndex={1}
+            >
               <ColorOverlayBox imageUrl={selectedNft.image}>
-
-                <VStack spacing={2} textAlign="center" maxW="80%" mx="auto" px={2} bg="rgba(0, 0, 0, 0.1)" >
+                <VStack
+                  spacing={1}
+                  textAlign="center"
+                  maxW="90%"
+                  mx="auto"
+                  px={3}
+                  bg="rgba(0, 0, 0, 0.2)"
+                  alignItems="center"
+                  justifyContent="center"
+                  h="100%"
+                >
                   {getPoemText(selectedHaiku.poemText)
-                    ?.split("\n")
+                    ?.split("\\n")
                     .map((line: string, i: number) => (
                       <Text
                         key={i}
                         fontStyle="italic"
-                        fontSize={{ base: "lg", md: "2xl" }} // taille augmentée
-                        lineHeight="1.8" // un peu plus espacé
-                        fontWeight="bold" // texte plus épais
+                        fontSize={{
+                          base: "md",
+                          md: "lg",
+                          lg: "xl",
+                          xl: "2xl"
+                        }}
+                        lineHeight="1.4"
+                        fontWeight="bold"
                         whiteSpace="pre-wrap"
                         wordBreak="break-word"
-
+                        color="white"
+                        textShadow="2px 2px 4px rgba(0,0,0,0.8)"
+                        textAlign="center"
+                        maxH="80%"
+                        overflow="hidden"
                       >
                         {line}
                       </Text>
-                  ))}
+                    ))}
                 </VStack>
-                </ColorOverlayBox>
+              </ColorOverlayBox>
+            </Box>
 
+            {/* Overlay actions */}
+            {showOverlay && (
+              <Box
+                position="absolute"
+                top="80%"
+                left="50%"
+                transform="translate(-50%, -50%)"
+                w="80%"
+                p={4}
+                borderRadius="md"
+                boxShadow="md"
+                zIndex={2}
+                bg="rgba(0,0,0,0.85)"
+              >
+                <Text fontSize="lg" mb={4} color="white">
+                  Que voulez-vous faire ?
+                </Text>
+                <HStack spacing={4} justifyContent="center">
+                  <Button
+                    colorScheme="white"
+                    onClick={() => {
+                      handleNavigatePoem();
+                      handleOverlayClick();
+                    }}
+                  >
+                    Voir le poème
+                  </Button>
+                  <Button
+                    colorScheme="white"
+                    onClick={() => {
+                      handleNavigateNft();
+                      handleOverlayClick();
+                    }}
+                  >
+                    Voir le NFT
+                  </Button>
+                </HStack>
               </Box>
+            )}
+          </Box>
 
-              {/* Overlay pour la sélection des actions */}
-              {showOverlay && (
-                <Box
-                  position="absolute" // Overlay positionné au-dessus de tout dans le composant
-                  top="85%" // Position verticale de l'overlay
-                  left="50%"
-                  transform="translate(-50%, -50%)" // Centrage de l'overlay
-                  w="80%" // Largeur de l'overlay
-                  p={4}
-                  borderRadius="md"
-                  boxShadow="md"
-                  zIndex={2} // Plus élevé que l'overlay du poème
-                >
-                  <Text fontSize="l" mb={4}>
-                    Que voulez-vous faire ?
+          {/* Infos centrées */}
+          <VStack
+            spacing={4}
+            mt={4}
+            w={{ base: "95%", md: "80%", lg: "70%" }}
+            align="center"
+            textAlign="center"
+          >
+            <Box w="100%">
+              <Text fontWeight="bold" fontSize="md">
+                Œuvre :{" "}
+                <Text as="span" fontWeight="normal">
+                  {selectedNft.name || "Sans nom"}
+                </Text>
+              </Text>
+              {selectedNft.artist && (
+                <Link href={`/u/${selectedNft.artist}`} passHref>
+                  <Text
+                    as="a"
+                    fontStyle="italic"
+                    fontSize="sm"
+                    _hover={{ textDecoration: "underline" }}
+                  >
+                    {resolveName(selectedNft.artist, "Artiste inconnu")}
                   </Text>
-
-                  <HStack spacing={4} justifyContent="center">
-                    <Button
-                      colorScheme="white"
-                      onClick={() => {
-                        handleNavigatePoem();
-                        handleOverlayClick();
-                      }}
-                    >
-                      Voir le poème
-                    </Button>
-
-                    <Button
-                      colorScheme="white"
-                      onClick={() => {
-                        handleNavigateNft();
-                        handleOverlayClick();
-                      }}
-                    >
-                      Voir le NFT
-                    </Button>
-                  </HStack>
-                </Box>
+                </Link>
               )}
             </Box>
 
-            <HStack spacing={4} mt={4} align="start" flexDirection="column">
-              <Box>
-                <Text fontWeight="bold" fontSize="md">
-                  Œuvre :{" "}
-                  <Text as="span" fontWeight="normal">
-                    {selectedNft.name || "Sans nom"}
+            <Box w="100%">
+              <Text fontWeight="bold" fontSize="md">
+                Poème :{" "}
+              </Text>
+              {selectedHaiku.poemText?.[7] && (
+                <Link href={`/u/${selectedHaiku.poemText[7]}`} passHref>
+                  <Text
+                    as="a"
+                    fontStyle="italic"
+                    fontSize="sm"
+                    _hover={{ textDecoration: "underline" }}
+                  >
+                    {resolveName(selectedHaiku.poemText[7], "Poète inconnu")}
                   </Text>
-                </Text>
-                {selectedNft.artist && (
-                  <Link href={`/u/${selectedNft.artist}`} passHref>
-                    <Text
-                      as="a"
-                      fontStyle="italic"
-                      fontSize="sm"
-                      _hover={{ textDecoration: "underline" }}
-                    >
-                      {resolveName(selectedNft.artist, "Artiste inconnu")}
-                    </Text>
-                  </Link>
-                )}
-              </Box>
-
-
-              <Box>
-                <Text fontWeight="bold" fontSize="md">
-                  Poème :{" "}
-                </Text>
-                    {selectedHaiku.poemText?.[7] && (
-                      <Link href={`/u/${selectedHaiku.poemText[7]}`} passHref>
-                        <Text
-                          as="a"
-                          fontStyle="italic"
-                          fontSize="sm"
-                          _hover={{ textDecoration: "underline" }}
-                        >
-                          {resolveName(selectedHaiku.poemText[7], "Poète inconnu")}
-                        </Text>
-                      </Link>
-                    )}
-              </Box>
-            </HStack>
-          </>
-        )}
-      </Box>
-    );
-  };
-
+                </Link>
+              )}
+            </Box>
+          </VStack>
+        </>
+      )}
+    </Box>
+  );
+};
   export default HeroSection;

@@ -38,7 +38,7 @@ import { PublicProfile } from "@/components/containers/dashboard";
 import genInsect25 from '@/utils/GenInsect25';
 import { usePinataUpload } from '@/hooks/usePinataUpload';
 import { useHatchEgg } from '@/hooks/useHatchEgg';
-import { useTokenEvolution } from '@/hooks/useTokenEvolution';
+import { useTokenEvolution, MembershipInfo  } from '@/hooks/useTokenEvolution';
 import { buildEvolutionHistory } from '@/utils/evolutionHistory';
 import CopyableAddress from "@/hooks/useCopyableAddress";
 import { useReproduction } from '@/hooks/useReproduction';
@@ -62,17 +62,6 @@ interface NFTData {
   uri?: string; // ✅ AJOUTÉ pour compatibilité
   tokenURI?: string;  // ✅ AJOUT (source on-chain)
 
-}
-
-interface MembershipInfo {
-  level: number;
-  autoEvolve: boolean;
-  startTimestamp: number;
-  expirationTimestamp: number;
-  totalYears: number;
-  locked: boolean;
-  isEgg: boolean;     // ✅ AJOUT
-  isAnnual: boolean;  // ✅ AJOUT
 }
 
 
@@ -156,7 +145,7 @@ const TokenPage = () => {
     if (typeof window !== 'undefined') {
       const restoreAuth = () => {
         if (!auth.isAuthenticated && (window as any).RESCOE_AUTH?.isAuthenticated) {
-          console.log('🔄 Restauration auth...');
+          //console.log('🔄 Restauration auth...');
           // Force refresh de l'objet global
           (window as any).RESCOE_AUTH = {
             ...auth,
@@ -254,27 +243,27 @@ const TokenPage = () => {
     // Cette fonction sera passée au hook useTokenEvolution
   }, []);
 
-  const {
-    membershipInfo: rawMembershipInfo,
-    evolvePriceEth,
-    isManualEvolveReady,
-    previewImageUrl,
-    evolveIpfsUrl,
-    isUploadingEvolve,
-    isEvolving,
-    prepareEvolution,
-    evolve,
-    refreshEvolution,
-  } = useTokenEvolution({
+  // ✅ REMPLACE TOUT ÇA (du début du hook jusqu'à membershipInfo) PAR ÇA EN ENTIER :
+  const evolutionResult = useTokenEvolution({
     contractAddress: contractAdhesion,
-    tokenId: tokenId !== undefined ? Number(tokenId) : undefined,
+    tokenId: Number(tokenId || 0),
     currentImage: nftData?.image,
     currentName: nftData?.name || "",
     currentBio: nftData?.bio || "",
     currentRoleLabel: nftData ? (roles[nftData.role] || "Member") : "Member",
-    onMetadataLoaded: (metadata: EvolutionMetadata) => console.log("Metadata loaded:", metadata),
-    updateCurrentMetadata, // ✅ Utilisation du callback
-  });
+    onMetadataLoaded: updateCurrentMetadata,
+  }) as any;  // ← Force le type
+
+  const rawMembershipInfo: MembershipInfo | null = evolutionResult.membershipInfo || null;
+  const evolvePriceEth = evolutionResult.evolvePriceEth || "0";
+  const isManualEvolveReady = evolutionResult.isManualEvolveReady || false;
+  const previewImageUrl = evolutionResult.previewImageUrl || "";
+  const evolveIpfsUrl = evolutionResult.evolveIpfsUrl || "";
+  const isUploadingEvolve = evolutionResult.isUploadingEvolve || false;
+  const isEvolving = evolutionResult.isEvolving || false;
+  const prepareEvolution = evolutionResult.prepareEvolution || (() => {});
+  const evolve = evolutionResult.evolve || (() => {});
+  const refreshEvolution = evolutionResult.refreshEvolution || (() => {});
 
   const membershipInfo = rawMembershipInfo || {
     level: Number(nftData?.level || 0),
@@ -284,6 +273,7 @@ const TokenPage = () => {
     expirationTimestamp: 0,
     totalYears: 0,
     locked: false,
+    isAnnual: false,
   };
 
   const fetchNFTData = useCallback(async (
@@ -815,7 +805,7 @@ const TokenPage = () => {
                 </VStack>
               ) : (
                 /* REPRODUCTION */
-                <ReproductionPanel reproduction={reproduction} renewPriceEth={renewPriceEth} />
+                <ReproductionPanel reproduction={reproduction as any} renewPriceEth={renewPriceEth} />
               )}
             </TabPanel>
           )}

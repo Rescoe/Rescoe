@@ -126,27 +126,20 @@ export const useReproduction = ({
   }, [contractAddress]);
 
   // Fetch metadata token unique
+  // Fetch metadata token unique
+  // Fetch metadata token unique - SANS try/catch pour éviter erreurs
   const fetchTokenMetadata = useCallback(async (
     tokenId: number,
     contract: EthersContract
   ): Promise<TokenWithMeta | null> => {
-    console.log(`🔍 fetchTokenMetadata #${tokenId}`);
-
-    // ✅ CACHE FIX
     if (cacheRef.current[tokenId]) {
-      console.log(`✅ CACHE HIT #${tokenId}`);
       return cacheRef.current[tokenId];
     }
 
     try {
-      // getTokenDetails (11 valeurs)
-      console.log(`📞 getTokenDetails(${tokenId})`);
       const [owner, role, mintTimestamp, price, nameOnChain, bio, remainingTime, forSale, levelFromDetails, autoEvolveFromDetails, expTimestamp] = await contract.getTokenDetails(tokenId);
 
-      // getMembershipInfo (struct 6 champs)
-      console.log(`📞 getMembershipInfo(${tokenId})`);
       const membershipRaw = await contract.getMembershipInfo(tokenId);
-      console.log(`🏷️ RAW membership #${tokenId}:`, membershipRaw);
 
       const membershipInfo: MembershipInfo = {
         level: Number(membershipRaw.level || levelFromDetails || 0),
@@ -158,51 +151,38 @@ export const useReproduction = ({
         isEgg: Boolean(membershipRaw.isEgg ?? false),
       };
 
-    console.log(`✅ ÉLIGIBILITÉ #${tokenId}:`, {
-      level: membershipInfo.level,
-      totalYears: membershipInfo.totalYears,
-      isEgg: membershipInfo.isEgg,
-      eligible: membershipInfo.level === 3 && membershipInfo.totalYears >= 1 && !membershipInfo.isEgg
-    });
+      const uri = await contract.tokenURI(tokenId);
+      const ipfsHash = uri.split("/").pop() || "";
+      const res = await fetch(`/api/proxyPinata?ipfsHash=${ipfsHash}`);
+      const metadata: EvolutionMetadata = await res.json();
 
-    // 3. Metadata IPFS
-    const uri = await contract.tokenURI(tokenId);
-    const ipfsHash = uri.split("/").pop() || "";
-    const res = await fetch(`/api/proxyPinata?ipfsHash=${ipfsHash}`);
-    const metadata: EvolutionMetadata = await res.json();
+      const roleLabel = roleLabelResolver?.(Number(role)) ?? `Role #${Number(role)}`;
 
-    const roleLabel = roleLabelResolver?.(Number(role)) ?? `Role #${Number(role)}`;
+      const token: TokenWithMeta = {
+        tokenId,
+        owner: owner.toString(),
+        membershipInfo,
+        metadata,
+        tokenURI: uri,
+        image: metadata.image,
+        name: metadata.name || nameOnChain,
+        roleLabel,
+      };
 
-    const token: TokenWithMeta = {
-      tokenId,
-      owner: owner.toString(),
-      membershipInfo,  // ← AVEC level/totalYears corrects !
-      metadata,
-      tokenURI: uri,
-      image: metadata.image,
-      name: metadata.name || nameOnChain,
-      roleLabel,
-    };
-
-    cacheRef.current[tokenId] = token;
-
-    // CRITIQUE : log éligibilité
-    if (membershipInfo.level === 3) {
-      console.log(`🥇 LVL3 DÉTECTÉ #${tokenId}: ${token.name} | Y${membershipInfo.totalYears} | Egg: ${membershipInfo.isEgg}`);
+      cacheRef.current[tokenId] = token;
+      return token;
+    } catch (e: any) {
+      console.error(`❌ #${tokenId}:`, e);
+      return null;
     }
+  }, [roleLabelResolver]);
 
-    return token;
-  } catch (e: any) {
-    console.error(`❌ #${tokenId}:`, e);
-    return null;
-  }
-}, [roleLabelResolver]);
 
 
 // REMPLACE la fonction loadEligibleTokens par ÇA :
 // REMPLACE loadEligibleTokens par ÇA (anti-boucle) :
 const loadEligibleTokens = useCallback(async () => {
-  console.log(`🚀 loadEligibleTokens pour ${account?.slice(0,10)}...`);
+  //console.log(`🚀 loadEligibleTokens pour ${account?.slice(0,10)}...`);
 
   if (!contractAddress || !account) return;
 
@@ -214,7 +194,7 @@ const loadEligibleTokens = useCallback(async () => {
     const userTokensRaw = await contract.getTokensByOwner(account);
     const userTokens: number[] = userTokensRaw.map((id: any) => Number(id));
 
-    console.log(`📋 ${userTokens.length} tokens utilisateur:`, userTokens);
+    //console.log(`📋 ${userTokens.length} tokens utilisateur:`, userTokens);
 
     let eligibleCount = 0;
     const eligibleTokensList: TokenWithMeta[] = [];
@@ -229,7 +209,7 @@ const loadEligibleTokens = useCallback(async () => {
       if (isEligible) {
         eligibleTokensList.push(token);
         eligibleCount++;
-        console.log(`🥇 PARENT #${eligibleCount}: #${tokenId}`);
+        //console.log(`🥇 PARENT #${eligibleCount}: #${tokenId}`);
 
         if (eligibleCount >= MAX_PARENTS) break;
       }
@@ -237,7 +217,7 @@ const loadEligibleTokens = useCallback(async () => {
 
     // ✅ SET UNE SEULE FOIS
     setEligibleTokens(eligibleTokensList);
-    console.log(`🏁 FINAL: ${eligibleCount} parents LVL3`);
+    //console.log(`🏁 FINAL: ${eligibleCount} parents LVL3`);
 
   } catch (e: any) {
     console.error('💥 ERREUR:', e);
@@ -251,7 +231,7 @@ const loadEligibleTokens = useCallback(async () => {
 
   // ✅ MANUEL : déclenchement scan
   const startScanning = useCallback(() => {
-    console.log('🔥 START SCAN');
+    //console.log('🔥 START SCAN');
     setEligibleTokens([]);
     setParentA(null);
     setParentB(null);
@@ -262,7 +242,7 @@ const loadEligibleTokens = useCallback(async () => {
   // AJOUTE ÇA dans useReproduction hook :
   useEffect(() => {
     if (contractAddress && account && eligibleTokens.length === 0) {
-      console.log('🚀 AUTO-SCAN au montage');
+      //console.log('🚀 AUTO-SCAN au montage');
       startScanning();
     }
   }, [contractAddress, account, eligibleTokens.length, startScanning]);
@@ -271,14 +251,14 @@ const loadEligibleTokens = useCallback(async () => {
   // ✅ useEffect SANS account ! Seulement manuel
   useEffect(() => {
     if (shouldLoad) {
-      console.log('⚙️  useEffect: lancement loadEligibleTokens');
+      //console.log('⚙️  useEffect: lancement loadEligibleTokens');
       loadEligibleTokens();
     }
   }, [shouldLoad, loadEligibleTokens]);
 
 //ANALYSE DE COULEURS GIFS OEUFS
 const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<string, string | number>> => {
-  console.log(`🎨 START: ${eggLocalPath}`);
+  //console.log(`🎨 START: ${eggLocalPath}`);
 
   // 1. Dummy IMMÉDIAT (perf + fallback)
   const dummy = {
@@ -291,7 +271,7 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
 
   try {
     const response = await fetch(eggLocalPath);
-    console.log(`🎨 FETCH: ${response.ok}`);
+    //console.log(`🎨 FETCH: ${response.ok}`);
 
     if (!response.ok) {
       console.warn(`🎨 GIF 404 → DUMMY`);
@@ -304,7 +284,7 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
 
     return new Promise((resolve) => {
       img.onload = () => {
-        console.log(`🎨 IMG LOADED: ${img.width}x${img.height}`);
+        //console.log(`🎨 IMG LOADED: ${img.width}x${img.height}`);
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d')!;
         canvas.width = img.width;
@@ -340,7 +320,7 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
           TailleBytes: `${Math.round(blob.size / 1024)}KB`
         };
 
-        console.log("🎨 RÉELLES:", result);
+        //console.log("🎨 RÉELLES:", result);
         resolve(result);
       };
 
@@ -461,7 +441,7 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
       }
     };
 
-    console.log(`🥚 ŒUF PARFAIT: 36 traits, history vide, breeding OK`);
+    //console.log(`🥚 ŒUF PARFAIT: 36 traits, history vide, breeding OK`);
     return metadata;
   }, []);
 
@@ -479,7 +459,7 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
     const formData = new FormData();
     formData.append("file", eggFile, eggFile.name);
 
-    console.log("📤 Upload œuf → Pinata (image) ...");
+    //console.log("📤 Upload œuf → Pinata (image) ...");
 
     const imageResponse = await axios.post(
       "https://api.pinata.cloud/pinning/pinFileToIPFS",
@@ -494,7 +474,7 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
 
     const imageHash = imageResponse.data.IpfsHash;
     const imageIpfsUrl = `${PINATA_GATEWAY_BASE}${imageHash}`;
-    console.log("✅ IPFS IMAGE ŒUF:", imageIpfsUrl);
+    //console.log("✅ IPFS IMAGE ŒUF:", imageIpfsUrl);
 
     return imageIpfsUrl;
   }, []);
@@ -505,7 +485,7 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
       throw new Error("PINATA_JWT manquant dans les variables d'environnement.");
     }
 
-    console.log("📤 Upload œuf → Pinata (metadata) ...");
+    //console.log("📤 Upload œuf → Pinata (metadata) ...");
 
     const metadataResponse = await axios.post(
       "https://api.pinata.cloud/pinning/pinJSONToIPFS",
@@ -520,7 +500,7 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
 
     const metadataHash = metadataResponse.data.IpfsHash;
     const metadataIpfsUrl = `${PINATA_GATEWAY_BASE}${metadataHash}`;
-    console.log("✅ IPFS METADATA ŒUF:", metadataIpfsUrl);
+    //console.log("✅ IPFS METADATA ŒUF:", metadataIpfsUrl);
 
     return metadataIpfsUrl; // tu passes ce hash/URL au contrat
   }, []);
@@ -545,7 +525,7 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
       const contract = fetchContractRead();
       const points = await contract.rewardPoints(account);
       setUserPoints(Number(points));
-      console.log(`💰 POINTS utilisateur: ${points}`);
+      //console.log(`💰 POINTS utilisateur: ${points}`);
     } catch (e) {
       console.error("Points fetch error:", e);
     }
@@ -558,7 +538,7 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
 
 
   const reproduce = useCallback(async () => {
-  console.log("🐣 REPRODUCTION START");
+  //console.log("🐣 REPRODUCTION START");
 
   if (!parentA || !parentB || parentA.tokenId === parentB.tokenId) {
     setError("Choisissez 2 parents différents");
@@ -589,14 +569,14 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
 
     // 🥚 1. IMAGE ŒUF → récupérer depuis /public/OEUFS
     const eggIndex = Math.floor(Math.random() * maxEggIndex) + 1;
-    console.log(`🥚 ŒUF #${eggIndex}/${maxEggIndex}`);
+    //console.log(`🥚 ŒUF #${eggIndex}/${maxEggIndex}`);
     const eggLocalPath = `/OEUFS/OEUF${eggIndex}.gif`;
-    console.log(`📁 Fetch: ${eggLocalPath}`);
+    //console.log(`📁 Fetch: ${eggLocalPath}`);
 
     const response = await fetch(eggLocalPath);
     if (!response.ok) throw new Error(`Œuf ${eggIndex} 404`);
     const blob = await response.blob();
-    console.log(`📊 Blob: ${blob.size}B ${blob.type}`);
+    //console.log(`📊 Blob: ${blob.size}B ${blob.type}`);
 
     const eggFile = new File(
       [blob],
@@ -608,7 +588,7 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
     const imageFormData = new FormData();
     imageFormData.append("file", eggFile, eggFile.name);
 
-    console.log("📤 Upload œuf → Pinata (image) ...");
+    //console.log("📤 Upload œuf → Pinata (image) ...");
 
     const imageResponse = await axios.post(
       "https://api.pinata.cloud/pinning/pinFileToIPFS",
@@ -623,12 +603,12 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
 
     const eggImageHash = imageResponse.data.IpfsHash;
     const eggImageIpfsUrl = `${PINATA_GATEWAY_BASE}${eggImageHash}`;
-    console.log("✅ IPFS IMAGE ŒUF:", eggImageIpfsUrl);
+    //console.log("✅ IPFS IMAGE ŒUF:", eggImageIpfsUrl);
 
     // ✅ APRÈS : analyse + 5 params
-    console.log("🎨 ANALYSE COULEURS avant metadata...");
+    //console.log("🎨 ANALYSE COULEURS avant metadata...");
     const eggColors = await analyzeEggGif(eggLocalPath);
-    console.log("🔍 eggColors:", eggColors);
+    //console.log("🔍 eggColors:", eggColors);
 
     // 📄 2. METADATA JSON pour l'œuf
     const eggMetadata = buildEggMetadata(
@@ -639,14 +619,14 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
       eggIndex           // 5 ✅
     );
 
-    console.log("🥚 METADATA GÉNÉRÉE:", {
+    /*console.log("🥚 METADATA GÉNÉRÉE:", {
       name: eggMetadata.name,
       parents: `${parentA.tokenId}-${parentB.tokenId}`,
       image: eggImageIpfsUrl,
-    });
+    });*/
 
     // 📤 2bis. Upload METADATA œuf → Pinata (pinJSONToIPFS)
-    console.log("📤 Upload œuf → Pinata (metadata) ...");
+    //console.log("📤 Upload œuf → Pinata (metadata) ...");
 
     const metadataResponse = await axios.post(
       "https://api.pinata.cloud/pinning/pinJSONToIPFS",
@@ -661,7 +641,7 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
 
     const eggMetadataHash = metadataResponse.data.IpfsHash;
     const eggMetadataIpfsUrl = `${PINATA_GATEWAY_BASE}${eggMetadataHash}`;
-    console.log("✅ IPFS METADATA ŒUF:", eggMetadataIpfsUrl);
+    //console.log("✅ IPFS METADATA ŒUF:", eggMetadataIpfsUrl);
 
     // 💰 3. PRIX + TRANSACTION
     const readContract = fetchContractRead();
@@ -680,7 +660,7 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
         gas: Math.floor(Number(gas) * 1.2).toString(),
       });
 
-    console.log(`🎉 TX SUCCÈS: ${tx.transactionHash}`);
+    //console.log(`🎉 TX SUCCÈS: ${tx.transactionHash}`);
     setLastTxHash(tx.transactionHash);
     setParentA(null);
     setParentB(null);

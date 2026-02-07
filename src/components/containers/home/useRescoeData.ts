@@ -1,12 +1,45 @@
 // src/components/containers/home/useRescoeData.ts
+
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { JsonRpcProvider, Contract } from 'ethers';
 import haikuContractABI from '../../ABI/HaikuEditions.json';
 import nftContractABI from '../../ABI/ABI_ART.json';
 import ABIRESCOLLECTION from '../../ABI/ABI_Collections.json';
 
+/* ------------------------------------------------------------------ */
+/* CONFIG */
+/* ------------------------------------------------------------------ */
+
 const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!;
 const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+const CACHE_TTL = 1000 * 60 * 60 * 12;
+
+/* ------------------------------------------------------------------ */
+/* CACHE UTILS (SAFE) */
+/* ------------------------------------------------------------------ */
+
+const now = () => Date.now();
+
+function loadCacheArray<T>(key: string): T[] | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed.data)) return null;
+    if (now() - parsed.timestamp > CACHE_TTL) return null;
+    return parsed.data;
+  } catch {
+    return null;
+  }
+}
+
+function saveCache<T>(key: string, data: T[]) {
+  localStorage.setItem(key, JSON.stringify({ timestamp: now(), data }));
+}
+
+/* ------------------------------------------------------------------ */
+/* TYPES */
+/* ------------------------------------------------------------------ */
 
 export interface Haiku {
   poemText: string[];
@@ -42,10 +75,13 @@ interface UseRescoeDataReturn {
   allHaikus: Haiku[];
   nftsByCollection: Record<string, Nft[]>;
   haikusByCollection: Record<string, Haiku[]>;
-  collectionsWithNfts: (Collection & { nfts: Nft[]; haikus: Haiku[] })[]; // ✅ NOUVEAU
+  collectionsWithNfts: (Collection & { nfts: Nft[]; haikus: Haiku[] })[];
   refetch: () => void;
 }
 
+/* ------------------------------------------------------------------ */
+/* HOOK */
+/* ------------------------------------------------------------------ */
 
 export const useRescoeData = (): UseRescoeDataReturn => {
   const [isLoading, setIsLoading] = useState(false);
@@ -54,237 +90,198 @@ export const useRescoeData = (): UseRescoeDataReturn => {
   const [haikusByCollection, setHaikusByCollection] = useState<Record<string, Haiku[]>>({});
 
   const hasFetchedCollections = useRef(false);
-  const fetchedCollections = useRef(new Set());
-
   const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
 
-  // ✅ 1. fetchCollections (inchangé - déjà parfait)
+  /* ------------------------------------------------------------------ */
+  /* COLLECTIONS */
+  /* ------------------------------------------------------------------ */
+
   const fetchCollections = useCallback(async () => {
     setIsLoading(true);
-    const now = new Date();
-    const tomorrowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
 
-    const cachedCollections = localStorage.getItem('featuredCollections');
-    const cacheExpiry = localStorage.getItem('collectionsExpiry');
-    const isExpired = !cacheExpiry || Number(cacheExpiry) < now.getTime();
+    // ✅ 1. hydrate depuis cache si valide
+    const cached = loadCacheArray<Collection>('featured_collections');
+    if (cached) setCollections(cached);
 
-    if (cachedCollections && !isExpired) {
-      console.log('[COLLECTIONS] ✅ Cache HIT');
-      setCollections(JSON.parse(cachedCollections));
-      setIsLoading(false);
-      return;
-    }
-
-    console.log('[COLLECTIONS] 🔄 Cache MISS → REFETCH');
     try {
       const total = await contract.getTotalCollectionsMinted();
-      const collectionsPaginated = await contract.getCollectionsPaginated(0, total);
+      const paginated = await contract.getCollectionsPaginated(0, total);
 
-      type CollectionTuple = [number, string, string, string, string[], boolean, boolean];
-      const collectionsData = await Promise.all(
-        collectionsPaginated.map(async (tuple: CollectionTuple | null) => {
-          if (!tuple) return null;
-          const [id, name, collectionType, creator, associatedAddresses, isActive, isFeatured] = tuple;
-          if (!isFeatured) return null;
+      const data = await Promise.all(
+        paginated.map(async (tuple: any) => {
+          if (!tuple || !tuple[6]) return null;
 
-          const uri = await contract.getCollectionURI(id);
-          let metadata = { image: '/default.png' };
-          const cachedMetadata = localStorage.getItem(uri);
-          if (cachedMetadata) {
-            metadata = JSON.parse(cachedMetadata);
-          } else {
-            try {
-              const response = await fetch(`/api/proxyPinata?ipfsHash=${uri.split('/').pop()}`);
-              metadata = await response.json();
-              localStorage.setItem(uri, JSON.stringify(metadata));
-            } catch (e) {
-              console.warn('[METADATA] Fail:', uri);
-            }
-          }
+          const uri = await contract.getCollectionURI(tuple[0]);
+          let metadata: any = {};
+
+          try {
+            const res = await fetch(`/api/proxyPinata?ipfsHash=${uri.split('/').pop()}`);
+            metadata = await res.json();
+          } catch {}
 
           return {
-            id: id.toString(),
-            name,
-            collectionType,
-            imageUrl: metadata?.image || "",
-            mintContractAddress: Array.isArray(associatedAddresses) ? associatedAddresses[0] : associatedAddresses,
-            isFeatured,
-            creator,
+            id: tuple[0].toString(),
+            name: tuple[1],
+            collectionType: tuple[2],
+            artist: tuple[3],
+            imageUrl: metadata.image || '/default.png',
+            mintContractAddress: Array.isArray(tuple[4]) ? tuple[4][0] : tuple[4],
+            isFeatured: tuple[6],
           };
         })
       );
 
-      const featured = collectionsData.filter((col): col is Collection => col !== null);
-      localStorage.setItem('featuredCollections', JSON.stringify(featured));
-      localStorage.setItem('collectionsExpiry', tomorrowMidnight.getTime().toString());
-      console.log('[COLLECTIONS] ✅ SAVED', featured.length);
+      const featured = data.filter(Boolean) as Collection[];
+
       setCollections(featured);
-    } catch (error) {
-      console.error("Erreur collections :", error);
+      saveCache('featured_collections', featured);
+    } catch (e) {
+      console.error('[COLLECTIONS] error', e);
     } finally {
       setIsLoading(false);
     }
-  }, [contract]);
+  }, []);
 
-  // ✅ 2. fetchPoems (pour UNE collection)
-  const fetchPoems = useCallback(async (collectionId: string, associatedAddress: string) => {
-    console.log(`[POEMS] ${collectionId}`);
+  /* ------------------------------------------------------------------ */
+  /* POEMS */
+  /* ------------------------------------------------------------------ */
+
+  const fetchPoems = useCallback(async (collectionId: string, address: string) => {
+    const cacheKey = `haikus_${collectionId}`;
+
+    const cached = loadCacheArray<Haiku>(cacheKey);
+    if (cached) {
+      setHaikusByCollection(p => ({ ...p, [collectionId]: cached }));
+      return;
+    }
+
     try {
-      const collectionContract = new Contract(associatedAddress, haikuContractABI, provider);
-      const uniqueTokenCount = await collectionContract.getLastUniqueHaikusMinted();
+      const contract = new Contract(address, haikuContractABI, provider);
+      const count = Number(await contract.getLastUniqueHaikusMinted());
+      if (!count) return;
 
-      if (Number(uniqueTokenCount) === 0) {
-        setHaikusByCollection(prev => ({ ...prev, [collectionId]: [] }));
-        return;
-      }
+      const max = Math.min(5, count);
+      const tokenIds = Array.from({ length: max }, (_, i) => i); // ✅ START AT 0
 
-      const tokenIds = Array.from({ length: Math.min(10, Number(uniqueTokenCount)) }, (_, i) => i + 1);
-      const poemsData = await Promise.all(
-        tokenIds.map(async (tokenId) => {
+      const poems = (await Promise.all(
+        tokenIds.map(async (id) => {
           try {
-            const haikuText = await collectionContract.getTokenFullDetails(tokenId);
-            if (!Array.isArray(haikuText) || haikuText.length < 7) return null;
-            const uniqueIdAssociated = await collectionContract.tokenIdToHaikuId(tokenId);
-
+            const data = await contract.getTokenFullDetails(id);
             return {
-              poemText: haikuText.map(text => text.toString()),
-              mintContractAddress: associatedAddress,
-              uniqueIdAssociated: uniqueIdAssociated.toString(),
+              poemText: data.map((t: any) => t.toString()),
+              mintContractAddress: address,
+              uniqueIdAssociated: id.toString(),
             };
           } catch {
             return null;
           }
         })
-      ).then(results => results.filter(Boolean) as Haiku[]);
+      )).filter(Boolean) as Haiku[];
 
-      setHaikusByCollection(prev => ({ ...prev, [collectionId]: poemsData }));
-      console.log(`[POEMS] ✅ ${poemsData.length} pour ${collectionId}`);
-    } catch (error) {
-      console.error('[POEMS] ERROR:', error);
-      setHaikusByCollection(prev => ({ ...prev, [collectionId]: [] }));
+      setHaikusByCollection(p => ({ ...p, [collectionId]: poems }));
+      saveCache(cacheKey, poems);
+    } catch (e) {
+      console.error('[POEMS] error', e);
     }
-  }, [provider]);
+  }, []);
 
-  // ✅ 3. fetchNFTs (pour UNE collection)
-  const fetchNFTs = useCallback(async (collectionId: string, associatedAddress: string) => {
-    console.log(`[NFTs] ${collectionId}`);
+  /* ------------------------------------------------------------------ */
+  /* NFTS */
+  /* ------------------------------------------------------------------ */
+
+  const fetchNFTs = useCallback(async (collectionId: string, address: string) => {
+    const cacheKey = `nfts_${collectionId}`;
+
+    const cached = loadCacheArray<Nft>(cacheKey);
+    if (cached) {
+      setNftsByCollection(p => ({ ...p, [collectionId]: cached }));
+      return;
+    }
+
     try {
-      const collectionContract = new Contract(associatedAddress, nftContractABI, provider);
-      let max = await collectionContract.getLastMintedTokenId();
-      if (max > 9) max = 9;
-      const pagination = Number(max) + 1;
-      const tokenIds = await collectionContract.getTokenPaginated(0, pagination);
+      const contract = new Contract(address, nftContractABI, provider);
+      let max = Number(await contract.getLastMintedTokenId());
+      max = Math.min(max, 9);
 
-      const nftsPromises = tokenIds.slice(0, 12).map(async (tokenId: string) => {
-        try {
-          const owner = await collectionContract.ownerOf(tokenId).catch(() => null);
-          if (!owner || owner === "0x0000000000000000000000000000000000000000") return null;
+      const tokenIds = Array.from({ length: max + 1 }, (_, i) => i);
 
-          let tokenURI = await collectionContract.tokenURI(tokenId);
-          const cachedMetadata = localStorage.getItem(tokenURI);
-          const metadata = cachedMetadata
-            ? JSON.parse(cachedMetadata)
-            : await (await fetch(`/api/proxyPinata?ipfsHash=${tokenURI.split('/').pop()}`)).json();
+      const nfts = (await Promise.all(
+        tokenIds.map(async (id) => {
+          try {
+            const uri = await contract.tokenURI(id);
+            const meta = await fetch(`/api/proxyPinata?ipfsHash=${uri.split('/').pop()}`).then(r => r.json());
+            return {
+              id: id.toString(),
+              image: meta.image,
+              name: meta.name,
+              artist: meta.artist,
+              content: { tokenId: id.toString(), mintContractAddress: address },
+            };
+          } catch {
+            return null;
+          }
+        })
+      )).filter(Boolean) as Nft[];
 
-          return {
-            id: tokenId,
-            image: metadata.image,
-            name: metadata.name,
-            artist: metadata.artist || "her",
-            content: { tokenId: tokenId.toString(), mintContractAddress: associatedAddress },
-          };
-        } catch {
-          return null;
-        }
-      });
-
-      const nftsResults = await Promise.all(nftsPromises);
-      const nftsData = nftsResults.filter((nft): nft is Nft => nft !== null);
-
-      setNftsByCollection(prev => ({ ...prev, [collectionId]: nftsData }));
-      console.log(`[NFTs] ✅ ${nftsData.length} pour ${collectionId}`);
-    } catch (error) {
-      console.error('[NFTs] ERROR:', error);
-      setNftsByCollection(prev => ({ ...prev, [collectionId]: [] }));
+      setNftsByCollection(p => ({ ...p, [collectionId]: nfts }));
+      saveCache(cacheKey, nfts);
+    } catch (e) {
+      console.error('[NFTS] error', e);
     }
-  }, [provider]);
+  }, []);
 
-  // ✅ 4. fetchAllData (récupère TOUT d'un coup)
-  const fetchAllData = useCallback(async () => {
-    console.log('[RESCOE] 🔄 Fetch all data');
-    fetchedCollections.current.clear();
+  /* ------------------------------------------------------------------ */
+  /* ORCHESTRATION */
+  /* ------------------------------------------------------------------ */
 
-    const artCollections = collections.filter(col => col.collectionType === 'Art').slice(0, 4);
-    const poetryCollections = collections.filter(col => col.collectionType === 'Poesie').slice(0, 4);
-
-    // NFTs en parallèle
-    await Promise.all(
-      artCollections.map(col => fetchNFTs(col.id, col.mintContractAddress))
-    );
-
-    // Poèmes en parallèle
-    await Promise.all(
-      poetryCollections.map(col => fetchPoems(col.id, col.mintContractAddress))
-    );
-
-    console.log('[RESCOE] ✅ All data fetched');
-  }, [collections, fetchNFTs, fetchPoems]);
-
-  // ✅ 5. Effets
   useEffect(() => {
     if (!hasFetchedCollections.current) {
-      fetchCollections();
       hasFetchedCollections.current = true;
+      fetchCollections();
     }
-  }, [fetchCollections]);
+  }, []);
 
   useEffect(() => {
-    if (collections.length > 0) {
-      fetchAllData();
-    }
-  }, [collections.length, fetchAllData]);
+    collections.forEach(col => {
+      if (col.collectionType === 'Art') fetchNFTs(col.id, col.mintContractAddress);
+      if (col.collectionType === 'Poesie') fetchPoems(col.id, col.mintContractAddress);
+    });
+  }, [collections]);
 
-  // ✅ 6. Computed values
-  const allNfts = useMemo(
-    () => Object.values(nftsByCollection).flat(),
-    [nftsByCollection]
+  /* ------------------------------------------------------------------ */
+  /* COMPUTED (SAFE) */
+  /* ------------------------------------------------------------------ */
+
+  const allNfts = useMemo(() => Object.values(nftsByCollection).flat(), [nftsByCollection]);
+  const allHaikus = useMemo(() => Object.values(haikusByCollection).flat(), [haikusByCollection]);
+
+  const collectionsWithNfts = useMemo(
+    () =>
+      Array.isArray(collections)
+        ? collections.map(col => ({
+            ...col,
+            nfts: nftsByCollection[col.id] || [],
+            haikus: haikusByCollection[col.id] || [],
+          }))
+        : [],
+    [collections, nftsByCollection, haikusByCollection]
   );
 
-  const allHaikus = useMemo(
-    () => Object.values(haikusByCollection).flat(),
-    [haikusByCollection]
-  );
-
-  // ✅ 7. Refetch manuel
   const refetch = useCallback(() => {
-    hasFetchedCollections.current = false;
-    fetchedCollections.current.clear();
+    setCollections([]);
+    setNftsByCollection({});
+    setHaikusByCollection({});
     fetchCollections();
   }, [fetchCollections]);
 
-  //  collectionsWithNfts (NFT + POÈMES)
-  const collectionsWithNfts = useMemo(() =>
-    collections.map(col => ({
-      ...col,
-      nfts: (nftsByCollection[col.id] || []).slice(0, 5),     // ✅ MAX 5 NFTs
-      haikus: (haikusByCollection[col.id] || []).slice(0, 5), // ✅ MAX 5 Haikus
-    }))
-    .filter(col => col.nfts.length > 0 || col.haikus.length > 0) // NFT OU Poème
-  , [collections, nftsByCollection, haikusByCollection]);
-
-  console.log('[HOOK] collectionsWithNfts:', collectionsWithNfts.length, 'cols prêtes');
-
-
-// ✅ EXPORT dans return
-return {
-  isLoading,
-  collections,
-  allNfts,
-  allHaikus,
-  nftsByCollection,
-  haikusByCollection,
-  collectionsWithNfts,  // ✅ NOUVEAU
-  refetch,
-};
-
+  return {
+    isLoading,
+    collections,
+    allNfts,
+    allHaikus,
+    nftsByCollection,
+    haikusByCollection,
+    collectionsWithNfts,
+    refetch,
+  };
 };

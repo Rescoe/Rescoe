@@ -246,12 +246,12 @@ try {
         return;
     }
 
-    ////console.log(`Début du processus d'achat pour le haiku avec l'ID de token : ${tokenId}`);
+    //console.log(`Début du processus d'achat pour le haiku avec l'ID de token : ${tokenId}`);
 
     try {
         const contract = new web3.eth.Contract(ABI, nft.mintContractAddress);
         const isForSale = await contract.methods.isNFTForSale(tokenId).call();
-        ////console.log(`Le haiku ${tokenId} est-il à vendre ? ${isForSale}`);
+        //console.log(`Le haiku ${tokenId} est-il à vendre ? ${isForSale}`);
 
         if (!isForSale) {
             alert("Ce haiku n'est pas en vente.");
@@ -267,7 +267,7 @@ try {
 
         const receipt = await contract.methods.buyEdition(tokenId).send({ from: address, value: nft.price });
         alert("Haiku acheté avec succès !");
-        ////console.log("Détails de la transaction :", receipt);
+        //console.log("Détails de la transaction :", receipt);
 
         // Rafraîchir la liste après achat
         if (selectedCollectionId) {

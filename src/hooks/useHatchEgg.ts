@@ -64,9 +64,9 @@ export const useHatchEgg = (contractAddress: string, eggTokenId: number) => {
 
       const raw = await contract.getMembershipInfo(eggTokenId);
       const TT = contract.getMembershipInfo(25);
-      console.log("coucou");
-      console.log(raw);
-      console.log(TT);
+      //console.log("coucou");
+      //console.log(raw);
+      //console.log(TT);
 
       const info: MembershipInfo = {
         level: Number(raw.level),

@@ -23,7 +23,7 @@ interface MembershipRaw {
 }
 
 
-interface MembershipInfo {
+export interface MembershipInfo {
   level: number;
   autoEvolve: boolean;
   startTimestamp: number;
@@ -99,7 +99,7 @@ export const useTokenEvolution = ({
         };
 
         setMembershipInfo(info);
-        console.log('🧬 TOKEN INFO OK:', info);
+        //console.log('🧬 TOKEN INFO OK:', info);
 
         // Prix (inchangé)
         let priceWei = "0";
@@ -175,22 +175,33 @@ export const useTokenEvolution = ({
       }
 
       const response = await fetch(tokenUri);
-
       const currentMetadata = await response.json();
+      //console.log("currentMetadata attributes[15]:", currentMetadata.attributes[15]);
 
-      // ✅ EXTRACTION DIRECTE (NO extractIPFS, NO history async)
-      const currentFamily = currentMetadata.family || currentMetadata.famille || 'unknown';
+      // ✅ ATTRS DICT D'ABORD
       const currentAttrs = Object.fromEntries(
         (currentMetadata.attributes || []).map((a: any) => [a.trait_type, a.value])
       );
 
-      console.log('🚀 CURRENT DIRECT:', {
-        family: currentFamily,
+      // ✅ PRIORITÉ : ATTRS (case sensitive)
+      let currentFamily = currentAttrs.Famille ||
+                         currentAttrs.family ||
+                         currentAttrs.Family ||
+                         currentMetadata.family ||
+                         currentMetadata.famille ||
+                         'unknown';
+
+      //console.log("currentAttrs keys:", Object.keys(currentAttrs));  // Debug
+      //console.log("currentFamily RAW:", currentFamily);
+
+      /*console.log('🚀 CURRENT DIRECT:', {
+        family: currentFamily,  // ✅ "Gravix"
         level: currentLevel,
         attrsKeys: Object.keys(currentAttrs).slice(0,5),
-        image: currentMetadata.image?.slice(-30)
+        image: currentMetadata.image?.slice(-30),
+        debugFamille: currentAttrs.Famille  // "Gravix"
       });
-
+*/
       const finalWallet = walletAddress || account || "0x0000000000000000000000000000000000";
 
       // 🔥 ENGINE (NO undefined → DIRECT attrs)
@@ -201,6 +212,7 @@ export const useTokenEvolution = ({
         finalWallet,
         tokenId
       );
+      //console.log("evolutionData", evolutionData);
 
       setPreviewImageUrl(evolutionData.imageUrl);
 
@@ -293,7 +305,7 @@ export const useTokenEvolution = ({
       });
 
       // ✅ GESTION NOUVEAU TOKEN ID
-      console.log("✅ ÉVOLUTION OK - Gas:", receipt.gasUsed.toString());
+      //console.log("✅ ÉVOLUTION OK - Gas:", receipt.gasUsed.toString());
 
       let newTokenId = null;
 
@@ -313,7 +325,7 @@ export const useTokenEvolution = ({
         newTokenId = (Number(tokenId) + 1).toString();
       }
 
-      console.log("🎉 Nouveau token ID:", newTokenId);
+      //console.log("🎉 Nouveau token ID:", newTokenId);
 
       // ✅ SPA REDIRECTION
       router.push(`/AdhesionId/${contractAddress}/${newTokenId}`);
@@ -352,7 +364,7 @@ export const useTokenEvolution = ({
         gasPrice: gasPrice.toString(),
       });
 
-      console.log("🥚 ÉCLOS OK:", receipt);
+      //console.log("🥚 ÉCLOS OK:", receipt);
 
       // Même logique newTokenId qu'evolve
       let newTokenId = (Number(tokenId) + 1).toString();

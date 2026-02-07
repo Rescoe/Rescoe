@@ -129,7 +129,7 @@ const CreateCollection: React.FC = () => {
     try {
       // 1. Récupère l'adresse de la factory
       const factoryAddress = await fetchFactoryAddress(collectionType!);
-      console.log("🏭 Factory address:", factoryAddress);
+      //console.log("🏭 Factory address:", factoryAddress);
 
       // 2. ABI selon le type
       const factoryABI = collectionType === "Art" ? ABI_ART_FACTORY : ABI_POESIE_FACTORY;
@@ -147,7 +147,7 @@ const CreateCollection: React.FC = () => {
         ? royaltyData.map(r => Number(r.value))
         : [90]; // 90% max (reste association)
 
-      console.log("👥 Royalties:", { collaborators, percents });
+      //console.log("👥 Royalties:", { collaborators, percents });
 
       // 5. ✅ CONFIGURE COLLECTION (CORRECT !)
       const tx = await handleMessageTransactions(
@@ -163,7 +163,7 @@ const CreateCollection: React.FC = () => {
         "Configuration appliquée"
       );
 
-      console.log("✅ Configuration TX:", tx.transactionHash);
+      //console.log("✅ Configuration TX:", tx.transactionHash);
 
       // 6. Upload metadata → IPFS
       const fullMetadata = {
@@ -282,24 +282,24 @@ const CreateCollection: React.FC = () => {
 const artFactoryContract = new web3.eth.Contract(ABI_ART_FACTORY as any, artFactoryAddr);
 const resCollectionsAuth = await artFactoryContract.methods.resCollectionsAuthorized().call();
 const masterFactoryAuth = await artFactoryContract.methods.masterFactoryAuthorized().call();
-console.log("📍 ArtFactory autorisations attendues:", resCollectionsAuth, masterFactoryAuth);
-console.log("📍 ResCoellectionManager réelle:", contractRESCOLLECTION.toLowerCase());
+//console.log("📍 ArtFactory autorisations attendues:", resCollectionsAuth, masterFactoryAuth);
+//console.log("📍 ResCoellectionManager réelle:", contractRESCOLLECTION.toLowerCase());
 //console.log("✅ Match ResCollections?", resCollectionsAuth.toLowerCase() === contractRESCOLLECTION.toLowerCase());
 
-    console.log("=== 🔍 DEBUG COMPLET createCollection ===");
-    console.log("1. collectionName:", metadata.name);
-    console.log("2. ipfsUrl:", ipfsUrl);
-    console.log("3. collectionType:", collectionType);
-    console.log("4. address:", address);
-    console.log("5. ResCollections:", contractRESCOLLECTION);
+    //console.log("=== 🔍 DEBUG COMPLET createCollection ===");
+    //console.log("1. collectionName:", metadata.name);
+    //console.log("2. ipfsUrl:", ipfsUrl);
+    //console.log("3. collectionType:", collectionType);
+    //console.log("4. address:", address);
+    //console.log("5. ResCollections:", contractRESCOLLECTION);
 
     // 🔍 QUI EST APPELÉ ?
     const rescoeFactory = await rescoeContract.methods.factoryContractAddress().call();
-    console.log("📍 ResCoellectionManager.factoryContractAddress =", rescoeFactory);
+    //console.log("📍 ResCoellectionManager.factoryContractAddress =", rescoeFactory);
 
     const masterFactory = new web3.eth.Contract(ABIMasterFactory as any, masterFactoryAddress);
     const artFactoryFromMaster = await masterFactory.methods.collectionFactories("Art").call();
-    console.log("🎨 ArtFactory VIA Master =", artFactoryFromMaster);
+    //console.log("🎨 ArtFactory VIA Master =", artFactoryFromMaster);
 
     const authorized1 = await artFactoryContract.methods.resCollectionsAuthorized().call();
     const authorized2 = await artFactoryContract.methods.masterFactoryAuthorized().call();
@@ -345,18 +345,18 @@ console.log("📍 ResCoellectionManager réelle:", contractRESCOLLECTION.toLower
 
     // 🔍 NOM EXACT
     const exactName = metadata.name.trim();
-    console.log("📝 NOM POUR CHECK:", `"${exactName}"`, "length:", exactName.length);
+    //console.log("📝 NOM POUR CHECK:", `"${exactName}"`, "length:", exactName.length);
 
     try {
       const cfg: any = await artFactory.methods.getUserCollectionConfig(address, exactName).call();
-      console.log("🔍 FULL CFG:", {
+      /*console.log("🔍 FULL CFG:", {
         exists: cfg[3],
         maxSupply: cfg[0]?.toString() || "0",
         collaboratorsLen: cfg[1]?.length || 0,
         percentsLen: cfg[2]?.length || 0,
         lengthsMatch: (cfg[1]?.length || 0) === (cfg[2]?.length || 0),
         totalPercentOK: cfg[2]?.reduce((a: any, b: any) => Number(a) + Number(b), 0) <= 100
-      });
+      });*/
 
       if (!cfg[3]) throw new Error("❌ CFG EXISTS=false");
       if ((cfg[1]?.length || 0) !== (cfg[2]?.length || 0)) throw new Error("❌ LENGTHS MISMATCH");
@@ -379,31 +379,31 @@ console.log("📍 ResCoellectionManager réelle:", contractRESCOLLECTION.toLower
       // Estimate gas (simulation sans exécution complète)
       const gasEstimate = await rescoeContract.methods.createCollection(metadata.name, ipfsUrl, collectionType)
         .estimateGas({ from: address });
-      console.log("⛽ Gas estimate:", gasEstimate.toString());
+      //console.log("⛽ Gas estimate:", gasEstimate.toString());
 
-      console.log(`${toastPrefix} ✅ ALL PRE-CHECKS PASSED → CREATE COLLECTION`);
+      //console.log(`${toastPrefix} ✅ ALL PRE-CHECKS PASSED → CREATE COLLECTION`);
       setLoading(true);
 
       const gasPrice = await web3.eth.getGasPrice();
 
-console.log("💡 TX PARAMS:");
-console.log("- From (EOA):", address);
-console.log("- ResCollections:", contractRESCOLLECTION);
-console.log("- MasterFactory:", masterFactoryAddress);
-console.log("- Gas:", Math.floor(Number(gasEstimate) * 1.2));
-console.log("- Gas price:", gasPrice.toString());
+//console.log("💡 TX PARAMS:");
+//console.log("- From (EOA):", address);
+//console.log("- ResCollections:", contractRESCOLLECTION);
+//console.log("- MasterFactory:", masterFactoryAddress);
+//console.log("- Gas:", Math.floor(Number(gasEstimate) * 1.2));
+//console.log("- Gas price:", gasPrice.toString());
 
 // 🔹 DEBUG CALLER ATTENDU
-console.log("🔍 QUI EST APPELÉ PAR QUI ?");
-console.log("1. EOA (toi) → ResCollections.createCollection()");
-console.log("2. ResCollections →", await rescoeContract.methods.factoryContractAddress().call());
-console.log("3. ???? → ArtFactory.createDynamicCollection()");
-console.log("   ↓ msg.sender dans ArtFactory sera ÇA");
+//console.log("🔍 QUI EST APPELÉ PAR QUI ?");
+//console.log("1. EOA (toi) → ResCollections.createCollection()");
+//console.log("2. ResCollections →", await rescoeContract.methods.factoryContractAddress().call());
+//console.log("3. ???? → ArtFactory.createDynamicCollection()");
+//console.log("   ↓ msg.sender dans ArtFactory sera ÇA");
 
-console.log("\n🎯 Dans ArtFactory, require(msg.sender == X):");
-console.log("✅ X = ResCollections:", contractRESCOLLECTION);
-console.log("❌ X ≠ EOA:", address);
-console.log("❌ X ≠ MasterFactory:", masterFactoryAddress);
+//console.log("\n🎯 Dans ArtFactory, require(msg.sender == X):");
+//console.log("✅ X = ResCollections:", contractRESCOLLECTION);
+//console.log("❌ X ≠ EOA:", address);
+//console.log("❌ X ≠ MasterFactory:", masterFactoryAddress);
 
 
 
@@ -422,7 +422,7 @@ const tx = await handleMessageTransactions(
 );
 
 
-      console.log("🎉 TX SUCCESS:", tx.transactionHash);
+      //console.log("🎉 TX SUCCESS:", tx.transactionHash);
       toast({
         title: "🎉 Succès",
         description: `Collection "${metadata.name}" créée ! TX: ${tx.transactionHash.slice(0, 10)}...`,

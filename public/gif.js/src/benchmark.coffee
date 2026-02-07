@@ -56,12 +56,12 @@ window.addEventListener 'load', ->
     delta = end - start
     runtimes.push delta
 
-  console.log runtimes.join('\n')
+  //console.log runtimes.join('\n')
 
   map = imgq.getColormap()
   avg = runtimes.reduce((p, n) -> p + n) / runtimes.length
   median = runtimes.sort()[Math.floor(runs / 2)]
-  console.log """
+  //console.log """
     run finished at q#{ quality }
     avg: #{ avg.toFixed(2) }ms median: #{ median.toFixed(2) }ms
   """

@@ -230,13 +230,13 @@ const handleConfirmRole = async (): Promise<void> => {
     setIsUploading(true);
 
     try {
-        console.log('🎨 1. Génération des insectes LVL0...');
+        //console.log('🎨 1. Génération des insectes LVL0...');
 
         // 1. GÉNÉRER insecte UNIQUE + DONNÉES COMPLÈTES pour CHAQUE adhésion
         const generatedInsects = await Promise.all(
             adhesionData.map(async (adhesion, index) => {
                 const insectData = genInsect25(0);  // ✅ Comme RoleBasedNFTPage
-                console.log(`✅ Insecte ${index + 1}:`, insectData.spriteName, insectData.family);
+                //console.log(`✅ Insecte ${index + 1}:`, insectData.spriteName, insectData.family);
                 return {
                     imageUrl: insectData.imageUrl,
                     data: insectData  // Toutes les données pour attributs
@@ -244,7 +244,7 @@ const handleConfirmRole = async (): Promise<void> => {
             })
         );
 
-        console.log('📤 2. Upload Pinata 35+ attributs...');
+        //console.log('📤 2. Upload Pinata 35+ attributs...');
 
         // 2. UPLOAD avec COULEURS + MORPHO pour CHAQUE adhésion
         const metadataUris = await Promise.all(
@@ -299,7 +299,7 @@ const handleConfirmRole = async (): Promise<void> => {
                     { trait_type: "Name", value: adhesion.name || "Membre" }
                 ];
 
-                console.log(`🎨 Adhésion ${index + 1}: ${fullAttributes.length} attributs`);
+                //console.log(`🎨 Adhésion ${index + 1}: ${fullAttributes.length} attributs`);
 
                 // 🔥 UPLOAD IDENTIQUE (gère tout)
                 const result = await uploadToIPFS({
@@ -316,7 +316,7 @@ const handleConfirmRole = async (): Promise<void> => {
                     color_profile: colorProfile  // Backup
                 });
 
-                console.log(`✅ Metadata URI ${index + 1}:`, result.url);
+                //console.log(`✅ Metadata URI ${index + 1}:`, result.url);
                 return result.url;
             })
         );
@@ -333,12 +333,12 @@ const handleConfirmRole = async (): Promise<void> => {
             setGeneratedImageUrl(generatedInsects[0].imageUrl);
         }
 
-        console.log('🎉 MULTI-MINT PRÊT:', {
+        /*console.log('🎉 MULTI-MINT PRÊT:', {
             count: metadataUris.length,
             attrsPerNFT: 35,  // 🔥
             sample: metadataUris.slice(0, 2)
         });
-
+*/
         alert(`✅ ${adhesionData.length} NFTs OpenSea READY!\n35+ attributs couleur/morpho par NFT`);
 
     } catch (error: any) {
@@ -357,7 +357,7 @@ const generateImageForAdhesion = async (adhesion: Adhesion): Promise<string> => 
     try {
         // Génère un insecte LVL0 unique avec GenInsect25
         const insectData = await genInsect25(0); // level 0 obligatoire
-        console.log('🪲 Insect généré:', insectData);
+        //console.log('🪲 Insect généré:', insectData);
 
         // Retourne directement l'URL publique de l'insecte
         return insectData.imageUrl;
@@ -431,20 +431,20 @@ const handleMintMultiple = async (): Promise<void> => {
                 }
             }
 
-            console.log('Minting params:', {
+            /*console.log('Minting params:', {
                 recipients: recipientsArray.length,
                 uris: urisArray.length,
                 roles: rolesArray,
                 names: nameArray.length,
                 bios: bioArray.length
             });
-
+*/
             // Appel du contrat avec les paramètres exacts
             const tx = await contract.methods
                 .mintMultiple(recipientsArray, urisArray, rolesArray, nameArray, bioArray)
                 .send({ from: accounts[0] });
 
-            console.log('Transaction hash:', tx.transactionHash);
+            //console.log('Transaction hash:', tx.transactionHash);
             alert(`✅ ${length} NFTs mintés avec succès!\nTX: ${tx.transactionHash}`);
 
             // Optionnel: reset après succès
@@ -488,10 +488,10 @@ const fetchPointPrice = async () => {
 
     try {
       const actualPointPrice = await contract.methods.pointPrice().call() as string; // ✅ cast en string
-      ////console.log("Prix en wei:", actualPointPrice);
+      //////console.log("Prix en wei:", actualPointPrice);
 
       const priceInEth = web3.utils.fromWei(actualPointPrice, "ether");
-      ////console.log("Prix en ETH:", priceInEth);
+      //////console.log("Prix en ETH:", priceInEth);
 
       setprixPoints(priceInEth);
 

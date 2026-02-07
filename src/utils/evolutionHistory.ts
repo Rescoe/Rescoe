@@ -37,7 +37,7 @@ export const fetchIPFSMetadata = async (uri: string): Promise<FullNFTMetadata | 
 };
 
 export const enrichHistoryWithRealMetadata = async (history: EvolutionStep[]): Promise<EvolutionStep[]> => {
-  console.log('🔍 Enriching', history.length, 'steps');
+  //console.log('🔍 Enriching', history.length, 'steps');
 
   const enriched = await Promise.all(
     history.map(async (step): Promise<EvolutionStep> => {
@@ -78,7 +78,7 @@ export const enrichHistoryWithRealMetadata = async (history: EvolutionStep[]): P
 
 
 export const buildEvolutionHistory = (metadata: any): EvolutionStep[] => {
- console.log('🔍 RAW metadata:', metadata);
+ //console.log('🔍 RAW metadata:', metadata);
  let history: EvolutionStep[] = [];
 
  // 1. HISTORIQUE : supporte entry.level OU lvlPrevious
@@ -93,7 +93,7 @@ export const buildEvolutionHistory = (metadata: any): EvolutionStep[] => {
      evolution_score: entry.evolution_score,
      loading: true
    }));
-   console.log('✅ History parsed:', history.map(h => h.lvlPrevious));  // [0,1]
+   //console.log('✅ History parsed:', history.map(h => h.lvlPrevious));  // [0,1]
  }
 
  // 2. CURRENT DERNIER : level fiable + tokenURI
@@ -106,9 +106,9 @@ export const buildEvolutionHistory = (metadata: any): EvolutionStep[] => {
      timestamp: metadata.timestamp || Date.now() / 1000,
      loading: true
    });
-   console.log('✅ CURRENT lvl DERNIER:', currentLevel, metadata.tokenURI);
+   //console.log('✅ CURRENT lvl DERNIER:', currentLevel, metadata.tokenURI);
  }
 
- console.log('✅ FINAL history:', history.map(h => ({ lvl: h.lvlPrevious, uri: h.uri?.slice(0,20) })));
+ //console.log('✅ FINAL history:', history.map(h => ({ lvl: h.lvlPrevious, uri: h.uri?.slice(0,20) })));
  return history;
 };

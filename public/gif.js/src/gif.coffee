@@ -203,7 +203,7 @@ class GIF extends EventEmitter
 
   log: (args...) ->
     return unless @options.debug
-    console.log args...
+    //console.log args...
 
 
 module.exports = GIF

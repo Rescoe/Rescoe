@@ -209,19 +209,19 @@ const [percent, setPercent] = useState<number[]>([]);
       const masterFactory = new Contract(masterFactoryAddress, ABIMasterFactory, provider);
 
       const artFactoryAddress = await masterFactory.collectionFactories("Art");
-      console.log(artFactoryAddress);
+      //console.log(artFactoryAddress);
 
 
       // 🔹 Récupère les détails de la collection via son ID
       const collectionDetails = await resCollections.getCollection(collectionId);
       const artiste = collectionDetails[3].toString();
-      console.log(artiste);
+      //console.log(artiste);
       const collectionAddress = collectionDetails.collectionAddress;
       setSelectedCollection(collectionAddress);
 
       const artFactory = new Contract(artFactoryAddress ,factoryABI, provider);
       const collaborateurs = await artFactory.getUserCollectionConfig(artiste, collectionDetails.name);
-      console.log(collaborateurs);
+      //console.log(collaborateurs);
 
       if (!collectionAddress) {
         console.error("Adresse de collection introuvable");
@@ -333,7 +333,7 @@ const [percent, setPercent] = useState<number[]>([]);
         );
 
         setIpfsUrl(`https://purple-managerial-ermine-688.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`);
-        console.log(ipfsUrl);
+        //console.log(ipfsUrl);
         toast({
           title: "Oeuvre uploadée",
           description: ipfsUrl,
@@ -448,7 +448,7 @@ const [percent, setPercent] = useState<number[]>([]);
       from: userAddress,
     });
 
-    console.log('✅ Gas estimé:', gasEstimate.toString(), 'pour', editions, 'éditions');
+    //console.log('✅ Gas estimé:', gasEstimate.toString(), 'pour', editions, 'éditions');
 
     if (gasEstimate > 4500000n) {
       throw new Error(`Gas trop élevé (${gasEstimate}): réduisez éditions ou réessayez.`);

@@ -187,34 +187,34 @@ const UniqueArtGalerie: React.FC = () => {
     const artNFT = new web3.eth.Contract(ABI_MINT_CONTRACT, nft.mintContractAddress);
     const rescoeManager = new web3.eth.Contract(ABIRESCOLLECTION, contractRESCOLLECTION); // ← TON .env adresse !
 
-    console.log("=== BUY DEBUG COMPLET ===");
-    console.log("ArtNFT:", nft.mintContractAddress);
-    console.log("Token:", nft.tokenId);
-    console.log("Buyer:", address);
+    //console.log("=== BUY DEBUG COMPLET ===");
+    //console.log("ArtNFT:", nft.mintContractAddress);
+    //console.log("Token:", nft.tokenId);
+    //console.log("Buyer:", address);
 
     // 1. GETTERS ARTNFT
     const artist = await artNFT.methods.tokenCreator(nft.tokenId).call();
-    console.log("1. tokenCreator:", artist);
+    //console.log("1. tokenCreator:", artist);
 
     const association = await artNFT.methods.associationAddress().call();
-    console.log("2. associationAddress:", association);
+    //console.log("2. associationAddress:", association);
 
     // 3. extraRecipients (index 0, car tes logs montrent ça)
     const extra0 = await artNFT.methods.extraRecipients(0).call().catch(() => "empty");
-    console.log("3. extraRecipients[0]:", extra0);
+    //console.log("3. extraRecipients[0]:", extra0);
 
     // 🔥 NOUVEAU : rewardContract DANS ArtNFT (CRITIQUE !)
     try {
       const rewardAddr = await artNFT.methods.rewardContract().call(); // ← TON INTERFACE IReward
-      console.log("🔥 4. ArtNFT.rewardContract():", rewardAddr);
+      //console.log("🔥 4. ArtNFT.rewardContract():", rewardAddr);
     } catch (e) {
-      console.log("❌ NO rewardContract() dans ArtNFT ABI");
+      //console.log("❌ NO rewardContract() dans ArtNFT ABI");
     }
 
     // 🔥 NOUVEAU : VÉRIF MANAGER ACTUEL
-    console.log("🔥 5. ResCoeManager utilisé:", contractRESCOLLECTION);
+    //console.log("🔥 5. ResCoeManager utilisé:", contractRESCOLLECTION);
     const isAuth = await rescoeManager.methods.authorizedCollections(nft.mintContractAddress).call();
-    console.log("🔥 6. authorizedCollections[ArtNFT]:", isAuth);
+    //console.log("🔥 6. authorizedCollections[ArtNFT]:", isAuth);
 
     // 🔥 STATIC SIMULATE buyNFT (exacte tx)
     try {
@@ -222,7 +222,7 @@ const UniqueArtGalerie: React.FC = () => {
         from: address,
         value: nft.priceInWei
       });
-      console.log("✅ STATIC CALL OK → problème gas/network seulement");
+      //console.log("✅ STATIC CALL OK → problème gas/network seulement");
     } catch (staticError: any) {
       console.error("❌ STATIC FAIL:", staticError.message);
       console.error("Revert data:", staticError.data || "no data");

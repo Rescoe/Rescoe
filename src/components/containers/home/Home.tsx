@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import Head from 'next/head';
+
 import { Box, Heading, Text, Button, VStack, Grid, GridItem, Divider, Icon, Flex, Input, FormLabel, Select, Checkbox, useColorModeValue, SimpleGrid, Stack,Collapse, HStack, Image, useTheme } from '@chakra-ui/react';
 import { FaBookOpen, FaUsers, FaLightbulb, FaHandsHelping, FaPaintBrush, FaGraduationCap, FaHandshake   } from 'react-icons/fa';
 //import useCheckMembership from '../../../utils/useCheckMembership';
@@ -165,533 +167,559 @@ const getRandomItems = <T,>(array: T[], count: number): T[] => {
     const maxBoxHeight = "150px"; // Hauteur max pour toutes les boîtes
 
     return (
-      <Box
-        as={motion.div}
-        w="100%"
-        textAlign="center"
-        position="relative"
-        overflow="hidden"
-        bgGradient={useColorModeValue(
-          "linear(to-b, bgGradientLight.start, bgGradientLight.end)",
-          "linear(to-b, bgGradientDark.start, bgGradientDark.end)"
-        )}
-        >
-      {/* ===== SECTION INTRO / PRÉSENTATION ===== */}
-      <motion.div
-        initial={{ opacity: 0, y: -30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.9, ease: "easeOut" }}
-      >
-        <Box
-          textAlign="center"
-          maxW="1100px"
-          mx="auto"
-        >
-        <Heading
-          size={{ base: "xl", md: "2xl" }}
-          bgClip="text"
-          fontWeight="extrabold"
-          mb={6}
-          lineHeight="1.2"  // <-- espace vertical correct
-          py={8}            // <-- évite la coupe du haut/bas
-        >
-            RESCOE — Réseau Expérimental Solidaire de Crypto Œuvres Émergentes
-          </Heading>
-
-          <FaucetWidget />
-
-          <Divider my={8} borderColor="purple.700" w="5%" mx="auto" />
-
-          <Text
-            color={textColor}
-            fontSize={{ base: "md", md: "lg" }}
-            maxW="800px"
-            mx="auto"
-            lineHeight="tall"
-            mb={8}
-          >
-
-          Participer à un réseau d’artistes et de poètes qui font dialoguer le numérique et le réel.
-          Créer des collections, exposer des œuvres, ou simplement soutenir la démarche.
-          Tout commence par une adhésion — symbolique et libre.
-          </Text>
-
-          {/* Premier bouton Adhésion visible dès l'intro */}
-          <Button
-            as={NextLink}
-            href="/adhesion"
-            size="lg"
-            px={12}
-            py={7}
-            fontWeight="bold"
-            color="white"
-            borderRadius="full"
-            animation={`${pulse} 2.5s infinite`}
-            mb={12}
-            _hover={{
-              ...hoverStyles.brandHover._hover,
-              ...brandHover,
-            }}
-          >
-            🚀 Adhérez Maintenant
-          </Button>
-
-          <Divider my={8} borderColor="purple.700" w="15%" mx="auto" />
-
-          <Heading
-            mt={6}
-            mb={2}
-            size="lg"
-            bgClip="text"
-            textAlign="center"
-            py={2}            // <-- évite la coupe du haut/bas
-          >
-            Œuvre et poème du jour
-          </Heading>
-
-
-          <HeroSection nfts={allNfts} haikus={allHaikus} />
-
-
-          <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
-
-          <Heading
-            mt={6}
-            mb={2}
-            size="lg"
-            bgClip="text"
-            textAlign="center"
-            py={2}            // <-- évite la coupe du haut/bas
-          >
-            Les nouveautées
-          </Heading>
-          <Flex
-  direction={{ base: "column", md: "row" }}
-  gap={6}
-  justify="center"
-  align="stretch"
-  maxW="1400px"
-  mx="auto"
->
-  {/* Actualités */}
-  <Box flex="1" borderRadius="2xl" border="1px solid #ccc" overflow="hidden">
-    <NextLink
-      href={{
-        pathname: "/actus",
-        query: { expand: "news" }, // indique quel bloc ouvrir
-      }}
-      passHref
-    >
-      <MotionBox
-        as="a"
-        p={6}
-        cursor="pointer"
-        whileHover={{ scale: 1.03, boxShadow: boxShadowHover }}
-        transition={{ duration: 0.3 }}
-        display="flex"
-        flexDirection="column"
-        justifyContent="space-between"
-      >
-        <ChannelPreview
-          channelId={process.env.NEXT_PUBLIC_CHANNEL_NEWS_ID!}
-          title="📰 Actualités"
-          limit={3}
-          maxLines={5}
-        />
-        <Text textAlign="center" mt={8}>
-          Cliquez pour afficher les dernières actualités.
-        </Text>
-      </MotionBox>
-    </NextLink>
-  </Box>
-
-  {/* Colonne droite */}
-  <Flex direction="column" flex="1" gap={6}>
-    {/* Expositions */}
-    <Box flex="1" borderRadius="2xl" border="1px solid #ccc" overflow="hidden">
-      <NextLink
-        href={{
-          pathname: "/actus",
-          query: { expand: "expos" },
-        }}
-        passHref
-      >
-        <MotionBox
-          as="a"
-          p={6}
-          cursor="pointer"
-          whileHover={{ scale: 1.03, boxShadow: boxShadowHover }}
-          transition={{ duration: 0.3 }}
-          display="flex"
-          flexDirection="column"
-          justifyContent="space-between"
-        >
-          <ChannelPreview
-            channelId={process.env.NEXT_PUBLIC_CHANNEL_EXPOS_ID!}
-            title="🖼️ Expositions"
-          />
-          <Text textAlign="center" mt={8}>
-            Cliquez pour en savoir plus !
-          </Text>
-        </MotionBox>
-      </NextLink>
-    </Box>
-  </Flex>
-</Flex>
-
-<Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
-
-
-<NextLink
-  href={{
-    pathname: "/actus",
-    query: { expand: "calendar" },
-  }}
-  passHref
->
-
-    <MiniCalendar onClick={() => {}} />
-    <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
-
-</NextLink>
-
+        <>
+          {/* ===== SEO OPTIMISATION ===== */}
+          <Head>
+            <title>RESCOE - Réseau d'art numérique, poésie et blockchain solidaire</title>
+            <meta
+              name="description"
+              content="RESCOE : réseau expérimental pour artistes, poètes et codeurs. Créez, exposez et partagez vos œuvres NFT et haïkus on-chain. Adhérez à l'association et rejoignez la communauté !"
+            />
+            <meta name="keywords" content="art numérique, poésie blockchain, NFT art, haïkus on-chain, réseau artistique solidaire, RESCOE, crypto œuvres émergentes" />
+            <meta property="og:title" content="RESCOE - Art, Poésie & Blockchain Solidaire" />
+            <meta property="og:description" content="Rejoignez le réseau RESCOE pour créer des œuvres numériques préservées sur blockchain. Ateliers, expositions, communauté ouverte." />
+            <meta property="og:image" content="/visuels/og-rescoe-hero.jpg" /> {/* Ajoute une image OG */}
+            <meta property="og:url" content="https://rescoe.fr" />
+            <meta name="twitter:card" content="summary_large_image" />
+            <link rel="canonical" href="https://rescoe.fr/" />
+            <script type="application/ld+json">
+              {JSON.stringify({
+                "@context": "https://schema.org",
+                "@type": "Organization",
+                "name": "RESCOE",
+                "description": "Réseau Expérimental Solidaire de Crypto Œuvres Émergentes",
+                "url": "https://rescoe.fr",
+                "keywords": "art numérique, blockchain poésie, NFT artistique"
+              })}
+            </script>
+          </Head>
 
           <Box
-            boxShadow="2xl"
-            borderRadius="2xl"
-            bg={cardBg}
+            as={motion.div}
+            w="100%"
+            textAlign="center"
+            position="relative"
+            overflow="hidden"
+            bgGradient={useColorModeValue(
+              "linear(to-b, bgGradientLight.start, bgGradientLight.end)",
+              "linear(to-b, bgGradientDark.start, bgGradientDark.end)"
+            )}
           >
-            <Heading
-              size="lg"
-              bgClip="text"
+            {/* ===== HERO ULTRA-FOCUS (Above the fold) - Pitch + CTA UNIQUES ===== */}
+            {/* Tagline simple + texte "tu/vous" + CTA fort, Œuvre du jour DESCENDU */}
+            <motion.div
+              initial={{ opacity: 0, y: -30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.9, ease: "easeOut" }}
             >
-          Pour vous :
-          </Heading>
+              <Box textAlign="center" maxW="1100px" mx="auto" py={12}>
+                <Heading size="3xl" fontWeight="extrabold" mb={4}>
+                  RESCOE
+                </Heading>
+                <Divider my={4} borderColor="purple.600" w="15%" mx="auto" />
+                <Heading
+                  size={{ base: "2xl", md: "4xl" }}
+                  bgClip="text"
+                  fontWeight="extrabold"
+                  mb={2}
+                  lineHeight="1.2"
+                  py={8}
+                >
+                  Réseau Expérimental Solidaire de <br />Crypto Œuvres Émergentes
+                </Heading>
+                {/* Tagline simple SUGGÉRÉE */}
+                <Text
+                  fontSize="xl"
+                  fontWeight="bold"
+                  color="purple.500"
+                  mb={6}
+                >
+                  Un réseau d’art numérique et de poésie, ouvert à tou·tes.
+                </Text>
 
-          {/* 3 bénéfices clés présentés proprement */}
-          <SimpleGrid
-            columns={{ base: 1, md: 3 }}
-            spacing={10}
-            mt={10}
-            textAlign="center"
-          >
-            {[            {
-                title: "Art, Poésie & Blockchain",
-                icon: "/visuels/icon-blockchain.svg",
-                desc: "Donner forme à des œuvres libres, signées et préservées dans le temps. Expérimenter une autre manière de créer, sans centre ni hiérarchie.",
-              },
-              {
-                title: "Formation & Transmission",
-                icon: "/visuels/icon-community.svg",
-                desc: "Partager des savoirs techniques et sensibles. Apprendre à coder, à poétiser, à relier — dans des ateliers ouverts à tous.",
-              },
-              {
-                title: "Communauté Solidaire",
-                icon: "/visuels/icon-reseau.svg",
-                desc: "Relier les artistes, poètes et développeurs qui œuvrent à une culture numérique commune. Chaque membre contribue à faire vivre le réseau, à son rythme.",
-              },
-            ].map((item, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.7, delay: i * 0.2 }}
-                viewport={{ once: true }}
-              >
-              <VStack
-                key={i}
-                bg={cardBg}
-                borderRadius="2xl"
-                boxShadow="xl"
-                p={6}
-                h="100%"
-                transition="all 0.3s ease"
-                _hover={{
-                  bgGradient: "linear(to-r, brand.start, brand.end)",
-                  color: "white",
-                  transform: "scale(1.03)",
-                }}
-              >
-                  <Image
-                    src={item.icon}
-                    alt={item.title}
-                    boxSize="60px"
-                    mb={3}
-                    mx="auto"
-                  />
-                  <Heading
-                    size="md"
-                    fontWeight="bold"
-                    mb={2}
-                  >
-                    {item.title}
-                  </Heading>
-                  <Text color={textColor} fontSize="sm">
-                    {item.desc}
-                  </Text>
-                </VStack>
-              </motion.div>
-            ))}
-          </SimpleGrid>
+                <Text
+                  color={textColor}
+                  fontSize={{ base: "lg", md: "xl" }}
+                  maxW="700px"
+                  mx="auto"
+                  lineHeight="tall"
+                  mb={12}
+                >
+                  En adhérant, <strong>vous rejoignez un réseau qui protège vos créations sur blockchain</strong>, vous connecte à une communauté solidaire d'artistes, poètes et codeurs, et vous ouvre ateliers et expositions gratuites.
+                </Text>
 
+                {/* CTA PRINCIPAL - Gros bouton animé PRIORITAIRE */}
+                <Button
+                  as={NextLink}
+                  href="/adhesion"
+                  size="xl"
+                  px={16}
+                  py={8}
+                  fontSize="lg"
+                  fontWeight="bold"
+                  color="white"
+                  borderRadius="full"
+                  animation={`${pulse} 2.5s infinite`}
+                  mb={8}
+                  boxShadow="2xl"
+                  _hover={{
+                    ...hoverStyles.brandHover._hover,
+                    ...brandHover,
+                    transform: "scale(1.05)",
+                  }}
+                >
+                  Rejoindre RESCOE
+                </Button>
 
-          <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
+                <Divider my={12} borderColor="purple.300" w="50%" mx="auto" />
+              </Box>
+            </motion.div>
 
-          <Heading
-            mt={6}
-            mb={2}
-            size="lg"
-            bgClip="text"
-            textAlign="center"
-          >
-          Artistes en résidence
-          </Heading>
-          <Text>
-          Artistes, poètes et codeurs que nous accompagnons au fil des projets.
-          </Text>
-          <FeaturedMembers addresses={featuredAddresses} />
-        </Box>
-      </Box>
-      </motion.div>
+            {/* ===== 2. ŒUVRE / POÈME DU JOUR (Preuve vivante, léger scroll) ===== */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8 }}
+              viewport={{ once: true }}
+            >
+              <Box maxW="1100px" mx="auto" px={{ base: 6, md: 10 }}>
+                <Heading
+                  mb={8}
+                  size="lg"
+                  bgClip="text"
+                  textAlign="center"
+                  py={4}
+                >
+                  Œuvre et poème du jour
+                </Heading>
+                <HeroSection nfts={allNfts} haikus={allHaikus} />
+              </Box>
+            </motion.div>
 
 
-      {/* ===== SECTION MISSIONS + CAROUSEL ===== */}
-      <motion.div
-        initial={{ opacity: 0, y: 50 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1 }}
-        viewport={{ once: true }}
-      >
-        <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
 
-        <Heading
-          mt={6}
-          mb={2}
-          size="lg"
-          bgClip="text"
-          textAlign="center"
-        >
-          Fusionnons des œuvres digitales et des poèmes on-chain
-        </Heading>
+                        {/*
+                                  <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
 
-        <Box w="100%" maxW="1100px" mx="auto" >
-          {collections.length > 0 ? (
-            <DynamicCarousel
-              nfts={allNfts}
-              haikus={allHaikus}
-              maxNfts={20}    // réglable
-              maxHaikus={20}  // réglable
-            />
-          ) : (
-            <Text>Pas de collections disponibles.</Text>
-          )}
-        </Box>
+                                  <Heading
+                                    mt={6}
+                                    mb={2}
+                                    size="lg"
+                                    bgClip="text"
+                                    textAlign="center"
+                                    py={2}            // <-- évite la coupe du haut/bas
+                                  >
+                                    Les nouveautées
+                                  </Heading>
+                                  <Flex
+                          direction={{ base: "column", md: "row" }}
+                          gap={6}
+                          justify="center"
+                          align="stretch"
+                          maxW="1400px"
+                          mx="auto"
+                        >
+                          <Box flex="1" borderRadius="2xl" border="1px solid #ccc" overflow="hidden">
 
-        {/* ===== SECTION COLLECTIONS DU JOUR ===== */}
-
-        {/* ===== ŒUVRES (NFTs) ===== */}
-        <Box py={10} w="100%" maxW="1100px" mx="auto" px={{ base: 6, md: 10 }}>
-          <Heading size="lg" mb={6} bgClip="text" textAlign="center">
-            Parmi les mêmes collections
-          </Heading>
-          {collectionsWithNfts.map((collection) =>
-            collection.nfts.length > 0 && (
-              <RelatedFull
-                key={collection.id}
-                nft={collection.nfts[0]}
-                allNFTs={collection.nfts}  // ✅ MAX 5
-                title={collection.name}
-              />
-            )
-          )}
-        </Box>
-
-        {/* ===== POÈMES ===== */}
-        <Box py={10} w="100%" maxW="1100px" mx="auto" px={{ base: 6, md: 10 }}>
-          <Heading size="lg" mb={6} bgClip="text" textAlign="center">
-            Poèmes de la même collection
-          </Heading>
-          {collectionsWithNfts.map((collection) =>
-            collection.haikus.length > 0 && (
-              <RelatedFullPoems  // À créer (copie RelatedFull)
-                key={`${collection.id}-poems`}
-                haiku={collection.haikus[0]}
-                allHaikus={collection.haikus}  // ✅ MAX 5
-                title={collection.name}
-              />
-            )
-          )}
-        </Box>
-
-        </motion.div>
+                            <NextLink
+                              href={{
+                                pathname: "/actus",
+                                query: { expand: "news" }, // indique quel bloc ouvrir
+                              }}
+                              passHref
+                            >
+                              <MotionBox
+                                as="a"
+                                p={6}
+                                cursor="pointer"
+                                whileHover={{ scale: 1.03, boxShadow: boxShadowHover }}
+                                transition={{ duration: 0.3 }}
+                                display="flex"
+                                flexDirection="column"
+                                justifyContent="space-between"
+                              >
+                                <ChannelPreview
+                                  channelId={process.env.NEXT_PUBLIC_CHANNEL_NEWS_ID!}
+                                  title="📰 Actualités"
+                                  limit={3}
+                                  maxLines={5}
+                                />
+                                <Text textAlign="center" mt={8}>
+                                  Cliquez pour afficher les dernières actualités.
+                                </Text>
+                              </MotionBox>
+                            </NextLink>
+                          </Box>
 
 
-      {/* ===== SECTION BENEFICES DETAILLES + APPEL A L'ADHESION ==== */}
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.9 }}
-        viewport={{ once: true }}
-      >
-        <VStack
-        borderRadius="2xl"
-        border="1px solid"
-        borderColor="purple.700"
-        bg={cardBg}
-        p={{ base: 8, md: 12 }}
-        maxW="95%"
-        mx="auto"
-        mt={10}
-        >
-          <Heading
-            size={{ base: "lg", md: "xl" }}
-            bgClip="text"
-            fontWeight="extrabold"
-            textAlign="center"
-          >
-            Rejoignez le réseau RESCOE
-          </Heading>
+                          <Flex direction="column" flex="1" gap={6}>
+                            <Box flex="1" borderRadius="2xl" border="1px solid #ccc" overflow="hidden">
+                              <NextLink
+                                href={{
+                                  pathname: "/actus",
+                                  query: { expand: "expos" },
+                                }}
+                                passHref
+                              >
+                                <MotionBox
+                                  as="a"
+                                  p={6}
+                                  cursor="pointer"
+                                  whileHover={{ scale: 1.03, boxShadow: boxShadowHover }}
+                                  transition={{ duration: 0.3 }}
+                                  display="flex"
+                                  flexDirection="column"
+                                  justifyContent="space-between"
+                                >
+                                  <ChannelPreview
+                                    channelId={process.env.NEXT_PUBLIC_CHANNEL_EXPOS_ID!}
+                                    title="🖼️ Expositions"
+                                  />
+                                  <Text textAlign="center" mt={8}>
+                                    Cliquez pour en savoir plus !
+                                  </Text>
+                                </MotionBox>
+                              </NextLink>
+                            </Box>
+                          </Flex>
 
-          <Text
-            fontSize={{ base: "md", md: "lg" }}
-            color={textColor}
-            textAlign="center"
-            maxW="700px"
-            mx="auto"
-          >
-          Un espace de recherche, de création et de transmission autour de l’art numérique et poétique.
-          Depuis 2018, nous explorons les liens entre code, geste, et communauté.
-          Nos outils s’appuient sur la blockchain pour donner à chaque œuvre — image, texte ou trace — une existence juste, traçable et partagée.
-          </Text>
+                        </Flex>
+                        */}
 
-          {/* CARTES DE BENEFICES */}
-          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={10} mt={6} w="100%">
-            {benefits.map((benefit, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: index * 0.1 }}
-                viewport={{ once: true }}
-              >
+                        <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
+
+                        {/*
+
+
+                        <NextLink
+                          href={{
+                            pathname: "/actus",
+                            query: { expand: "calendar" },
+                          }}
+                          passHref
+                        >
+
+                            <MiniCalendar onClick={() => {}} />
+
+                            <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
+
+                        </NextLink>
+                          */}
+
+
+
+
+            {/* ===== 3. POUR VOUS (3 cartes résultats-oriented) ===== */}
+            {/* Titres "résultat" + hover couleur conditionnée */}
+            <motion.div
+              initial={{ opacity: 0, y: 50 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 1 }}
+              viewport={{ once: true }}
+            >
               <Box
-                as="button"
-                onClick={() => toggle(index)}
-                role="group"
-                px={10}
-                py={8}
-                borderRadius="2xl"
-                border="1px solid"
-                boxShadow={useColorModeValue(
-                  "0 0 15px rgba(180, 166, 213, 0.25)", // mauve clair en light
-                  "0 0 15px rgba(238, 212, 132, 0.25)"  // doré doux en dark
-                )}
-                transition="all 0.4s ease"
-                _hover={{
-                  bgGradient: useColorModeValue(
-                    `linear(to-r, ${theme.colors.brand.gold}, ${theme.colors.brand.mauve})`,
-                    `linear(to-r, ${theme.colors.brand.mauve}, ${theme.colors.brand.gold})`
-                  ),
-                  transform: "scale(1.05)",
-                  boxShadow: useColorModeValue(
-                    "0 0 30px rgba(180, 166, 213, 0.45)", // lumière mauve en light
-                    "0 0 30px rgba(238, 212, 132, 0.45)"  // halo doré en dark
-                  ),
-                }}
-                w="100%"
-                h="100%"
+                boxShadow="2xl"
+                borderRadius="3xl"
+                bg={cardBg}
+                p={{ base: 8, md: 12 }}
+                maxW="1200px"
+                mx="auto"
+                mt={20}
+                mb={16}
               >
-                  <Stack align="center" spacing={4}>
-                    <Icon
-                      as={benefit.icon}
-                      boxSize={12}
-                      color={textColor}
-                      transition="color 0.3s ease"
-                      _groupHover={{ color: "white" }}
-                    />
-                    <Text
-                      fontWeight="bold"
-                      fontSize="xl"
-                      textAlign="center"
-                      _groupHover={{ color: "white" }}
-                    >
-                      {benefit.title}
-                    </Text>
-                    <Text
-                      mt={3}
-                      color={textColor}
-                      textAlign="center"
-                      fontSize="md"
-                      maxW="300px"
-                      mx="auto"
-                    >
-                      {benefit.description}
-                    </Text>
-                  </Stack>
-                </Box>
-              </motion.div>
-            ))}
-          </SimpleGrid>
+                <Heading size="xl" bgClip="text" mb={12} textAlign="center">
+                  Pour vous :
+                </Heading>
 
-          <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
+                <SimpleGrid
+                  columns={{ base: 1, md: 3 }}
+                  spacing={8}
+                  mb={12}
+                >
+                  {[
+                    {
+                      title: "Créer des œuvres signées et préservées", // Résultat-oriented
+                      icon: "/visuels/icon-blockchain.svg",
+                      desc: "Vos NFT libres, éternels sur blockchain. Expérimentez sans hiérarchie.",
+                    },
+                    {
+                      title: "Apprendre à coder et poétiser", // Résultat-oriented
+                      icon: "/visuels/icon-community.svg",
+                      desc: "Ateliers ouverts : code, poésie, Web3 pour toutes et tous.",
+                    },
+                    {
+                      title: "Relier une communauté solidaire", // Résultat-oriented
+                      icon: "/visuels/icon-reseau.svg",
+                      desc: "Artistes, poètes, devs : culture numérique partagée.",
+                    },
+                  ].map((item, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 30 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.7, delay: i * 0.2 }}
+                      viewport={{ once: true }}
+                    >
+                      <VStack
+                        bg={cardBg}
+                        borderRadius="2xl"
+                        boxShadow="xl"
+                        p={8}
+                        h="100%"
+                        spacing={4}
+                        transition="all 0.3s ease"
+                        _groupHover={{
+                          bgGradient: "linear(to-r, brand.start, brand.end)",
+                        }}
+                      >
+                        <Image
+                          src={item.icon}
+                          alt={item.title}
+                          boxSize="70px"
+                          mb={4}
+                          mx="auto"
+                        />
+                        <Heading size="md" fontWeight="bold" color={textColor}>
+                          {item.title}
+                        </Heading>
+                        <Text
+                          fontSize="sm"
+                          textAlign="center"
+                          color={textColor}
+                          _groupHover={{ color: "white" }} // ✅ Fix contraste hover
+                        >
+                          {item.desc}
+                        </Text>
+                      </VStack>
+                    </motion.div>
+                  ))}
+                </SimpleGrid>
 
-          <motion.div
-            style={{ width: "100%" }}
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.3 }}
-            viewport={{ once: true }}
-          >
-            <Heading
-              mt={6}
-              mb={2}
-              size="lg"
-              bgClip="text"
-              textAlign="center"
+                {/* ===== 4. ARTISTES EN RÉSIDENCE (Fusionné dans même bloc) ===== */}
+                <Divider my={12} borderColor="purple.700" w="70%" mx="auto" />
+
+                <Heading
+                  mb={6}
+                  size="lg"
+                  bgClip="text"
+                  textAlign="center"
+                >
+                  Artistes en résidence
+                </Heading>
+                <Text color={textColor} textAlign="center" mb={8} maxW="800px" mx="auto">
+                  Artistes, poètes et codeurs que nous accompagnons au fil des projets.
+                </Text>
+                <FeaturedMembers addresses={featuredAddresses} />
+              </Box>
+            </motion.div>
+
+            {/* ===== 5. FUSION ŒUVRES/POÈMES + CAROUSEL ===== */}
+            <motion.div
+              initial={{ opacity: 0, y: 50 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 1 }}
+              viewport={{ once: true }}
             >
-              Ils viennent de rejoindre l’aventure :
-            </Heading>
-            <Text color={textColor}  textAlign="center" mb={6} maxW="800px" mx="auto">
-              Découvrez les nouveaux membres du réseau et leurs créations.
-            </Text>
+              <Divider my={16} borderColor="purple.700" w="70%" mx="auto" />
+              <Box maxW="1100px" mx="auto">
+                <Heading
+                  mb={12}
+                  size="2xl"
+                  bgClip="text"
+                  textAlign="center"
+                >
+                  Fusionnons œuvres digitales et poèmes on-chain
+                </Heading>
+                {collections.length > 0 ? (
+                  <DynamicCarousel nfts={allNfts} haikus={allHaikus} maxNfts={20} maxHaikus={20} />
+                ) : (
+                  <Text textAlign="center">Pas de collections disponibles pour le moment.</Text>
+                )}
+              </Box>
 
-            <DerniersAdherents />
-          </motion.div>
-        </VStack>
-      </motion.div>
+              {/* NFTs et Poèmes (gardés courts) */}
+              <Box py={16} maxW="1100px" mx="auto" px={{ base: 6, md: 10 }}>
+                <Heading size="lg" mb={12} bgClip="text" textAlign="center">
+                  Œuvres NFT (5/collection)
+                </Heading>
+                {collectionsWithNfts
+                  .filter((c: any) => c.nfts.length > 0)
+                  .map((collection: any) => (
+                    <RelatedFull
+                      key={`nft-${collection.id}`}
+                      nft={collection.nfts[0]}
+                      allNFTs={collection.nfts.slice(0, 5)}
+                      title={collection.name}
+                    />
+                  ))}
+              </Box>
 
-{/*
-      <motion.div
-        initial={{ opacity: 0, y: 40 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1.1, ease: "easeOut" }}
-        viewport={{ once: true }}
-      >
+              <Box py={16} maxW="1100px" mx="auto" px={{ base: 6, md: 10 }}>
+                <Heading size="lg" mb={12} bgClip="text" textAlign="center">
+                  Poèmes Haiku (5/collection)
+                </Heading>
+                {collectionsWithNfts
+                  .filter((c: any) => c.haikus.length > 0)
+                  .map((collection: any) => (
+                    <RelatedFullPoems
+                      key={`poem-${collection.id}`}
+                      haiku={collection.haikus[0]}
+                      allHaikus={collection.haikus.slice(0, 5)}
+                      title={collection.name}
+                    />
+                  ))}
+              </Box>
+            </motion.div>
+
+            {/* ===== 6. BLOC PERSUASION + CTA + Bénéfices + DERNIERS ADHÉRENTS ===== */}
+            {/* Texte condensé + CTA secondaire */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.9 }}
+              viewport={{ once: true }}
+            >
+              <VStack
+                borderRadius="3xl"
+                border="1px solid"
+                borderColor="purple.700"
+                bg={cardBg}
+                p={{ base: 12, md: 16 }}
+                maxW="95%"
+                mx="auto"
+                spacing={12}
+              >
+                <Heading
+                  size={{ base: "2xl", md: "3xl" }}
+                  bgClip="text"
+                  fontWeight="extrabold"
+                  textAlign="center"
+                >
+                  Rejoignez le réseau RESCOE dès maintenant
+                </Heading>
+
+                <Text
+                  fontSize={{ base: "lg", md: "xl" }}
+                  color={textColor}
+                  textAlign="center"
+                  maxW="800px"
+                  mx="auto"
+                  lineHeight="tall"
+                >
+                  Création, transmission et communauté autour de l’art numérique et poétique sur blockchain. Depuis 2018.
+                </Text>
+
+                {/* CTA SECONDaire renforcé */}
+                <Button
+                  as={NextLink}
+                  href="/adhesion"
+                  size="lg"
+                  px={12}
+                  py={6}
+                  color="white"
+                  borderRadius="full"
+                  boxShadow="xl"
+                  _hover={{ transform: "scale(1.05)" }}
+                  animation={`${pulse} 3s infinite`} // Subtil
+                >
+                  Adhérez en 2 minutes
+                </Button>
+
+                {/* Bénéfices détaillés (hover fixés) */}
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={10}>
+                  {benefits.map((benefit: any, index: number) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, y: 30 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.6, delay: index * 0.1 }}
+                      viewport={{ once: true }}
+                    >
+                      <Box
+                        as="button"
+                        onClick={() => toggle(index)}
+                        role="group"
+                        px={12}
+                        py={10}
+                        borderRadius="3xl"
+                        border="1px solid"
+                        boxShadow="0 0 20px rgba(180, 166, 213, 0.3)"
+                        transition="all 0.4s ease"
+                        w="100%"
+                        h="100%"
+                        _hover={{
+                          bgGradient: useColorModeValue(
+                            `linear(to-r, brand.gold, brand.mauve)`,
+                            `linear(to-r, brand.mauve, brand.gold)`
+                          ),
+                          transform: "scale(1.05)",
+                          boxShadow: "0 0 40px rgba(180, 166, 213, 0.5)",
+                        }}
+                      >
+                        <VStack spacing={6} align="center">
+                          <Icon as={benefit.icon} boxSize={14} color={textColor} _groupHover={{ color: "white" }} />
+                          <Heading size="lg" fontWeight="bold" color={textColor} _groupHover={{ color: "white" }}>
+                            {benefit.title}
+                          </Heading>
+                          <Text textAlign="center" fontSize="md" color={textColor} maxW="300px" _groupHover={{ color: "white" }}>
+                            {benefit.description}
+                          </Text>
+                        </VStack>
+                      </Box>
+                    </motion.div>
+                  ))}
+                </SimpleGrid>
+
+                <Divider my={12} borderColor="purple.700" w="70%" mx="auto" />
+
+                <motion.div
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.8, delay: 0.3 }}
+                  viewport={{ once: true }}
+                >
+                  <Heading size="lg" bgClip="text" textAlign="center" mb={6}>
+                    Ils viennent de rejoindre l’aventure :
+                  </Heading>
+                  <Text color={textColor} textAlign="center" mb={12} maxW="800px" mx="auto">
+                    Découvrez les nouveaux membres du réseau et leurs créations.
+                  </Text>
+                  <DerniersAdherents />
+                </motion.div>
+              </VStack>
+            </motion.div>
+
+                        {/*
+                              <motion.div
+                                initial={{ opacity: 0, y: 40 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 1.1, ease: "easeOut" }}
+                                viewport={{ once: true }}
+                              >
 
 
-        <VStack spacing={8} mt={12} mb={20}>
-          <Heading size="xl" color="gray.100" fontWeight="extrabold">
-            Rejoignez un réseau d'art numérique et de poésie solidaire
-          </Heading>
-          <Text
-            fontSize={{ base: "sm", md: "md" }}
-            maxW="800px"
-            textAlign="center"
-            color="gray.300"
-            mx="auto"
-          >
-            RESCOE soutient les artistes émergents en leur offrant un accès privilégié à des outils numériques innovants et à des formations accessibles. <br />
-            Explorez l’art génératif, le Web3 et l’expression poétique sous un nouveau jour.
-          </Text>
-        </VStack>
+                                <VStack spacing={8} mt={12} mb={20}>
+                                  <Heading size="xl" color="gray.100" fontWeight="extrabold">
+                                    Rejoignez un réseau d'art numérique et de poésie solidaire
+                                  </Heading>
+                                  <Text
+                                    fontSize={{ base: "sm", md: "md" }}
+                                    maxW="800px"
+                                    textAlign="center"
+                                    color="gray.300"
+                                    mx="auto"
+                                  >
+                                    RESCOE soutient les artistes émergents en leur offrant un accès privilégié à des outils numériques innovants et à des formations accessibles. <br />
+                                    Explorez l’art génératif, le Web3 et l’expression poétique sous un nouveau jour.
+                                  </Text>
+                                </VStack>
 
 
-      </motion.div>
-      */}
+                              </motion.div>
+                              */}
+          </Box>
+        </>
+      );
+    };
 
-    </Box>
-  );
-
-};
-
-export default Home;
+    export default Home;

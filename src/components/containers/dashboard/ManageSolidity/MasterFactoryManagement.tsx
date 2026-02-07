@@ -21,7 +21,7 @@ import {
 } from '@chakra-ui/react';
 import detectEthereumProvider from '@metamask/detect-provider';
 import ABIMasterFactory from '../../../ABI/Factories/ABI_MasterFactory.json';
-import ABISocial from '../../../ABI/Factories/MessageFactory.json';
+import ABISocial from '../../../ABI/Factories/ABI_SOCIAL_FACTORY.json';
 import CreateSocialCollection from "./CreateSocialCollection"
 
 const ManageContracts = () => {

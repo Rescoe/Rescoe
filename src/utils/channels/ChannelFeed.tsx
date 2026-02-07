@@ -228,7 +228,7 @@ const ChannelFeed: React.FC<ChannelFeedProps> = ({ channelId }) => {
   const priceBN = BigInt(priceInWei);
   const priceToPay = isAdherent ? (priceBN * (1000n - BigInt(reductionRate))) / 1000n : priceBN;
 
-  ////console.log("isAdherent:", isAdherent, "priceToPay:", priceToPay.toString());
+  //console.log("isAdherent:", isAdherent, "priceToPay:", priceToPay.toString());
 
 
       // timestamp

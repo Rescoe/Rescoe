@@ -512,7 +512,7 @@ const handleCopy = () => {
           borderRadius="md"
         />
         <Heading as="h1" fontSize={{ base: "xl", md: "3xl" }}>
-          {nftData.name} - {nftData.artist}
+          {nftData.name} - {formatAddress(nftData.artist)}
         </Heading>
       </Stack>
 
@@ -598,8 +598,8 @@ const handleCopy = () => {
                 <VStack spacing={4} alignItems="start" mb={6}>
                     <Text fontSize="lg"><strong>Nom :</strong> {nftData.name}</Text>
                     <Text fontSize="lg"><strong>Description :</strong> {nftData.description}</Text>
-                    <Text fontSize="lg" cursor="pointer" onClick={handleCopy}><strong>Artiste :</strong> {nftData.artist}</Text>
-                    <Text fontSize="lg" cursor="pointer" onClick={handleCopy}><strong>Propriétaire :</strong> {nftData.owner}</Text>
+                    <Text fontSize="lg" cursor="pointer" onClick={handleCopy}><strong>Artiste :</strong> {formatAddress(nftData.artist)}</Text>
+                    <Text fontSize="lg" cursor="pointer" onClick={handleCopy}><strong>Propriétaire :</strong> {formatAddress(nftData.owner)}</Text>
                     {/* Dernier prix de vente ou prix actuel */}
                       {!isForSale && nftData.price ? (
                         <Text fontSize="lg">
