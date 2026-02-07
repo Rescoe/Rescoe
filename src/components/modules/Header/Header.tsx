@@ -10,7 +10,7 @@ import { NavBar } from '../../../components/elements/navigation/NavBar';
 import { ConnectBouton } from '../ConnectBouton';
 import { GenerativeLogo } from '../../../components/elements/RescoeLogo';
 import NextLink from 'next/link';
-import { useAuth } from '../../../utils/authContext';
+import { useAuth } from '@/utils/authContext';
 import Insecte from '../MoovingInsect';
 import SelectInsect from '../InsectSelector';
 

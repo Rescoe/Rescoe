@@ -1,18 +1,34 @@
 "use client";
-import { useAccount } from "wagmi";
+import { useAuth } from '@/utils/authContext';
 import { useMemo } from "react";
 
 export const RESIDENT_ADDRESSES = [
-  "0x552C63E3B89ADf749A5C1bB66fE574dF9203FfB4", // Roubzi + ajoute les autres
+  "0x552C63E3B89ADf749A5C1bB66fE574dF9203FfB4",
   // ...
-] as const;
+].map(a => a.toLowerCase());
 
-export const useResidentAccess = (ownerAddress: string) => {
-  const { address: connectedAddress } = useAccount();
+export const useResidentAccess = (ownerAddress?: string) => {
+  const { address: connectedAddress } = useAuth();
 
   return useMemo(() => {
-    const isResident = !!connectedAddress && RESIDENT_ADDRESSES.includes(connectedAddress.toLowerCase() as any);
-    const isOwner = connectedAddress?.toLowerCase() === ownerAddress.toLowerCase();
-    return { isResident, isOwner, canEdit: isResident && isOwner };
+    if (!connectedAddress) {
+      return {
+        isResident: false,
+        isOwner: false,
+        canEdit: false,
+      };
+    }
+
+    const addr = connectedAddress.toLowerCase();
+    const owner = ownerAddress?.toLowerCase();
+
+    const isResident = RESIDENT_ADDRESSES.includes(addr);
+    const isOwner = !!owner && addr === owner;
+
+    return {
+      isResident,
+      isOwner,
+      canEdit: isResident && isOwner,
+    };
   }, [connectedAddress, ownerAddress]);
 };
