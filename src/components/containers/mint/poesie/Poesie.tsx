@@ -192,10 +192,19 @@ const PoemMintingPage: React.FC = () => {
         }
 
 
+
+        // Estimate gas (simulation sans exécution complète)
+        const gasEstimate = await contract.methods.mint(editions, poemText, salePriceInWei, editionsForSale).estimateGas({ from: userAddress });
+
+        const gasPrice = await web3.eth.getGasPrice();
+
         // Mint le poème
         await contract.methods
           .mint(editions, poemText, salePriceInWei, editionsForSale)
-          .send({ from: userAddress });
+          .send({ from: userAddress,
+            gas: Math.floor(Number(gasEstimate) * 1.2).toString(),
+            gasPrice: gasPrice.toString()
+           });
 
         if (salePriceInWei === "0" && editionsForSale > 0) {
           toast({

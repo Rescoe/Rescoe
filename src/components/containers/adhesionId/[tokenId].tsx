@@ -44,6 +44,7 @@ import CopyableAddress from "@/hooks/useCopyableAddress";
 import { useReproduction } from '@/hooks/useReproduction';
 import { ReproductionPanel, ParentSelector } from '@/components/Reproduction';
 import EvolutionHistoryTimeline from '@/utils/EvolutionHistoryTimeline'; // ✅ ERREUR 2: import corrigé (pas d'espace)
+import { resolveIPFS } from '@/utils/resolveIPFS';
 
 interface NFTData {
   owner: string;
@@ -301,8 +302,15 @@ const TokenPage = () => {
 
       const [membership, realName, realBio] = await contract.getUserInfo(owner);
       const uri = await contract.tokenURI(tokenIdNumber);
-      const ipfsHash = uri.split('/').pop();
-      const res = await fetch(`/api/proxyPinata?ipfsHash=${ipfsHash}`);
+
+
+      const metadataUrl = resolveIPFS(uri, true);
+
+      if (!metadataUrl) {
+        throw new Error("metadataUrl is undefined");
+      }
+
+      const res = await fetch(metadataUrl);
       const metadata: EvolutionMetadata = await res.json();
 
       const finAdhesion = new Date(
@@ -342,7 +350,7 @@ const TokenPage = () => {
         membership,
         membershipInfo,
       };
-
+      console.log(nftData);
 
       setNftCache(prev => ({ ...prev, [cacheKey]: nftData })); // ✅ CORRECTION: setNftCache
 
@@ -604,12 +612,13 @@ const TokenPage = () => {
       </Heading>
 
       <Image
-        src={nftData.image || '/fallback-image.png'}
+        src={resolveIPFS(nftData.image, true) || '/fallback-image.png'}
         alt={nftData.name}
         maxWidth="400px"
         mx="auto"
         mb={6}
       />
+
 
       <Tabs variant="enclosed" colorScheme="teal">
       <Box overflowX="auto" pb={2} sx={{ '::-webkit-scrollbar': { display: 'none' } }}>
@@ -662,6 +671,7 @@ const TokenPage = () => {
                 {membershipInfo ? membershipInfo.level : "—"}
               </Text>
               <Divider my={4} />
+
               // Remplace ton ancien historique par :
               {evolutionHistory.length > 0 && (
                 <EvolutionHistoryTimeline evolutionHistory={evolutionHistory} />

@@ -3,16 +3,27 @@ import { ethers } from "ethers";
 import ABI from "../../../ABI/ABIAdhesion.json";
 import ABI_ADHESION_MANAGEMENT from "../../../ABI/ABI_ADHESION_MANAGEMENT.json";
 import {
-  Box, Heading, Text, Grid, GridItem, Center, Image, Tooltip, useColorModeValue, useColorMode
+  Box, Heading, Text, Grid, GridItem, Center, Image, Tooltip, useColorModeValue, useColorMode, Badge,  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  PopoverBody,
+  SimpleGrid,
+  useBreakpointValue,
+  Button,
 } from "@chakra-ui/react";
+
 import Link from "next/link";
-import { gradients, animations, Backgrounds } from "@/styles/theme";
+import {gradients, animations, styles, Backgrounds} from "@/styles/theme"
+
+import { resolveIPFS } from "@/utils/resolveIPFS";
+
 
 interface InsectURI {
   id: string;
   image: string;
   name?: string;
   family?: string;  // ✅ Ajouté pour famille (15ème attribut)
+  level?: string;
 }
 
 interface UserInfo {
@@ -24,12 +35,15 @@ interface UserInfo {
   insects: InsectURI[];
 }
 
+
 const DerniersAdherents: React.FC = () => {
   const [dernierAdherentsInfo, setDernierAdherentsInfo] = useState<UserInfo[]>([]);
   const [family, setFamily] = useState<string[]>([]);  // ✅ string[] cohérent
 
   const { colorMode } = useColorMode();
   const bgColor = useColorModeValue(Backgrounds.cardBorderLight, Backgrounds.cardBorderDark);
+  const cardBg = useColorModeValue("brand.cream", "brand.navy");
+const cardBorder = useColorModeValue("brand.cream", "brand.cream");
 
   const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS!;
   const contractAddressManagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGER!;
@@ -77,24 +91,32 @@ const DerniersAdherents: React.FC = () => {
       const [membershipValid, name, bio] = await contract.getUserInfo(address);
       const tokens: bigint[] = await contract.getTokensByOwner(address);
 
-      // ✅ Récupère TOUS les insectes + familles
+      // 🔑 Récupère TOUS les insectes + familles avec resolveIPFS
       const insects = await Promise.all(
         tokens.map(async (tokenId) => {
           try {
             const tokenURI: string = await contract.tokenURI(tokenId);
-            const res = await fetch(tokenURI);
+
+            // Résoudre tokenURI pour fetch metadata
+            const metadataUrl = resolveIPFS(tokenURI, true);
+            if (!metadataUrl) throw new Error(`Impossible de résoudre tokenURI ${tokenId}`);
+
+            const res = await fetch(metadataUrl);
             if (!res.ok) throw new Error(`Erreur tokenURI ${tokenId}`);
+
             const metadata = await res.json();
 
-            // ✅ Famille = 15ème attribut (index 14)
-            const insectFamily = metadata.attributes?.[15]?.value || 'Inconnue';
-            //console.log(`Token ${tokenId} → Famille: ${insectFamily}`);
+            const insectFamily = metadata.attributes?.[17]?.value || "Inconnue";
+            //console.log(metadata);
+            const insectlvl = metadata.attributes?.[21]?.value ?? "Inconnue";
+            console.log(metadata);
 
             return {
               id: tokenId.toString(),
-              image: metadata.image,
+              image: resolveIPFS(metadata.image, true) || "", // URL HTTP pour <Image />
               name: metadata.name,
-              family: insectFamily  // ✅ Stockée localement
+              family: insectFamily,
+              level : insectlvl,
             };
           } catch (err) {
             console.error("Erreur récupération token:", err);
@@ -103,12 +125,10 @@ const DerniersAdherents: React.FC = () => {
         })
       );
 
-      // ✅ TOUTES les familles après Promise.all (setState asynchrone OK ici)
       const allFamilies = insects
         .filter(Boolean)
-        .map((insect): string => (insect as InsectURI).family || 'Inconnue');
+        .map((insect): string => (insect as InsectURI).family || "Inconnue");
       setFamily(allFamilies);
-      //console.log("✅ Toutes les familles:", allFamilies);
 
       return {
         membershipValid,
@@ -124,136 +144,232 @@ const DerniersAdherents: React.FC = () => {
     }
   };
 
-  return (
-    <Box p={5}>
-      <Box mt={5}>
-        {dernierAdherentsInfo.length > 0 ? (
-          <Grid
-            templateColumns={{ base: "1fr", sm: "repeat(2, 1fr)", md: "repeat(4, 1fr)" }}
-            gap={6}
-            justifyContent="center"
-          >
-            {dernierAdherentsInfo.map((info, idx) => (
-              <GridItem
-                key={idx}
-                w={{ base: "100%", md: "200px" }}
-                h="250px"
-                borderRadius="xl"
-                position="relative"
-                p="2px"
-                bgGradient={
-                  colorMode === "light"
-                    ? gradients.cardBorderLight
-                    : gradients.cardBorderDark
-                }
-                backgroundSize="300% 300%"
-                animation={animations.borderGlow}
-                transition="all 0.3s ease"
-                _hover={{
-                  animation: animations.borderGlow.replace("6s", "2s"),
-                  transform: "scale(1.05)",
-                  boxShadow:
-                    colorMode === "light"
-                      ? "0 0 25px rgba(180, 166, 213, 0.6)"
-                      : "0 0 25px rgba(238, 212, 132, 0.6)",
-                }}
-                justifySelf="center"
-                mx="auto"
-              >
-                <Box borderRadius="xl" height="100%" p={4} textAlign="center" bg={bgColor}>
-                  <Link href={`/u/${info.address}`} passHref>
-                    <Tooltip label="Voir le profil" hasArrow>
-                    <Box as="a" display="block" height="100%">
-                  <Text fontSize="md" fontWeight="bold" color="pink.200" noOfLines={1}>
-                    {info.name || "Utilisateur anonyme"}
-                  </Text>
-                  <Text fontSize="xs" color="gray.300" noOfLines={2}>
-                    {info.bio || "Aucune bio"}
-                  </Text>
+  const InsectCard = ({ insect }: { insect: InsectURI }) => {
+    const isMobile = useBreakpointValue({ base: true, md: false });
 
-                  {/* ✅ Layout 2x2 : MAX 4 insectes */}
-                  <Box position="relative" mt={2}>
-                    {info.insects.length > 0 ? (
-                      <>
-                        {/* Ligne 1 : 1er & 2ème */}
-                        <Box display="flex" justifyContent="center" gap={1}>
-                          {info.insects.slice(0, 2).map((insect) => (
-                            <Box key={`top-${insect.id}`} textAlign="center" minW="42px">
-                              <Image
-                                src={insect.image}
-                                alt={insect.name}
-                                boxSize="38px"
-                                borderRadius="md"
-                                objectFit="cover"
-                              />
-                              <Text fontSize="2xs" color="gray.400" mt={0.5} noOfLines={1}>
-                                {insect.family?.slice(0,6) || '???'} #{insect.id}
-                              </Text>
-                            </Box>
-                          ))}
-                        </Box>
+    const cardBg = useColorModeValue("brand.cream", "brand.navy");
+    const borderColor = useColorModeValue("brand.navy", "brand.cream");
+    const popBg = useColorModeValue("brand.cream", "brand.navy");
 
-                        {/* Ligne 2 : 3ème & 4ème */}
-                        <Box display="flex" justifyContent="center" gap={1}>
-                          {info.insects.slice(2, 4).map((insect) => (
-                            <Box key={`bot-${insect.id}`} textAlign="center" minW="42px">
-                              <Image
-                                src={insect.image}
-                                alt={insect.name}
-                                boxSize="38px"
-                                borderRadius="md"
-                                objectFit="cover"
-                              />
-                              <Text fontSize="2xs" color="gray.400" mt={0.5} noOfLines={1}>
-                                {insect.family?.slice(0,6) || '???'} #{insect.id}
-                              </Text>
-                            </Box>
-                          ))}
-                        </Box>
+    const CardVisual = (
+      <Box
+         borderRadius="xl"
+         overflow="hidden"
+         bg={cardBg}
+         border="1px solid"
+         borderColor={borderColor}
+         transition="all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)"  // ✅ bounce fluide
+         _hover={{
+           transform: "translateY(-6px) rotate(1deg) scale(1.08)",  // ✅ lift + rotation fun
+           //boxShadow: "0 15px 40px rgba(180,166,213,0.5)",  // ✅ glow mauve
+           boxShadow: "0 25px 600px rgba(238,212,132,0.4)",  // ✅ glow gold
 
-                        {/* Badge +X si >4 */}
-                        {info.insects.length > 4 && (
-                          <Box
-                            position="absolute"
-                            top="1"
-                            right="1"
-                            bg="pink.500"
-                            color="white"
-                            borderRadius="full"
-                            w="18px"
-                            h="18px"
-                            fontSize="3xs"
-                            fontWeight="bold"
-                            display="flex"
-                            alignItems="center"
-                            justifyContent="center"
-                          >
-                            +{info.insects.length - 4}
-                          </Box>
-                        )}
-                      </>
-                    ) : (
-                      <Center mt={4}>
-                        <Text fontSize="2xs" color="gray.500">
-                          Aucun jeton
-                        </Text>
-                      </Center>
-                    )}
-                  </Box>
+           borderWidth: "1px",
+           borderColor: "brand.gold"
+         }}
+         _active={{
+           transform: "scale(0.95)"
+         }}
+         sx={{
+           // ✅ Spin subtil sur hover prolongé
+           "&:hover": {
+             animation: "spin 0.6s ease-in-out infinite alternate"
 
-                      </Box>
-                    </Tooltip>
-                  </Link>
-                </Box>
-              </GridItem>
-            ))}
-          </Grid>
-        ) : (
-          <Center><Text>Aucun adhérent trouvé.</Text></Center>
-        )}
+           },
+           "@keyframes spin": {
+             "0%": { transform: "translateY(-6px) rotate(0deg) scale(1.08)" },
+             "100%": { transform: "translateY(-6px) rotate(2deg) scale(1.08)" }
+           }
+         }}
+       >
+        <Image
+          src={insect.image || "/fallback-image.png"}
+          boxSize="80px"
+          objectFit="cover"
+        />
       </Box>
+    );
+
+    const InfoContent = (
+      <Box>
+        <Heading size="sm" mb={1}>
+          {insect.name}
+        </Heading>
+
+        <Heading fontSize="xs" opacity={0.7} mb={2}>
+          {insect.family}
+        </Heading>
+
+        <Badge colorScheme="yellow" variant="solid">
+          Niveau {insect.level ?? "?"}
+        </Badge>
+      </Box>
+    );
+
+    if (isMobile) {
+      return (
+        <Popover trigger="click" placement="auto" isLazy>
+          <PopoverTrigger>
+            {CardVisual}
+          </PopoverTrigger>
+          <PopoverContent
+            bg={popBg}
+            border="1px solid"
+            borderColor="brand.gold"
+            borderRadius="xl"
+            _focus={{ boxShadow: "none" }}
+          >
+            <PopoverBody p={4}>{InfoContent}</PopoverBody>
+          </PopoverContent>
+        </Popover>
+      );
+    }
+
+    return (
+      <Tooltip
+        label={InfoContent}
+        hasArrow
+        placement="top"
+        bg={popBg}
+        borderRadius="lg"
+        p={3}
+      >
+        {CardVisual}
+      </Tooltip>
+    );
+  };
+  return (
+    <Box px={{ base: 4, md: 8 }} py={{ base: 10, md: 14 }}>
+
+      <Heading
+        mb={10}
+        textAlign="center"
+        bgClip="text"
+      >
+        Derniers adhérents
+      </Heading>
+
+      {dernierAdherentsInfo.length === 0 ? (
+        <Center py={20}>
+          <Text opacity={0.6}>Aucun adhérent trouvé</Text>
+        </Center>
+      ) : (
+        <Grid
+          templateColumns={{
+            base: "1fr",
+            sm: "repeat(2, 1fr)",
+            lg: "repeat(4, 1fr)"
+          }}
+          gap={8}
+        >
+          {dernierAdherentsInfo.map((info) => (
+            <Box
+              key={info.address}
+              borderRadius="2xl"
+              bg={cardBg}
+              border="1px solid"
+              borderColor={cardBorder}
+              p={6}
+              transition="all 0.35s cubic-bezier(0.4, 0, 0.2, 1)"  // ✅ easing fluide
+              _hover={{
+                transform: "translateY(-8px) scale(1.02)",  // ✅ lift + léger zoom
+                boxShadow: "0 25px 60px rgba(238,212,132,0.4)",  // ✅ glow gold
+                borderColor: "brand.gold",
+                background: "linear-gradient(135deg, brand.cream 0%, rgba(238,212,132,0.1) 100%)"  // ✅ shimmer
+              }}
+              _active={{
+                transform: "translateY(-4px) scale(1.01)"
+              }}
+              sx={{
+                // ✅ Pulse subtil au load
+                animation: "pulse 2s ease-in-out infinite",
+                "@keyframes pulse": {
+                  "0%, 100%": { boxShadow: "0 4px 20px rgba(0,0,0,0.1)" },
+                  "50%": { boxShadow: "0 8px 30px rgba(238,212,132,0.2)" }
+                }
+              }}
+            >
+              {/* HEADER */}
+              <Box
+                flex={1}
+                mb={4}
+                position="relative"
+                height="140px"  // ✅ HAUTEUR TOTALE FIXE
+                display="flex"
+                flexDirection="column"
+              >
+                <Text
+                  fontSize="lg"
+                  fontWeight="bold"
+                  noOfLines={1}
+                  mb={2}
+                  height="28px"  // ✅ FIXE nom
+                >
+                  {info.name || "Utilisateur"}
+                </Text>
+
+                <Text
+                  fontSize="sm"
+                  opacity={0.65}
+                  noOfLines={2}
+                  height="40px"  // ✅ FIXE bio (2 lignes)
+                  display="flex"
+                  alignItems="flex-start"
+                >
+                  {info.bio || "Aucune description"}
+                </Text>
+
+                <Box height="28px" mt="auto">
+                  {info.membershipValid && (
+                    <Badge colorScheme="green" size="sm">
+                      Membre actif
+                    </Badge>
+                  )}
+                </Box>
+              </Box>
+
+
+
+              {/* NFT GRID */}
+              {info.insects.length > 0 ? (
+                <SimpleGrid columns={2} spacing={3} mb={6}>
+                  {info.insects.slice(0, 4).map((insect) => (
+                    <InsectCard key={insect.id} insect={insect} />
+                  ))}
+                </SimpleGrid>
+              ) : (
+                <Center py={8}>
+                  <Text fontSize="sm" opacity={0.5}>
+                    Aucun NFT
+                  </Text>
+                </Center>
+              )}
+
+              {/* CTA */}
+              <Button
+                as={Link}
+                href={`/u/${info.address}`}
+                size="sm"
+                w="full"
+                borderRadius="full"
+                fontWeight="bold"
+                _hover={{
+                  transform: "translateY(-2px)",
+                  boxShadow: "0 6px 20px rgba(0,0,0,0.25)"
+                }}
+                _active={{ transform: "scale(0.97)" }}
+                transition="all 0.2s ease"
+              >
+                Voir le profil
+              </Button>
+            </Box>
+          ))}
+        </Grid>
+      )}
     </Box>
   );
+
+
 };
 
 export default DerniersAdherents;

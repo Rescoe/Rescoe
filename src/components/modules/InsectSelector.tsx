@@ -4,6 +4,8 @@ import { Box, Button, Image, VStack } from '@chakra-ui/react';
 import { useAuth } from '../../utils/authContext';
 import { JsonRpcProvider, Contract } from 'ethers';
 import ABI from '../ABI/ABIAdhesion.json';
+import { resolveIPFS } from "@/utils/resolveIPFS";
+
 
 import { BigNumberish } from 'ethers';
 
@@ -19,50 +21,54 @@ const SelectInsect = ({ onSelect }: { onSelect: (insect: Insect) => void }) => {
 
 
   const fetchInsects = async () => {
-    const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+  const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
 
-    if (!contractAddress) {
-      console.error("L'adresse du contrat n'est pas définie.");
-      return;
-    }
+  if (!contractAddress) {
+    console.error("L'adresse du contrat n'est pas définie.");
+    return;
+  }
 
-    const contract = new Contract(contractAddress, ABI, provider);
+  const contract = new Contract(contractAddress, ABI, provider);
 
-    const tokenIds: BigNumberish[] = await contract.getTokensByOwner(address);
+  const tokenIds: BigNumberish[] = await contract.getTokensByOwner(address);
 
-    const fetchedInsects = await Promise.all(
-      tokenIds.map(async (tokenId: BigNumberish) => {
-        try {
-          const tokenURI = await contract.tokenURI(tokenId);
-          const response = await fetch(tokenURI);
-          //console.log("Token URI:", tokenURI);
-          const details = await contract.getTokenDetails(tokenId);
+  const fetchedInsects = await Promise.all(
+    tokenIds.map(async (tokenId: BigNumberish) => {
+      try {
+        const tokenURI = await contract.tokenURI(tokenId);
 
-          const level = Number(details[8]);
-
-          if (!response.ok) {
-            throw new Error('Erreur lors de la récupération de URI');
-          }
-
-          const metadata = await response.json();
-
-
-          return {
-            id: Number(tokenId),
-            name: metadata.name || `Insecte ${tokenId}`,
-            image: metadata.image,
-            level,
-          };
-
-        } catch (error) {
-          console.error("Erreur lors de la récupération de l'insecte :", error);
-          return null;
+        // 🔑 on passe le tokenURI par le resolver IPFS
+        const metadataUrl = resolveIPFS(tokenURI, true); // -> /api/ipfs/...
+        if (!metadataUrl) {
+          throw new Error("Impossible de résoudre le tokenURI IPFS");
         }
-      })
-    );
 
-    setInsects(fetchedInsects.filter((insect): insect is Insect => insect !== null));
-  };
+        const response = await fetch(metadataUrl);
+        if (!response.ok) {
+          throw new Error("Erreur lors de la récupération de l'URI");
+        }
+
+        const details = await contract.getTokenDetails(tokenId);
+        const level = Number(details[8]);
+
+        const metadata = await response.json();
+
+        return {
+          id: Number(tokenId),
+          name: metadata.name || `Insecte ${tokenId}`,
+          image: resolveIPFS(metadata.image, true) || "", // URL HTTP pour <Image />
+          level,
+        };
+      } catch (error) {
+        console.error("Erreur lors de la récupération de l'insecte :", error);
+        return null;
+      }
+    })
+  );
+
+  setInsects(fetchedInsects.filter((insect): insect is Insect => insect !== null));
+};
+
 
 
   useEffect(() => {
@@ -80,14 +86,19 @@ const SelectInsect = ({ onSelect }: { onSelect: (insect: Insect) => void }) => {
 
   return (
     <VStack spacing={4}>
-      {insects.map((insect) => (
-        <Box key={insect.id} display="flex" alignItems="center">
-          <Image src={insect.image} alt={`Insecte ${insect.id}`} boxSize="45px" />
-          <Button onClick={() => handleInsectSelect(insect)} variant="outline" ml={2}>
-            Sélectionner
-          </Button>
-        </Box>
+    {insects.map((insect) => (
+      <Box key={insect.id} display="flex" alignItems="center">
+        <Image
+          src={insect.image || "/fallback-image.png"}
+          alt={`Insecte ${insect.id}`}
+          boxSize="45px"
+        />
+        <Button onClick={() => handleInsectSelect(insect)} variant="outline" ml={2}>
+          Sélectionner
+        </Button>
+      </Box>
       ))}
+
     </VStack>
   );
 };

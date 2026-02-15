@@ -1,6 +1,8 @@
-// src/hooks/usePinataUpload.ts - ✅ FIXÉ : retourne URI + interface correcte
+// ✅ VERSION INTELLIGENTE : badges (level+history) / oeuvres (artist+simple)
+
 import { useState } from "react";
-import axios from "axios";
+
+export type UploadScope = "badges" | "oeuvres";
 
 export interface OpenSeaAttribute {
   trait_type: string;
@@ -8,148 +10,159 @@ export interface OpenSeaAttribute {
 }
 
 export interface UploadOptions {
-  imageUrl: string;
+  scope: UploadScope;
+  imageFile?: File;
+  imageUrl?: string;
   name: string;
-  bio: string;
-  role: string;
-  level: number;
-
-  previousImage?: string | null;
-  rarityTier?: string;
-  rarityScore?: number;
+  description?: string;  // Oeuvres
+  bio?: string;          // Badges
+  role?: string;         // Badges
+  level?: number;        // Badges (optionnel oeuvres)
   attributes?: OpenSeaAttribute[];
-  evolutionHistory?: any;
-
-  // ✅ AJOUTS STRUCTURANTS
+  tags?: string;         // Oeuvres
+  maxEditions?: number;
+  collectionType?: string;
+  artist?: string;       // 🔥 OEUVRES
   family?: string;
   sprite_name?: string;
-  color_profile?: unknown; // ou ColorProfile si tu veux typer fort
+  color_profile?: unknown;
+  previousImage?: string | null;
+  evolutionHistory?: any[];
+  custom_data?: Record<string, any>;
 }
 
 interface UsePinataUploadReturn {
-  ipfsUrl: string | null;
-  imageIpfsUrl: string | null;
+  metadataUri: string | null;
+  imageUri: string | null;
   isUploading: boolean;
   error: string | null;
-  uploadToIPFS: (options: UploadOptions) => Promise<{ipfsHash: string, url: string}>;  // ✅ FIXÉ : retourne URI
+  uploadToIPFS: (options: UploadOptions) => Promise<{
+    metadataUri: string;
+    imageUri: string;
+    metadataHash: string;
+    imageHash: string;
+  }>;
 }
 
-async function urlToBlob(url: string): Promise<Blob> {
+async function urlToBase64(url: string): Promise<string> {
   const res = await fetch(url, { cache: "no-cache" });
-  if (!res.ok) throw new Error(`Impossible de charger l'image : ${res.status}`);
-  return await res.blob();
+  if (!res.ok) {
+    throw new Error(`Impossible de charger l'image (${res.status})`);
+  }
+  const blob = await res.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      resolve(result.split(",")[1]);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      resolve(result.split(",")[1]);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 export const usePinataUpload = (): UsePinataUploadReturn => {
-  const [ipfsUrl, setIpfsUrl] = useState<string | null>(null);
-  const [imageIpfsUrl, setImageIpfsUrl] = useState<string | null>(null);
+  const [metadataUri, setMetadataUri] = useState<string | null>(null);
+  const [imageUri, setImageUri] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const uploadToIPFS = async (options: UploadOptions) => {
-    const {
-      imageUrl,
-      name,
-      bio,
-      role,
-      previousImage,
-      level,
-      rarityTier,
-      rarityScore,
-      attributes,
-      evolutionHistory,
-    } = options;
-
     setIsUploading(true);
     setError(null);
 
     try {
-      if (!imageUrl) {
-        throw new Error("Veuillez vous assurer que l'image est générée.");
+      const {
+        scope, imageUrl, imageFile, name, description, bio,
+        role, level, attributes = [], tags, maxEditions,
+        collectionType, artist, family, sprite_name, color_profile,
+        previousImage, evolutionHistory = [], custom_data = {}
+      } = options;
+
+      // 1. Image → base64
+      let fileBase64: string;
+      if (imageFile) {
+        fileBase64 = await fileToBase64(imageFile);
+      } else if (imageUrl) {
+        fileBase64 = await urlToBase64(imageUrl);
+      } else {
+        throw new Error("imageFile ou imageUrl requis");
       }
 
-      const blob = await urlToBlob(imageUrl);
-      const formData = new FormData();
-      formData.append("file", blob, "insect.gif");
-
-      const pinataJwt = process.env.NEXT_PUBLIC_PINATA_JWT;
-      if (!pinataJwt) {
-        throw new Error("PINATA_JWT manquant dans les variables d'environnement.");
-      }
-
-      // 1) Upload de l'image
-      const imageResponse = await axios.post(
-        "https://api.pinata.cloud/pinning/pinFileToIPFS",
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${pinataJwt}`,
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-
-      const gatewayBase = "https://purple-managerial-ermine-688.mypinata.cloud/ipfs/";
-      const imageHash = imageResponse.data.IpfsHash;
-      const imageIpfsUrlLocal = `${gatewayBase}${imageHash}`;
-      setImageIpfsUrl(imageIpfsUrlLocal);
-
-      // 2) Construction des métadatas JSON
-      const metadataJson: any = {
-        name: name || "Nom inconnu",
-        bio: bio || "Aucune bio",
-        description: `Vous êtes ${role || "Membre"}`,
-        image: imageIpfsUrlLocal,
-        level,
-        role: role || "Membre",
-        rarityTier: rarityTier || "Common",
-        rarityScore: rarityScore ?? 1,
-        tags: ["Adhesion", role || "Membre"],
+      // 2. Base commune INTELLIGENTE
+      const baseMetadata: any = {
+        name,
+        ...(level !== undefined && { level }),  // Badges seulement si fourni
+        ...(attributes.length > 0 && { attributes }),
+        ...(family && { family }),
+        ...(sprite_name && { sprite_name }),
+        ...(color_profile ? { color_profile: color_profile as any } : {}),
+        ...(previousImage !== undefined && { previousImage }),
+        ...(evolutionHistory.length > 0 && { evolutionHistory }),
       };
 
-      if (attributes && attributes.length > 0) {
-        metadataJson.attributes = attributes;
+      let metadata: any = { ...baseMetadata };
+
+      // 3. BADGES (complexes)
+      if (scope === "badges") {
+        metadata = {
+          ...metadata,
+          bio: bio || "",
+          description: `Badge ${role || "Membre"}. ${bio || "Aucune bio fournie."}`,
+          role: role || "Membre",
+          tags: ["Adhesion", role || "Membre"]
+        };
+      }
+      // 4. OEUVRES (simples + artist)
+      else {
+        metadata = {
+          ...metadata,
+          description: description || "",
+          ...(artist && { artist }),  // 🔥 OEUVRES ARTISTE
+          tags: tags ? tags.split(',').map(t => t.trim()) : ["Oeuvre"],
+          collectionType: collectionType || "solo",
+          maxEditions: maxEditions || 1,
+          ...custom_data
+        };
       }
 
-      if (evolutionHistory) {
-        metadataJson.evolutionHistory = evolutionHistory;
-      } else {
-        metadataJson.evolutionHistory = [];
+      // 5. Backend
+      const res = await fetch("/api/pinata/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope, fileBase64, metadata })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err?.error || "Upload IPFS échoué");
       }
 
-      if (previousImage && !evolutionHistory) {
-        metadataJson.previousImage = previousImage;
-        metadataJson.evolutionHistory = [
-          {
-            lvlPrevious: level - 1,
-            image: previousImage,
-            timestamp: Math.floor(Date.now() / 1000),
-          },
-        ];
-      }
-
-      // 3) Upload du JSON de métadatas
-      const metadataResponse = await axios.post(
-        "https://api.pinata.cloud/pinning/pinJSONToIPFS",
-        metadataJson,
-        {
-          headers: {
-            Authorization: `Bearer ${pinataJwt}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      const metadataHash = metadataResponse.data.IpfsHash;
-      const metadataIpfsUrl = `${gatewayBase}${metadataHash}`;
-      setIpfsUrl(metadataIpfsUrl);
-
-      // ✅ RETOURNE DIRECT l'URI
-      return { ipfsHash: metadataHash, url: metadataIpfsUrl };
+      const data = await res.json();
+      setImageUri(data.image);
+      setMetadataUri(data.metadata);
+      return {
+        imageUri: data.image,
+        metadataUri: data.metadata,
+        imageHash: data.imageHash,
+        metadataHash: data.metadataHash
+      };
 
     } catch (err: any) {
-      console.error("Erreur lors de l'upload sur IPFS:", err);
-      setError(err?.message || "Erreur lors de l'upload sur IPFS.");
+      console.error("Upload IPFS error:", err);
+      setError(err?.message || "Erreur upload IPFS");
       throw err;
     } finally {
       setIsUploading(false);
@@ -157,10 +170,10 @@ export const usePinataUpload = (): UsePinataUploadReturn => {
   };
 
   return {
-    ipfsUrl,
-    imageIpfsUrl,
+    metadataUri,
+    imageUri,
     isUploading,
     error,
-    uploadToIPFS,
+    uploadToIPFS
   };
 };

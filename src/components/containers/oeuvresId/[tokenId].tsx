@@ -4,6 +4,7 @@ import detectEthereumProvider from '@metamask/detect-provider';
 import { useRouter } from 'next/router';
 import { JsonRpcProvider, Contract, ethers, formatUnits  } from 'ethers';
 import {FilteredCollectionsCarousel} from '../galerie/art'; // Mettez à jour le chemin
+import { resolveIPFS } from '@/utils/resolveIPFS';  // ✅ TON UTILS
 
 
 
@@ -270,15 +271,17 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
         const priceInEther = formatUnits(currentPrice, 18);
         setPrice(priceInEther);
 
+        // Dans fetchNFTData, remplace cette partie :
+        // Dans fetchNFTData, remplace :
         const uri = await contract.tokenURI(tokenId);
         if (!uri) throw new Error("URI invalide.");
 
-        const res = await fetch(`/api/proxyPinata_Oeuvres?ipfsHash=${uri.split("/").pop()}`);
-        if (!res.ok) throw new Error("Erreur lors de la récupération des données d'image.");
+        const hash = uri.replace('ipfs://', '').split('/')[0];  // QmUUWndns...
+    const res = await fetch(`/api/metadata/${hash}`);
+    const data = await res.json();
+    data.image = resolveIPFS(data.image, true)!;  // Pour affichage
 
-        const data = await res.json();
-
-        //const resolvedArtist = await fetchENS(data.artist);
+        console.log("📄 Main NFT metadata:", data);
 
 
         const nftData: NFTData = {
@@ -311,22 +314,31 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
         return null; // Indiquez que l'opération a échoué sans lancer d'erreurs sur l'application
     }
 };
+
 const fetchCollectionNFTs = async (contractAddress: string) => {
   try {
     setIsLoadingCollection(true);
-
     const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
     const collectionContract = new Contract(contractAddress, ABI, provider);
 
-    // ✅ Récupère les 20 premiers NFTs de la collection
     const tokenIds: string[] = await collectionContract.getTokenPaginated(0, 19);
 
     const nftsData = await Promise.all(
       tokenIds.map(async (tokenId: string) => {
         try {
           const tokenURI = await collectionContract.tokenURI(tokenId);
-          const response = await fetch(tokenURI);
+
+          // ✅ 1. RESOLVE METADATA URI AVANT fetch()
+          const resolvedMetadataUri = resolveIPFS(tokenURI, true)!;  // /api/ipfs/CID
+          console.log("📄 Fetch metadata:", resolvedMetadataUri);  // DEBUG
+
+          const response = await fetch(resolvedMetadataUri);
+          if (!response.ok) throw new Error("Metadata fetch failed");
+
           const metadata = await response.json();
+
+          // ✅ 2. RESOLVE IMAGE URI pour affichage
+          const resolvedImageUri = resolveIPFS(metadata.image, true)!;  // /api/ipfs/imageCID
 
           const owner = await collectionContract.ownerOf(tokenId);
           const isForSale = await collectionContract.isNFTForSale(tokenId);
@@ -336,7 +348,7 @@ const fetchCollectionNFTs = async (contractAddress: string) => {
           return {
             tokenId: Number(tokenId),
             name: metadata.name,
-            image: metadata.image,
+            image: resolvedImageUri,  // ✅ URL proxy prête à afficher
             description: metadata.description,
             owner,
             forSale: isForSale,
@@ -344,20 +356,22 @@ const fetchCollectionNFTs = async (contractAddress: string) => {
             mintContractAddress: contractAddress,
           };
         } catch (err) {
-          console.error("Erreur sur le token", tokenId, err);
+          console.error("❌ Erreur token", tokenId, err);
           return null;
         }
       })
     );
 
-    const filteredNFTs = nftsData.filter((nft) => nft !== null);
+    const filteredNFTs = nftsData.filter((nft) => nft !== null) as any[];
     setCollectionNFTs(filteredNFTs);
   } catch (error) {
-    console.error("Erreur lors du chargement des NFTs de la collection :", error);
+    console.error("❌ Collection load error:", error);
   } finally {
     setIsLoadingCollection(false);
   }
 };
+
+
 
 
 /*
@@ -662,6 +676,7 @@ const handleCopy = () => {
           </TabPanels>
       </Tabs>
 
+{/*
       <Box mt={10}>
         <Heading size="md" mb={4}>Autres œuvres de cette collection</Heading>
 
@@ -694,7 +709,6 @@ const handleCopy = () => {
                   transition="transform 0.2s ease, box-shadow 0.2s ease"
                   _hover={{ transform: "scale(1.05)" }}
                 >
-                  {/* Image de l'œuvre */}
                   <Image
                     src={nft.image}
                     alt={nft.name}
@@ -703,7 +717,6 @@ const handleCopy = () => {
                     objectFit="cover"
                   />
 
-                  {/* Légende sur l'image */}
                   <Box
                     position="absolute"
                     bottom="0"
@@ -731,18 +744,81 @@ const handleCopy = () => {
 
 
 <Divider/>
-      {/* Carrousels */}
-      <Box mt={5} w="full">
-        <Heading size="md" mb={3}>
-          Découvrez les autres collections de {nftData.artist}
-        </Heading>
-        <Stack direction={{ base: "column", md: "row" }} spacing={2}>
-          <FilteredCollectionsCarousel
-            creator={nftData.artist}
-          />
 
-        </Stack>
-      </Box>
+*/}
+      {/* Carrousels */}
+      {/* 🔥 SECTION DYNAMIQUE - remplace le Box existant */}
+    <Box mt={10} w="full">
+      {collectionNFTs.length > 1 ? (
+        <>
+          <Heading size="md" mb={4}>Autres œuvres de cette collection</Heading>
+          <Grid
+            templateColumns="repeat(auto-fill, minmax(220px, 1fr))"
+            gap={6}
+            mb={10}
+          >
+            {collectionNFTs
+              .filter((nft: any) => nft.tokenId !== Number(tokenId))
+              .map((nft: any) => (
+                <Box
+                  key={nft.tokenId}
+                  onClick={() => router.push(`/oeuvresId/${nft.mintContractAddress}/${nft.tokenId}`)}
+                  cursor="pointer"
+                  position="relative"
+                  width="220px"
+                  height="220px"
+                  overflow="hidden"
+                  borderRadius="lg"
+                  transition="transform 0.2s ease, box-shadow 0.2s ease"
+                  _hover={{ transform: "scale(1.05)" }}
+                >
+                  <Image
+                    src={nft.image}
+                    alt={nft.name}
+                    width="100%"
+                    height="100%"
+                    objectFit="cover"
+                  />
+                  <Box
+                    position="absolute"
+                    bottom="0"
+                    left="0"
+                    width="100%"
+                    bgGradient="linear(to-t, rgba(0,0,0,0.6), transparent)"
+                    color="white"
+                    p={2}
+                    textAlign="left"
+                  >
+                    <Text fontWeight="bold" fontSize="sm" isTruncated>
+                      {nft.name || "Œuvre"}
+                    </Text>
+                    {nft.forSale && (
+                      <Text fontSize="xs" opacity={0.8}>
+                        {nft.price} ETH
+                      </Text>
+                    )}
+                  </Box>
+                </Box>
+              ))}
+          </Grid>
+        </>
+      ) : (
+        <>
+          <Heading size="md" mb={3}>
+            🔥 Œuvres phares de l'association
+          </Heading>
+          <Text mb={6} color="gray.300">
+            {collectionNFTs.length === 1
+              ? "Collection solo. Découvrez les œuvres mises en avant !"
+              : "Découvrez les œuvres mises en avant !"
+            }
+          </Text>
+          <FilteredCollectionsCarousel
+            creator="0xFa6d6E36Da4acA3e6aa3bf2b4939165C39d83879"
+          />
+        </>
+      )}
+    </Box>
 
     </Box>
   );

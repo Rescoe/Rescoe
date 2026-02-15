@@ -33,6 +33,9 @@ import DerniersAdherents from "./DerniersAdherents";
 import { hoverStyles, brandHover } from "@styles/theme";
 import { AspectRatio, Image } from "@chakra-ui/react";
 import { useRouter } from 'next/router'; // ✅ Pour hash navigation
+import { useAuth } from "@/utils/authContext";
+import { resolveIPFS } from "@/utils/resolveIPFS";
+
 
 
 import MarketplaceBadges from "./MarketplaceBadges";
@@ -87,8 +90,8 @@ const Adherent: React.FC = () => {
   const RPC_URL = process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!;
 
   // Au début du composant
-const auth = (typeof window !== 'undefined' ? (window as any).RESCOE_AUTH : {});
-const { isAuthenticated, address, role, isAdmin } = auth;
+//const auth = (typeof window !== 'undefined' ? (window as any).RESCOE_AUTH : {});
+const { isAuthenticated, address, role, isAdmin } = useAuth();
 
   // ✅ Initialise le provider et le contrat Moralis
   useEffect(() => {
@@ -111,8 +114,6 @@ const { isAuthenticated, address, role, isAdmin } = auth;
     if (!contract) return;
     if (activeTab !== 0) return;  // ✅ SKIP si pas Tab 1
 
-
-    // ✅ REMPLACE CETTE FONCTION ENTIÈRE
     const fetchData = async () => {
       try {
         // --- Membres par rôle (INCHANGÉ)
@@ -132,39 +133,51 @@ const { isAuthenticated, address, role, isAdmin } = auth;
         const insectsCount = await contract.getTotalMinted();
         setTotalInsectsMinted(Number(insectsCount));
 
-        // ✅ NOUVEAU : Détails des insectes → SKIP BURNED
+        // 🔑 Détails des insectes → SKIP BURNED + resolveIPFS
         const fetchedInsects: InsectURI[] = [];
         for (let i = 0; i < Number(insectsCount); i++) {
           try {
-            // ✅ CHECK 1 : Token existe-t-il ? (owner non nul)
+            // CHECK 1 : Token existe-t-il ? (owner non nul)
             const owner = await contract.ownerOf(i).catch(() => null);
             if (!owner || owner === "0x0000000000000000000000000000000000000000") {
-              //console.log(`⏭️ Token ${i} brûlé/skippé`);
               continue;
             }
 
-            // ✅ CHECK 2 : TokenURI valide
+            // CHECK 2 : TokenURI valide
             const tokenURI = await contract.tokenURI(i);
-            const res = await fetch(tokenURI);
+
+            // 🔑 Résoudre tokenURI pour fetch metadata
+            const metadataUrl = resolveIPFS(tokenURI, true);
+            if (!metadataUrl) {
+              console.warn(`Skip token ${i}: pas d'URI IPFS valide`);
+              continue;
+            }
+
+            const res = await fetch(metadataUrl);
+            if (!res.ok) {
+              console.warn(`Skip token ${i}: HTTP ${res.status}`);
+              continue;
+            }
+
             const meta = await res.json();
 
             fetchedInsects.push({
               id: i.toString(),
-              image: meta.image,
+              image: resolveIPFS(meta.image, true) || "", // URL HTTP pour <Image />
               name: meta.name,
               bio: meta.bio || "",
             });
           } catch (err) {
-            //console.warn(`⚠️ Skip token ${i}:`, err.message);
+            console.warn(`Skip token ${i}:`, err);
           }
         }
 
-        //console.log(`✅ ${fetchedInsects.length}/${insectsCount} tokens actifs`);
         setInsectURIs(fetchedInsects);
       } catch (error) {
-        //console.error("Erreur fetchData:", error);
+        console.error("Erreur fetchData:", error);
       }
     };
+
 
     fetchData();
   }, [contract, activeTab]);
@@ -428,28 +441,25 @@ const { isAuthenticated, address, role, isAdmin } = auth;
                         shadow: "xl",
                       }}
                     >
-                      <AspectRatio ratio={1} w={{ base: "120px", md: "160px" }}>
-                        <Box position="relative" rounded="lg" overflow="hidden">
-                          <Image
-                            src={insect.image}
-                            alt={`Insecte ${insect.id}`}
-                            objectFit="cover"
-                            w="100%"
-                            h="100%"
-                            transition="all 0.3s ease"
-                            _hover={{
-                              ...hoverStyles.brandHover._hover,
-                              ...brandHover,
-                              transform: "scale(1.05)",
-                              shadow: "xl",
-                            }}
-                          />
+                    <AspectRatio ratio={1} w={{ base: "120px", md: "160px" }}>
+                      <Box position="relative" rounded="lg" overflow="hidden">
+                        <Image
+                          src={insect.image || "/fallback-image.png"}
+                          alt={`Insecte ${insect.id}`}
+                          objectFit="cover"
+                          w="100%"
+                          h="100%"
+                          transition="all 0.3s ease"
+                          _hover={{
+                            ...hoverStyles.brandHover._hover,
+                            ...brandHover,
+                            transform: "scale(1.05)",
+                            shadow: "xl",
+                          }}
+                        />
+                      </Box>
+                    </AspectRatio>
 
-
-                        </Box>
-
-
-                      </AspectRatio>
 
                       <Text
                         mt={4}

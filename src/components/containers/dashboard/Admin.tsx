@@ -13,6 +13,8 @@ import colorProfilesJson from '@/data/gif_profiles_smart_colors.json';
 
 import { usePinataUpload, type OpenSeaAttribute } from '@/hooks/usePinataUpload'; // ✅ Hook Pinata
 
+import { resolveIPFS } from '@/utils/resolveIPFS';  // Ajuste le chemin
+
 // Dans le composant, ajoutez le hook après les useState existants :
 
 import { useAuth } from '@/utils/authContext';
@@ -88,6 +90,13 @@ type ColorProfile = {
   brightness?: number;
   contrast?: number;
 };
+
+interface PinataResult {
+  image: string;        // "ipfs://QmIMAGE"
+  metadataUri: string;   // "ipfs://QmMETADATA" ← À utiliser
+  imageHash: string;
+  metadataHash: string;
+}
 
 type ColorProfilesJson = {
   families: Record<string, ColorProfile[]>;
@@ -233,16 +242,28 @@ const handleConfirmRole = async (): Promise<void> => {
         //console.log('🎨 1. Génération des insectes LVL0...');
 
         // 1. GÉNÉRER insecte UNIQUE + DONNÉES COMPLÈTES pour CHAQUE adhésion
-        const generatedInsects = await Promise.all(
-            adhesionData.map(async (adhesion, index) => {
-                const insectData = genInsect25(0);  // ✅ Comme RoleBasedNFTPage
-                //console.log(`✅ Insecte ${index + 1}:`, insectData.spriteName, insectData.family);
-                return {
-                    imageUrl: insectData.imageUrl,
-                    data: insectData  // Toutes les données pour attributs
-                };
-            })
-        );
+        // Dans la map pour preview image
+        const generatedInsects = await Promise.all(adhesionData.map(async (adhesion, index) => {
+          const insectData = await genInsect25(0);  // LVL 0
+          // ✅ Preview via proxy
+          const previewUrl = resolveIPFS(insectData.imageUrl, true);
+          console.log(`Insecte ${index}:`, insectData.spriteName, previewUrl);
+          return { imageUrl: previewUrl, data: insectData };
+        }));
+
+        // Après upload Pinata
+        setAdhesionData(prev => prev.map((adhesion, index) => ({
+          ...adhesion,
+          imageIpfsUrl: generatedInsects[index].imageUrl,  // Déjà résolu
+          metadataUri: metadataUris[index],
+          insectData: generatedInsects[index].data
+        })));
+
+        // Preview première image
+        if (generatedInsects[0]?.imageUrl) {
+          setGeneratedImageUrl(generatedInsects[0].imageUrl);  // Proxy ready
+        }
+
 
         //console.log('📤 2. Upload Pinata 35+ attributs...');
 
@@ -303,6 +324,7 @@ const handleConfirmRole = async (): Promise<void> => {
 
                 // 🔥 UPLOAD IDENTIQUE (gère tout)
                 const result = await uploadToIPFS({
+                    scope: "badges", // ou "badges" selon le contexte
                     imageUrl,
                     name: insectData.display_name || adhesion.name || `Membre ${index + 1}`,
                     bio: adhesion.bio || "",
@@ -317,7 +339,7 @@ const handleConfirmRole = async (): Promise<void> => {
                 });
 
                 //console.log(`✅ Metadata URI ${index + 1}:`, result.url);
-                return result.url;
+                return result.metadataUri;  // ✅ Nom exact
             })
         );
 
@@ -577,41 +599,35 @@ useEffect(() => {
 
 
 const fetchCollectionById = async (id: string) => {
-  if (!web3) return;
-
+  if (!web3) return null;
   try {
     const contract = new web3.eth.Contract(ABICollection, contratRescollection);
-
     const collection = await contract.methods.getCollection(id).call() as Collection;
     const type = collection.collectionType;
     const uri = await contract.methods.getCollectionURI(id).call() as string;
 
-    // Conversion IPFS -> HTTP (si nécessaire)
-    const normalizedUri = uri.startsWith('ipfs://')
-      ? uri.replace('ipfs://', 'https://ipfs.io/ipfs/')
-      : uri;
+    // ✅ CORRIGÉ : utilise ton proxy API
+    const normalizedUri = resolveIPFS(uri, true);
+    if (!normalizedUri) throw new Error('URI IPFS invalide');
 
-    // Fetch du JSON de métadonnées
     const res = await fetch(normalizedUri);
+    if (!res.ok) throw new Error(`Fetch échoué: ${res.status}`);
     const metadata = await res.json();
 
-    // Récupération et normalisation de l'image
-    const image = metadata.image?.startsWith('ipfs://')
-      ? metadata.image.replace('ipfs://', 'https://ipfs.io/ipfs/')
-      : metadata.image;
+    // ✅ Image via proxy aussi
+    const image = resolveIPFS(metadata.image, true) || '';
 
     return {
-
       id,
-      uri: normalizedUri,        // URI du JSON
-      image,                     // URL directe de l’image
-      name: metadata.name,       // Ajoute le nom si présent
-      description: metadata.description, // Optionnel
+      uri: normalizedUri,
+      image,
+      name: metadata.name,
+      description: metadata.description || '',
       tags: metadata.tags || [],
       type,
     };
   } catch (error) {
-    console.error(`Erreur lors de la récupération de la collection ${id}:`, error);
+    console.error(`Erreur collection ${id}:`, error);
     return null;
   }
 };

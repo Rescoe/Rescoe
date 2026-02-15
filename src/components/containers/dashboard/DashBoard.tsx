@@ -11,6 +11,8 @@ import { BrowserProvider, Eip1193Provider } from "ethers";
 import UserNFTFeed from "@/hooks/Moralis/userNFT";
 import UserTransactionsFeed from "@/hooks/Moralis/UserTransactionsFeed";
 
+import { resolveIPFS } from "@/utils/resolveIPFS";
+
 import { Contract } from 'ethers';
 import ABI from '../../ABI/ABIAdhesion.json';
 import ABIRESCOLLECTION from '../../ABI/ABI_Collections.json';
@@ -135,7 +137,7 @@ const Dashboard = () => {
         const mergedUserData = {
           address: authAddress,
           name: rolesAndImages.name || '',
-          avatarSvg: rolesAndImages.nfts?.[0]?.image || '',
+          avatarSvg: resolveIPFS(rolesAndImages.nfts?.[0]?.image, true) || "",
           biography: rolesAndImages.biography || '',
           roles: rolesAndImages.roles,
           finAdhesion: rolesAndImages.finAdhesion,
@@ -167,60 +169,101 @@ const Dashboard = () => {
     const tokenIds = await contractadhesion.getTokensByOwner(userAddress);
     const userInfos = await contractadhesion.getUserInfo(userAddress);
 
-    const fetchedRolesAndImages = await Promise.all(tokenIds.map(async (tokenId: number) => {
-      const fullDatas = await contractadhesion.getTokenDetails(tokenId);
+    const fetchedRolesAndImages = await Promise.all(
+      tokenIds.map(async (tokenId: number) => {
+        const fullDatas = await contractadhesion.getTokenDetails(tokenId);
 
-      const mintTimestamp = Number(fullDatas[2]); // secondes
-      const remainingTime = Number(await contractadhesion.getRemainingMembershipTime(tokenId)); // secondes
-      const finAdhesion = new Date((mintTimestamp + remainingTime) * 1000);
+        const mintTimestamp = Number(fullDatas[2]);
+        const remainingTime = Number(
+          await contractadhesion.getRemainingMembershipTime(tokenId)
+        );
+        const finAdhesion = new Date((mintTimestamp + remainingTime) * 1000);
 
-      const tokenURI = await contractadhesion.tokenURI(tokenId);
-      const response = await fetch(tokenURI);
-      const metadata = await response.json();
+        const tokenURI = await contractadhesion.tokenURI(tokenId);
 
-      return {
-        role: metadata.role,
-        image: metadata.image,
-        tokenId: Number(tokenId),
-        finAdhesion,
-        remainingTime: formatSeconds(remainingTime),  // ✅ AJOUTÉ (comme TokenPage)
-      };
-    }));
+        const metadataUrl = resolveIPFS(tokenURI, true); // -> /api/ipfs/...
+        let metadata: any = {};
+        try {
+          if (!metadataUrl) throw new Error("no metadataUrl");
+          const response = await fetch(metadataUrl);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          metadata = await response.json();
+        } catch (e) {
+          console.warn("❌ metadata fetch failed for token", tokenId, e);
+        }
+
+        return {
+          role: metadata.role,
+          image: resolveIPFS(metadata.image, true) || "",
+          tokenId: Number(tokenId),
+          finAdhesion,
+          remainingTime: formatSeconds(remainingTime),
+        };
+      })
+    );
 
     return {
       name: userInfos.name,
       biography: userInfos.bio,
-      roles: fetchedRolesAndImages.map(item => item.role),
-      finAdhesion: fetchedRolesAndImages[0]?.finAdhesion || '',
+      roles: fetchedRolesAndImages.map((item) => item.role),
+      finAdhesion: fetchedRolesAndImages[0]?.finAdhesion || "",
       nfts: fetchedRolesAndImages,
     };
   };
 
+
   const fetchNFTs = async (userAddress: string) => {
     const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
     const contractadhesionVar = new Contract(contractAdhesion, ABI, provider);
-    const contractadhesionManagementVar = new Contract(contratAdhesionManagement, ABI_ADHESION_MANAGEMENT, provider);
+    const contractadhesionManagementVar = new Contract(
+      contratAdhesionManagement,
+      ABI_ADHESION_MANAGEMENT,
+      provider
+    );
 
-
-    const nftsData: NFTData[] = []; // <- type explicite
+    const nftsData: NFTData[] = [];
 
     try {
       const totalMinted = await contractadhesionVar.getTotalMinted();
-      const tokenIds = await contractadhesionManagementVar.getTokensByOwnerPaginated(userAddress, 0, totalMinted);
-      await Promise.all(tokenIds.map(async (tokenId: string) => {
-        const tokenURI = await contractadhesionVar.tokenURI(tokenId);
-        const response = await fetch(tokenURI);
-        const metadata = await response.json();
+      const tokenIds = await contractadhesionManagementVar.getTokensByOwnerPaginated(
+        userAddress,
+        0,
+        totalMinted
+      );
 
-        nftsData.push({ tokenId: tokenId.toString(), metadata });
-      }));
+      await Promise.all(
+        tokenIds.map(async (tokenId: string) => {
+          try {
+            const tokenURI = await contractadhesionVar.tokenURI(tokenId);
+            const metadataUrl = resolveIPFS(tokenURI, true); // -> /api/ipfs/...
 
-      return nftsData; // Retournner la liste
+            if (!metadataUrl) throw new Error("no metadataUrl");
+
+            const response = await fetch(metadataUrl);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+            const metadata = await response.json();
+
+            nftsData.push({
+              tokenId: tokenId.toString(),
+              metadata: {
+                ...metadata,
+                image: resolveIPFS(metadata.image, true) || "",
+              },
+            });
+          } catch (e) {
+            console.warn("❌ NFT metadata fetch failed:", tokenId, e);
+          }
+        })
+      );
+
+      return nftsData;
     } catch (error) {
       console.error("Erreur lors de la récupération des NFTs:", error);
-      return []; // fallback vide
+      return [];
     }
   };
+
 
   const fetchStatsCollection = async (userAddress: string) => {
     const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
@@ -360,17 +403,17 @@ const Dashboard = () => {
               overflow="hidden"
               mb={2}
             >
-              {userData.avatarSvg ? (
-                <Image
-                  src={userData.avatarSvg} // ici tu mets ton URL IPFS
-                  alt="Avatar"
-                  objectFit="cover"
-                  w="100%"
-                  h="100%"
-                />
-              ) : (
-                <Box w="100%" h="100%" bg="gray.300" /> // fallback si pas d'image
-              )}
+            {userData.avatarSvg ? (
+              <Image
+                src={userData.avatarSvg || "/fallback-image.png"}
+                alt="Avatar"
+                objectFit="cover"
+                w="100%"
+                h="100%"
+              />
+            ) : (
+              <Box w="100%" h="100%" bg="gray.300" />
+            )}
             </Box>
 
               <Box textAlign="center" w="100%">
@@ -436,14 +479,15 @@ const Dashboard = () => {
                               borderRadius="lg"
                               overflow="hidden"
                             >
-                              <Image
-                                src={nft.image}
-                                alt={`Jeton ${nft.tokenId}`}
-                                w="full"
-                                h="full"
-                                objectFit="cover"
-                                transition="transform 0.2s"
-                              />
+                            <Image
+                              src={nft.image || "/fallback-image.png"}
+                              alt={`Jeton ${nft.tokenId}`}
+                              w="full"
+                              h="full"
+                              objectFit="cover"
+                              transition="transform 0.2s"
+                            />
+
                             </Box>
 
                             {/* INFO */}

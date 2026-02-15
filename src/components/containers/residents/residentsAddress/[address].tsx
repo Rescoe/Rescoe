@@ -83,58 +83,7 @@ const ResidentDashboard = () => {
 
   const previewConfig = { ...config, ...editDraft };
 
-  const saveConfig = async () => {
-  setUploading(true);
-  try {
-    let finalConfig = { ...previewConfig, updatedAt: new Date().toISOString() };
-
-    // ✅ AVATAR - SAFE CHECK
-    if (editDraft.avatar && typeof editDraft.avatar !== 'string') {
-      const avatarFile = editDraft.avatar as unknown as File;
-      const avatarBlobUrl = URL.createObjectURL(avatarFile);
-      const avatarUpload = await uploadToIPFS({
-        imageUrl: avatarBlobUrl,
-        name: "avatar",
-        bio: "Profile avatar",
-        role: "user",
-        level: 1,
-        attributes: [],
-        family: "resident",
-        sprite_name: "avatar"
-      });
-      finalConfig.avatar = avatarUpload.url;
-    }
-
-    // ✅ BANNER - SAFE CHECK
-    if (editDraft.banner && typeof editDraft.banner !== 'string') {
-      const bannerFile = editDraft.banner as unknown as File;
-      const bannerBlobUrl = URL.createObjectURL(bannerFile);
-      const bannerUpload = await uploadToIPFS({
-        imageUrl: bannerBlobUrl,
-        name: "banner",
-        bio: "Profile banner",
-        role: "user",
-        level: 1,
-        attributes: [],
-        family: "resident",
-        sprite_name: "banner"
-      });
-      finalConfig.banner = bannerUpload.url;
-    }
-
-    localStorage.setItem(STORAGE_KEY(urlAddress.toLowerCase()), JSON.stringify(finalConfig));
-    setConfig(finalConfig);
-    setEditDraft({});
-    setEditMode(false);
-    toast({ title: "💾 Profil sauvegardé !", status: "success" });
-  } catch (err) {
-    toast({ title: "❌ Erreur sauvegarde", status: "error" });
-  } finally {
-    setUploading(false);
-  }
-};
-
-
+  
   const handleFileUpload = (type: 'avatar' | 'banner') => (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) setEditDraft(prev => ({ ...prev, [type]: file }));
@@ -283,16 +232,6 @@ const ResidentDashboard = () => {
                       />
                     </FormControl>
 
-                    <Button
-                      colorScheme="purple"
-                      size="lg"
-                      leftIcon={<FiSave />}
-                      onClick={saveConfig}
-                      isLoading={uploading}
-                      w="full"
-                    >
-                      💾 Sauvegarder mon profil
-                    </Button>
                   </VStack>
                 </CardBody>
               </Card>

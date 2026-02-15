@@ -36,9 +36,9 @@ const MotionBox = motion(Box);
 
 // Animation pulsante pour le bouton "Adhérez"
 const pulse = keyframes`
-  0% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.6); }
-  70% { box-shadow: 0 0 0 15px rgba(236, 72, 153, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(238,212,132,0.7); }
+  70% { box-shadow: 0 0 0 20px rgba(238,212,132,0); }
+  100% { box-shadow: 0 0 0 0 rgba(238,212,132,0); }
 `;
 
 
@@ -77,16 +77,27 @@ const Home = () => {
 const router = useRouter();
 const theme = useTheme();
 
+
+const bg = useColorModeValue("brand.cream", "brand.navy");
+const cardBg = useColorModeValue("rgba(247,245,236,0.9)", "rgba(1,28,57,0.85)");
+const textColor = useColorModeValue("brand.navy", "brand.cream");
+const borderColor = useColorModeValue("brand.navy/50", "brand.gold/60");
 const boxShadowHover = useColorModeValue(
-"0 0 15px rgba(180, 166, 213, 0.25)", // light
-"0 0 15px rgba(238, 212, 132, 0.25)"  // dark
+  "0 0 20px rgba(1,28,57,0.4)",
+  "0 0 20px rgba(238,212,132,0.5)"
 );
 
+const iconBg = useColorModeValue(
+  "brand.navy/30",   // navy avec 30% d'opacité en light
+  "brand.cream/18"   // cream avec 18% d'opacité en dark
+);
+const iconBorder = useColorModeValue(
+  "brand.navy/40",   // bordure plus marquée en light
+  "brand.gold/50"    // gold plus visible en dark
+);
+const iconColor = useColorModeValue("brand.navy", "brand.gold");
 
-const bg = useColorModeValue("bg.light", "bg.dark");
-const cardBg = useColorModeValue("card.light", "card.dark");
-const textColor = useColorModeValue("text.light", "text.dark");
-const borderColor = useColorModeValue("border.light", "border.dark");
+
 const startColor = useColorModeValue(
     theme.colors.brand.startLight,
     theme.colors.brand.startDark
@@ -277,7 +288,7 @@ const getRandomItems = <T,>(array: T[], count: number): T[] => {
                   Rejoindre RESCOE
                 </Button>
 
-                <Divider my={12} borderColor="purple.300" w="50%" mx="auto" />
+                <Divider my={12} borderColor={useColorModeValue("brand.navy/70", "brand.gold/60")} />
               </Box>
             </motion.div>
 
@@ -392,7 +403,7 @@ const getRandomItems = <T,>(array: T[], count: number): T[] => {
                         </Flex>
                         */}
 
-                        <Divider my={8} borderColor="purple.700" w="70%" mx="auto" />
+                        <Divider my={12} borderColor={useColorModeValue("brand.navy/70", "brand.gold/60")} />
 
                         {/*
 
@@ -430,6 +441,7 @@ const getRandomItems = <T,>(array: T[], count: number): T[] => {
                 p={{ base: 8, md: 12 }}
                 maxW="1200px"
                 mx="auto"
+                color={textColor}
                 mt={20}
                 mb={16}
               >
@@ -474,13 +486,12 @@ const getRandomItems = <T,>(array: T[], count: number): T[] => {
                         h="100%"
                         spacing={4}
                         transition="all 0.3s ease"
-                        _groupHover={{
-                          bgGradient: "linear(to-r, brand.start, brand.end)",
-                        }}
+
                       >
                         <Image
                           src={item.icon}
                           alt={item.title}
+                          color={textColor}
                           boxSize="70px"
                           mb={4}
                           mx="auto"
@@ -502,7 +513,7 @@ const getRandomItems = <T,>(array: T[], count: number): T[] => {
                 </SimpleGrid>
 
                 {/* ===== 4. ARTISTES EN RÉSIDENCE (Fusionné dans même bloc) ===== */}
-                <Divider my={12} borderColor="purple.700" w="70%" mx="auto" />
+                <Divider my={12} borderColor={useColorModeValue("brand.navy/70", "brand.gold/60")} />
 
                 <Heading
                   mb={6}
@@ -512,7 +523,7 @@ const getRandomItems = <T,>(array: T[], count: number): T[] => {
                 >
                   Artistes en résidence
                 </Heading>
-                <Text color={textColor} textAlign="center" mb={8} maxW="800px" mx="auto">
+                <Text color={textColor} textAlign="center" maxW="800px" mx="auto">
                   Artistes, poètes et codeurs que nous accompagnons au fil des projets.
                 </Text>
                 <FeaturedMembers addresses={featuredAddresses} />
@@ -526,7 +537,7 @@ const getRandomItems = <T,>(array: T[], count: number): T[] => {
               transition={{ duration: 1 }}
               viewport={{ once: true }}
             >
-              <Divider my={16} borderColor="purple.700" w="70%" mx="auto" />
+            <Divider my={12} borderColor={useColorModeValue("brand.navy/70", "brand.gold/60")} />
               <Box maxW="1100px" mx="auto">
                 <Heading
                   mb={12}
@@ -631,52 +642,105 @@ const getRandomItems = <T,>(array: T[], count: number): T[] => {
                   Adhérez en 2 minutes
                 </Button>
 
-                {/* Bénéfices détaillés (hover fixés) */}
-                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={10}>
-                  {benefits.map((benefit: any, index: number) => (
-                    <motion.div
-                      key={index}
-                      initial={{ opacity: 0, y: 30 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.6, delay: index * 0.1 }}
-                      viewport={{ once: true }}
-                    >
-                      <Box
-                        as="button"
-                        onClick={() => toggle(index)}
-                        role="group"
-                        px={12}
-                        py={10}
-                        borderRadius="3xl"
-                        border="1px solid"
-                        boxShadow="0 0 20px rgba(180, 166, 213, 0.3)"
-                        transition="all 0.4s ease"
-                        w="100%"
-                        h="100%"
-                        _hover={{
-                          bgGradient: useColorModeValue(
-                            `linear(to-r, brand.gold, brand.mauve)`,
-                            `linear(to-r, brand.mauve, brand.gold)`
-                          ),
-                          transform: "scale(1.05)",
-                          boxShadow: "0 0 40px rgba(180, 166, 213, 0.5)",
-                        }}
-                      >
-                        <VStack spacing={6} align="center">
-                          <Icon as={benefit.icon} boxSize={14} color={textColor} _groupHover={{ color: "white" }} />
-                          <Heading size="lg" fontWeight="bold" color={textColor} _groupHover={{ color: "white" }}>
-                            {benefit.title}
-                          </Heading>
-                          <Text textAlign="center" fontSize="md" color={textColor} maxW="300px" _groupHover={{ color: "white" }}>
-                            {benefit.description}
-                          </Text>
-                        </VStack>
-                      </Box>
-                    </motion.div>
-                  ))}
-                </SimpleGrid>
+                {/* Bénéfices détaillés (navy/cream/gold parfait) */}
+  <SimpleGrid columns={{ base: 1, md: 2 }} spacing={8}>
+    {benefits.map((benefit: any, index: number) => (
+      <MotionBox
+        key={index}
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        minH="240px"
+        as="button"
+        onClick={() => toggle(index)}
+        role="group"
+        p={8}
+        borderRadius="2xl"
+        bg={useColorModeValue(
+          "rgba(247,245,236,0.85)",  // ✅ cream light
+          "rgba(1,28,57,0.85)"       // ✅ navy dark
+        )}
+        backdropFilter="blur(16px)"
+        border="1px solid"
 
-                <Divider my={12} borderColor="purple.700" w="70%" mx="auto" />
+        display="flex"
+        flexDir="column"
+        _hover={{
+          bgGradient: useColorModeValue(
+            "linear(to-br, brand.cream, brand.cream)",     // ✅ navy→cream light
+            "linear(to-br, brand.navy, brand.navy)"       // ✅ gold→navy dark
+          ),
+          transform: "translateY(-10px) scale(1.02)",
+          boxShadow: useColorModeValue(
+            "0 25px 60px rgba(238,212,132,0.5)",         // ✅ gold glow dark
+            "0 25px 60px rgba(1,28,57,0.4)"             // ✅ navy glow light
+          ),
+          borderColor: "brand.cream"
+        }}
+        cursor="pointer"
+      >
+        <VStack spacing={6} align="center" flex="1" justify="center">
+
+        <Box
+          p={4}
+          bg={iconBg}
+          borderRadius="2xl"
+
+          display="inline-flex"
+          alignItems="center"
+          justifyContent="center"
+          transition="all 0.35s cubic-bezier(0.23,1,0.32,1)"
+          _groupHover={{
+            transform: "translateY(-3px) scale(1.12) rotate(4deg)",
+          }}
+        >
+          <Icon
+            as={benefit.icon}
+            boxSize={10}
+            color={iconColor}
+            _groupHover={{
+              color: useColorModeValue("black", "brand.cream")  // navy light / cream dark
+            }}
+            transition="all 0.3s ease"
+          />
+        </Box>
+
+
+          <Heading
+            size="md"
+            fontWeight="extrabold"
+            textAlign="center"
+            color={useColorModeValue(
+              "brand.navy",              // ✅ navy titre light
+              "brand.cream"              // ✅ cream titre dark
+            )}
+            bgClip="text"
+          >
+            {benefit.title}
+          </Heading>
+
+          <Text
+            textAlign="center"
+            fontSize="sm"
+            color={useColorModeValue(
+              "brand.navy",              // ✅ navy texte light
+              "brand.cream"              // ✅ cream texte dark
+            )}
+            opacity={0.9}
+            lineHeight="1.7"
+            _groupHover={{
+              opacity: 1
+            }}
+          >
+            {benefit.description}
+          </Text>
+        </VStack>
+      </MotionBox>
+    ))}
+  </SimpleGrid>
+
+
+  <Divider my={12} borderColor={useColorModeValue("brand.navy/70", "brand.gold/60")} />
 
                 <motion.div
                   initial={{ opacity: 0, y: 30 }}

@@ -5,6 +5,8 @@ import {
   Badge, SimpleGrid, Spinner, Center
 } from "@chakra-ui/react";
 import { EvolutionStep, enrichHistoryWithRealMetadata, FullNFTMetadata } from "@/utils/evolutionHistory";
+import { resolveIPFS } from "@/utils/resolveIPFS";
+
 
 export default function EvolutionHistoryTimeline({
   evolutionHistory: rawHistory
@@ -17,11 +19,11 @@ export default function EvolutionHistoryTimeline({
 
   useEffect(() => {
     const loadMetadata = async () => {
-      console.log('🔍 Loading metadata for:', rawHistory.length, 'steps');
+      //console.log('🔍 Loading metadata for:', rawHistory.length, 'steps');
       setIsLoading(true);
       try {
         const enriched = await enrichHistoryWithRealMetadata(rawHistory);
-        console.log('✅ Enriched history:', enriched.length);
+        //console.log('✅ Enriched history:', enriched.length);
         setHistoryWithMetadata(enriched);
       } catch (e) {
         console.error('❌ Load failed:', e);
@@ -40,10 +42,10 @@ export default function EvolutionHistoryTimeline({
   }, [rawHistory]);
 
   const handleStepClick = useCallback((index: number) => {
-    console.log('🔥 CLICK lvl0 index:', index, 'total:', historyWithMetadata.length);
+    //console.log('🔥 CLICK lvl0 index:', index, 'total:', historyWithMetadata.length);
     if (index >= 0 && index < historyWithMetadata.length) {
       const step = historyWithMetadata[index];
-      console.log('✅ SELECT:', step.lvlPrevious, step.fullMetadata?.name);
+      //console.log('✅ SELECT:', step.lvlPrevious, step.fullMetadata?.name);
       setSelectedStepIndex(index);
     } else {
       console.error('❌ Index invalide:', index);
@@ -113,7 +115,7 @@ export default function EvolutionHistoryTimeline({
                     >
                       <HStack spacing={3}>
                         <Image
-                          src={step.image}
+                        src={step.image || "/fallback-image.png"}
                           boxSize="90px"
                           objectFit="cover"
                           borderRadius="md"
@@ -162,7 +164,8 @@ export default function EvolutionHistoryTimeline({
                         onClick={() => handleStepClick(idx)}
                         cursor="pointer"
                       >
-                        <Image src={step.image} w="100%" h="120px" objectFit="cover" />
+                        <Image   src={step.image || "/fallback-image.png"}
+                                  w="100%" h="120px" objectFit="cover" />
                         <Box p={3}>
                           <Text fontSize="xs" textTransform="uppercase" color="brand.cream">
                             Étape {idx + 1}
@@ -209,11 +212,16 @@ export default function EvolutionHistoryTimeline({
               {selectedMetadata ? (
                 <VStack spacing={8} align="stretch">
                   <VStack spacing={6} align="center">
-                    <Image
-                      src={selectedMetadata.image || selectedStep?.image}
-                      boxSize="300px"
-                      borderRadius="2xl"
+                  <Image
+                    src={
+                      resolveIPFS(selectedMetadata?.image, true) ||
+                      selectedStep?.image ||
+                      "/fallback-image.png"
+                    }
+                    boxSize="300px"
+                    borderRadius="2xl"
                     />
+
                     <Box textAlign="center">
                       <Text fontSize="2xl" fontWeight="bold">{selectedMetadata.name}</Text>
                       <Text fontSize="lg" fontWeight="semibold">

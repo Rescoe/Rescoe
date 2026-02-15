@@ -58,7 +58,7 @@ export const useTokenEvolution = ({
   const [isUploadingEvolve, setIsUploadingEvolve] = useState(false);
   const [isEvolving, setIsEvolving] = useState(false);
 
-  const { uploadToIPFS, ipfsUrl } = usePinataUpload();
+  const { uploadToIPFS, imageUri: ipfsUrl, metadataUri } = usePinataUpload();
   const { address: account, web3, isAuthenticated } = useAuth();
   const router = useRouter();
 
@@ -231,11 +231,13 @@ export const useTokenEvolution = ({
       });
 
       // ☁️ IPFS (IDENTIQUE)
+      // Dans prepareEvolution, REMPLACE le bloc upload (ligne ~200)
       const pinataResult = await uploadToIPFS({
+        scope: "badges",  // ✅ OBLIGATOIRE
         imageUrl: evolutionData.imageUrl,
-        name: evolutionData.display_name || currentName,
-        bio: currentBio,
-        role: currentRoleLabel,
+        name: evolutionData.display_name || currentName || "Évolution Adhesion",
+        bio: currentBio || "",
+        role: currentRoleLabel || "Membre",
         level: targetLevel,
         attributes: evolutionData.attributes,
         family: evolutionData.family,
@@ -245,9 +247,13 @@ export const useTokenEvolution = ({
         evolutionHistory: history,
       });
 
-      if (!pinataResult?.url) {
-        throw new Error("Upload IPFS échoué");
+      // ✅ Utilise imageUri (pas .url)
+      if (!pinataResult.imageUri) {
+        throw new Error("Upload IPFS image échoué");
       }
+
+      setPreviewImageUrl(pinataResult.imageUri);  // Preview image
+
 
       updateCurrentMetadata({
         ...currentMetadata,
@@ -286,8 +292,8 @@ export const useTokenEvolution = ({
   ======================= */
 
   const evolve = useCallback(async () => {
-    if (!ipfsUrl || !contractAddress || tokenId === undefined) return;
-    if (!isAuthenticated || !account || !web3) {
+  if (!ipfsUrl || !contractAddress || tokenId === undefined) return;
+      if (!isAuthenticated || !account || !web3) {
       alert("Connexion requise");
       return;
     }
@@ -397,8 +403,8 @@ export const useTokenEvolution = ({
     evolvePriceEth,
     hatchPriceEth,        // ✅
     isManualEvolveReady,
-    previewImageUrl,
-    evolveIpfsUrl: ipfsUrl,
+    evolveIpfsUrl: ipfsUrl,     // ✅ imageUri aliasé
+    metadataUri, 
     isUploadingEvolve,
     isEvolving,
     prepareEvolution,     // Utilise pour œufs ET évolutions

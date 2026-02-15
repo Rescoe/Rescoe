@@ -20,6 +20,9 @@ import { useRouter } from "next/router";
 import ABIRESCOLLECTION from "../../../ABI/ABI_Collections.json";
 import ABI from "../../../ABI/HaikuEditions.json";
 
+import { resolveIPFS } from "@/utils/resolveIPFS"; // ✅ COMME ART
+
+
 import { useAuth } from '../../../../utils/authContext';
 import { useCollectionSearch } from '../../../../hooks/useCollectionSearch';
 import useEthToEur from "../../../../hooks/useEuro";
@@ -84,68 +87,71 @@ const PoetryGallery: React.FC = () => {
 
 
 const fetchPoetryCollections = async (page: number) => {
-setIsLoading(true);
-try {
-  const total: BigNumberish = await contract.getTotalCollectionsMinted();
-  const totalNumber = Number(total);
-  setTotalCollections(totalNumber);
+  setIsLoading(true);
+  try {
+    const total: BigNumberish = await contract.getTotalCollectionsMinted();
+    const totalNumber = Number(total);
+    setTotalCollections(totalNumber);
 
-  // Calcul des indices inversés
-  const startId = totalNumber - (page + 1) * pageSize;
-  const adjustedStartId = startId < 0 ? 0 : startId; // Si on dépasse 0
-  let endId = totalNumber - page * pageSize - 1;
-  if (endId >= totalNumber) endId = totalNumber - 1;
+    const startId = totalNumber - (page + 1) * pageSize;
+    const adjustedStartId = Math.max(startId, 0);
+    let endId = totalNumber - page * pageSize - 1;
+    endId = Math.min(endId, totalNumber - 1);
 
-  const collectionsPaginated = await contract.getCollectionsByType(
-    "Poesie",
-    adjustedStartId,
-    endId
-  );
+    const collectionsPaginated = await contract.getCollectionsByType(
+      "Poesie",
+      adjustedStartId,
+      endId
+    );
 
-  const collectionsData: Collection[] = await Promise.all(
-    collectionsPaginated.map(async (tuple: any) => {
-      const [id, name, collectionType, , associatedAddresses, , isFeatured] = tuple;
-      const uri: string = await contract.getCollectionURI(id);
-      const mintContractAddress: string = associatedAddresses;
+    const collectionsData: Collection[] = await Promise.all(
+      collectionsPaginated.map(async (tuple: any) => {
+        const [id, name, collectionType, creator, associatedAddresses, , isFeatured] = tuple;
+        const uri: string = await contract.getCollectionURI(id);
+        const mintContractAddress: string = associatedAddresses[0]; // Premier
 
-      const cachedMetadata = localStorage.getItem(uri);
-      if (cachedMetadata) {
-        const metadata = JSON.parse(cachedMetadata);
+        // 🔥 1. CACHE
+        const cached = localStorage.getItem(uri);
+        if (cached) {
+          const metadata = JSON.parse(cached);
+          return {
+            id: id.toString(),
+            name,
+            imageUrl: resolveIPFS(metadata.image, true), // ✅ COMME ART
+            mintContractAddress,
+            isFeatured,
+          };
+        }
+
+        // 🔥 2. RESOLVE IPFS DIRECT (comme Art)
+        const hash = uri.replace('ipfs://', '').split('/')[0];
+        const res = await fetch(`/api/metadata/${hash}`); // Même API Art
+        const metadata = await res.json();
+        localStorage.setItem(uri, JSON.stringify(metadata));
+
         return {
           id: id.toString(),
           name,
-          imageUrl: metadata.image,
+          imageUrl: resolveIPFS(metadata.image, true), // ✅ TRUE gateway
           mintContractAddress,
           isFeatured,
         };
-      }
+      })
+    );
 
-      const response = await fetch(`/api/proxyPinata_Oeuvres?ipfsHash=${uri.split("/").pop()}`);
-      const metadata = await response.json();
-      localStorage.setItem(uri, JSON.stringify(metadata));
+    setCollections(
+      collectionsData
+        .filter(Boolean)
+        .sort((a, b) => Number(b.id) - Number(a.id))
+    );
 
-      return {
-        id: id.toString(),
-        name,
-        imageUrl: metadata.image,
-        mintContractAddress,
-        isFeatured,
-      };
-    })
-  );
-
-  // Trier par ID décroissant pour avoir les plus récents en premier
-  setCollections(
-    collectionsData
-      .filter(Boolean)
-      .sort((a, b) => Number(b!.id) - Number(a!.id))
-  );
-} catch (error) {
-  console.error("Erreur lors de la récupération des collections :", error);
-} finally {
-  setIsLoading(false);
-}
+  } catch (error) {
+    console.error("Collections error:", error);
+  } finally {
+    setIsLoading(false);
+  }
 };
+
 
 
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Box, Heading, VStack, Divider, Flex, HStack, Input, Button, Text, FormLabel, useToast, Image, Select } from "@chakra-ui/react";
+import { Box, Heading, VStack, Divider, Flex, HStack, Input, Button, Text, FormLabel, useToast, Image, Select, Progress } from "@chakra-ui/react";
 import { JsonRpcProvider, Contract } from "ethers";
 import { useAuth } from '@/utils/authContext';
 import { handleMessageTransactions } from '@/utils/handleMessageTransactions';
@@ -8,8 +8,9 @@ import ABIMasterFactory from '@/components/ABI/Factories/ABI_MasterFactory.json'
 import ABI_ART_FACTORY from '@/components/ABI/Factories/ABI_ART_FACTORY.json';
 import ABI_POESIE_FACTORY from '@/components/ABI/Factories/ABI_POESIE_FACTORY.json';
 import ABI_Adhesion from '@/components/ABI/ABIAdhesion.json';
+import { usePinataUpload } from "@/hooks/usePinataUpload"; // ✅ NOUVEAU
 
-import axios from "axios";
+
 import Web3 from "web3";
 
 const CreateCollection: React.FC = () => {
@@ -28,7 +29,11 @@ const CreateCollection: React.FC = () => {
   const [collections, setCollections] = useState<{ id: string, name: string, imageUrl: string }[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [metadata, setMetadata] = useState<{ name: string, description: string, tags: string }>({ name: "", description: "", tags: "" });
-  const [isUploading, setIsUploading] = useState<boolean>(false);
+
+  const { metadataUri, imageUri, isUploading: pinataUploading, uploadToIPFS } = usePinataUpload();
+  // Supprime : [isUploading, setIsUploading]
+  const [isUploading, setIsUploading] = useState(false); // Garde pour configureCollection
+
   const [userCollections, setUserCollections] = useState<number>(0);
   const [remainingCollections, setRemainingCollections] = useState<number>(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -112,121 +117,112 @@ const CreateCollection: React.FC = () => {
     }
   };
 
-  // Upload file and metadata to IPFS
-  const uploadFileToIPFS = async (): Promise<void> => {
-    if (!file || !metadata.name) {
-      alert("Veuillez sélectionner un fichier et remplir le nom.");
-      return;
-    }
 
-    if (!address || !web3) {
-      console.error("Erreur Web3 Wallet");
-      return;
-    }
+    // Upload file and metadata to IPFS
+    const uploadFileToIPFS = async (): Promise<void> => {
+      if (!file || !metadata.name || !collectionType) {
+        alert("Champs incomplets");
+        return;
+      }
 
-    setIsUploading(true);
+      if (!address || !web3) return;
 
-    try {
-      // 1. Récupère l'adresse de la factory
-      const factoryAddress = await fetchFactoryAddress(collectionType!);
-      //console.log("🏭 Factory address:", factoryAddress);
+      setIsUploading(true);
 
-      // 2. ABI selon le type
-      const factoryABI = collectionType === "Art" ? ABI_ART_FACTORY : ABI_POESIE_FACTORY;
-      const factoryContract = new web3.eth.Contract(factoryABI as any, factoryAddress);
+      try {
+        // 1. Factory + configureCollection (INCHANGÉ)
+        const factoryAddress = await fetchFactoryAddress(collectionType!);
+        const factoryABI = collectionType === "Art" ? ABI_ART_FACTORY : ABI_POESIE_FACTORY;
+        const factoryContract = new web3.eth.Contract(factoryABI as any, factoryAddress);
 
-      // 3. Upload image → IPFS
-      const imageUrl = await uploadFile(file);
+        const collaborators = splitRoyalties
+          ? royaltyData.map(r => r.address)
+          : [address!];
 
-      // 4. Prépare royalties
-      const collaborators = splitRoyalties
-        ? royaltyData.map(r => r.address)
-        : [address!]; // 100% créateur si pas de split
+        const percents = splitRoyalties
+          ? royaltyData.map(r => Number(r.value))
+          : [90];
 
-      const percents = splitRoyalties
-        ? royaltyData.map(r => Number(r.value))
-        : [90]; // 90% max (reste association)
-
-      //console.log("👥 Royalties:", { collaborators, percents });
-
-      // 5. ✅ CONFIGURE COLLECTION (CORRECT !)
-      const tx = await handleMessageTransactions(
-        factoryContract.methods
-          .configureCollection(  // ← CORRECT : configureCollection PAS configureUserCollection
+          // Estimate gas (simulation sans exécution complète)
+          const gasEstimate = await factoryContract.methods.configureCollection(
             metadata.name,
             Number(maxEditions),
             collaborators,
             percents
-          )
-          .send({ from: address! }),
-        toast,
-        "Configuration appliquée"
-      );
+          ).estimateGas({ from: address });
 
-      //console.log("✅ Configuration TX:", tx.transactionHash);
+          const gasPrice = await web3.eth.getGasPrice();
 
-      // 6. Upload metadata → IPFS
-      const fullMetadata = {
-        ...metadata,
-        image: imageUrl,
-        maxEditions: maxEditions
-      };
+        await handleMessageTransactions(
+          factoryContract.methods.configureCollection(
+            metadata.name,
+            Number(maxEditions),
+            collaborators,
+            percents
+          ).send({
+            from: address,
+            gas: Math.floor(Number(gasEstimate) * 1.2).toString(),
+            gasPrice: gasPrice.toString()
+          }),
+          toast,
+          "Configuration appliquée"
+        );
 
-      const metadataUrl = await uploadMetadata(fullMetadata);
-      setIpfsUrl(metadataUrl);
+        // 2. ✅ UPLOAD IPFS VIA HOOK (comme badges)
+        const fullMetadata = {
+          name: metadata.name,
+          description: metadata.description,
+          tags: metadata.tags.split(',').map(t => t.trim()),
+          maxEditions,
+          attributes: [
+            { trait_type: "CollectionType", value: collectionType },
+            { trait_type: "Creator", value: address },
+            // Ajoute color_profile si image analysée
+          ]
+        };
 
-      toast({
-        title: "✅ Configuration sauvegardée",
-        description: `IPFS: ${metadataUrl.slice(0, 50)}...`,
-        status: "success"
-      });
+        await uploadToIPFS({
+          scope: "oeuvres",
+          imageFile: file,
+          name: metadata.name,
+          description: metadata.description,
+          tags: metadata.tags,
+          attributes: fullMetadata.attributes || [],  // Optionnel
+          custom_data: {
+            maxEditions,
+            collectionType,
+            royalties: royaltyData  // Si besoin
+          }
+          // ✅ OMIT level/family/evolution (optionnels dans hook)
+        });
 
-    } catch (err: any) {
-      console.error("❌ Erreur upload IPFS:", err);
-      toast({
-        title: "❌ Erreur configuration",
-        description: err.message || "Upload échoué",
-        status: "error"
-      });
-    } finally {
-      setIsUploading(false);
+
+        // 3. metadataUri prêt (comme badges)
+        if (!metadataUri) throw new Error("Upload IPFS échoué");
+        setIpfsUrl(metadataUri);
+
+        toast({
+          title: "✅ Collection configurée",
+          description: `IPFS: ${metadataUri.slice(0, 50)}...`,
+          status: "success"
+        });
+        console.log(metadataUri);
+
+    // Remplace le try/catch final :
+  } catch (err: any) {
+    console.error("Upload échoué:", err);
+    toast({ title: "❌ Erreur", description: err.message, status: "error" });
+  } finally {
+    setIsUploading(false);
+
+    // ✅ FORCE setIpfsUrl même si hook state lag
+    if (metadataUri) {
+      setIpfsUrl(metadataUri);
+      console.log("✅ FORCÉ ipfsUrl:", metadataUri);
     }
+  }
   };
 
-
-  const handleRoyalties = async (factoryContract: any) => {
-    const collaborators = splitRoyalties ? royaltyData.map(r => r.address) : [address || ""];
-    const percents = splitRoyalties ? royaltyData.map(r => Number(r.value)) : [90];
-
-    await handleMessageTransactions(
-      factoryContract.methods.configureCollection(metadata.name, maxEditions, collaborators, percents).send({ from: address }),
-      toast,
-      "Configuration temporaire appliquée ✅",
-      "Échec configuration"
-    );
-  };
-
-  // Upload file to Pinata
-  const uploadFile = async (file: File): Promise<string> => {
-    const formData = new FormData();
-    formData.append('file', file);
-    console.log(process.env.NEXT_PUBLIC_PINATA_JWT_OEUVRES?.slice(0,10));
-
-    const response = await axios.post('https://api.pinata.cloud/pinning/pinFileToIPFS', formData, createPinataHeaders());
-    return `https://harlequin-key-marmot-538.mypinata.cloud/ipfs/${response.data.IpfsHash}`;
-  };
-
-  const uploadMetadata = async (metadata: any): Promise<string> => {
-    const response = await axios.post('https://api.pinata.cloud/pinning/pinJSONToIPFS', metadata, createPinataHeaders(true));
-    return `https://harlequin-key-marmot-538.mypinata.cloud/ipfs/${response.data.IpfsHash}`;
-  };
-
-  const createPinataHeaders = (isJson: boolean = false) => ({
-    headers: {
-      'Authorization': `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT_OEUVRES}`,
-      'Content-Type': isJson ? 'application/json' : 'multipart/form-data'
-    }
-  });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -466,15 +462,92 @@ const tx = await handleMessageTransactions(
         <Text mt={4}>Collections restantes : {remainingCollections}</Text>
       </HStack>
 
-      {/* File Input */}
-      <FormLabel fontWeight="bold" color="gray.200">Image de la collection</FormLabel>
-      <Input type="file" onChange={handleFileChange} mb={5} border="2px dashed" borderColor="purple.400" bg="blackAlpha.300" color="white" py={2} />
+      {/* 🔥 File Input + Feedback PRO */}
+  <FormLabel fontWeight="bold" color="gray.200">
+    Image de la collection
+  </FormLabel>
 
-      {previewUrl && (
-        <Box borderRadius="xl" overflow="hidden" boxShadow="md" mb={6} border="1px solid" borderColor="purple.300">
-          <Image src={previewUrl} alt="Preview" boxSize="300px" objectFit="cover" mx="auto" transition="transform 0.3s ease" _hover={{ transform: "scale(1.05)" }} />
-        </Box>
-      )}
+  <Box>
+    {/* Input principal */}
+    <Input
+      type="file"
+      onChange={handleFileChange}
+      mb={file ? 3 : 2}
+      border="2px dashed"
+      borderColor={file?.size! > 8*1024*1024 ? "orange.400" : "purple.400"}
+      bg="blackAlpha.300"
+      color="white"
+      py={2}
+      accept="image/jpeg,image/png,image/webp"
+      _hover={{ borderColor: "pink.400" }}
+    />
+
+    {/* Feedback si fichier sélectionné */}
+    {file && (
+      <Box mt={3} p={3} bg="gray.900/80" borderRadius="lg" border="1px solid" borderColor="purple.400">
+        <HStack justify="space-between" mb={1}>
+          <Text fontSize="sm" color="gray.300">
+            📁 <b>{file.name}</b>
+          </Text>
+          <Text fontSize="sm" fontWeight="bold" color="purple.300">
+            {(file.size / 1024 / 1024).toFixed(1)} Mo
+          </Text>
+        </HStack>
+
+        {/* Barre progression */}
+        <Progress
+          value={Math.min((file.size / (3 * 1024 * 1024)) * 100, 100)}
+          size="xs"
+          colorScheme={
+            file.size < 2 * 1024 * 1024 ? "green" :
+            file.size < 3 * 1024 * 1024 ? "yellow" : "orange"
+          }
+          mb={2}
+        />
+
+        {/* Temps estimé */}
+        <Text fontSize="xs" color="gray.400">
+          ⏱️ Estimé :
+          <span style={{
+            color: file.size < 5*1024*1024 ? "#10b981" : "#f59e0b",
+            fontWeight: "bold"
+          }}>
+            {(file.size / 1024 / 1024 * 4).toFixed(0)}s
+          </span>
+        </Text>
+
+        {/* Avertissement volumineux */}
+        {file.size > 3 * 1024 * 1024 && (
+          <Text fontSize="xs" color="orange.400" fontWeight="bold" mt={1}>
+            ⚠️ Volumineux : patience 45s+
+          </Text>
+        )}
+      </Box>
+    )}
+
+    {/* Placeholder vide */}
+    {!file && (
+      <Text fontSize="xs" color="gray.500" mt={2} textAlign="center">
+        📸 JPG/PNG/WebP &lt;3Mo (1-2Mo optimal)
+      </Text>
+    )}
+  </Box>
+
+  {/* Preview (après feedback) */}
+  {previewUrl && (
+    <Box mt={4} borderRadius="xl" overflow="hidden" boxShadow="md" mb={6} border="1px solid" borderColor="purple.300">
+      <Image
+        src={previewUrl}
+        alt="Preview"
+        boxSize="300px"
+        objectFit="cover"
+        mx="auto"
+        transition="transform 0.3s ease"
+        _hover={{ transform: "scale(1.05)" }}
+      />
+    </Box>
+  )}
+
 
       <VStack spacing={4} align="stretch">
         <Input placeholder="Nom de la collection" name="name" value={metadata.name} onChange={handleMetadataChange} bg="blackAlpha.300" color="white" borderColor="purple.300" />
@@ -519,9 +592,18 @@ const tx = await handleMessageTransactions(
         </Box>
 
 
-      <Button mt={4} w="full" bgGradient="linear(to-r, teal.500, green.400)" color="white" fontWeight="bold" _hover={{ transform: "scale(1.03)" }} onClick={uploadFileToIPFS} isLoading={isUploading} isDisabled={!canUpload}>
-        🚀 Enregistrez votre collection
-      </Button>
+        <Button
+          w="full"
+          bgGradient="linear(to-r, teal.500, green.400)"
+          onClick={uploadFileToIPFS}
+          isLoading={isUploading || pinataUploading}
+          isDisabled={!canUpload}
+        >
+          {isUploading && !pinataUploading ? "Factory..." :
+           pinataUploading ? "IPFS..." : "🚀 Config + IPFS"}
+        </Button>
+
+
 
 {/*
       {ipfsUrl && <Text mt={3} wordBreak="break-word">IPFS URL: {ipfsUrl}</Text>}

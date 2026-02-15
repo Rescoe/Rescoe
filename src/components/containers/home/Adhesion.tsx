@@ -49,7 +49,7 @@ const RoleBasedNFTPage = () => {
   const { address: account, web3, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const { convertEthToEur, loading: loadingEthPrice } = useEthToEur();
-  const { ipfsUrl, isUploading, uploadToIPFS } = usePinataUpload();
+  const { metadataUri, imageUri, isUploading, uploadToIPFS } = usePinataUpload();
   const { isOpen, onToggle } = useDisclosure();
 
   const Bananas = dynamic(() => import("@/components/modules/Bananas"), { ssr: false });
@@ -217,6 +217,9 @@ const [simulatedInsect, setSimulatedInsect] = useState<any | null>(null);
     alert("Erreur lors de la génération de l'insecte LVL0");
   }
 };
+
+
+
 const handleConfirmRole = async () => {
   if (!name || !bio || !selectedRole || !insectData) return alert("Champs incomplets");
 
@@ -279,24 +282,34 @@ const handleConfirmRole = async () => {
     ];
 
     //console.log(`🚀 ${insectAttributes} attributs générés !`);
-
+    //const data = getRandomInsectGif(0);
+    //console.log("INSECT DATA =", data);
     //console.log(`🚀 ${fullAttributes.length} attributs OpenSea générés !`);
 
+    //console.log("UPLOAD IMAGE =", insectData.imageUrl)
+
+
     await uploadToIPFS({
-      imageUrl: generatedImageUrl!,
-      name: name,
+      scope: "badges",
+      imageUrl: insectData.imageUrl,
+      name,
       bio,
       role: selectedRole,
       level: 0,
-      attributes: fullAttributes,  // 30+ ATTRIBUTS !
+      attributes: fullAttributes,
       family: familyKey,
       sprite_name: spriteFilename,
       previousImage: null,
       evolutionHistory: [],
-      color_profile: colorProfile  // Full backup
+      color_profile: colorProfile
     });
 
+
+    //console.log("METADATA URI =", metadataUri);
+
     setIsReadyToMint(true);
+
+    console.log(metadataUri, selectedRole, web3, account);
   } catch (error) {
     console.error("IPFS:", error);
     setRoleConfirmed(false);
@@ -309,7 +322,8 @@ const handleConfirmRole = async () => {
 
 
   const mintNFT = async () => {
-    if (!ipfsUrl || !selectedRole || !web3 || !account) {
+
+    if (!metadataUri || !selectedRole || !web3 || !account){
       alert("Assurez-vous d'être connecté, d'avoir généré l'IPFS et d'avoir sélectionné un rôle.");
       return;
     }
@@ -327,7 +341,7 @@ const handleConfirmRole = async () => {
 
         // ✅ COPIE EXACTE de ton code qui marche
         const tx = await contract.methods
-          .safeMint(ipfsUrl, roleValue, name, bio, isAnnual, autoEvolve)
+        .safeMint(metadataUri, roleValue, name, bio, isAnnual, autoEvolve)
           .send({
             from: account,
             value: priceInWei,
@@ -636,7 +650,7 @@ mb={4}
                   onClick={handleMint}
                   isLoading={isMinting || isUploading}
                   loadingText="🔄 Création du badge ResCoe..."
-                  isDisabled={!ipfsUrl || !roleConfirmed || mintRestant <= 0}
+                  isDisabled={!metadataUri || !roleConfirmed || mintRestant <= 0}
                 >
                   {mintRestant > 1 ? `Adhérer (${mintRestant} restantes)` : "Adhérer (dernière !)"}
                 </Button>

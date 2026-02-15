@@ -5,7 +5,8 @@ import { ethers } from "ethers";
 
 
 import detectEthereumProvider from "@metamask/detect-provider";
-import axios from "axios";
+import { usePinataUpload } from '@/hooks/usePinataUpload';
+
 import contractABI from '../../../ABI/ABI_ART.json';
 import factoryABI from '../../../ABI/Factories/ABI_ART_FACTORY.json';
 import ABIMasterFactory from '../../../ABI/Factories/ABI_MasterFactory.json';
@@ -105,7 +106,18 @@ const MintArt: React.FC = () => {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [customFee, setCustomFee] = useState<number>(10);
-  const [isUploading, setIsUploading] = useState<boolean>(false);
+
+  // 🆕 NOUVEAUX STATES pour le bouton unique
+const [uploadAndMintStep, setUploadAndMintStep] = useState<'idle' | 'uploading' | 'minting' | 'success'>('idle');
+const [countdown, setCountdown] = useState<number>(0);
+const [currentIpfsForMint, setCurrentIpfsForMint] = useState<string | null>(null);
+
+
+  const [isUploading, setIsUploading] = useState<boolean>(false);     // ← TON ÉTAT EXISTANT
+
+  // Dans MintArt (comme dans Adhesion)
+  const { uploadToIPFS, isUploading: ipfsUploading, metadataUri: ipfsUri } = usePinataUpload();
+
   const [isMinting, setIsMinting] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -141,6 +153,22 @@ const [percent, setPercent] = useState<number[]>([]);
         fetchUserCollections();
             }
   }, [address]);
+
+  // 🔥 MISE À JOUR : Écoute l'IPFS upload automatique
+  useEffect(() => {
+    if (ipfsUri) {
+      setIpfsUrl(ipfsUri);
+      setCurrentIpfsForMint(ipfsUri); // 🔥 SAUVEGARDE pour mint
+      toast({
+        title: "Oeuvre uploadée",
+        description: ipfsUri,
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+        position: "top",
+      });
+    }
+  }, [ipfsUri, toast]);
 
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -292,81 +320,51 @@ const [percent, setPercent] = useState<number[]>([]);
   setLoadingInfo(false);
 };
 
-
-
-  const uploadFileToIPFS = async (): Promise<void> => {
-    if (file && metadata) {
-      setIsUploading(true);
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
-
-        const imageResponse = await axios.post<{ IpfsHash: string }>(
-          'https://api.pinata.cloud/pinning/pinFileToIPFS',
-          formData,
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT_OEUVRES}`,
-              'Content-Type': 'multipart/form-data',
-            },
-          }
-        );
-
-        const imageUrl = `https://harlequin-key-marmot-538.mypinata.cloud/ipfs/${imageResponse.data.IpfsHash}`;
-        const metadataJson = {
-          artist: address,
-          name: metadata.name,
-          description: metadata.description,
-          image: imageUrl,
-          tags: metadata.tags.split(',').map(tag => tag.trim()),
-        };
-
-        const metadataResponse = await axios.post<{ IpfsHash: string }>(
-          'https://api.pinata.cloud/pinning/pinJSONToIPFS',
-          metadataJson,
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT_OEUVRES}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-
-        setIpfsUrl(`https://harlequin-key-marmot-538.mypinata.cloud/ipfs/${metadataResponse.data.IpfsHash}`);
-        //console.log(ipfsUrl);
-        toast({
-          title: "Oeuvre uploadée",
-          description: ipfsUrl,
-          status: "success",
-          duration: 1000,
-          isClosable: true,
-          position: "top",
-        });
-
-
-      } catch (error) {
-        console.error('Error uploading to IPFS:', error);
-        alert('Error uploading to IPFS');
-      } finally {
-        setIsUploading(false);
-      }
-    } else {
-      alert('Please ensure both file and metadata are set.');
-    }
-  };
-
-
-
-  const mintNFT = async (): Promise<void> => {
-  if (!ipfsUrl || selectedCollectionId === null) {
+/*
+const uploadFileToIPFS = async (): Promise<void> => {
+  if (!file || !metadata.name || !metadata.description) {
     toast({
       title: "Erreur",
-      description: "Veuillez uploader les métadonnées sur IPFS et choisir une collection.",
+      description: "Veuillez sélectionner un fichier et remplir les métadonnées.",
       status: "error",
       duration: 3000,
       isClosable: true,
     });
     return;
+  }
+
+  setIsUploading(true);
+  try {
+    await uploadToIPFS({
+      scope: "oeuvres",
+      imageFile: file,
+      name: metadata.name,
+      description: metadata.description,
+      artist: address!,
+      tags: metadata.tags
+    });
+
+    // metadataUri sera set auto via useEffect
+  } catch (error) {
+    console.error('Error uploading to IPFS:', error);
+    toast({
+      title: "Erreur upload IPFS",
+      description: "Échec de l'upload. Réessayez.",
+      status: "error",
+      duration: 5000,
+      isClosable: true,
+    });
+  } finally {
+    setIsUploading(false);
+  }
+};
+
+
+*/
+
+const mintNFT = async (): Promise<void> => {
+  if (!ipfsUrl || selectedCollectionId === null) {
+    throw new Error(`❌ IPFS manquant: ${ipfsUrl ? 'EXISTS' : 'NULL'} | Collection: ${selectedCollectionId}`);
   }
 
   if (!web3) {
@@ -383,7 +381,7 @@ const [percent, setPercent] = useState<number[]>([]);
   if (!editions || editions <= 0) {
     toast({
       title: "Erreur",
-      description: "Veuillez entrer un nombre d'éditions supérieur à 0.",
+      description: "Veuillez entrer un nombre d'éditions > 0.",
       status: "error",
       duration: 3000,
       isClosable: true,
@@ -394,7 +392,7 @@ const [percent, setPercent] = useState<number[]>([]);
   if (editions > 5) {
     toast({
       title: "Limite",
-      description: "Maximum 5 éditions par mint pour éviter les limites gas Web3Auth.",
+      description: "Max 5 éditions (limite gas).",
       status: "warning",
       duration: 4000,
       isClosable: true,
@@ -409,7 +407,7 @@ const [percent, setPercent] = useState<number[]>([]);
     const userAddress = address!;
     const gasPrice = await web3.eth.getGasPrice();
 
-    // Récup collection details
+    // 1️⃣ Récup collection details
     const resCollection = new web3.eth.Contract(ABIRESCOLLECTION, contractRESCOLLECTION);
     const collectionDetails = await resCollection.methods
       .getCollection(selectedCollectionId)
@@ -421,24 +419,23 @@ const [percent, setPercent] = useState<number[]>([]);
 
     const collectionMintAddress = collectionDetails.collectionAddress;
     if (!web3.utils.isAddress(collectionMintAddress)) {
-      throw new Error("Adresse de contrat invalide.");
+      throw new Error("Adresse contrat invalide.");
     }
 
     const mintContract = new web3.eth.Contract(contractABI, collectionMintAddress);
 
-    // 🔍 Vérification supply
+    // 2️⃣ Vérification supply
     const maxSupply = await mintContract.methods._getCollectionMaxSupplyFallback().call();
     const totalSupply = await mintContract.methods.totalSupply().call();
-    const remaining = Number(maxSupply) - Number(totalSupply);
+    const remainingSlots = Number(maxSupply) - Number(totalSupply);
 
-    if (editions > remaining) {
-      throw new Error(`Il ne reste que ${remaining} slots (maxSupply=${maxSupply}).`);
+    if (editions > remainingSlots) {
+      throw new Error(`❌ Slots restants: ${remainingSlots} (max: ${maxSupply})`);
     }
 
-    // 🔥 ESTIMATION GAS + VALIDATION
+    // 3️⃣ ESTIMATION GAS
     toast({
-      title: "Estimation gas...",
-      description: "Calcul en cours...",
+      title: "💨 Estimation gas...",
       status: "info",
       duration: 2000,
       isClosable: false,
@@ -448,39 +445,37 @@ const [percent, setPercent] = useState<number[]>([]);
       from: userAddress,
     });
 
-    //console.log('✅ Gas estimé:', gasEstimate.toString(), 'pour', editions, 'éditions');
-
     if (gasEstimate > 4500000n) {
-      throw new Error(`Gas trop élevé (${gasEstimate}): réduisez éditions ou réessayez.`);
+      throw new Error(`Gas trop élevé: ${gasEstimate} - réduisez éditions`);
     }
 
-    const gasLimit = (gasEstimate * BigInt(130n) / 100n).toString(); // +30% buffer
+    const gasLimit = (gasEstimate * BigInt(130n) / 100n).toString(); // +30%
 
-    // 🔄 MINT AVEC RETRY
+    // 4️⃣ MINT AVEC RETRY (3 tentatives)
     const mintWithRetry = async (retries = 3): Promise<any> => {
       for (let attempt = 1; attempt <= retries; attempt++) {
         try {
           toast({
-            title: `Mint en cours... (essai ${attempt}/${retries})`,
+            title: `⚡ Mint (essai ${attempt}/${retries})`,
             status: "loading",
             duration: 5000,
             isClosable: false,
           });
 
           return await mintContract.methods
-            .mint(ipfsUrl, editions)
+            .mint(ipfsUrl, editions)  // ✅ ipfsUrl direct
             .send({
               from: userAddress,
               gas: gasLimit,
-              gasPrice: (BigInt(gasPrice) * 110n / 100n).toString(),
+              gasPrice: (BigInt(gasPrice) * BigInt(110n) / 100n).toString(),
             });
         } catch (error: any) {
           console.warn(`Tentative ${attempt} échouée:`, error.message);
 
           if (attempt === retries) throw error;
 
-          if (error.message.includes('gas limit') || error.message.includes('insufficient funds')) {
-            await new Promise(resolve => setTimeout(resolve, 3000 * attempt)); // Backoff
+          if (error.message.includes('gas') || error.message.includes('funds')) {
+            await new Promise(resolve => setTimeout(resolve, 3000 * attempt));
             continue;
           }
           throw error;
@@ -490,22 +485,23 @@ const [percent, setPercent] = useState<number[]>([]);
 
     const mintResult = await mintWithRetry();
 
+    // 5️⃣ SUCCÈS
     toast({
-      title: "✅ Mint réussi!",
-      description: `TX: ${mintResult.transactionHash}`,
+      title: "✅ Mint réussi !",
+      description: `TX: ${mintResult.transactionHash.slice(0, 20)}...`,
       status: "success",
       duration: 5000,
       isClosable: true,
     });
 
-    // Récup tokenId
+    // 6️⃣ Token ID
     const lastTokenIdStr = await mintContract.methods.getLastMintedTokenId().call();
     const currentTokenId = Number(lastTokenIdStr);
     setTokenId(currentTokenId);
 
-    // 🔥 LISTING OPTIONNEL
+    // 7️⃣ LISTING AUTO si activé
     if (isSaleListing && salePrice && Number(salePrice) > 0) {
-      toast({ title: "Listing en cours...", status: "loading" });
+      toast({ title: "🏪 Listing auto...", status: "loading" });
 
       const priceWei = web3.utils.toWei(salePrice, "ether");
       const listGasEstimate = await mintContract.methods
@@ -521,33 +517,133 @@ const [percent, setPercent] = useState<number[]>([]);
         });
 
       toast({
-        title: "✅ Listé à la vente!",
+        title: `✅ Listé ${salePrice} ETH !`,
         status: "success",
         duration: 3000,
       });
     }
 
+    // 8️⃣ Toast succès
     publishSuccess(currentTokenId, collectionMintAddress);
 
   } catch (e: any) {
-    console.error("❌ Erreur mint:", e);
-
+    console.error("❌ Mint error:", e);
     const msg = e.message || 'Erreur inconnue';
     setError(msg);
 
     toast({
       title: "❌ Mint échoué",
       description: msg.includes('gas')
-        ? 'Gas trop élevé. Réduisez éditions ou réessayez.'
-        : msg.slice(0, 100) + '...',
+        ? 'Gas élevé - réduisez éditions'
+        : msg.slice(0, 80) + '...',
       status: "error",
       duration: 6000,
       isClosable: true,
     });
   } finally {
     setIsMinting(false);
+    setUploadAndMintStep('success'); // Reset UI
   }
 };
+
+
+const mintNFTWithIpfs = async (ipfsUrl: string): Promise<void> => {
+  // TEMPORAIREMENT override pour ce mint
+  const originalIpfs = ipfsUrl;
+  setIpfsUrl(ipfsUrl); // Force la vérif
+
+  try {
+    await mintNFT();
+  } finally {
+    setIpfsUrl(originalIpfs); // Restore
+  }
+};
+
+/* FONCTION QUI UPLOAD ET MINT ! */
+const handleUploadAndMint = async (): Promise<void> => {
+  if (!file || !metadata.name || !metadata.description || !selectedCollectionId) {
+    toast({
+      title: "Erreur",
+      description: "Fichier, métadonnées et collection obligatoires.",
+      status: "error",
+      duration: 3000,
+      isClosable: true,
+    });
+    return;
+  }
+
+  setUploadAndMintStep('uploading');
+
+  try {
+    // 1️⃣ UPLOAD IPFS + ATTENTE FORCÉE 3s (temps suffisant)
+    toast({
+      title: "⏳ Upload IPFS...",
+      status: "loading",
+      duration: 4000,
+      isClosable: false,
+    });
+
+    await uploadToIPFS({
+      scope: "oeuvres",
+      imageFile: file,
+      name: metadata.name,
+      description: metadata.description,
+      artist: address!,
+      tags: metadata.tags
+    });
+
+    // 2️⃣ ATTENTE 2s ADDITIONNELLE pour useEffect
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // 3️⃣ VÉRIF + MINT DIRECT (pas de countdown compliqué)
+    if (!ipfsUrl) {
+      throw new Error("IPFS timeout - réessayez");
+    }
+
+    setUploadAndMintStep('minting');
+
+    toast({
+      title: "🚀 Mint automatique...",
+      status: "loading",
+      duration: 5000,
+      isClosable: false,
+    });
+
+    // 4️⃣ MINT DIRECT
+    await mintNFT();
+
+    setUploadAndMintStep('success');
+
+    toast({
+      title: "🎉 Upload & Mint parfait !",
+      description: `IPFS: ${ipfsUrl.slice(0, 40)}...`,
+      status: "success",
+      duration: 4000,
+      isClosable: true,
+    });
+
+  } catch (error: any) {
+    console.error('Erreur:', error);
+    setUploadAndMintStep('idle');
+    toast({
+      title: "❌ Échec",
+      description: error.message || "Réessayez.",
+      status: "error",
+      duration: 5000,
+      isClosable: true,
+    });
+  }
+};
+
+// 🆕 RESET après succès
+useEffect(() => {
+  if (uploadAndMintStep === 'success') {
+    setTimeout(() => {
+      setUploadAndMintStep('idle');
+      setCountdown(0);
+    }, 2000);
+  }
+}, [uploadAndMintStep]);
 
 
 
@@ -788,6 +884,7 @@ return (
       Mintez
     </Heading>
 
+    {/* 🖼️ UPLOAD FICHIER */}
     <FormLabel fontWeight="bold" color="gray.200">
       Choisir un fichier à minter
     </FormLabel>
@@ -828,6 +925,7 @@ return (
       </Box>
     )}
 
+    {/* 📝 FORMULAIRE MÉTADONNÉES - DESCRIPTION EN TEXTAREA LARGE */}
     <VStack spacing={4} align="stretch">
       <Input
         placeholder="Nom de l’œuvre"
@@ -839,16 +937,43 @@ return (
         _placeholder={{ color: "gray.400" }}
         borderColor="purple.300"
       />
-      <Input
-        placeholder="Description (avec votre nom d'artiste)"
-        name="description"
-        value={metadata.description}
-        onChange={handleMetadataChange}
-        bg="blackAlpha.300"
-        color="white"
-        _placeholder={{ color: "gray.400" }}
-        borderColor="purple.300"
-      />
+
+      {/* 🔥 TEXTAREA LARGE POUR DESCRIPTION */}
+      <Box>
+        <FormLabel fontSize="sm" color="gray.400" mb={2}>
+          Description (avec votre nom d'artiste)
+        </FormLabel>
+        <textarea
+          placeholder="Décrivez votre œuvre en détail..."
+          name="description"
+          value={metadata.description}
+          onChange={(e) => setMetadata(prev => ({ ...prev, description: e.target.value }))}
+          rows={4} // Hauteur fixe
+          style={{
+            width: '100%',
+            minHeight: '120px',
+            padding: '12px 16px',
+            border: '2px solid #9333ea',
+            borderRadius: '12px',
+            backgroundColor: 'rgba(26, 32, 44, 0.7)',
+            color: 'white',
+            fontSize: '16px',
+            fontFamily: 'inherit',
+            resize: 'vertical',
+            outline: 'none',
+            transition: 'all 0.2s ease'
+          }}
+          onFocus={(e) => {
+            e.target.style.borderColor = '#ec4899';
+            e.target.style.boxShadow = '0 0 0 3px rgba(236, 72, 153, 0.2)';
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = '#9333ea';
+            e.target.style.boxShadow = 'none';
+          }}
+        />
+      </Box>
+
       <Input
         placeholder="Tags (séparés par des virgules)"
         name="tags"
@@ -863,9 +988,9 @@ return (
       <Input
         mt={4}
         type="number"
-        placeholder="Nombre d’éditions"
+        placeholder="Nombre d'éditions"
         value={editions}
-        max={remaining ?? undefined}     // 🔥 AJOUT
+        max={remaining ?? undefined}
         onChange={(e) => setEditions(Number(e.target.value))}
         isDisabled={remaining !== null && remaining <= 0}
         bg="blackAlpha.300"
@@ -873,35 +998,9 @@ return (
         borderColor="purple.300"
         _placeholder={{ color: "gray.400" }}
       />
-
-
-
     </VStack>
 
-    <Flex justify="center" mt={8}>
-      <Button
-        px={8}
-        py={5}
-        fontSize="md"
-        fontWeight="semibold"
-        borderRadius="full"
-        bgGradient="linear(to-r, purple.700, pink.600)"
-        color="white"
-        boxShadow="lg"
-        _hover={{
-          transform: "scale(1.05)",
-          boxShadow: "xl",
-        }}
-        _active={{
-          transform: "scale(0.97)",
-        }}
-        onClick={uploadFileToIPFS}
-        isLoading={isUploading}
-      >
-        🧾 Upload vers IPFS
-      </Button>
-    </Flex>
-
+    {/* COLLECTION & RESTE DE L'UI (inchangé) */}
     <FormLabel mt={8} color="gray.300" fontWeight="bold">
       Choisir une collection
     </FormLabel>
@@ -916,13 +1015,6 @@ return (
       borderColor="purple.300"
       mb={4}
     >
-    {loadingInfo && (
-      <Flex align="center" mt={2}>
-        <Spinner size="sm" mr={2} />
-        <Text color="gray.300">Chargement des informations…</Text>
-      </Flex>
-    )}
-
       {collections.map((collection) => (
         <option
           key={collection.id}
@@ -1001,6 +1093,7 @@ return (
     )}
 
     <Divider my={10} borderColor="purple.300" />
+{/*
 
     <Flex justify="center" mt={8}>
       <Button
@@ -1026,6 +1119,61 @@ return (
       >
         💾 Créer l'œuvre
       </Button>
+    </Flex>
+*/}
+
+    {/* 🔥 BOUTON UNIQUE UPLOAD & MINT */}
+    <Flex justify="center" mt={8} direction="column" align="center">
+      <Button
+        px={12}
+        py={6}
+        fontSize="lg"
+        fontWeight="bold"
+        borderRadius="full"
+        bgGradient={
+          uploadAndMintStep === 'success'
+            ? "linear(to-r, green.500, green.400)"
+            : "linear(to-r, purple.700, pink.600)"
+        }
+        color="white"
+        boxShadow="lg"
+        _hover={{
+          transform: "scale(1.05)",
+          boxShadow: "2xl",
+        }}
+        transition="all 0.25s ease"
+        isDisabled={uploadAndMintStep !== 'idle'}
+        onClick={handleUploadAndMint}
+        size="lg"
+      >
+        {uploadAndMintStep === 'idle' && '🚀 Upload & Mint'}
+        {uploadAndMintStep === 'uploading' && '⏳ Upload IPFS...'}
+        {uploadAndMintStep === 'minting' && '⚡ Mint en cours...'}
+        {uploadAndMintStep === 'success' && '✅ Terminé!'}
+
+        {countdown > 0 && (
+          <Text fontSize="sm" fontWeight="bold" ml={2}>
+            ({countdown})
+          </Text>
+        )}
+      </Button>
+
+      {/* 🔥 COUNTDOWN VISUEL */}
+      {countdown > 0 && (
+        <Box mt={3} p={3} bg="purple.900/80" borderRadius="full" border="2px solid" borderColor="purple.400">
+          <Text fontSize="md" fontWeight="bold" color="purple.200">
+            Mint automatique dans <span style={{ color: 'white', fontSize: '1.2em' }}>{countdown}s</span> ⏳
+          </Text>
+        </Box>
+      )}
+
+      {ipfsUrl && (
+        <Box mt={4} p={3} bg="green.900/20" borderRadius="md" borderColor="green.400" borderWidth="1px">
+          <Text fontSize="sm" color="green.200">
+            ✅ IPFS: <code>{ipfsUrl.slice(0, 50)}...</code>
+          </Text>
+        </Box>
+      )}
     </Flex>
 
     <Text mt={6} textAlign="center" color="gray.400" fontSize="sm">
