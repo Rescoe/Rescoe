@@ -6,8 +6,6 @@ import ABI from "@/components/ABI/ABIAdhesion.json";
 import { useAuth } from "@/utils/authContext";
 
 import { usePinataUpload } from "@/hooks/usePinataUpload";
-//import axios from "axios";
-const { uploadToIPFS } = usePinataUpload();  // ✅ IMPORT/USE comme Adhesion
 
 // ✅ AJOUTE ÇA à la fin du hook, AVANT le return principal
 export type UseReproductionReturn = {
@@ -105,6 +103,7 @@ export const useReproduction = ({
   const [lastTxHash, setLastTxHash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [userPoints, setUserPoints] = useState<number>(0);
+  const { uploadToIPFS } = usePinataUpload();  // ✅ IMPORT/USE comme Adhesion
 
 
   // ✅ ANTI-BOUCLE : lazy loading + pagination
