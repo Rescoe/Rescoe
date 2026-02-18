@@ -1,30 +1,44 @@
 // /utils/resolveIPFS.ts
-const PUBLIC_GATEWAY = "https://cloudflare-ipfs.com/ipfs/";
-const LOCAL_PROXY = "/api/ipfs/"; // ton API
+const PUBLIC_GATEWAY = "https://gateway.pinata.cloud/ipfs/";  // Backup (mais proxy prioritaire)
+const LOCAL_PROXY = "/api/ipfs/";
 
-export function resolveIPFS(uri?: string | null, useProxy = false): string | undefined {
+export function resolveIPFS(uri?: string | null, useProxy = true): string | undefined {  // true par défaut
   if (!uri) return undefined;
 
-  // Déjà une URL HTTP -> on renvoie tel quel
-  if (uri.startsWith("http://") || uri.startsWith("https://")) {
+  //console.log(`🔍 resolveIPFS input: ${uri} (useProxy: ${useProxy})`);
+
+  // EXTRACTION CID/PATH DE TOUS LES FORMATS (ipfs://, http gateway, CID brut)
+  let cidPath = "";
+
+  // 1. ipfs://CID/path
+  if (uri.startsWith("ipfs://")) {
+    cidPath = uri.replace("ipfs://", "");
+  }
+  // 2. http(s)://gateway/ipfs/CID/path → extrait /CID/path
+  else if (uri.startsWith("http://") || uri.startsWith("https://")) {
+    const url = new URL(uri);
+    cidPath = url.pathname.replace(/^\/ipfs\//, "");  // /ipfs/CID → CID
+    if (!cidPath) cidPath = url.pathname.replace(/^\/ipfs\//i, "");
+    //console.log(`📡 Extracted CID/path from HTTP: ${cidPath}`);
+  }
+  // 3. CID brut
+  else if (/^[Qm][A-Za-z0-9]{44,}$/.test(uri) || /^[b][A-Za-z2-7]{58,}$/.test(uri)) {
+    cidPath = uri;
+  }
+  else {
+    //console.log(`❌ Invalid IPFS URI: ${uri}`);
     return uri;
   }
 
-  // ipfs://CID[/path]
-  if (uri.startsWith("ipfs://")) {
-    const withoutPrefix = uri.replace("ipfs://", ""); // "CID" ou "CID/path"
-    if (useProxy) {
-      // /api/ipfs/[cidOrCidSlashPath]
-      return `${LOCAL_PROXY}${withoutPrefix}`;
-    }
-    return `${PUBLIC_GATEWAY}${withoutPrefix}`;
+  // PRIORITÉ PROXY API (fallback auto publics + log)
+  if (useProxy) {
+    const proxyUrl = `${LOCAL_PROXY}${cidPath}`;
+    //console.log(`🔗 Using PROXY: ${proxyUrl} (CID: ${cidPath})`);
+    return proxyUrl;
   }
 
-  // CID brut
-  if (/^[a-zA-Z0-9]+$/.test(uri)) {
-    if (useProxy) return `${LOCAL_PROXY}${uri}`;
-    return `${PUBLIC_GATEWAY}${uri}`;
-  }
-
-  return uri;
+  // Fallback public direct
+  const publicUrl = `${PUBLIC_GATEWAY}${cidPath}`;
+  //console.log(`🌐 Using PUBLIC: ${publicUrl}`);
+  return publicUrl;
 }

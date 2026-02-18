@@ -6,6 +6,7 @@ import ABI from "@/components/ABI/ABIAdhesion.json";
 import { useAuth } from "@/utils/authContext";
 //import { usePinataUpload } from "@/hooks/usePinataUpload";
 import axios from "axios";
+const { uploadToIPFS } = usePinataUpload();  // ✅ IMPORT/USE comme Adhesion
 
 // ✅ AJOUTE ÇA à la fin du hook, AVANT le return principal
 export type UseReproductionReturn = {
@@ -446,76 +447,6 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
   }, []);
 
 
-
-/*
-  const PINATA_GATEWAY_BASE = "https://purple-managerial-ermine-688.mypinata.cloud/ipfs/";
-
-  const uploadEggImageToPinata = useCallback(async (eggFile: File): Promise<string> => {
-    const pinataJwt = process.env.NEXT_PUBLIC_PINATA_JWT;
-    if (!pinataJwt) {
-      throw new Error("PINATA_JWT manquant dans les variables d'environnement.");
-    }
-
-    const formData = new FormData();
-    formData.append("file", eggFile, eggFile.name);
-
-    //console.log("📤 Upload œuf → Pinata (image) ...");
-
-    const imageResponse = await axios.post(
-      "https://api.pinata.cloud/pinning/pinFileToIPFS",
-      formData,
-      {
-        headers: {
-          Authorization: `Bearer ${pinataJwt}`,
-          "Content-Type": "multipart/form-data",
-        },
-      }
-    );
-
-    const imageHash = imageResponse.data.IpfsHash;
-    const imageIpfsUrl = `${PINATA_GATEWAY_BASE}${imageHash}`;
-    //console.log("✅ IPFS IMAGE ŒUF:", imageIpfsUrl);
-
-    return imageIpfsUrl;
-  }, []);
-
-  const uploadEggMetadataToPinata = useCallback(async (metadata: any): Promise<string> => {
-    const pinataJwt = process.env.NEXT_PUBLIC_PINATA_JWT;
-    if (!pinataJwt) {
-      throw new Error("PINATA_JWT manquant dans les variables d'environnement.");
-    }
-
-    //console.log("📤 Upload œuf → Pinata (metadata) ...");
-
-    const metadataResponse = await axios.post(
-      "https://api.pinata.cloud/pinning/pinJSONToIPFS",
-      metadata,
-      {
-        headers: {
-          Authorization: `Bearer ${pinataJwt}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    const metadataHash = metadataResponse.data.IpfsHash;
-    const metadataIpfsUrl = `${PINATA_GATEWAY_BASE}${metadataHash}`;
-    //console.log("✅ IPFS METADATA ŒUF:", metadataIpfsUrl);
-
-    return metadataIpfsUrl; // tu passes ce hash/URL au contrat
-  }, []);
-
-
-  const generateAndUploadEgg = useCallback(async (pa: TokenWithMeta, pb: TokenWithMeta) => {
-    // Dummy pour test (remplace par ton GIF generator)
-    const dummyFile = new File(["egg"], "egg.gif", { type: "image/gif" });
-    const imgUrl = await uploadEggImageToPinata(dummyFile);
-    const colors = { Couleur1: "rgb(255,0,0)", };
-    const metadata = buildEggMetadata(pa, pb, imgUrl, colors, 1);
-    return await uploadEggMetadataToPinata(metadata);
-  }, [uploadEggImageToPinata, uploadEggMetadataToPinata, buildEggMetadata]);
-*/
-
   // ✅ VÉRIF POINTS AVANT REPRO (ajoute après states)
 
   const fetchUserPoints = useCallback(async () => {
@@ -537,15 +468,101 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
   }, [fetchUserPoints]);
 
 
-  const reproduce = useCallback(async () => {
-  //console.log("🐣 REPRODUCTION START");
 
+  const reproduce = useCallback(async () => {
+    //console.log("🐣 REPRODUCTION START");
+
+    if (!parentA || !parentB || parentA.tokenId === parentB.tokenId) {
+      setError("Choisissez 2 parents différents");
+      return;
+    }
+
+    // ✅ NOUVEAU : check points
+    if (userPoints < 100) {
+      setError(`Points insuffisants: ${userPoints}/100`);
+      return;
+    }
+
+    setIsReproducing(true);
+    setError(null);
+    setLastTxHash(null);
+
+    try {
+      const contractWrite = fetchContractWrite();
+      if (!contractWrite) throw new Error("Wallet non connecté");
+
+      // 🥚 1. IMAGE ŒUF → /public/OEUFS (INCHANGÉ)
+      const eggIndex = Math.floor(Math.random() * maxEggIndex) + 1;
+      const eggLocalPath = `/OEUFS/OEUF${eggIndex}.gif`;
+      const response = await fetch(eggLocalPath);
+      if (!response.ok) throw new Error(`Œuf ${eggIndex} 404`);
+      const blob = await response.blob();
+      const eggFile = new File([blob], `OEUF_${eggIndex}_${Date.now()}.gif`, { type: "image/gif" });
+
+      // 🎨 2. COULEURS (INCHANGÉ)
+      const eggColors = await analyzeEggGif(eggLocalPath);
+
+      // 📄 3. TES METADATA EXACTES (INCHANGÉ - role 50/50)
+      const eggMetadata = buildEggMetadata(parentA, parentB, "", eggColors, eggIndex);
+
+      // 🔥 4. UPLOAD via usePinataUpload (REMPLACE axios)
+      await uploadToIPFS({
+        scope: "reproduction",
+        imageUrl: URL.createObjectURL(eggFile),  // ton blob
+        name: eggMetadata.name,
+        bio: eggMetadata.bio || "",
+        attributes: eggMetadata.attributes,      // tes 36 traits
+        family: "Hybride",
+        sprite_name: `OEUF${eggIndex}.gif`,
+        tags: eggMetadata.tags || [],
+        breeding: eggMetadata.breeding           // tes parents
+      });
+
+      const eggMetadataIpfsUrl = metadataUri!;  // hook retourne URI
+      if (!eggMetadataIpfsUrl) throw new Error("Upload échoué");
+
+      // 💰 5. TRANSACTION (INCHANGÉ)
+      const readContract = fetchContractRead();
+      const mintPrice = await readContract.mintPrice();
+      const halfPriceWei = (BigInt(mintPrice.toString()) / BigInt(2)).toString();
+
+      const gas = await contractWrite.methods
+        .reproduce(parentA.tokenId, parentB.tokenId, eggMetadataIpfsUrl)
+        .estimateGas({ from: account!, value: halfPriceWei });
+
+      const tx = await contractWrite.methods
+        .reproduce(parentA.tokenId, parentB.tokenId, eggMetadataIpfsUrl)
+        .send({
+          from: account!,
+          value: halfPriceWei,
+          gas: Math.floor(Number(gas) * 1.2).toString(),
+        });
+
+      //console.log(`🎉 TX SUCCÈS: ${tx.transactionHash}`);
+      setLastTxHash(tx.transactionHash);
+      setParentA(null);
+      setParentB(null);
+    } catch (e: any) {
+      console.error("💥 REPRO ERROR:", e);
+      setError(e.message);
+    } finally {
+      setIsReproducing(false);
+    }
+  }, [
+    parentA, parentB, account, maxEggIndex, buildEggMetadata,
+    fetchContractRead, fetchContractWrite, analyzeEggGif, userPoints,
+    uploadToIPFS, metadataUri  // ✅ Hook deps
+  ]);
+
+
+//A tester si jamais sucs dans reproduce :  (correctif ChatGPT)
+/*
+const reproduce = useCallback(async () => {
   if (!parentA || !parentB || parentA.tokenId === parentB.tokenId) {
     setError("Choisissez 2 parents différents");
     return;
   }
 
-  // ✅ NOUVEAU : check points
   if (userPoints < 100) {
     setError(`Points insuffisants: ${userPoints}/100`);
     return;
@@ -559,91 +576,45 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
     const contractWrite = fetchContractWrite();
     if (!contractWrite) throw new Error("Wallet non connecté");
 
-    const pinataJwt = process.env.NEXT_PUBLIC_PINATA_JWT;
-    if (!pinataJwt) {
-      throw new Error("PINATA_JWT manquant dans les variables d'environnement.");
-    }
-
-    const PINATA_GATEWAY_BASE =
-      "https://purple-managerial-ermine-688.mypinata.cloud/ipfs/";
-
-    // 🥚 1. IMAGE ŒUF → récupérer depuis /public/OEUFS
+    // -----------------------------
+    // 1️⃣ Préparation de l'œuf
+    // -----------------------------
     const eggIndex = Math.floor(Math.random() * maxEggIndex) + 1;
-    //console.log(`🥚 ŒUF #${eggIndex}/${maxEggIndex}`);
     const eggLocalPath = `/OEUFS/OEUF${eggIndex}.gif`;
-    //console.log(`📁 Fetch: ${eggLocalPath}`);
-
     const response = await fetch(eggLocalPath);
-    if (!response.ok) throw new Error(`Œuf ${eggIndex} 404`);
+    if (!response.ok) throw new Error(`Œuf ${eggIndex} introuvable`);
     const blob = await response.blob();
-    //console.log(`📊 Blob: ${blob.size}B ${blob.type}`);
-
     const eggFile = new File(
       [blob],
       `OEUF_${eggIndex}_${Date.now()}.gif`,
       { type: "image/gif" }
     );
 
-    // 📤 1bis. Upload IMAGE œuf → Pinata (pinFileToIPFS)
-    const imageFormData = new FormData();
-    imageFormData.append("file", eggFile, eggFile.name);
-
-    //console.log("📤 Upload œuf → Pinata (image) ...");
-
-    const imageResponse = await axios.post(
-      "https://api.pinata.cloud/pinning/pinFileToIPFS",
-      imageFormData,
-      {
-        headers: {
-          Authorization: `Bearer ${pinataJwt}`,
-          "Content-Type": "multipart/form-data",
-        },
-      }
-    );
-
-    const eggImageHash = imageResponse.data.IpfsHash;
-    const eggImageIpfsUrl = `${PINATA_GATEWAY_BASE}${eggImageHash}`;
-    //console.log("✅ IPFS IMAGE ŒUF:", eggImageIpfsUrl);
-
-    // ✅ APRÈS : analyse + 5 params
-    //console.log("🎨 ANALYSE COULEURS avant metadata...");
     const eggColors = await analyzeEggGif(eggLocalPath);
-    //console.log("🔍 eggColors:", eggColors);
+    const eggMetadata = buildEggMetadata(parentA, parentB, "", eggColors, eggIndex);
 
-    // 📄 2. METADATA JSON pour l'œuf
-    const eggMetadata = buildEggMetadata(
-      parentA,           // 1
-      parentB,           // 2
-      eggImageIpfsUrl,   // 3
-      eggColors,         // 4 ✅
-      eggIndex           // 5 ✅
-    );
-
-    /*console.log("🥚 METADATA GÉNÉRÉE:", {
+    // -----------------------------
+    // 2️⃣ Upload sur IPFS
+    // -----------------------------
+    const objUrl = URL.createObjectURL(eggFile);
+    const { metadataUri: eggMetadataIpfsUrl } = await uploadToIPFS({
+      scope: "reproduction",
+      imageUrl: objUrl,
       name: eggMetadata.name,
-      parents: `${parentA.tokenId}-${parentB.tokenId}`,
-      image: eggImageIpfsUrl,
-    });*/
+      bio: eggMetadata.bio || "",
+      attributes: eggMetadata.attributes,
+      family: "Hybride",
+      sprite_name: `OEUF${eggIndex}.gif`,
+      tags: eggMetadata.tags || [],
+      breeding: eggMetadata.breeding
+    });
+    URL.revokeObjectURL(objUrl);
 
-    // 📤 2bis. Upload METADATA œuf → Pinata (pinJSONToIPFS)
-    //console.log("📤 Upload œuf → Pinata (metadata) ...");
+    if (!eggMetadataIpfsUrl) throw new Error("Upload échoué");
 
-    const metadataResponse = await axios.post(
-      "https://api.pinata.cloud/pinning/pinJSONToIPFS",
-      eggMetadata,
-      {
-        headers: {
-          Authorization: `Bearer ${pinataJwt}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    const eggMetadataHash = metadataResponse.data.IpfsHash;
-    const eggMetadataIpfsUrl = `${PINATA_GATEWAY_BASE}${eggMetadataHash}`;
-    //console.log("✅ IPFS METADATA ŒUF:", eggMetadataIpfsUrl);
-
-    // 💰 3. PRIX + TRANSACTION
+    // -----------------------------
+    // 3️⃣ Transaction blockchain
+    // -----------------------------
     const readContract = fetchContractRead();
     const mintPrice = await readContract.mintPrice();
     const halfPriceWei = (BigInt(mintPrice.toString()) / BigInt(2)).toString();
@@ -660,13 +631,13 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
         gas: Math.floor(Number(gas) * 1.2).toString(),
       });
 
-    //console.log(`🎉 TX SUCCÈS: ${tx.transactionHash}`);
     setLastTxHash(tx.transactionHash);
     setParentA(null);
     setParentB(null);
+
   } catch (e: any) {
     console.error("💥 REPRO ERROR:", e);
-    setError(e.message);
+    setError(e.message || "Erreur inconnue");
   } finally {
     setIsReproducing(false);
   }
@@ -679,9 +650,11 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
   fetchContractRead,
   fetchContractWrite,
   analyzeEggGif,
-  userPoints
+  userPoints,
+  uploadToIPFS
 ]);
 
+*/
 
 
 return {

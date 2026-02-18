@@ -529,7 +529,7 @@ const fetchFeaturedCollections = async (web3Instance: Web3, userAccount: string)
   if (web3) {
     try {
       const contract = new web3.eth.Contract(ABICollection, contratRescollection);
-      const total = await contract.methods._totalCollectionMinted().call() as string;
+      const total = await contract.methods.getTotalCollectionsMinted().call() as string;
 
 
         const featured: number[] = [];
@@ -550,23 +550,6 @@ const fetchFeaturedCollections = async (web3Instance: Web3, userAccount: string)
 };
 
 
-const handleFeature = async (isFeatured: boolean) => {
-    if (!collectionId) return alert('Veuillez renseigner un ID de collection.');
-    if (web3 && account) {
-        try {
-            const contract = new web3.eth.Contract(ABICollection as any, contratRescollection);
-            await contract.methods.featureCollection(parseInt(collectionId), isFeatured).send({ from: account });
-            alert(`La collection ${collectionId} a été ${isFeatured ? 'mise en avant' : 'retirée des mises en avant'}.`);
-            setCollectionId('');
-            await fetchFeaturedCollections(web3, account); // Refresh after update
-        } catch (error) {
-            console.error('Erreur lors de la mise à jour de la mise en avant :', error);
-            alert('Erreur lors de la mise à jour de la collection.');
-        }
-    } else {
-        alert("Assurez-vous d'être connecté et d'avoir une instance Web3 disponible.");
-    }
-};
 
 useEffect(() => {
 
@@ -738,12 +721,32 @@ const ManageFeaturedCollections = () => {
 
     const handleFeature = async (isFeatured: boolean) => {
         if (!collectionId) return alert('Veuillez renseigner un ID de collection.');
-
-        if (window.ethereum && web3 && account) {
+        if (web3 && account) {
             try {
-                const contract = new web3.eth.Contract(ABICollection, contratRescollection);
-                await contract.methods.featureCollection(parseInt(collectionId), isFeatured).send({ from: account });
+                const contract = new web3.eth.Contract(ABICollection as any, contratRescollection);
+
+                // Estimate gas (simulation sans exécution complète)
+                const gasEstimate = await contract.methods.featureCollection(
+                  parseInt(collectionId),
+                   isFeatured
+                 ).estimateGas({ from: account });
+
+                const gasPrice = await web3.eth.getGasPrice();
+
+                console.log("gasEstimate");
+
+                await contract.methods.featureCollection(
+                  parseInt(collectionId),
+                   isFeatured
+                 ).send({
+                    from: account,
+                    gas: Math.floor(Number(gasEstimate) * 1).toString(),
+                    gasPrice: gasPrice.toString()
+                  });
+
                 alert(`La collection ${collectionId} a été ${isFeatured ? 'mise en avant' : 'retirée des mises en avant'}.`);
+                setCollectionId('');
+                await fetchFeaturedCollections(web3, account); // Refresh after update
             } catch (error) {
                 console.error('Erreur lors de la mise à jour de la mise en avant :', error);
                 alert('Erreur lors de la mise à jour de la collection.');

@@ -2,16 +2,22 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 
 const GATEWAYS = [
-  "https://harlequin-key-marmot-538.mypinata.cloud/ipfs/",
-  "https://purple-managerial-ermine-688.mypinata.cloud/ipfs/",
+  // Publics recurseurs GRATUITS d'abord (pas de limite bande passante pour toi)
+  "https://dweb.link/ipfs/",
   "https://gateway.pinata.cloud/ipfs/",
   "https://cloudflare-ipfs.com/ipfs/",
+  "https://ipfs.io/ipfs/",
+  "https://w3s.link/ipfs/",           // Web3.Storage gratuit NFT
+  //"https://www.rescoe.xyz/ipfs/",     // Ou /api/ si prefères
+  "https://nftstorage.link/ipfs/",
+
+  // TES DÉDIÉS Pinata EN DERNIER (économise bande passante gratuite)
+  "https://harlequin-key-marmot-538.mypinata.cloud/ipfs/",
+  "https://purple-managerial-ermine-688.mypinata.cloud/ipfs/",
 ];
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const cidParts = req.query.cid;
-
-  // /api/ipfs/[...cid] -> cidParts peut être string | string[]
   if (!cidParts) {
     return res.status(400).send("CID invalide");
   }
@@ -20,8 +26,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   for (const gateway of GATEWAYS) {
     try {
-      const url = gateway + cidPath;
-      const response = await fetch(url);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+
+      const url = `${gateway}${cidPath}`;
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: { 'User-Agent': 'Mozilla/5.0' } // Évite certains blocks
+      });
+      clearTimeout(timeoutId);
 
       if (!response.ok) continue;
 
@@ -30,13 +43,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       res.setHeader("Content-Type", contentType);
       res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
       res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET");
 
       const arrayBuffer = await response.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
       return res.status(200).send(buffer);
-    } catch (e) {
-      // on tente le gateway suivant
+    } catch (e: any) {
+      if (e.name !== 'AbortError') console.error(`Gateway ${gateway} failed:`, e.message);
       continue;
     }
   }

@@ -19,10 +19,7 @@
 .DS_Store
 *.pem
 
-# Ignorer les fichiers de sauvegarde des contrats Solidity
 *.sol
-
-# Ignorer les fichiers ABI
 *.abi
 
 # debug

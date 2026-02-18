@@ -352,7 +352,7 @@ const UniqueArtGalerie: React.FC = () => {
 
       {/* Stats */}
       <Flex justify="space-between" mb={16} flexWrap="wrap" gap={4}>
-        <Heading size="2xl">Galerie d'Art Unique</Heading>
+        <Heading size="xl">Galerie</Heading>
         <Badge colorScheme="purple" fontSize="lg" p={3}>
           {filtered.length} collections trouvées
         </Badge>
