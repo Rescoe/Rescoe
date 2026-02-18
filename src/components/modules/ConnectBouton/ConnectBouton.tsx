@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import {
   Button,
   Text,
-  HStack,
   useToast,
   Tooltip,
   Box,
@@ -10,7 +9,13 @@ import {
   MenuButton,
   MenuList,
   MenuItem,
+  useClipboard,
+IconButton,
+VStack,
+HStack,
 } from "@chakra-ui/react";
+import { LinkIcon } from '@chakra-ui/icons';  // ✅ ✅ ✅
+
 import { signIn, signOut } from "next-auth/react";
 import { useAuthRequestChallengeEvm } from "@moralisweb3/next";
 import { getEllipsisTxt } from "../../../utils/format";
@@ -18,6 +23,7 @@ import { useAuth } from "../../../utils/authContext";
 import { brandHover, hoverStyles } from "@styles/theme";
 import Web3 from "web3";
 import detectEthereumProvider from "@metamask/detect-provider";
+
 
 const ConnectBouton: React.FC = () => {
 
@@ -166,6 +172,24 @@ const ConnectBouton: React.FC = () => {
     );
   }
 
+  const CopyButton = ({ address }: { address: string }) => {
+    const { onCopy, hasCopied } = useClipboard(address);
+
+    return (
+      <IconButton
+        aria-label="Copier adresse"
+        icon={<LinkIcon />}
+        size="sm"
+        colorScheme={hasCopied ? "green" : "purple"}
+        variant="ghost"
+        onClick={onCopy}
+        title={hasCopied ? "Copié !" : "Copier"}
+        animation={hasCopied ? "pulse 0.5s" : "none"}
+      />
+    );
+  };
+
+
   return (
     <Box>
       <Tooltip
@@ -174,25 +198,51 @@ const ConnectBouton: React.FC = () => {
         hasArrow
         placement="bottom"
       >
-        <Menu>
-          <MenuButton
-            as={HStack}
-            cursor="pointer"
-            gap={"20px"}
-            spacing={{ base: 2, md: 4 }}
-            direction={{ base: "column", md: "row" }}
+      <Menu>
+        <MenuButton
+          as={HStack}
+          cursor="pointer"
+          gap="20px"
+          spacing={{ base: 2, md: 4 }}
+          direction={{ base: "column", md: "row" }}
+        >
+          <Text fontWeight="medium">
+            {address ? getEllipsisTxt(address) : "Non connecté"}
+          </Text>
+        </MenuButton>
+        <MenuList bg="gray.800" borderColor="purple.600">
+          {/* 🔥 ADRESSE COMPLÈTE + COPY */}
+          <MenuItem p={4} borderBottom="1px" borderColor="gray.700">
+            <VStack align="start" spacing={1} w="full">
+              <Text fontSize="xs" color="gray.400">Adresse</Text>
+              <HStack justify="space-between" w="full">
+              <Text fontSize="sm" fontFamily="mono" noOfLines={1}>
+                {address ?? 'Aucune'}  // ✅ Nullish safe
+              </Text>
+              <CopyButton address={address!} />  // ✅ ! OK car isAuthenticated true
+
+              </HStack>
+            </VStack>
+          </MenuItem>
+
+          {/* Déconnecter */}
+          <MenuItem
+            onClick={handleDisconnect}
+            _hover={{ bg: "purple.600", color: "white" }}
+            _active={{ bg: "purple.700" }}
+            fontWeight="medium"
+            borderRadius="md"
           >
-            <Text fontWeight="medium">
-              {address ? getEllipsisTxt(address) : "Non connecté"}
-            </Text>
-          </MenuButton>
-          <MenuList>
-            <MenuItem onClick={handleDisconnect}>Se déconnecter</MenuItem>
-          </MenuList>
-        </Menu>
+            Se déconnecter
+          </MenuItem>
+        </MenuList>
+      </Menu>
+
       </Tooltip>
     </Box>
   );
 };
+
+
 
 export default ConnectBouton;

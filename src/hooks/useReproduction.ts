@@ -4,8 +4,9 @@ import Web3 from "web3";
 import { JsonRpcProvider, Contract as EthersContract } from "ethers";
 import ABI from "@/components/ABI/ABIAdhesion.json";
 import { useAuth } from "@/utils/authContext";
-//import { usePinataUpload } from "@/hooks/usePinataUpload";
-import axios from "axios";
+
+import { usePinataUpload } from "@/hooks/usePinataUpload";
+//import axios from "axios";
 const { uploadToIPFS } = usePinataUpload();  // ✅ IMPORT/USE comme Adhesion
 
 // ✅ AJOUTE ÇA à la fin du hook, AVANT le return principal
@@ -55,7 +56,7 @@ export interface EvolutionMetadata {
     image: string;
     timestamp: number;
   }>;
-  tags?: string[];  // ✅ AJOUTE ÇA
+  tags?: string | string[];  // ✅ Flexible string OU array
   [key: string]: unknown;
 }
 
@@ -468,16 +469,12 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
   }, [fetchUserPoints]);
 
 
-
   const reproduce = useCallback(async () => {
-    //console.log("🐣 REPRODUCTION START");
-
     if (!parentA || !parentB || parentA.tokenId === parentB.tokenId) {
       setError("Choisissez 2 parents différents");
       return;
     }
 
-    // ✅ NOUVEAU : check points
     if (userPoints < 100) {
       setError(`Points insuffisants: ${userPoints}/100`);
       return;
@@ -491,7 +488,7 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
       const contractWrite = fetchContractWrite();
       if (!contractWrite) throw new Error("Wallet non connecté");
 
-      // 🥚 1. IMAGE ŒUF → /public/OEUFS (INCHANGÉ)
+      // 1️⃣ Œuf image
       const eggIndex = Math.floor(Math.random() * maxEggIndex) + 1;
       const eggLocalPath = `/OEUFS/OEUF${eggIndex}.gif`;
       const response = await fetch(eggLocalPath);
@@ -499,29 +496,31 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
       const blob = await response.blob();
       const eggFile = new File([blob], `OEUF_${eggIndex}_${Date.now()}.gif`, { type: "image/gif" });
 
-      // 🎨 2. COULEURS (INCHANGÉ)
+      // 2️⃣ Analyse couleurs
       const eggColors = await analyzeEggGif(eggLocalPath);
 
-      // 📄 3. TES METADATA EXACTES (INCHANGÉ - role 50/50)
+      // 3️⃣ Metadata
       const eggMetadata = buildEggMetadata(parentA, parentB, "", eggColors, eggIndex);
 
-      // 🔥 4. UPLOAD via usePinataUpload (REMPLACE axios)
-      await uploadToIPFS({
-        scope: "reproduction",
-        imageUrl: URL.createObjectURL(eggFile),  // ton blob
+      // 4️⃣ ✅ UPLOAD CORRIGÉ
+      const objUrl = URL.createObjectURL(eggFile);
+      const { metadataUri: eggMetadataIpfsUrl } = await uploadToIPFS({
+        scope: "badges",
+        imageUrl: objUrl,
         name: eggMetadata.name,
         bio: eggMetadata.bio || "",
-        attributes: eggMetadata.attributes,      // tes 36 traits
+        attributes: eggMetadata.attributes,
         family: "Hybride",
         sprite_name: `OEUF${eggIndex}.gif`,
-        tags: eggMetadata.tags || [],
-        breeding: eggMetadata.breeding           // tes parents
+        tags: Array.isArray(eggMetadata.tags)
+          ? eggMetadata.tags.join(', ')
+          : eggMetadata.tags || 'hybride,egg,reproduction'
       });
+      URL.revokeObjectURL(objUrl);
 
-      const eggMetadataIpfsUrl = metadataUri!;  // hook retourne URI
       if (!eggMetadataIpfsUrl) throw new Error("Upload échoué");
 
-      // 💰 5. TRANSACTION (INCHANGÉ)
+      // 5️⃣ Transaction
       const readContract = fetchContractRead();
       const mintPrice = await readContract.mintPrice();
       const halfPriceWei = (BigInt(mintPrice.toString()) / BigInt(2)).toString();
@@ -538,21 +537,17 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
           gas: Math.floor(Number(gas) * 1.2).toString(),
         });
 
-      //console.log(`🎉 TX SUCCÈS: ${tx.transactionHash}`);
       setLastTxHash(tx.transactionHash);
       setParentA(null);
       setParentB(null);
+
     } catch (e: any) {
       console.error("💥 REPRO ERROR:", e);
       setError(e.message);
     } finally {
       setIsReproducing(false);
     }
-  }, [
-    parentA, parentB, account, maxEggIndex, buildEggMetadata,
-    fetchContractRead, fetchContractWrite, analyzeEggGif, userPoints,
-    uploadToIPFS, metadataUri  // ✅ Hook deps
-  ]);
+  }, [parentA, parentB, account, maxEggIndex, buildEggMetadata, fetchContractRead, fetchContractWrite, analyzeEggGif, userPoints, uploadToIPFS]);
 
 
 //A tester si jamais sucs dans reproduce :  (correctif ChatGPT)

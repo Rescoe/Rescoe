@@ -1,5 +1,5 @@
 import { Box, Tooltip, Container, Button, Menu, MenuButton, MenuList, MenuItem, Drawer, DrawerBody, DrawerCloseButton, DrawerContent, DrawerHeader, DrawerOverlay, useDisclosure, HStack, VStack, Flex, useColorModeValue, useTheme } from '@chakra-ui/react';
-import { FaBug, FaEye, FaEyeSlash, FaBars } from 'react-icons/fa';
+import { FaBug, FaEye, FaEyeSlash, FaBars, FaArrowRight, FaChevronRight, FaStar, FaCheck, FaQuestion  } from 'react-icons/fa';
 import { Badge } from '@chakra-ui/react'; // ✅ À ajouter en haut si pas déjà
 
 import { ChevronDownIcon } from '@chakra-ui/icons';
@@ -24,7 +24,7 @@ import { brandHover, hoverStyles } from "@styles/theme"; //Style
 
 // ✅ NOUVELLE LISTE CENTRALE DES ADRESSES RÉSIDENTS
 const RESIDENT_ADDRESSES = [
-  "0x552C63E3B89ADf749A5C1bB66fE574dF9203FfB4".toLowerCase(),
+  "0x7EbDE55C4Aba6b3b31E03306e833fF92187F984b".toLowerCase(),
 ] as const;
 
 // ✅ CONFIG MÉNUS PAR RÔLE CENTRALISÉE
@@ -90,12 +90,16 @@ const ROLE_MENUS: Record<RoleKey, RoleMenuConfig> = {
     ],
   },
   nonMember: {
-    label: "Non-adhérent",
+    label: "🚀 Rejoins-nous !",  // Plus engageant
     items: [
-      { label: "Devenir adhérent", href: "/adhesion" },
-      { label: "FAQ", href: "/faq" },
+      {
+        label: "Devenir adhérent 🔥",
+        href: "/adhesion",
+      },
+      { label: "FAQ", href: "/association/faq" },
     ],
   },
+
 };
 
 // ✅ COMPOSANT RoleMenu RÉUTILISABLE (AVEC TOOLTIP RÉSIDENCE)
@@ -375,20 +379,58 @@ useEffect(() => {
                   borderRadius="full"
                   boxShadow="lg"
                   border="1px solid"
-                  whileHover={{ scale: 1.03, boxShadow: boxShadowHover }}
-                  _hover={{ ...hoverStyles.brandHover._hover, ...brandHover }}
+                  borderColor="brand.mauve"  // Ton mauve
+                  bgGradient="linear(to-r, brand.mauve, brand.gold)"  // Ton theme
+                  color="white"
+                  whileHover={{
+                    scale: 1.05,
+                    boxShadow: "0 20px 40px rgba(180, 166, 213, 0.6)"  // Mauve glow
+                  }}
+                  _hover={{
+                    ...hoverStyles.brandHover._hover,
+                    bgGradient: "linear(to-r, brand.gold, brand.navy)",  // Ton hover + navy
+                    scale: 1.05
+                  }}
                   _active={{ transform: "scale(0.98)" }}
-                  transition={{ duration: 0.25, ease: "easeInOut" }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
                 >
-                  Connecté (non-adhérent)
+                  🚀 Connecté (Rejoins-nous !)  {/* Pas d'icon = ZÉRO erreur */}
                 </MotionMenuButton>
-                <MenuList bg="gray.800" borderColor="purple.600">
+
+                <MenuList bg="gray.800" borderColor="brand.mauve" p={4}>
+                  {/* CTA 🔥 */}
                   <NextLink href="/adhesion" passHref>
-                    <MenuItem as="a">Devenir adhérent</MenuItem>
+                    <MenuItem
+                      as="a"
+                      icon={<FaArrowRight />}
+                      bg="brand.mauve"
+                      _hover={{ bg: "brand.gold" }}
+                      borderRadius="md"
+                      fontWeight="bold"
+                    >
+                      Devenir adhérent 🔥
+                      <Badge ml={2} colorScheme="orange">Offre limitée</Badge>
+                    </MenuItem>
+                  </NextLink>
+
+                  {/* Avantages */}
+                  <MenuItem fontSize="xs" color="gray.400" icon={<FaCheck  />}>
+                    ✅ Accès exclusif NFT & événements
+                  </MenuItem>
+                  <MenuItem fontSize="xs" color="gray.400" icon={<FaCheck  />}>
+                    ✅ Support prioritaire + bonus
+                  </MenuItem>
+
+                  {/* FAQ */}
+                  <NextLink href="/association/faq" passHref>
+                    <MenuItem as="a" mt={2} icon={<FaQuestion  />}>
+                      FAQ Association
+                    </MenuItem>
                   </NextLink>
                 </MenuList>
               </Menu>
             )}
+
 
             {/* ✅ MENU INSECTE (inchangé) */}
             {isAuthenticated && isMember && role !== "non-member" && (
