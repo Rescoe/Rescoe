@@ -15,7 +15,7 @@ import {
   Button,
   Input
 } from "@chakra-ui/react";
-import { JsonRpcProvider, Contract, BigNumberish } from "ethers";
+import { JsonRpcProvider, Contract, BigNumberish, ethers } from "ethers";
 import { useRouter } from "next/router";
 import ABIRESCOLLECTION from "../../../ABI/ABI_Collections.json";
 import ABI from "../../../ABI/HaikuEditions.json";
@@ -108,8 +108,23 @@ const fetchPoetryCollections = async (page: number) => {
       collectionsPaginated.map(async (tuple: any) => {
         const [id, name, collectionType, creator, associatedAddresses, , isFeatured] = tuple;
         const uri: string = await contract.getCollectionURI(id);
-        const mintContractAddress: string = associatedAddresses[0]; // Premier
+        //const mintContractAddress: string = associatedAddresses; // Premier
 
+        let mintContractAddress: string;
+
+        if (Array.isArray(associatedAddresses)) {
+          mintContractAddress = associatedAddresses[0];
+        } else {
+          mintContractAddress = associatedAddresses;
+        }
+
+        if (!ethers.isAddress(mintContractAddress)) {
+          console.error("Adresse invalide reçue:", mintContractAddress);
+          return;
+        }
+
+
+        console.log([id, name, collectionType, creator, associatedAddresses, , isFeatured]);
         // 🔥 1. CACHE
         const cached = localStorage.getItem(uri);
         if (cached) {
@@ -128,6 +143,7 @@ const fetchPoetryCollections = async (page: number) => {
         const res = await fetch(`/api/metadata/${hash}`); // Même API Art
         const metadata = await res.json();
         localStorage.setItem(uri, JSON.stringify(metadata));
+        console.log(metadata);
 
         return {
           id: id.toString(),
@@ -180,7 +196,6 @@ const fetchPoetryCollections = async (page: number) => {
     try {
       const collectionContract = new Contract(associatedAddress, ABI, provider);
       const uniqueHaikuCount: BigNumberish = await collectionContract.getLastUniqueHaikusMinted();
-
       const poemsData: Poem[] = await Promise.all(
         Array.from({ length: Number(uniqueHaikuCount) }, (_, i) => i).map(async (uniqueHaikuId) => {
           const premierToDernier = await collectionContract.getHaikuInfoUnique(uniqueHaikuId);
@@ -306,6 +321,8 @@ const handleBurn = async (nft: Poem, tokenId: number) => {
 
 
   const handleCollectionClick = (collectionId: string, associatedAddress: string) => {
+    console.log(associatedAddress);
+
     setSelectedCollectionId(collectionId);
     fetchPoems(collectionId, associatedAddress);
     setCurrentTabIndex(1);

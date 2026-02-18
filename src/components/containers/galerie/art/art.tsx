@@ -21,8 +21,12 @@ import {
   Tag,
   Skeleton,
   InputGroup,
-  InputLeftElement
+  InputLeftElement,
+  Button,
+  Icon
 } from '@chakra-ui/react';
+import { BsCollectionPlay } from 'react-icons/bs';
+
 import { JsonRpcProvider, Contract, BigNumberish } from "ethers";
 import { SearchIcon } from '@chakra-ui/icons'; // ✅ AJOUTÉ
 
@@ -143,42 +147,88 @@ const UniqueArtGalerie: React.FC = () => {
       setIsLoading(false);
     }
   };
-
   const fetchNFTs = async (collectionId: string, associatedAddress: string) => {
+    if (!associatedAddress || associatedAddress === "0") {
+      console.error("Adresse de collection invalide :", associatedAddress);
+      return;
+    }
+    console.log("fetchNFTs called", { collectionId, associatedAddress });
+
+
     setIsLoading(true);
+
     try {
-      const collectionContract = new Contract(associatedAddress, ABI_MINT_CONTRACT, provider);
-      const tokenIds: string[] = await collectionContract.getTokenPaginated(0, 19);
+      const collectionContract = new Contract(
+        associatedAddress,
+        ABI_MINT_CONTRACT,
+        provider
+      );
+
+      const tokenIds: string[] =
+        await collectionContract.getTokenPaginated(0, 19);
 
       const nftsData = await Promise.all(
         tokenIds.map(async (tokenId: string) => {
           try {
             let tokenURI: string;
+
             try {
               tokenURI = await collectionContract.tokenURI(tokenId);
-            } catch (error) {
-              console.warn(`Le token avec le tokenId ${tokenId} n'existe pas.`);
+            } catch {
+              console.warn(
+                `Le token avec le tokenId ${tokenId} n'existe pas.`
+              );
               return null;
             }
 
+            // Nettoyage URI IPFS
+            const cleanURI = tokenURI.replace("ipfs://", "");
+            const cid = cleanURI.split("/")[0];
+
+            if (!cid) {
+              console.error("CID invalide pour token :", tokenId);
+              return null;
+            }
+
+            let metadata;
+
             const cachedMetadata = localStorage.getItem(tokenURI);
-            const metadata = cachedMetadata
-              ? JSON.parse(cachedMetadata)
-              : await (await fetch(`/api/proxyPinata_Oeuvres?ipfsHash=${tokenURI.split('/').pop()}`)).json();
 
-            const priceInWei: BigNumberish = await collectionContract.getTokenPrice(tokenId);
-            const isForSale: boolean = await collectionContract.isNFTForSale(tokenId);
-            const priceInEthers = Number(priceInWei) / 1e18;
-            const proprietaire = await collectionContract.ownerOf(tokenId);
+            if (cachedMetadata) {
+              metadata = JSON.parse(cachedMetadata);
+            } else {
+              const response = await fetch(`/api/ipfs/${cid}`);
 
-            if (!cachedMetadata) {
+              if (!response.ok) {
+                console.error(
+                  `Erreur API metadata (${response.status}) pour CID:`,
+                  cid
+                );
+                return null;
+              }
+
+              const text = await response.text();
+
+              try {
+                metadata = JSON.parse(text);
+              } catch (err) {
+                console.error("Réponse non JSON reçue :", text);
+                return null;
+              }
+
               localStorage.setItem(tokenURI, JSON.stringify(metadata));
             }
+
+            const priceInWei = await collectionContract.getTokenPrice(tokenId);
+            const isForSale = await collectionContract.isNFTForSale(tokenId);
+            const proprietaire = await collectionContract.ownerOf(tokenId);
+
+            const priceInEthers = Number(priceInWei) / 1e18;
 
             return {
               owner: proprietaire,
               tokenId: tokenId.toString(),
-              image: resolveIPFS(metadata.image),
+              image: resolveIPFS(metadata.image, true),
               name: metadata.name,
               description: metadata.description,
               priceInWei: priceInWei.toString(),
@@ -194,14 +244,19 @@ const UniqueArtGalerie: React.FC = () => {
         })
       );
 
-      const filteredNFTsData = nftsData.filter((nft): nft is NFT => nft !== null);
+      console.log(nftsData);
+      const filteredNFTsData = nftsData.filter(
+        (nft): nft is NFT => nft !== null
+      );
+
       setNfts(filteredNFTsData);
     } catch (error) {
-      console.error('Erreur lors de la récupération des NFTs :', error);
+      console.error("Erreur lors de la récupération des NFTs :", error);
     } finally {
       setIsLoading(false);
     }
   };
+
 
   const buyNFT = async (nft: NFT) => {
     if (!web3 || !address) return;
@@ -259,10 +314,12 @@ const UniqueArtGalerie: React.FC = () => {
   }, [router.isReady, router.query, collections]);
 
   const handleCollectionClick = (collectionId: string, associatedAddress: string) => {
+    console.log("CLICK collection", { collectionId, associatedAddress });
     setSelectedCollectionId(collectionId);
     fetchNFTs(collectionId, associatedAddress);
     setCurrentTabIndex(2);
   };
+
 
   useEffect(() => {
     fetchCollections();
@@ -322,7 +379,7 @@ const UniqueArtGalerie: React.FC = () => {
         <Heading size="lg" mb={8}>
           Toutes les collections {featured.length > 0 && `(${others.length})`}
         </Heading>
-        {isLoading ? (
+        {isLoading && !selectedCollectionId ? (
           <SimpleGrid columns={gridCols} spacing={8}>
             {Array(12).fill(0).map((_, i) => <CollectionCardSkeleton key={i} />)}
           </SimpleGrid>
@@ -345,8 +402,71 @@ const UniqueArtGalerie: React.FC = () => {
           </SimpleGrid>
         )}
       </Box>
+
+      {/* 🆕 SECTION NFTs - L'INTÉGRATION MANQUANTE */}
+      {selectedCollectionId && (
+        <Box mt={24} mb={12}>
+          <Flex align="center" mb={8} gap={4}>
+            <Heading size="lg">
+              🎨 NFTs de la collection "
+              {collections.find((c) => c.id === selectedCollectionId)?.name}"
+            </Heading>
+            <Badge colorScheme="green" fontSize="md">
+              {nfts.length} œuvres disponibles
+            </Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedCollectionId(null);
+                setNfts([]);
+              }}
+            >
+              ← Retour collections
+            </Button>
+          </Flex>
+
+          {isLoading ? (
+            <Flex justify="center" py={20}>
+              <Spinner size="xl" thickness="4px" color="purple.500" />
+            </Flex>
+          ) : nfts.length === 0 ? (
+            <VStack py={20} spacing={6} color="gray.500">
+              <Icon as={BsCollectionPlay} boxSize={16} />
+              <Text fontSize="xl" textAlign="center">
+                Aucun NFT trouvé dans cette collection
+              </Text>
+              <Text fontSize="md" textAlign="center">
+                Peut-être que la collection est vide ou en cours de minting...
+              </Text>
+            </VStack>
+          ) : (
+            <SimpleGrid columns={isMobile ? 1 : 2} spacing={8}>
+              {nfts.map((nft) => (
+                <Box
+                  key={nft.tokenId}
+                  cursor="pointer"
+                  onClick={() =>
+                    router.push(`/oeuvresId/${nft.mintContractAddress}/${nft.tokenId}`)
+                  }
+                  _hover={{ transform: "translateY(-2px)" }}
+                  transition="all 0.2s"
+                >
+                  <NFTCard
+                    nft={nft}
+                    buyNFT={() => buyNFT(nft)}
+                    isForSale={nft.forSale}
+                    proprietaire={nft.owner}
+                  />
+                </Box>
+              ))}
+            </SimpleGrid>
+          )}
+        </Box>
+      )}
     </Box>
   );
+
 };
 
 // ✅ CORRIGÉ : CollectionCard avec props onClick et imageUrl

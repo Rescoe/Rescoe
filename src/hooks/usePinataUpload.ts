@@ -126,15 +126,19 @@ export const usePinataUpload = (): UsePinataUploadReturn => {
         };
       }
       // 4. OEUVRES (simples + artist)
+      //Probleme avec solo et maxedition sici !!!
+      // ✅ FIX usePinataUpload.tsx
       else {
         metadata = {
           ...metadata,
           description: description || "",
-          ...(artist && { artist }),  // 🔥 OEUVRES ARTISTE
+          ...(artist && { artist }),
           tags: tags ? tags.split(',').map(t => t.trim()) : ["Oeuvre"],
-          collectionType: collectionType || "solo",
-          maxEditions: maxEditions || 1,
-          ...custom_data
+          // 🔥 PRIORITÉ custom_data d'ABORD
+          ...custom_data,
+          // 🔥 ENSUITE collectionType/maxEditions (avec check explicite)
+          collectionType: custom_data?.collectionType || collectionType || "solo",
+          maxEditions: custom_data?.maxEditions || maxEditions || 1,
         };
       }
 
