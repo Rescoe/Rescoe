@@ -92,7 +92,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         const instance = new Web3Auth({
           clientId: WEB3AUTH_CLIENT_ID,
-          web3AuthNetwork: "sapphire_devnet",
+          web3AuthNetwork: "sapphire_mainnet",
           uiConfig: {
             loginMethodsOrder: isMobile
               ? ["google", "facebook", "email_passwordless"]  // ✅ Sans metamask mobile
