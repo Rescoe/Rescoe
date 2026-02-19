@@ -1,5 +1,5 @@
 import { Box, Tooltip, Container, Button, Menu, MenuButton, MenuList, MenuItem, Drawer, DrawerBody, DrawerCloseButton, DrawerContent, DrawerHeader, DrawerOverlay, useDisclosure, HStack, VStack, Flex, useColorModeValue, useTheme } from '@chakra-ui/react';
-import { FaBug, FaEye, FaEyeSlash, FaBars, FaArrowRight, FaChevronRight, FaStar, FaCheck, FaQuestion  } from 'react-icons/fa';
+import { FaBug, FaEye, FaEyeSlash, FaBars } from 'react-icons/fa';
 import { Badge } from '@chakra-ui/react'; // ✅ À ajouter en haut si pas déjà
 
 import { ChevronDownIcon } from '@chakra-ui/icons';
@@ -8,6 +8,8 @@ import { ColorModeButton } from '../../../components/elements/ColorModeButton';
 import { NavBar } from '../../../components/elements/navigation/NavBar';
 
 import { ConnectBouton } from '../ConnectBouton';
+import { SoldeWallet } from '../ConnectBouton';
+
 import { GenerativeLogo } from '../../../components/elements/RescoeLogo';
 import NextLink from 'next/link';
 import { useAuth } from '@/utils/authContext';
@@ -24,7 +26,7 @@ import { brandHover, hoverStyles } from "@styles/theme"; //Style
 
 // ✅ NOUVELLE LISTE CENTRALE DES ADRESSES RÉSIDENTS
 const RESIDENT_ADDRESSES = [
-  "0x7EbDE55C4Aba6b3b31E03306e833fF92187F984b".toLowerCase(),
+  "0x552C63E3B89ADf749A5C1bB66fE574dF9203FfB4".toLowerCase(),
 ] as const;
 
 // ✅ CONFIG MÉNUS PAR RÔLE CENTRALISÉE
@@ -90,13 +92,10 @@ const ROLE_MENUS: Record<RoleKey, RoleMenuConfig> = {
     ],
   },
   nonMember: {
-    label: "🚀 Rejoins-nous !",  // Plus engageant
+    label: "visiteur",
     items: [
-      {
-        label: "Devenir adhérent 🔥",
-        href: "/adhesion",
-      },
-      { label: "FAQ", href: "/association/faq" },
+      { label: "Devenir adhérent", href: "/adhesion" },
+      { label: "FAQ", href: "/faq" },
     ],
   },
 
@@ -144,9 +143,15 @@ const RoleMenu: React.FC<RoleMenuProps> = ({ config, isResident = false }) => {
           }}
           transition={{ duration: 0.25, ease: "easeInOut" }}
         >
+
+
           {/* ✅ CONTENU : RÔLE + MACARON À L'INTÉRIEUR */}
           <HStack spacing={1} w="100%" justify="center">
-            <Box>{config.label}</Box>
+
+            <Box>{config.label} | </Box>
+            <SoldeWallet compact={false} showAddress={false} />
+
+
             {isResident && (
               <Badge
                 colorScheme="green"
@@ -166,13 +171,19 @@ const RoleMenu: React.FC<RoleMenuProps> = ({ config, isResident = false }) => {
         </MotionMenuButton>
 
         <MenuList bg="gray.800" borderColor="purple.600">
+        <ConnectBouton />
+
           {config.items.map((item) => (
             <NextLink key={item.href} href={item.href} passHref>
               <MenuItem as="a">{item.label}</MenuItem>
             </NextLink>
           ))}
+
+
         </MenuList>
       </Menu>
+
+
     </Tooltip>
   );
 };
@@ -300,9 +311,14 @@ useEffect(() => {
       role="banner"
       aria-label="En-tête du site"
       shadow="md"
+      px={{ base: 2, md: 4 }}  // ✅ PX=1 base (anti-bord)
+      maxW="100vw"             // ✅ Jamais plus large écran
+      overflowX="hidden"       // ✅ CUT overflow
       top={0}
       zIndex={1000}
-    >
+      py={{ base: 2, md: 4 }}  // ✅ ESPACE HAUT/BAS ajouté !
+      >
+
       <Container maxW="container.xl" p="20px">
         <Flex
           align="center"
@@ -354,7 +370,6 @@ useEffect(() => {
             direction={{ base: 'column', md: 'row' }}
             aria-label="Actions utilisateur"
           >
-            <ConnectBouton />
 
             {/* ✅ MÉNUS RÔLE-BASED (TOOLTIP RÉSIDENCE INTÉGRÉ !) */}
             {isMember && (
@@ -379,58 +394,20 @@ useEffect(() => {
                   borderRadius="full"
                   boxShadow="lg"
                   border="1px solid"
-                  borderColor="brand.mauve"  // Ton mauve
-                  bgGradient="linear(to-r, brand.mauve, brand.gold)"  // Ton theme
-                  color="white"
-                  whileHover={{
-                    scale: 1.05,
-                    boxShadow: "0 20px 40px rgba(180, 166, 213, 0.6)"  // Mauve glow
-                  }}
-                  _hover={{
-                    ...hoverStyles.brandHover._hover,
-                    bgGradient: "linear(to-r, brand.gold, brand.navy)",  // Ton hover + navy
-                    scale: 1.05
-                  }}
+                  whileHover={{ scale: 1.03, boxShadow: boxShadowHover }}
+                  _hover={{ ...hoverStyles.brandHover._hover, ...brandHover }}
                   _active={{ transform: "scale(0.98)" }}
-                  transition={{ duration: 0.3, ease: "easeOut" }}
+                  transition={{ duration: 0.25, ease: "easeInOut" }}
                 >
-                  🚀 Connecté (Rejoins-nous !)  {/* Pas d'icon = ZÉRO erreur */}
+                  Connecté (non-adhérent)
                 </MotionMenuButton>
-
-                <MenuList bg="gray.800" borderColor="brand.mauve" p={4}>
-                  {/* CTA 🔥 */}
+                <MenuList bg="gray.800" borderColor="purple.600">
                   <NextLink href="/adhesion" passHref>
-                    <MenuItem
-                      as="a"
-                      icon={<FaArrowRight />}
-                      bg="brand.mauve"
-                      _hover={{ bg: "brand.gold" }}
-                      borderRadius="md"
-                      fontWeight="bold"
-                    >
-                      Devenir adhérent 🔥
-                      <Badge ml={2} colorScheme="orange">Offre limitée</Badge>
-                    </MenuItem>
-                  </NextLink>
-
-                  {/* Avantages */}
-                  <MenuItem fontSize="xs" color="gray.400" icon={<FaCheck  />}>
-                    ✅ Accès exclusif NFT & événements
-                  </MenuItem>
-                  <MenuItem fontSize="xs" color="gray.400" icon={<FaCheck  />}>
-                    ✅ Support prioritaire + bonus
-                  </MenuItem>
-
-                  {/* FAQ */}
-                  <NextLink href="/association/faq" passHref>
-                    <MenuItem as="a" mt={2} icon={<FaQuestion  />}>
-                      FAQ Association
-                    </MenuItem>
+                    <MenuItem as="a">Devenir adhérent</MenuItem>
                   </NextLink>
                 </MenuList>
               </Menu>
             )}
-
 
             {/* ✅ MENU INSECTE (inchangé) */}
             {isAuthenticated && isMember && role !== "non-member" && (
@@ -498,9 +475,13 @@ useEffect(() => {
               <RoleMenu config={ROLE_MENUS.nonMember} isResident={isResident} />
             )}
 
-            <Box py={6} borderRadius="full">
-              <ColorModeButton />
-            </Box>
+            {/* ✅ MENU NON-CONNECTÉ (quand PAS authentifié) */}
+            {!isAuthenticated && (
+              <Tooltip label="Veuillez d'abord connecter votre wallet" aria-label="Aide Adhésion">
+                <ConnectBouton />
+              </Tooltip>
+            )}
+
           </HStack>
         </Flex>
 
@@ -527,6 +508,11 @@ useEffect(() => {
               <VStack align="start" spacing={4}>
                 <NavBar />
               </VStack>
+
+              <Box py={6} borderRadius="full">
+                <ColorModeButton />
+              </Box>
+
             </DrawerBody>
           </DrawerContent>
         </Drawer>

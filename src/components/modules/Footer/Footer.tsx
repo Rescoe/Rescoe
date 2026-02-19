@@ -1,268 +1,214 @@
-import { Box, Link, Text, VStack, HStack, Button, Center, Heading } from '@chakra-ui/react';
-import { FaInstagram } from 'react-icons/fa';
-import { SiBluesky } from 'react-icons/si';
-import NextLink from 'next/link';
+import {
+  Box,
+  VStack,
+  HStack,
+  Text,
+  Heading,
+  Button,
+  Link,
+  Center,
+  Grid,
+  useColorModeValue,
+} from "@chakra-ui/react";
+
+import NextLink from "next/link";
 import { motion } from "framer-motion";
+import { FaInstagram, FaQuestionCircle, FaGraduationCap, FaGithub } from "react-icons/fa";
+import { SiBluesky } from "react-icons/si";
 
-// Animation pulsante pour le bouton "Adhérez"
-import { pulse } from "@styles/theme";
-import { brandHover, hoverStyles } from "@styles/theme"; //Style
+import { effects, gradients, animations, brandHover } from "@styles/theme";
 
-
+const MotionBox = motion(Box);
 
 const links = {
-  adhesion: '/adhesion',
-  instagram: 'https://www.instagram.com/r_e_s_c_o_e/', // Remplace par le bon lien
-  bluesky: 'https://bsky.app/profile/rescoe.bsky.social', // Remplace par le bon lien
+  adhesion: "/adhesion",
+  faq: "/association/faq",
+  formations: "/association/formations",
+  instagram: "https://www.instagram.com/r_e_s_c_o_e/",
+  bluesky: "https://bsky.app/profile/rescoe.bsky.social",
+  github: "https://github.com/Rescoe/Rescoe",
 };
 
+export default function Footer() {
+  const glow = useColorModeValue(effects.glowLight, effects.glowDark);
+  const borderGradient = useColorModeValue(
+    gradients.cardBorderLight,
+    gradients.cardBorderDark
+  );
 
-
-
-const Footer = () => {
   return (
-
-    <Box
-      mt={10}
-      textAlign="center"
-      p={4}
-      boxShadow="dark-lg"
-      borderWidth={1}
-      borderRadius="lg"
-      border="1px solid"
-      borderColor="purple.300"
-      maxWidth="95%" // Limite la largeur de la box
-      mx="auto"
+    <MotionBox
+      mt={20}
+      px={{ base: 6, md: 12, lg: 20, xl: 24 }}
+      py={{ base: 12, md: 16, lg: 20 }}
+      position="relative"
+      w="full"
+      mx={0}
+      minH={{ base: "auto", md: "400px" }}
+      overflow="hidden"
+      boxShadow={glow}
+      bg={useColorModeValue("brand.cream", "brand.gold")}
+      _before={{
+        content: '""',
+        position: "absolute",
+        inset: 0,
+        padding: "1px",
+        background: borderGradient,
+        WebkitMask:
+          "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+        WebkitMaskComposite: "xor",
+        maskComposite: "exclude",
+        animation: animations.borderGlow,
+      }}
     >
-      <VStack spacing={3}>
-      <Heading fontSize="lg" fontWeight="bold"> RESCOE </Heading>
-        <Heading fontSize="md" fontWeight="bold">
-          Réseau expérimental solidaire de Crypto Œuvres émergentes
+      <VStack
+        spacing={{ base: 8, md: 12 }}
+        position="relative"
+        zIndex={1}
+        align="center"
+        w="full"
+        maxW={{ base: "100%", lg: "1200px" }}
+        mx="auto"
+      >
+        {/* BRAND - Toujours centré */}
+        <Heading size={{ base: "lg", md: "xl" }} textAlign="center" mb={2}>
+          RESCOE
         </Heading>
+        <Text as="span" fontWeight="medium" color="brand.gold" fontSize="sm">
+          Association loi 1901
+        </Text>
 
-        <Box>
-          <Text fontSize="m" fontWeight="bold" mb={2}>
-            Rejoignez le réseau !
-          </Text>
-
-          {/* Bouton d’appel à l’action (CTA) */}
-
-          <NextLink href="/adhesion" passHref>
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.1, ease: "easeOut" }}
-            viewport={{ once: true }}
-          >
-          <Center mt={10}>
-
-
+        {/* CTA PRINCIPAL - En haut pour impact max */}
+        <motion.div whileHover={{ scale: 1.05 }} style={{ zIndex: 2 }}>
+          <NextLink href={links.adhesion} passHref>
             <Button
-              as={NextLink}
-              href="/adhesion"
-              size="lg"
               px={12}
               py={6}
-              fontWeight="bold"
-              rounded="full"
-              _hover={{
-                ...hoverStyles.brandHover._hover,
-                ...brandHover,
-                transform: "scale(1.05)",
-                transition: "all 0.3s ease",
-              }}
-              animation={`${pulse} 2s infinite`}
-              boxShadow="0 8px 32px rgba(168, 85, 247, 0.25)"
+              rounded="2xl"
+              fontSize={{ base: "md", md: "lg" }}
+              fontWeight="extrabold"
+              bgGradient="linear(to-r, brand.gold, brand.mauve)"
+              color="brand.navy"
+              boxShadow={glow}
+              _hover={{ ...brandHover, transform: "scale(1.05)" }}
+              size="lg"
             >
-            🚀 Adhérez Maintenant
+              🚀 Rejoindre RESCOE
             </Button>
-          </Center>
-
-          </motion.div>
-
           </NextLink>
-        </Box>
+        </motion.div>
 
-        <Text fontSize="md" mt={4}>Suivez-nous :</Text>
-
-        <HStack spacing={5} mt={2}>
-          <Link href={links.instagram} isExternal display="flex" alignItems="center">
-            <FaInstagram size={20} />
-            <Text ml={2}>Instagram</Text>
-          </Link>
-          <Link href={links.bluesky} isExternal display="flex" alignItems="center">
-            <SiBluesky size={20} />
-            <Text ml={2}>Bluesky</Text>
-          </Link>
-        </HStack>
-
-        <Text fontSize="xs" mt={4}>
-          &copy; 2018 - {new Date().getFullYear()} RESCOE. Tous droits réservés.
-        </Text>
-      </VStack>
-    </Box>
-  );
-};
-
-export default Footer;
-
-
-/*
-import { Box, Link, Text, VStack, HStack, Button, Center, Heading, useToast, useColorModeValue, useColorMode } from '@chakra-ui/react';
-import { FaInstagram } from 'react-icons/fa';
-import { SiBluesky } from 'react-icons/si';
-import NextLink from 'next/link';
-import { motion } from "framer-motion";
-import RoleBasedNFTPage from '@/components/containers/home/Adhesion'; // Importez votre composant de notice d'adhésion
-
-// Animation pulsante pour le bouton "Adhérez"
-import { pulse } from "@styles/theme";
-import { brandHover, hoverStyles } from "@styles/theme"; //Style
-import { gradients, animations, Backgrounds } from "@/styles/theme";
-
-
-const Footer = () => {
-    const toast = useToast();
-    const { colorMode } = useColorMode();
-    const bgColor = useColorModeValue(Backgrounds.cardBorderLight, Backgrounds.cardBorderDark);
-
-    const showMembershipToast = () => {
-    const toastId = toast({
-          position: "bottom",
-                  duration: null,
-                  isClosable: true,
-                  render: () => (
-                      <Box
-                          position="fixed"
-                          top={0}
-                          left={0}
-                          w="100vw"
-                          h="100vh"
-                          p="1px"
-
-                          overflow="hidden"
-                          zIndex={1500}
-                          display="flex"
-                          justifyContent="center"
-                          alignItems="center"
-                          onClick={() => toast.close(toastId)} // clique dehors ferme le toast
-                      >
-                          <Box
-                              borderRadius="md"
-                              maxH="90vh"
-                              w="95%"
-                              p="3px"
-                              overflowY="auto"
-                              bgGradient={
-                                  colorMode === "light"
-                                      ? gradients.cardBorderLight
-                                      : gradients.cardBorderDark
-                              }
-                              backgroundSize="300% 300%"
-                              animation={animations.borderGlow}
-                              boxShadow="lg"
-                              onClick={(e) => e.stopPropagation()} // empêche la fermeture si on clique dedans
-                          >
-            <Box borderRadius="xl" height="100%" p={4} textAlign="center" bg={bgColor}>
-
-                <Button
-                    position="absolute"
-                    right="10px"
-                    top="10px"
-                    onClick={() => toast.close(toastId)} // Ferme le toast
-                    aria-label="Close" // Accessibilité
-                >
-                    &times;
-                </Button>
-                <RoleBasedNFTPage />
-                </Box>
-            </Box>
-            </Box>
-        ),
-    });
-
-    // Gérer la fermeture en cliquant à l'extérieur
-    const handleClickOutside = (event) => {
-        const toastElement = document.getElementById(`chakra-toast-${toastId}`);
-        if (toastElement && !toastElement.contains(event.target)) {
-            toast.close(toastId); // Ferme le toast si le clic est à l'extérieur
-        }
-    };
-
-    // Ajout d'un écouteur d'événements
-    window.addEventListener("click", handleClickOutside);
-
-    return () => {
-        window.removeEventListener("click", handleClickOutside); // Nettoyage lors de la fermeture
-    };
-};
-
-
-    return (
-        <Box
-            mt={10}
+        {/* DESCRIPTION PRINCIPALE */}
+        <VStack spacing={2} maxW={{ base: "320px", md: "500px", lg: "560px" }} w="full">
+          <Text
+            fontSize={{ base: "sm", md: "md" }}
+            opacity={0.95}
             textAlign="center"
-            p={4}
-            boxShadow="dark-lg"
-            borderWidth={1}
-            borderRadius="lg"
-            border="1px solid"
-            maxWidth="95%"
-            mx="auto"
+            lineHeight={1.3}
+            fontWeight="medium"
+          >
+            Galerie d'art associative depuis 2018
+          </Text>
+          <Text
+            fontSize={{ base: "sm", md: "md" }}
+            opacity={0.8}
+            textAlign="center"
+            lineHeight={1.4}
+          >
+            Réseau d'artistes, d'expérimentation et de transmission.
+          </Text>
+
+        </VStack>
+
+        {/* MISSION */}
+        <Text
+          fontSize={{ base: "xs", md: "sm" }}
+          opacity={0.75}
+          textAlign="center"
+          maxW={{ base: "340px", md: "540px", lg: "640px" }}
+          px={{ base: 3, md: 6 }}
+          lineHeight={1.6}
+          fontStyle="italic"
         >
-            <VStack spacing={3}>
-                <Heading fontSize="lg" fontWeight="bold"> RESCOE </Heading>
-                <Heading fontSize="md" fontWeight="bold">
-                    Réseau expérimental solidaire de Crypto Œuvres émergentes
-                </Heading>
+          Infrastructure ouverte pour créer, publier et diffuser des œuvres numériques
+          entre pratique artistique, recherche et pédagogie.
+        </Text>
 
-                <Box>
-                    <Text fontSize="m" fontWeight="bold" mb={2}>
-                        Rejoignez le réseau !
-                    </Text>
+        {/* NAVIGATION & COMMUNITY - Parfaitement centrée */}
+        <Grid
+          templateColumns={{
+            base: "repeat(auto-fit, minmax(140px, 1fr))",
+            md: "repeat(auto-fit, minmax(160px, 1fr))",
+            lg: "repeat(3, 1fr)"
+          }}
+          gap={{ base: 6, md: 8 }}
+          w="full"
+          maxW={{ base: "100%", md: "600px", lg: "800px" }}
+          justifyContent="center"
+        >
+          <VStack align="center" spacing={3} textAlign="center">
+            <Text fontSize="xs" fontWeight="medium" opacity={0.8}>
+              Des Questions ?
+            </Text>
+            <NextLink href={links.faq} passHref>
+              <HStack as={Link} spacing={2} _hover={{ opacity: 0.8 }}>
+                <FaQuestionCircle size={14} />
 
-                    <Center mt={10}>
-                        <Button
-                          size="lg"
-                          px={12}
-                          py={6}
-                          fontWeight="bold"
-                          rounded="full"
-                          _hover={{
-                            ...hoverStyles.brandHover._hover,
-                            ...brandHover,
-                            transform: "scale(1.05)",
-                            transition: "all 0.3s ease",
-                          }}
-                          animation={`${pulse} 2s infinite`}
-                          boxShadow="0 8px 32px rgba(168, 85, 247, 0.25)"
-                          onClick={showMembershipToast} // Appelle le toast au clic
-                        >
-                        🚀 Adhérez Maintenant
-                        </Button>
-                    </Center>
-                </Box>
+                <Text fontSize="sm">FAQ</Text>
+              </HStack>
+            </NextLink>
+            <NextLink href={links.formations} passHref>
+            {/*
+              <HStack as={Link} spacing={2} _hover={{ opacity: 0.8 }}>
+                <FaQuestionCircle size={14} />
+                <Text fontSize="sm">Formations</Text>
+              </HStack>
+            */}
+            </NextLink>
+          </VStack>
 
-                <Text fontSize="md" mt={4}>Suivez-nous :</Text>
+          <VStack align="center" spacing={3} textAlign="center">
+            <Text fontSize="xs" fontWeight="medium" opacity={0.8}>
+              Communauté
+            </Text>
+            <HStack as={Link} href={links.instagram} isExternal spacing={2} _hover={{ opacity: 0.8 }}>
+              <FaInstagram size={14} />
+              <Text fontSize="sm">Instagram</Text>
+            </HStack>
+            <HStack as={Link} href={links.bluesky} isExternal spacing={2} _hover={{ opacity: 0.8 }}>
+              <SiBluesky size={14} />
+              <Text fontSize="sm">Bluesky</Text>
+            </HStack>
+            <HStack as={Link} href={links.github} isExternal spacing={2} _hover={{ opacity: 0.8 }}>
+              <FaGithub size={14} />
+              <Text fontSize="sm">Github</Text>
+            </HStack>
+          </VStack>
 
-                <HStack spacing={5} mt={2}>
-                    <Link href="https://www.instagram.com/r_e_s_c_o_e/" isExternal display="flex" alignItems="center">
-                        <FaInstagram size={20} />
-                        <Text ml={2}>Instagram</Text>
-                    </Link>
-                    <Link href="https://bsky.app/profile/rescoe.bsky.social" isExternal display="flex" alignItems="center">
-                        <SiBluesky size={20} />
-                        <Text ml={2}>Bluesky</Text>
-                    </Link>
-                </HStack>
+          <VStack align="center" spacing={3} textAlign="center" display={{ base: "none", lg: "flex" }}>
+            <Text fontSize="xs" fontWeight="medium" opacity={0.8}>
+              Depuis 2018
+            </Text>
+            <Text fontSize="xs" opacity={0.7}>Art onchain</Text>
+            <Text fontSize="xs" opacity={0.7}>France</Text>
+          </VStack>
+        </Grid>
 
-                <Text fontSize="xs" mt={4}>
-                    &copy; 2018 - {new Date().getFullYear()} RESCOE. Tous droits réservés.
-                </Text>
-            </VStack>
-        </Box>
-    );
-};
-
-export default Footer;
-*/
+        {/* COPYRIGHT - Parfaitement centré */}
+        <Center
+          pt={{ base: 6, md: 8 }}
+          pb={6}
+          w="full"
+          borderTopWidth={1}
+          borderTopColor="rgba(255,255,255,0.1)"
+          mt={4}
+          maxW="400px"
+        >
+          <Text fontSize="xs" opacity={0.6} textAlign="center">
+            © 2018 — {new Date().getFullYear()} RESCOE
+          </Text>
+        </Center>
+      </VStack>
+    </MotionBox>
+  );
+}

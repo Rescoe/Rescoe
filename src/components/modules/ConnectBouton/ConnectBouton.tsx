@@ -10,23 +10,26 @@ import {
   MenuList,
   MenuItem,
   useClipboard,
-IconButton,
-VStack,
-HStack,
+  IconButton,
+  VStack,
+  HStack,
+  Badge,
+  Flex,
+  useBreakpointValue,
 } from "@chakra-ui/react";
-import { LinkIcon } from '@chakra-ui/icons';  // ✅ ✅ ✅
-
+import { LinkIcon, CopyIcon } from "@chakra-ui/icons";
+import { motion } from "framer-motion";
 import { signIn, signOut } from "next-auth/react";
 import { useAuthRequestChallengeEvm } from "@moralisweb3/next";
 import { getEllipsisTxt } from "../../../utils/format";
 import { useAuth } from "../../../utils/authContext";
-import { brandHover, hoverStyles } from "@styles/theme";
 import Web3 from "web3";
 import detectEthereumProvider from "@metamask/detect-provider";
+import { formatUnits } from "@ethersproject/units";
 
+const MotionMenuButton = motion(MenuButton);
 
 const ConnectBouton: React.FC = () => {
-
   const { requestChallengeAsync } = useAuthRequestChallengeEvm();
   const toast = useToast();
 
@@ -45,62 +48,67 @@ const ConnectBouton: React.FC = () => {
   } = useAuth();
 
   const [isConnecting, setIsConnecting] = useState(false);
-  const selectedChainId = 8453;  // ID de Base Sepolia
-  const chainName = "Base"; // Nom du réseau
+  const [balance, setBalance] = useState("0");
+  const selectedChainId = 8453;
   const [web3, setWeb3] = useState<Web3 | null>(null);
 
-  // Init Web3 instance
+  const isDesktop = useBreakpointValue({ base: false, md: true });
+
+  // Init Web3 + fetch balance périodique
   useEffect(() => {
     const initWeb3 = async () => {
       const provider = await detectEthereumProvider();
       if (provider) {
-        const web3Instance = new Web3(provider);
+        const web3Instance = new Web3(provider as any);
         setWeb3(web3Instance);
-        // Changer automatiquement de réseau à Base Sepolia lors de la connexion
-        try {
-          await (window.ethereum as any).request({
-            method: "wallet_switchEthereumChain",
-            params: [{ chainId: `0x${selectedChainId.toString(16)}` }],
-          });
+      }
+    };
+    initWeb3();
+  }, []);
 
-        } catch (error) {
-          console.error("Erreur lors du changement de chaîne:", error);
-        }
+  useEffect(() => {
+    if (!web3 || !address) return;
+
+    const fetchBalance = async () => {
+      try {
+        const bal = await web3.eth.getBalance(address);
+        const formatted = formatUnits(bal, 18);
+        setBalance(formatted.slice(0, 8));
+      } catch (e) {
+        console.error("Erreur balance:", e);
       }
     };
 
-    initWeb3();
+    fetchBalance();
+    const interval = setInterval(fetchBalance, 10000);
+    return () => clearInterval(interval);
+  }, [web3, address]);
 
-    // Vérifier l'authentification à la connexion
-    /*
-    const storedAddress = localStorage.getItem("connectedAddress");
-    const storedAuth = localStorage.getItem("isAuthenticated") === "true";
-    if (storedAddress && storedAuth) {
-      setAddress(storedAddress);
-      setIsAuthenticated(true);
-    }
-    */
-  }, []);
-
-  // Moralis EVM auth flow
   const handleAuth = async (account: string) => {
     setIsConnecting(true);
     try {
-      const challenge = await requestChallengeAsync({ address: account, chainId: selectedChainId });
+      const challenge = await requestChallengeAsync({
+        address: account,
+        chainId: selectedChainId,
+      });
       if (!challenge?.message) throw new Error("Challenge non valide.");
 
       setAddress(account.toLowerCase());
       setIsAuthenticated(true);
-      //localStorage.setItem("connectedAddress", account.toLowerCase());
-      //localStorage.setItem("isAuthenticated", "true");
+
+      toast({
+        title: "Connecté avec succès !",
+        status: "success",
+        duration: 2000,
+        position: "top-right",
+      });
     } catch (e) {
-      console.error("Erreur lors de l'authentification:", e);
       toast({
         title: "Erreur de connexion",
-        description: "Impossible de vous authentifier, veuillez réessayer.",
+        description: "Veuillez réessayer.",
         status: "error",
         position: "top-right",
-        isClosable: true,
+        duration: 4000,
       });
     } finally {
       setIsConnecting(false);
@@ -112,58 +120,76 @@ const ConnectBouton: React.FC = () => {
     signOut({ callbackUrl: "/" });
     setIsAuthenticated(false);
     setAddress(null);
-    //localStorage.removeItem("connectedAddress");
-    //localStorage.removeItem("isAuthenticated");
+    setBalance("0");
   };
 
-  // Suppression de la sélection de chaîne dans le UI
   const getUserRole = () => {
-    return role ? role.charAt(0).toUpperCase() + role.slice(1) : "User";
+    if (!role) return "User";
+    return role.charAt(0).toUpperCase() + role.slice(1);
   };
 
-  // --------------------------
-  // 🟢 UI
-  // --------------------------
+  // Loading state
   if (isLoading || roleLoading) {
     return (
-      <Button px={6} py={4} fontSize="md" borderRadius="full" boxShadow="lg" isLoading>
-        Chargement...
-      </Button>
+      <Button
+        size="sm"
+        borderRadius="full"
+        bg="whiteAlpha.100"
+        border="1px solid whiteAlpha.200"
+        backdropFilter="blur(10px)"
+        isLoading
+      />
     );
   }
 
+  // ========== DISCONNECTED - Ton bouton doré parfait ✅ ==========
   if (!isAuthenticated) {
     return (
       <Menu>
-        <MenuButton
+        <MotionMenuButton
           as={Button}
-          px={6}
           py={4}
-          fontSize="md"
+          minW="auto"
+          maxW={{ base: "calc(100vw - 40px)", md: "160px" }}
+          fontSize={{ base: "sm", md: "md" }}
+          fontWeight="600"
           borderRadius="full"
-          boxShadow="lg"
-          _hover={{ ...hoverStyles.brandHover._hover, ...brandHover }}
+          letterSpacing={0.5}
+          whiteSpace="nowrap"
+          bg="brand.gold"
+          color="black"
+          boxShadow="0 10px 40px rgba(238,212,132,0.25)"
+          border="1px solid rgba(238,212,132,0.3)"
+          whileHover={isDesktop ? { scale: 1.05, boxShadow: "0 20px 60px rgba(238,212,132,0.35)", y: -2 } : {}}
+          whileTap={{ scale: 0.98 }}
+          _hover={{ bg: "brand.gold" }}
           _active={{ transform: "scale(0.98)" }}
+          data-loading={isConnecting}
+          //isDisabled={isConnecting}
+          mx={1}
         >
           Se connecter
-        </MenuButton>
-        <MenuList>
+        </MotionMenuButton>
+
+        <MenuList
+          backdropFilter="blur(18px)"
+          bg="rgba(20,20,24,0.95)"
+          border="1px solid whiteAlpha.200"
+          shadow="lg"
+          minW="280px"
+        >
           <MenuItem
             onClick={async () => {
               await connectWallet();
-              if (address) {
-                await handleAuth(address);
-              } else {
-                console.warn("Adresse absente après connexion wallet");
-              }
+              if (address) await handleAuth(address);
             }}
+            _hover={{ bg: "whiteAlpha.100" }}
           >
             🦊 MetaMask / Wallet
           </MenuItem>
           <MenuItem
-            onClick={async () => {
-              await connectWithEmail();
-            }}
+            onClick={connectWithEmail}
+            _hover={{ bg: "whiteAlpha.100" }}
           >
             📧 Email (Web3Auth)
           </MenuItem>
@@ -172,77 +198,124 @@ const ConnectBouton: React.FC = () => {
     );
   }
 
-  const CopyButton = ({ address }: { address: string }) => {
-    const { onCopy, hasCopied } = useClipboard(address);
-
-    return (
-      <IconButton
-        aria-label="Copier adresse"
-        icon={<LinkIcon />}
-        size="sm"
-        colorScheme={hasCopied ? "green" : "purple"}
-        variant="ghost"
-        onClick={onCopy}
-        title={hasCopied ? "Copié !" : "Copier"}
-        animation={hasCopied ? "pulse 0.5s" : "none"}
-      />
-    );
-  };
-
+  // ========== CONNECTED - NOUVEAU BOUTON PETIT + COMPACT ✅ ==========
+  const { onCopy, hasCopied } = useClipboard(address || "");
 
   return (
-    <Box>
+    <Menu placement="bottom-end">
       <Tooltip
-        label={`Connecté : ${getUserRole()}`}
-        aria-label="User Role Tooltip"
+        label={
+          <VStack align="start" spacing={1} p={2}>
+            <Text fontSize="sm" fontWeight="500">{getUserRole()}</Text>
+            <Text fontSize="xs" color="gray.400">Base Sepolia • {balance} ETH</Text>
+          </VStack>
+        }
         hasArrow
-        placement="bottom"
+        placement="bottom-start"
+        bg="gray.800"
+        color="white"
       >
-      <Menu>
-        <MenuButton
-          as={HStack}
-          cursor="pointer"
-          gap="20px"
-          spacing={{ base: 2, md: 4 }}
-          direction={{ base: "column", md: "row" }}
+        <MotionMenuButton
+          as={Button}
+          px={2.5} py={2}             // ✅ COMPACT
+          borderRadius="full"
+          bg="whiteAlpha.100"
+          border="1px solid whiteAlpha.200"
+          backdropFilter="blur(10px)"
+          whileHover={isDesktop ? { scale: 1.05 } : {}}
+          _hover={{ bg: "whiteAlpha.200" }}
         >
-          <Text fontWeight="medium">
-            {address ? getEllipsisTxt(address) : "Non connecté"}
-          </Text>
-        </MenuButton>
-        <MenuList bg="gray.800" borderColor="purple.600">
-          {/* 🔥 ADRESSE COMPLÈTE + COPY */}
-          <MenuItem p={4} borderBottom="1px" borderColor="gray.700">
-            <VStack align="start" spacing={1} w="full">
-              <Text fontSize="xs" color="gray.400">Adresse</Text>
-              <HStack justify="space-between" w="full">
-              <Text fontSize="sm" fontFamily="mono" noOfLines={1}>
-                {address ?? 'Aucune'}  // ✅ Nullish safe
+          {/* Layout ultra-compact : Logo + Badge + Adresse + Solde */}
+          <HStack spacing={1.5} w="full">
+
+            {/* Rôle + Adresse + Solde */}
+            <Flex align="center" gap={1} flex={1} minW={0}>
+              <Badge
+                colorScheme={role === "admin" ? "purple" : "green"}
+                fontSize="2xs" px={1.5} borderRadius="full" flexShrink={0}
+              >
+                {getUserRole().slice(0, 3)}
+              </Badge>
+              <Text
+                fontSize="xs"
+                fontFamily="mono"
+                noOfLines={1}
+                overflow="hidden"
+                textOverflow="ellipsis"
+                flex={1}
+              >
+                {getEllipsisTxt(address!)}
               </Text>
-              <CopyButton address={address!} />  // ✅ ! OK car isAuthenticated true
-
-              </HStack>
-            </VStack>
-          </MenuItem>
-
-          {/* Déconnecter */}
-          <MenuItem
-            onClick={handleDisconnect}
-            _hover={{ bg: "purple.600", color: "white" }}
-            _active={{ bg: "purple.700" }}
-            fontWeight="medium"
-            borderRadius="md"
-          >
-            Se déconnecter
-          </MenuItem>
-        </MenuList>
-      </Menu>
-
+              <Badge fontSize="2xs" colorScheme="gray" variant="subtle" px={1} flexShrink={0}>
+                {balance} Ξ
+              </Badge>
+            </Flex>
+          </HStack>
+        </MotionMenuButton>
       </Tooltip>
-    </Box>
+
+      {/* Ton MenuList parfait (inchangé) */}
+      <MenuList
+        backdropFilter="blur(18px)"
+        bg="rgba(20,20,24,0.95)"
+        border="1px solid whiteAlpha.200"
+        minW={{ base: "300px", md: "320px" }}
+        maxW="90vw"
+      >
+        <MenuItem p={4} borderBottom="1px" borderColor="gray.700">
+          <VStack align="start" spacing={2} w="full">
+            <Text fontSize="xs" color="gray.400" textTransform="uppercase">Adresse</Text>
+            <HStack justify="space-between" w="full">
+              <Text fontSize="sm" fontFamily="mono" color="white" noOfLines={1}>
+                {getEllipsisTxt(address!)}
+              </Text>
+              <IconButton
+                aria-label={hasCopied ? "Copié !" : "Copier"}
+                icon={hasCopied ? <CopyIcon color="green.400" /> : <LinkIcon />}
+                size="sm"
+                variant="ghost"
+                colorScheme="purple"
+                onClick={onCopy}
+                title={hasCopied ? "Copié !" : "Copier"}
+                animation={hasCopied ? "pulse 0.5s" : "none"}
+                _hover={{ bg: "purple.600" }}
+              />
+            </HStack>
+          </VStack>
+        </MenuItem>
+
+        <MenuItem py={3} px={4}>
+          <HStack>
+            <Box w={3} h={3} bg="green.400" borderRadius="full" />
+            <VStack align="start" spacing={0}>
+              <Text fontWeight="500">Solde</Text>
+              <Text fontSize="sm" color="green.400">{balance} ETH</Text>
+            </VStack>
+          </HStack>
+        </MenuItem>
+
+        <MenuItem py={3} px={4}>
+          <HStack>
+            <Box w={3} h={3} bg="blue.400" borderRadius="full" />
+            <Text>Base Sepolia ({selectedChainId})</Text>
+          </HStack>
+        </MenuItem>
+
+        <MenuItem
+          onClick={handleDisconnect}
+          mt={2}
+          _hover={{ bg: "red.600", color: "white" }}
+          fontWeight="600"
+          borderTop="1px"
+          borderColor="gray.700"
+          borderRadius="md"
+          color="red.300"
+        >
+          Se déconnecter
+        </MenuItem>
+      </MenuList>
+    </Menu>
   );
 };
-
-
 
 export default ConnectBouton;

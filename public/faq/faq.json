@@ -1,0 +1,72 @@
+[
+  {
+    "question": "Dois-je avoir un wallet crypto pour utiliser RESCOE ?",
+    "answer": "Non.\n\nVous pouvez :\n- vous connecter avec votre adresse email\n- ou connecter votre propre wallet (ex : MetaMask)\n\nSi vous choisissez la connexion par email, un wallet est automatiquement créé pour vous.",
+    "category": "🔐 Connexion et sécurité"
+  },
+  {
+    "question": "Puis-je récupérer ma clé privée ?",
+    "answer": "Oui.\n\nVous pouvez récupérer la clé privée associée à votre wallet à tout moment.\n\nRESCOE :\n- n’a pas accès à vos fonds\n- ne peut pas déplacer vos actifs\n- ne contrôle pas votre portefeuille\n\nVous êtes le seul propriétaire de votre wallet.",
+    "category": "🔐 Connexion et sécurité"
+  },
+  {
+    "question": "Envoyez-vous des emails promotionnels ?",
+    "answer": "Non.\n\nNous n’envoyons pas d’emails promotionnels.\nVotre adresse email sert uniquement à la gestion de votre compte.",
+    "category": "🔐 Connexion et sécurité"
+  },
+  {
+    "question": "Faut-il être adhérent pour acheter une œuvre ?",
+    "answer": "Non.\n\nToute personne connectée peut acheter une œuvre ou un poème.\n\nL’adhésion donne accès à des fonctionnalités supplémentaires (mint complet, création, évolution…), mais l’achat est ouvert à tous.",
+    "category": "🎨 Achat d’œuvres"
+  },
+  {
+    "question": "Qu’est-ce qu’un insecte ?",
+    "answer": "Un insecte est votre badge d’adhésion numérique évolutif.\n\nIl représente :\n- votre statut de membre\n- votre niveau d’implication\n- votre ancienneté dans le réseau\n\nIl évolue selon le type d’adhésion et les points RESCOE que vous obtenez.",
+    "category": "🐞 L’adhésion et les insectes"
+  },
+  {
+    "question": "Pourquoi utiliser des insectes comme badges ?",
+    "answer": "RESCOE explore une approche artistique et expérimentale.\n\nL’insecte symbolise :\n- la transformation\n- l’évolution\n- l’écosystème\n- l’interdépendance\n\nIl ne s’agit pas d’un simple « jeton », mais d’un objet artistique vivant dans l’écosystème RESCOE.",
+    "category": "🐞 L’adhésion et les insectes"
+  },
+  {
+    "question": "Quels types d’adhésion existent actuellement ?",
+    "answer": "Actuellement, deux mécanismes principaux :\n\n1️⃣ Adhésion manuelle\n- Prix réduit\n- Durée déterminée\n- Évolution possible via des paliers payants\n- Frais d’évolution réduits (÷10 par rapport au prix principal)\n\n2️⃣ Adhésion annuelle\n- Prix annuel fixe\n- Renouvellement chaque année si vous le souhaitez\n- Possibilité d’évolution\n\n🔜 Évolution future (phase 2)\nAdhésion annuelle avec évolution automatique.",
+    "category": "💳 Les différents types d’adhésion"
+  },
+  {
+    "question": "Que sont les points RESCOE ?",
+    "answer": "Les points RESCOE sont des points internes attribués :\n- lors de chaque adhésion\n- lors des évolutions d’insectes\n- selon une grille définie dans le contrat\n\nIls peuvent également être achetés si nécessaire.",
+    "category": "⭐ Les points RESCOE"
+  },
+  {
+    "question": "Ont-ils une valeur financière ?",
+    "answer": "Non.\n\nLes points RESCOE :\n- n’ont aucune valeur monétaire\n- ne sont pas échangeables contre de l’argent\n- ne sont pas un actif spéculatif\n\nIls servent uniquement à faire fonctionner l’écosystème interne.",
+    "category": "⭐ Les points RESCOE"
+  },
+  {
+    "question": "Puis-je avoir plusieurs insectes ?",
+    "answer": "Oui.\n\nChaque adhérent peut avoir :\n- 2 insectes maximum par an",
+    "category": "🥚 Reproduction des insectes"
+  },
+  {
+    "question": "Que signifie la reproduction ?",
+    "answer": "Vous pouvez faire se reproduire deux insectes contre 100 points RESCOE.\n\nCela génère :\n- un œuf\n- qui éclot plus tard\n- donnant une adhésion annuelle supplémentaire offerte pour l’année suivante\n\nCela vous permet d’obtenir une nouvelle adhésion et d’augmenter votre capacité d’engagement.",
+    "category": "🥚 Reproduction des insectes"
+  },
+  {
+    "question": "Puis-je vendre mon insecte ?",
+    "answer": "Oui, mais uniquement à la fin de la durée d’adhésion.\n\nPendant la période active :\n- le badge est verrouillé\n- il ne peut pas être transféré",
+    "category": "🔄 Revente et renouvellement"
+  },
+  {
+    "question": "La galerie à Bordeaux est-elle ouverte ?",
+    "answer": "Pas encore.\n\nLa galerie physique est actuellement en travaux.\n\nElle ouvrira dans une seconde phase du projet et permettra :\n- des expositions\n- des événements\n- des rencontres\n- des activations hybrides (physique + blockchain).",
+    "category": "🏗 Galerie physique"
+  },
+  {
+    "question": "RESCOE est-il un projet spéculatif ?",
+    "answer": "Non.\n\nRESCOE est une association artistique expérimentale.\n\nL’adhésion sert à soutenir :\n- un réseau créatif\n- une recherche autour de l’art génératif\n- une hybridation entre monde physique et numérique\n\nLes mécanismes (insectes, reproduction, évolution) sont des outils artistiques et structurels, pas des instruments financiers.",
+    "category": "🧭 Vision générale"
+  }
+]
