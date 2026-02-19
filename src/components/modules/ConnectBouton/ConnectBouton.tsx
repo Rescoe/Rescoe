@@ -207,7 +207,7 @@ const ConnectBouton: React.FC = () => {
         label={
           <VStack align="start" spacing={1} p={2}>
             <Text fontSize="sm" fontWeight="500">{getUserRole()}</Text>
-            <Text fontSize="xs" color="gray.400">Base Sepolia • {balance} ETH</Text>
+            <Text fontSize="xs" color="gray.400">Base • {balance} ETH</Text>
           </VStack>
         }
         hasArrow
@@ -296,8 +296,8 @@ const ConnectBouton: React.FC = () => {
 
         <MenuItem py={3} px={4}>
           <HStack>
-            <Box w={3} h={3} bg="blue.400" borderRadius="full" />
-            <Text>Base Sepolia ({selectedChainId})</Text>
+            <Box w={2} h={2} bg="blue.400" borderRadius="full" />
+            <Text>Base ({selectedChainId})</Text>
           </HStack>
         </MenuItem>
 

@@ -47,7 +47,7 @@ export default function Footer() {
       minH={{ base: "auto", md: "400px" }}
       overflow="hidden"
       boxShadow={glow}
-      bg={useColorModeValue("brand.cream", "brand.gold")}
+      bg={useColorModeValue("brand.cream", "brand.navy")}
       _before={{
         content: '""',
         position: "absolute",
@@ -87,7 +87,7 @@ export default function Footer() {
               rounded="2xl"
               fontSize={{ base: "md", md: "lg" }}
               fontWeight="extrabold"
-              bgGradient="linear(to-r, brand.gold, brand.mauve)"
+              bgGradient="linear(to-r, brand.gold, brand.cream)"
               color="brand.navy"
               boxShadow={glow}
               _hover={{ ...brandHover, transform: "scale(1.05)" }}

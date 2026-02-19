@@ -95,7 +95,7 @@ const ROLE_MENUS: Record<RoleKey, RoleMenuConfig> = {
     label: "visiteur",
     items: [
       { label: "Devenir adhérent", href: "/adhesion" },
-      { label: "FAQ", href: "/faq" },
+      { label: "FAQ", href: "/association/faq" },
     ],
   },
 
@@ -441,45 +441,80 @@ useEffect(() => {
               </HStack>
             )}
 
-            {/* ✅ BOUTON ADHÉRER (inchangé) */}
-            {!isAuthenticated && (
-              <Tooltip label="Veuillez d'abord connecter votre wallet pour adhérer" aria-label="Aide Adhésion">
-                <span>
-                  <NextLink href="/adhesion" passHref>
-                    <Button
-                      px={4}
-                      py={6}
-                      fontSize="sm"
-                      borderRadius="full"
-                      boxShadow="lg"
-                      _hover={{
-                        ...hoverStyles.brandHover._hover,
-                        ...brandHover,
-                      }}
-                      _active={{
-                        transform: "scale(0.9)",
-                      }}
-                      transition="all 0.25s ease"
-                      isDisabled={!isAuthenticated}
-                      aria-disabled={!isAuthenticated}
-                    >
-                      Adhérer
-                    </Button>
-                  </NextLink>
-                </span>
-              </Tooltip>
-            )}
+
 
             {/* ✅ RÔLE NON-MEMBER (TOOLTIP RÉSIDENCE aussi !) */}
             {isAuthenticated && role === "non-member" && (
               <RoleMenu config={ROLE_MENUS.nonMember} isResident={isResident} />
             )}
 
+
+
             {/* ✅ MENU NON-CONNECTÉ (quand PAS authentifié) */}
             {!isAuthenticated && (
-              <Tooltip label="Veuillez d'abord connecter votre wallet" aria-label="Aide Adhésion">
+              <>
+                {/* Menu simple - FIXED */}
+                <Menu>
+                    <MotionMenuButton
+                      as={Button}
+                      px={10}
+                      py={6}
+                      fontSize="sm"
+                      fontWeight="bold"
+                      borderRadius="full"
+                      boxShadow="lg"
+                      border="1px solid whiteAlpha.300"
+                      whileHover={{ scale: 1.03, boxShadow: boxShadowHover }}
+                      _hover={{ ...hoverStyles.brandHover._hover, ...brandHover }}
+                      _active={{ transform: "scale(0.98)" }}
+                      transition={{ duration: 0.25, ease: "easeInOut" }}
+                    >
+                      Explorez
+                    </MotionMenuButton>
+                    <MenuList bg="gray.800" borderColor="purple.600">
+
+                    <NextLink href="/association/rescoe" passHref>
+                      <MenuItem as="a">Décourir l'asso</MenuItem>
+                    </NextLink>
+
+                    <NextLink href="/association/adherent" passHref>
+                      <MenuItem as="a">Voir les adhérents</MenuItem>
+                    </NextLink>
+
+                      <NextLink href="/association/faq" passHref>
+                        <MenuItem as="a">FAQ</MenuItem>
+                      </NextLink>
+                      <Tooltip label="Veuillez d'abord connecter votre wallet pour adhérer" aria-label="Aide Adhésion">
+
+                      <NextLink href="/adhesion" passHref>
+                        <Button
+                          px={4}
+                          py={6}
+                          fontSize="sm"
+                          borderRadius="full"
+                          boxShadow="lg"
+                          _hover={{
+                            ...hoverStyles.brandHover._hover,
+                            ...brandHover,
+                          }}
+                          _active={{
+                            transform: "scale(0.9)",
+                          }}
+                          transition="all 0.25s ease"
+                          isDisabled={!isAuthenticated}
+                          aria-disabled={!isAuthenticated}
+                        >
+                          Adhérer
+                        </Button>
+                      </NextLink>
+                      </Tooltip>
+
+                    </MenuList>
+                </Menu>
+
+                {/* ConnectBouton séparé */}
                 <ConnectBouton />
-              </Tooltip>
+              </>
             )}
 
           </HStack>
