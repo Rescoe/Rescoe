@@ -48,7 +48,7 @@ interface TeamMember {
 
 // Données association RESCOE (Art & Web3)
 const contactInfo: ContactInfo[] = [
-  { title: 'Email', value: 'contact@rescoe.xyz', icon: FaEnvelope },
+  { title: 'Email', value: 'rescoe.association@gmail.com', icon: FaEnvelope },
   { title: 'Téléphone', value: '+33 6 76 76 91 62', icon: FaPhoneAlt },
   { title: 'Adresse', value: '8 rue Burgade, 33500 Libourne, France', icon: FaMapMarkerAlt },
   { title: 'Site Web', value: 'rescoe.xyz', icon: FaGlobe },
@@ -134,11 +134,10 @@ const ContactPage: React.FC = () => {
               Contactez le Bureau RESCOE
             </Heading>
             <Text fontSize={{ base: "lg", md: "xl" }} maxW="lg" mx="auto" opacity={0.9} mt={4}>
-              Association d\'artistes dédiée à l\'exploration NFT et blockchain.
-              <br />Application produite gracieusement par <strong>BLOCKOS MEMORS</strong>,
-              expert en blockchain et distribution de mandales.
+              Association d'artistes dédiée à l'exploration générative, poétique et blockchain.
             </Text>
           </motion.div>
+          {/*
           <HStack spacing={4} flexWrap="wrap" justify="center">
             <Button size="lg" colorScheme="purple" leftIcon={<FaEnvelope />} boxShadow="xl" _hover={{ boxShadow: "2xl" }}>
               Message au Bureau
@@ -147,6 +146,7 @@ const ContactPage: React.FC = () => {
               +33 6 76 76 91 62
             </Button>
           </HStack>
+          */}
         </VStack>
 
         <Grid templateColumns={{ base: "1fr", lg: "1fr 1fr" }} gap={{ base: 12, md: 20 }} mb={20}>
@@ -156,6 +156,7 @@ const ContactPage: React.FC = () => {
               <Heading as="h2" size="2xl" mb={8} textAlign={{ base: "center", lg: "left" }}>
                 Bureau de l'Association
               </Heading>
+              {/*
               <VStack align="start" spacing={6}>
                 {contactInfo.map((info, index) => (
                   <HStack key={index} spacing={4} p={6} borderWidth={1} borderRadius="2xl" w="full" _hover={{ transform: "translateX(8px)" }} transition="all 0.3s">
@@ -174,6 +175,7 @@ const ContactPage: React.FC = () => {
                   </HStack>
                 ))}
               </VStack>
+              */}
               <HStack mt={8} spacing={6} flexWrap="wrap">
                 <VStack p={4} borderWidth={1} borderRadius="xl" align="start">
                   <Icon as={FaUsers} boxSize={8} color="purple.400" />
@@ -190,6 +192,7 @@ const ContactPage: React.FC = () => {
           </motion.div>
 
           {/* Formulaire Bureau */}
+          {/*
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6, delay: 0.4 }}>
             <Box as="form" onSubmit={handleSubmit} p={{ base: 8, md: 12 }} borderWidth={1} borderRadius="3xl" boxShadow="2xl">
               <Heading as="h2" size="xl" mb={6}>Message au Bureau</Heading>
@@ -216,6 +219,7 @@ const ContactPage: React.FC = () => {
               </VStack>
             </Box>
           </motion.div>
+          */}
         </Grid>
 
         {/* Bureau Dirigeants */}
@@ -272,6 +276,7 @@ const ContactPage: React.FC = () => {
       </Container>
 
       {/* Modal Succès Bureau */}
+      {/*
       <Modal isOpen={isSuccessModalOpen} onClose={() => setIsSuccessModalOpen(false)} isCentered size="xl">
         <ModalOverlay />
         <ModalContent color="black" borderRadius="3xl" borderWidth={1}>
@@ -286,6 +291,7 @@ const ContactPage: React.FC = () => {
           </ModalBody>
         </ModalContent>
       </Modal>
+      */}
     </Box>
   );
 };
