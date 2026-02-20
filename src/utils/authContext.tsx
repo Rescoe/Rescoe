@@ -221,6 +221,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!providerInstance) throw new Error("Provider manquant");
 
       const web3Instance = new Web3(providerInstance);
+
+      // ✅ Base switch (TS SAFE)
+      if (typeof window !== 'undefined' && window.ethereum) {
+        const ethProvider = window.ethereum as any;  // Safe cast
+        try {
+          await ethProvider.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: "0x2105" }]  // Base
+          });
+        } catch (switchError: any) {
+          if (switchError.code === 4902) {
+            await ethProvider.request({
+              method: "wallet_addEthereumChain",
+              params: [{
+                chainId: "0x2105",
+                chainName: "Base",
+                rpcUrls: ["https://mainnet.base.org"],
+                blockExplorerUrls: ["https://basescan.org"],
+                nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }
+              }]
+            });
+          }
+        }
+      }
+
       const accounts = await web3Instance.eth.getAccounts();
       const userAddress = accounts[0].toLowerCase();
 
@@ -239,6 +264,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       toast({ title: "Erreur connexion", description: error.message, status: "error" });
     }
   };
+
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production') {
+      console.log("🔥 PROD DEBUG:");
+      console.log("address:", address);
+      console.log("provider:", !!provider);
+      console.log("web3auth.provider:", !!web3auth?.provider);
+      console.log("accounts length:", provider ? "OK" : "EMPTY");
+    }
+  }, [address, provider]);
+
 
   const logout = async () => {
     try {

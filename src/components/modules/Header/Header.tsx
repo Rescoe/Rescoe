@@ -469,45 +469,41 @@ useEffect(() => {
                       _active={{ transform: "scale(0.98)" }}
                       transition={{ duration: 0.25, ease: "easeInOut" }}
                     >
-                      Explorez
+                      Découvrir
                     </MotionMenuButton>
                     <MenuList bg="gray.800" borderColor="purple.600">
 
                     <NextLink href="/association/rescoe" passHref>
-                      <MenuItem as="a">Décourir l'asso</MenuItem>
+                      <MenuItem as="a">L'association</MenuItem>
                     </NextLink>
 
                     <NextLink href="/association/adherent" passHref>
-                      <MenuItem as="a">Voir les adhérents</MenuItem>
+                      <MenuItem as="a">Les adhérents</MenuItem>
                     </NextLink>
 
-                      <NextLink href="/association/faq" passHref>
-                        <MenuItem as="a">FAQ</MenuItem>
-                      </NextLink>
-                      <Tooltip label="Veuillez d'abord connecter votre wallet pour adhérer" aria-label="Aide Adhésion">
+                    <NextLink href="/association/faq" passHref>
+                      <MenuItem as="a">La FAQ</MenuItem>
+                    </NextLink>
 
+                    {/* Adhérer - MenuItem stylé + Tooltip intégré */}
+                    {isAuthenticated ? (
                       <NextLink href="/adhesion" passHref>
-                        <Button
-                          px={4}
-                          py={6}
-                          fontSize="sm"
-                          borderRadius="full"
-                          boxShadow="lg"
-                          _hover={{
-                            ...hoverStyles.brandHover._hover,
-                            ...brandHover,
-                          }}
-                          _active={{
-                            transform: "scale(0.9)",
-                          }}
-                          transition="all 0.25s ease"
-                          isDisabled={!isAuthenticated}
-                          aria-disabled={!isAuthenticated}
-                        >
-                          Adhérer
-                        </Button>
+                      <MenuItem>
+                        🚀 Adhérer
+                      </MenuItem>
+
                       </NextLink>
+                    ) : (
+                      <Tooltip label="Connectez votre wallet pour adhérer">
+                        <MenuItem
+                        isDisabled={!isAuthenticated}
+                        aria-disabled={!isAuthenticated}
+                        >
+                          🚀 Adhérer
+                        </MenuItem>
                       </Tooltip>
+                    )}
+
 
                     </MenuList>
                 </Menu>

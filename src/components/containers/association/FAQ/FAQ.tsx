@@ -82,12 +82,9 @@ export default function FAQPage() {
   return (
     <Container maxW="container.lg" py={{ base: 12, md: 24 }} px={6}>
       <Box textAlign="center" mb={16}>
-        <Heading size="2xl" bgGradient="linear(to-r, purple.400, pink.400)" bgClip="text" mb={4}>
+        <Heading size="2xl"  bgClip="text" mb={4}>
           FAQ Rescoe
         </Heading>
-        <Text fontSize="lg" color="gray.400" maxW="md" mx="auto">
-          Adhésion NFT Web3 | <Link href="mailto:support@rescoe.xyz" color="purple.400">support@rescoe.xyz</Link>
-        </Text>
       </Box>
       <VStack spacing={6} w="full">
         {faqs.map((faq, i) => (
