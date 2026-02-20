@@ -110,16 +110,16 @@ const [simulatedInsect, setSimulatedInsect] = useState<any | null>(null);
 
     const checkNetworkAndId = async () => {
       const chainId = await web3.eth.getChainId();
-      console.log("chainId : ", chainId);
+     //console.log("chainId : ", chainId);
 
       const contract = new web3.eth.Contract(ABI as any, contractAddress);
       const totalMinted = await contract.methods.getTotalMinted().call();
       // même formule que dans le contrat
       const currentYearIndex = Math.floor(Date.now() / 1000 / (365 * 24 * 60 * 60)); //comme ans le contrat, on cheerche l'année a partir du genesis block d'eth
-      console.log(currentYearIndex);
+     //console.log(currentYearIndex);
 
       const maxMints = Number(await contract.methods.maxMintsPerYear().call());
-      console.log(maxMints);
+     //console.log(maxMints);
       setMaxMint(maxMints);
       const adhesionRestantes: string = await contract.methods
         .mintsPerYear(account, currentYearIndex)
@@ -129,7 +129,7 @@ const [simulatedInsect, setSimulatedInsect] = useState<any | null>(null);
 
       const used = Number(adhesionRestantes);
       const remaining = Number(maxMints) - used; // récupère maxMintsPerYear avec un call aussi
-      console.log(remaining);
+     //console.log(remaining);
       setMintRestant(remaining); // récupère maxMintsPerYear avec un call aussi
 
 //console.log("mints restants:", mintRestant);
@@ -309,7 +309,7 @@ const handleConfirmRole = async () => {
 
     setIsReadyToMint(true);
 
-    console.log(metadataUri, selectedRole, web3, account);
+   //console.log(metadataUri, selectedRole, web3, account);
   } catch (error) {
     console.error("IPFS:", error);
     setRoleConfirmed(false);

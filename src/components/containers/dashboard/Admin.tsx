@@ -39,6 +39,8 @@ import {
 import detectEthereumProvider from '@metamask/detect-provider';
 import ManageContracts from './ManageSolidity/MasterFactoryManagement'
 
+type FamilyKey = keyof typeof colorProfilesJson.families;
+
 type Collection =  {
   id: string;
   name: string;
@@ -224,152 +226,122 @@ const handleAdhesionChange = (index: number, field: 'address' | 'role' | 'name' 
 };
 
 
-
 const handleConfirmRole = async (): Promise<void> => {
-    if (adhesionData.length === 0) {
-        alert('Aucune adhésion à traiter.');
-        return;
-    }
+  if (adhesionData.length === 0) {
+    alert('Aucune adhésion à traiter.');
+    return;
+  }
+  if (pinataError) {
+    alert(`Erreur Pinata: ${pinataError}`);
+    return;
+  }
+  setIsUploading(true);
 
-    if (pinataError) {
-        alert(`Erreur Pinata: ${pinataError}`);
-        return;
-    }
+  try {
+    // 1. GÉNÉRER insectes LVL0 pour CHAQUE adhésion
+    const generatedInsects = await Promise.all(adhesionData.map(async (adhesion, index) => {
+      const insectData = await genInsect25(0);  // LVL 0
+      const previewUrl = resolveIPFS(insectData.imageUrl, true);
+     //console.log(`Insecte ${index}:`, insectData.spriteName, previewUrl);
+      return { imageUrl: previewUrl, data: insectData };
+    }));
 
-    setIsUploading(true);
+    // 2. UPLOAD avec 35+ ATTRIBUTS ALIGNÉS V1 pour CHAQUE adhésion
+    const metadataUris = await Promise.all(adhesionData.map(async (adhesion, index) => {
+      const { imageUrl, data: insectData } = generatedInsects[index];
 
-    try {
-        //console.log('🎨 1. Génération des insectes LVL0...');
+      // 🔥 PROFIL COULEUR EXACT (aligné V1)
+      const spriteFilename = insectData.spriteName;
+      const familyKey = (insectData.folder) as FamilyKey;  // Comme V1
 
-        // 1. GÉNÉRER insecte UNIQUE + DONNÉES COMPLÈTES pour CHAQUE adhésion
-        // Dans la map pour preview image
-        const generatedInsects = await Promise.all(adhesionData.map(async (adhesion, index) => {
-          const insectData = await genInsect25(0);  // LVL 0
-          // ✅ Preview via proxy
-          const previewUrl = resolveIPFS(insectData.imageUrl, true);
-          console.log(`Insecte ${index}:`, insectData.spriteName, previewUrl);
-          return { imageUrl: previewUrl, data: insectData };
-        }));
+      const profiles = colorProfilesJson.families[familyKey];  // Même source que V1
 
-        // Après upload Pinata
-        setAdhesionData(prev => prev.map((adhesion, index) => ({
-          ...adhesion,
-          imageIpfsUrl: generatedInsects[index].imageUrl,  // Déjà résolu
-          metadataUri: metadataUris[index],
-          insectData: generatedInsects[index].data
-        })));
+      const colorProfile = profiles?.find(p => p.filename === spriteFilename) ?? profiles?.[0];
 
-        // Preview première image
-        if (generatedInsects[0]?.imageUrl) {
-          setGeneratedImageUrl(generatedInsects[0].imageUrl);  // Proxy ready
-        }
+      // ✅ ATTRIBUTS MORPHO + MÉTAS (aligné V1)
+      const insectAttributes = [
+        ...insectData.attributes,  // 15 morpho
+        { trait_type: "Famille", value: familyKey },
+        { trait_type: "1er Propriétaire", value: adhesion.name || "Membre" },  // Aligné V1
+        { trait_type: "Insect name", value: insectData.display_name },  // Aligné V1
+        { trait_type: "Lore", value: insectData.lore },
+        { trait_type: "TotalFamille", value: insectData.total_in_family },
+        { trait_type: "Sprite", value: spriteFilename }
+      ];
 
+      // 🔥 COULEURS COMPLÈTES V1 (20+)
+      const colorAttributes = colorProfile ? [
+        // Couleurs dominantes (Top 5)
+        { trait_type: "Couleur1", value: colorProfile.dominant_colors.hex[0] },
+        { trait_type: "Couleur2", value: colorProfile.dominant_colors.hex[1] },
+        { trait_type: "Couleur3", value: colorProfile.dominant_colors.hex[2] },
+        { trait_type: "Couleur4", value: colorProfile.dominant_colors.hex[3] },
+        { trait_type: "Couleur5", value: colorProfile.dominant_colors.hex[4] },
+        // HSV complet
+        { trait_type: "Teinte", value: Math.round(colorProfile.hsv.mean[0]) + "°" },
+        { trait_type: "Saturation", value: Math.round(colorProfile.hsv.mean[1] * 100) + "%" },
+        { trait_type: "Luminosité", value: Math.round(colorProfile.hsv.mean[2] * 100) + "%" },
+        // Métriques techniques
+        { trait_type: "Colorful", value: Math.round(colorProfile.metrics.colorfulness * 100) + "%" },
+        { trait_type: "Contraste", value: Math.round(colorProfile.metrics.contrast) },
+        { trait_type: "Nettete", value: Math.round(colorProfile.metrics.sharpness) },
+        { trait_type: "Entropie", value: Math.round(colorProfile.metrics.entropy * 10) / 10 },
+        // Tech GIF
+        { trait_type: "Frames", value: colorProfile.frame_count },
+        { trait_type: "Pixels", value: colorProfile.total_pixels_analyzed.toLocaleString() },
+        { trait_type: "TailleBytes", value: (colorProfile.gif_info.size_bytes / 1000).toFixed(1) + "KB" }
+      ] : [];
 
-        //console.log('📤 2. Upload Pinata 35+ attributs...');
+      // 🔥 FULL ATTRIBUTS (aligné V1 + admin)
+      const fullAttributes = [
+        ...insectAttributes.filter(attr => !["Niveau", "Level"].includes(attr.trait_type)),  // Robuste
+        { trait_type: "Niveau", value: 0 },
+        ...colorAttributes,  // 🔥 20+ couleur
+        // ✅ ADMIN UNIQUEMENT (après couleurs, pas de conflit)
+        { trait_type: "Role", value: parseInt(adhesion.role) || 0 },
+        { trait_type: "Name", value: adhesion.name || "Membre" }
+      ];
 
-        // 2. UPLOAD avec COULEURS + MORPHO pour CHAQUE adhésion
-        const metadataUris = await Promise.all(
-            adhesionData.map(async (adhesion, index) => {
-                const { imageUrl, data: insectData } = generatedInsects[index];
+      // 🔥 UPLOAD (même params que V1)
+      const result = await uploadToIPFS({
+        scope: "badges",
+        imageUrl,
+        name: insectData.display_name || adhesion.name || `Membre ${index + 1}`,
+        bio: adhesion.bio || "",
+        role: adhesion.role,
+        level: 0,
+        attributes: fullAttributes,  // 35+ alignés !
+        family: familyKey,
+        sprite_name: spriteFilename,
+        previousImage: null,
+        evolutionHistory: [],
+        color_profile: colorProfile
+      });
 
-                // 🔥 PROFIL COULEUR EXACT
-                const spriteFilename = insectData.spriteName;
-                const familyKey: string | undefined =
-                  insectData.new_folder ?? insectData.key;
+      return result.metadataUri;
+    }));
 
-                const familyProfiles = familyKey
-                  ? typedColorProfilesJson.families[familyKey]
-                  : undefined;
+    // 3. MAJ ÉTAT (comme avant)
+    setAdhesionData(prev => prev.map((adhesion, index) => ({
+      ...adhesion,
+      imageIpfsUrl: generatedInsects[index].imageUrl,
+      metadataUri: metadataUris[index],
+      insectData: generatedInsects[index].data
+    })));
 
-                const colorProfile =
-                  familyProfiles?.find(
-                    (p) => p.filename === spriteFilename
-                  ) ?? familyProfiles?.[0];
+   //console.log(adhesionData);
+    if (generatedInsects[0]?.imageUrl) setGeneratedImageUrl(generatedInsects[0].imageUrl);
 
+    alert(`✅ ${adhesionData.length} NFTs READY !\n35+ attributs (alignés single mint)`);
 
-                // ✅ 35+ ATTRIBUTS (identique simple)
-                const insectAttributes = [
-                    ...insectData.attributes,  // 15 morpho
-                    { trait_type: "Famille", value: familyKey },
-                    { trait_type: "DisplayName", value: insectData.display_name },
-                    { trait_type: "Lore", value: insectData.lore },
-                    { trait_type: "TotalFamille", value: insectData.total_in_family },
-                    { trait_type: "Sprite", value: spriteFilename }
-                ];
-
-                const colorAttributes = colorProfile ? [
-                    // 20+ COULEURS
-                    { trait_type: "Couleur1", value: colorProfile.dominant_colors.hex[0] },
-                    { trait_type: "Couleur2", value: colorProfile.dominant_colors.hex[1] },
-                    { trait_type: "Couleur3", value: colorProfile.dominant_colors.hex[2] },
-                    { trait_type: "Teinte", value: Math.round(colorProfile.hsv.mean[0]) + "°" },
-                    { trait_type: "Saturation", value: Math.round(colorProfile.hsv.mean[1] * 100) + "%" },
-                    { trait_type: "Luminosité", value: Math.round(colorProfile.hsv.mean[2] * 100) + "%" },
-                    { trait_type: "Colorful", value: Math.round(colorProfile.metrics.colorfulness * 100) + "%" },
-                    { trait_type: "Contraste", value: Math.round(colorProfile.metrics.contrast) },
-                    { trait_type: "Frames", value: colorProfile.frame_count },
-                    { trait_type: "Pixels", value: colorProfile.total_pixels_analyzed.toLocaleString() }
-                ] : [];
-
-                const fullAttributes: OpenSeaAttribute[] = [
-                    ...insectAttributes.filter(attr => !["Niveau", "Level"].includes(attr.trait_type)),
-                    { trait_type: "Niveau", value: 0 },  // ✅ Admin format
-                    ...colorAttributes,
-                    // ✅ VOS ATTRIBUTS ADMIN
-                    { trait_type: "Role", value: parseInt(adhesion.role) || 0 },
-                    { trait_type: "Name", value: adhesion.name || "Membre" }
-                ];
-
-                //console.log(`🎨 Adhésion ${index + 1}: ${fullAttributes.length} attributs`);
-
-                // 🔥 UPLOAD IDENTIQUE (gère tout)
-                const result = await uploadToIPFS({
-                    scope: "badges", // ou "badges" selon le contexte
-                    imageUrl,
-                    name: insectData.display_name || adhesion.name || `Membre ${index + 1}`,
-                    bio: adhesion.bio || "",
-                    role: adhesion.role,
-                    level: 0,
-                    attributes: fullAttributes,  // 35+ !
-                    family: familyKey,
-                    sprite_name: spriteFilename,
-                    previousImage: null,
-                    evolutionHistory: [],
-                    color_profile: colorProfile  // Backup
-                });
-
-                //console.log(`✅ Metadata URI ${index + 1}:`, result.url);
-                return result.metadataUri;  // ✅ Nom exact
-            })
-        );
-
-        // 3. STOCKE résultats
-        setAdhesionData(prev => prev.map((adhesion, index) => ({
-            ...adhesion,
-            imageIpfsUrl: generatedInsects[index].imageUrl,
-            metadataUri: metadataUris[index],
-            insectData: generatedInsects[index].data  // Bonus debug
-        })));
-
-        if (generatedInsects[0]?.imageUrl) {
-            setGeneratedImageUrl(generatedInsects[0].imageUrl);
-        }
-
-        /*console.log('🎉 MULTI-MINT PRÊT:', {
-            count: metadataUris.length,
-            attrsPerNFT: 35,  // 🔥
-            sample: metadataUris.slice(0, 2)
-        });
-*/
-        alert(`✅ ${adhesionData.length} NFTs OpenSea READY!\n35+ attributs couleur/morpho par NFT`);
-
-    } catch (error: any) {
-        console.error('❌ Admin échoué:', error);
-        alert(`❌ Échec: ${error.message || 'Erreur inconnue'}`);
-    } finally {
-        setIsUploading(false);
-    }
+  } catch (error: any) {
+    console.error('❌ Admin échoué:', error);
+    alert(`❌ Échec: ${error.message || 'Erreur inconnue'}`);
+  } finally {
+    setIsUploading(false);
+  }
 };
+
 
 
 
@@ -462,10 +434,27 @@ const handleMintMultiple = async (): Promise<void> => {
             });
 */
             // Appel du contrat avec les paramètres exacts
-            const tx = await contract.methods
-                .mintMultiple(recipientsArray, urisArray, rolesArray, nameArray, bioArray)
-                .send({ from: accounts[0] });
 
+            // Estimate gas (simulation sans exécution complète)
+            const gasEstimate = await contract.methods.mintMultiple(recipientsArray, urisArray, rolesArray, nameArray, bioArray)
+            .estimateGas({ from: accounts[0] });
+
+            const gasPrice = await web3.eth.getGasPrice();
+
+           //console.log("gasEstimate");
+
+            const tx = await contract.methods.mintMultiple(recipientsArray, urisArray, rolesArray, nameArray, bioArray)
+            .send({
+                  from: accounts[0],
+                  gas: Math.floor(Number(gasEstimate) * 1).toString(),
+                  gasPrice: gasPrice.toString()
+                });
+
+/*
+                const tx = await contract.methods
+                    .mintMultiple(recipientsArray, urisArray, rolesArray, nameArray, bioArray)
+                    .send({ from: accounts[0] });
+*/
             //console.log('Transaction hash:', tx.transactionHash);
             alert(`✅ ${length} NFTs mintés avec succès!\nTX: ${tx.transactionHash}`);
 
@@ -733,7 +722,6 @@ const ManageFeaturedCollections = () => {
 
                 const gasPrice = await web3.eth.getGasPrice();
 
-                console.log("gasEstimate");
 
                 await contract.methods.featureCollection(
                   parseInt(collectionId),

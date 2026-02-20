@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";  // ✅ + useRef
 import {
   Box,
   Text,
@@ -24,24 +24,24 @@ const SoldeWallet: React.FC<SoldeWalletProps> = ({
   compact = true,
 }) => {
   const { address, isAuthenticated } = useAuth();
-  const [balance, setBalance] = useState("0.00");
-  const [isLoading, setIsLoading] = useState(true);
-  const [lastUpdate, setLastUpdate] = useState(0);
+  const toast = useToast();
 
-  const web3Ref = useRef<Web3 | null>(null);
-  const cacheRef = useRef<{ [address: string]: { value: string; timestamp: number } }>({});
-  const CACHE_DURATION = 300000; // 5min cache
-  const SPEND_THRESHOLD = 0.001;  // Refresh si dépense > 0.001 ETH
+  const [balance, setBalance] = useState("0.00");
+  const [web3, setWeb3] = useState<Web3 | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const previousBalanceRef = useRef<string>("0.00");  // 🔥 OPTIM : old balance
 
   const isDesktop = useBreakpointValue({ base: false, md: true });
 
-  // SINGLE Web3 init
+  // ✅ INIT Web3
   useEffect(() => {
     const initWeb3 = async () => {
       try {
         const provider = await detectEthereumProvider();
         if (provider) {
-          web3Ref.current = new Web3(provider as any);
+          const web3Instance = new Web3(provider as any);
+          setWeb3(web3Instance);
         }
       } catch (error) {
         console.error("Erreur init Web3:", error);
@@ -50,85 +50,48 @@ const SoldeWallet: React.FC<SoldeWalletProps> = ({
     initWeb3();
   }, []);
 
-  // SMART FETCH + DÉTECTEUR DÉPENSES
-  const fetchBalance = useCallback(async (force = false) => {
-    if (!web3Ref.current || !address) {
+  // ✅ FETCH avec COMPARAISON (NO RE-RENDER si identique)
+  const fetchBalance = useCallback(async () => {
+    if (!web3 || !address) {
       setBalance("0.00");
-      setIsLoading(false);
-      return;
-    }
-
-    const cached = cacheRef.current[address];
-
-    // ✅ CACHE HIT (sauf force)
-    if (!force && cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-      setBalance(cached.value);
       setIsLoading(false);
       return;
     }
 
     try {
       setIsLoading(true);
-      const bal = await web3Ref.current.eth.getBalance(address);
-      const formatted = parseFloat(formatUnits(bal, 18)).toFixed(4);
+      const bal = await web3.eth.getBalance(address);
+      const newBalance = parseFloat(formatUnits(bal, 18)).toFixed(4);
 
-      // ✅ Détecteur dépenses
-      if (cached && parseFloat(formatted) < parseFloat(cached.value) - SPEND_THRESHOLD) {
-        console.log("💸 Dépense détectée ! Refresh auto");
+      // 🔥 SKIP UPDATE si PAS CHANGÉ → NO RERENDER
+      if (newBalance !== previousBalanceRef.current) {
+        setBalance(newBalance);
+        previousBalanceRef.current = newBalance;
+       //console.log(`💰 Balance mise à jour: ${newBalance} ETH`);
       }
-
-      // Cache update
-      cacheRef.current[address] = {
-        value: formatted,
-        timestamp: Date.now()
-      };
-
-      setBalance(formatted);
-      setLastUpdate(Date.now());
     } catch (error) {
       console.error("Erreur balance:", error);
+      toast({
+        title: "Erreur lecture balance",
+        status: "warning",
+        duration: 2000,
+        position: "top-right",
+      });
       setBalance("?.??");
     } finally {
       setIsLoading(false);
     }
-  }, [address]);
+  }, [web3, address, toast]);
 
-  // ON CONNECT + SLOW REFRESH (5min)
   useEffect(() => {
-    if (isAuthenticated && address) {
-      fetchBalance(true);  // Force initial
-
-      const interval = setInterval(() => fetchBalance(false), CACHE_DURATION);
+    if (isAuthenticated && web3 && address) {
+      fetchBalance();
+      const interval = setInterval(fetchBalance, 10000); // 10s
       return () => clearInterval(interval);
     }
-  }, [fetchBalance, address]);
+  }, [fetchBalance, isAuthenticated, web3, address]);
 
-  // ÉCoute changements chaîne/adresse (MetaMask events)
-  useEffect(() => {
-    const provider = web3Ref.current?.currentProvider;
-    if (!provider || !address) return;
-
-    const handleAccountsChanged = (accounts: string[]) => {
-      if (accounts.length === 0) {
-        // Déconnexion
-        cacheRef.current = {};
-        setBalance("0.00");
-      }
-    };
-
-    const handleChainChanged = () => {
-      fetchBalance(true);  // Force refresh chaîne
-    };
-
-    provider.on('accountsChanged', handleAccountsChanged);
-    provider.on('chainChanged', handleChainChanged);
-
-    return () => {
-      provider.removeListener('accountsChanged', handleAccountsChanged);
-      provider.removeListener('chainChanged', handleChainChanged);
-    };
-  }, [fetchBalance, address]);
-
+  // Pas connecté
   if (!isAuthenticated || !address) {
     return (
       <Badge
@@ -142,9 +105,15 @@ const SoldeWallet: React.FC<SoldeWalletProps> = ({
     );
   }
 
+  // Loading
   if (isLoading) {
     return (
-      <Badge colorScheme="blue" variant="subtle" fontSize={compact ? "2xs" : "xs"} px={1}>
+      <Badge
+        colorScheme="gray"
+        variant="subtle"
+        fontSize={compact ? "2xs" : "xs"}
+        px={1}
+      >
         ...
       </Badge>
     );
@@ -158,7 +127,7 @@ const SoldeWallet: React.FC<SoldeWalletProps> = ({
             {balance} ETH
           </Text>
           <Text fontSize="2xs" color="gray.400">
-            Base • Maj il y a {(Date.now() - lastUpdate) / 1000 | 0}s
+            Base
           </Text>
         </Flex>
       }

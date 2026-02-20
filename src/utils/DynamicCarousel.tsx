@@ -55,7 +55,7 @@ const GridLayout: React.FC<GridLayoutProps> = ({
 /*
   // ✅ DEBUG PROPS + CONFIRMATION 10/10
   useEffect(() => {
-    console.log('[GRIDLAYOUT] ✅ Props OK:', {
+   //console.log('[GRIDLAYOUT] ✅ Props OK:', {
       nftsCount: nfts.length,
       haikusCount: haikus.length,
       nftsSample: nfts.slice(0, 3).map(n => n.id),

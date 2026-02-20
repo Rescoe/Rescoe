@@ -272,7 +272,7 @@ const Dashboard = () => {
     try {
       const userCollections = await contract.getNumberOfCollectionsByUser(userAddress);
       const remainingCollections = await contract.getRemainingCollections(userAddress);
-      console.log(remainingCollections);
+     //console.log(remainingCollections);
       return {
         collections: [], // Vous pouvez ajouter la logique pour récupérer les collections
         userCollections: Number(userCollections),

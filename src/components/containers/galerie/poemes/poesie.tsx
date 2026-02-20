@@ -124,7 +124,7 @@ const fetchPoetryCollections = async (page: number) => {
         }
 
 
-        console.log([id, name, collectionType, creator, associatedAddresses, , isFeatured]);
+       //console.log([id, name, collectionType, creator, associatedAddresses, , isFeatured]);
         // 🔥 1. CACHE
         const cached = localStorage.getItem(uri);
         if (cached) {
@@ -143,7 +143,7 @@ const fetchPoetryCollections = async (page: number) => {
         const res = await fetch(`/api/metadata/${hash}`); // Même API Art
         const metadata = await res.json();
         localStorage.setItem(uri, JSON.stringify(metadata));
-        console.log(metadata);
+       //console.log(metadata);
 
         return {
           id: id.toString(),
@@ -321,7 +321,7 @@ const handleBurn = async (nft: Poem, tokenId: number) => {
 
 
   const handleCollectionClick = (collectionId: string, associatedAddress: string) => {
-    console.log(associatedAddress);
+   //console.log(associatedAddress);
 
     setSelectedCollectionId(collectionId);
     fetchPoems(collectionId, associatedAddress);

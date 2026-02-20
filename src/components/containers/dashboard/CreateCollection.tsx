@@ -206,7 +206,7 @@ const CreateCollection: React.FC = () => {
           description: `IPFS: ${metadataUri.slice(0, 50)}...`,
           status: "success"
         });
-        console.log(metadataUri);
+       //console.log(metadataUri);
 
     // Remplace le try/catch final :
   } catch (err: any) {
@@ -218,7 +218,7 @@ const CreateCollection: React.FC = () => {
     // ✅ FORCE setIpfsUrl même si hook state lag
     if (metadataUri) {
       setIpfsUrl(metadataUri);
-      console.log("✅ FORCÉ ipfsUrl:", metadataUri);
+     //console.log("✅ FORCÉ ipfsUrl:", metadataUri);
     }
   }
   };

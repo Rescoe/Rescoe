@@ -139,7 +139,7 @@ const UniqueArtGalerie: React.FC = () => {
         )).filter((collection): collection is Collection => collection !== null);
 
         setCollections(collectionsData.sort((a, b) => Number(b.isFeatured) - Number(a.isFeatured)));
-        console.log(collections);
+       //console.log(collections);
 
     } catch (error) {
       console.error('Erreur lors de la récupération des collections :', error);
@@ -152,7 +152,7 @@ const UniqueArtGalerie: React.FC = () => {
       console.error("Adresse de collection invalide :", associatedAddress);
       return;
     }
-    console.log("fetchNFTs called", { collectionId, associatedAddress });
+   //console.log("fetchNFTs called", { collectionId, associatedAddress });
 
 
     setIsLoading(true);
@@ -244,7 +244,7 @@ const UniqueArtGalerie: React.FC = () => {
         })
       );
 
-      console.log(nftsData);
+     //console.log(nftsData);
       const filteredNFTsData = nftsData.filter(
         (nft): nft is NFT => nft !== null
       );
@@ -271,7 +271,7 @@ const UniqueArtGalerie: React.FC = () => {
     try {
       const rewardAddr = await artNFT.methods.rewardContract().call();
     } catch (e) {
-      console.log("❌ NO rewardContract() dans ArtNFT ABI");
+     //console.log("❌ NO rewardContract() dans ArtNFT ABI");
     }
 
     const isAuth = await rescoeManager.methods.authorizedCollections(nft.mintContractAddress).call();
@@ -314,7 +314,7 @@ const UniqueArtGalerie: React.FC = () => {
   }, [router.isReady, router.query, collections]);
 
   const handleCollectionClick = (collectionId: string, associatedAddress: string) => {
-    console.log("CLICK collection", { collectionId, associatedAddress });
+   //console.log("CLICK collection", { collectionId, associatedAddress });
     setSelectedCollectionId(collectionId);
     fetchNFTs(collectionId, associatedAddress);
     setCurrentTabIndex(2);

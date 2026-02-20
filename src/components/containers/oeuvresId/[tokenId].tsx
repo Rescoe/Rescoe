@@ -281,7 +281,7 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
     const data = await res.json();
     data.image = resolveIPFS(data.image, true)!;  // Pour affichage
 
-        console.log("📄 Main NFT metadata:", data);
+       //console.log("📄 Main NFT metadata:", data);
 
 
         const nftData: NFTData = {
@@ -330,7 +330,7 @@ const fetchCollectionNFTs = async (contractAddress: string) => {
 
           // ✅ 1. RESOLVE METADATA URI AVANT fetch()
           const resolvedMetadataUri = resolveIPFS(tokenURI, true)!;  // /api/ipfs/CID
-          console.log("📄 Fetch metadata:", resolvedMetadataUri);  // DEBUG
+         //console.log("📄 Fetch metadata:", resolvedMetadataUri);  // DEBUG
 
           const response = await fetch(resolvedMetadataUri);
           if (!response.ok) throw new Error("Metadata fetch failed");

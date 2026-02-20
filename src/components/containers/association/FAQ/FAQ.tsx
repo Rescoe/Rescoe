@@ -69,7 +69,7 @@ export default function FAQPage() {
       .then((res) => res.json())
       .then((data: FAQItemProps[]) => setFaqs(data))
       .catch((err) => {
-        console.log('JSON absent:', err);  // Debug
+       //console.log('JSON absent:', err);  // Debug
         setFaqs([
           {
             question: "FAQ en cours",

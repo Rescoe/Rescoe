@@ -109,7 +109,7 @@ const cardBorder = useColorModeValue("brand.cream", "brand.cream");
             const insectFamily = metadata.attributes?.[17]?.value || "Inconnue";
             //console.log(metadata);
             const insectlvl = metadata.attributes?.[21]?.value ?? "Inconnue";
-            console.log(metadata);
+           //console.log(metadata);
 
             return {
               id: tokenId.toString(),

@@ -25,11 +25,11 @@ export default async function handler(
       scope: UploadScope;
     };
 
-    console.log("📥 API reçue:", {
+   /*console.log("📥 API reçue:", {
       scope,
       fileSize: fileBase64.length / 1000 / 1000 + "Mo base64"
     });
-
+*/
     if (!scope || !["badges", "oeuvres"].includes(scope)) {
       throw new Error("Scope invalide");
     }
@@ -62,7 +62,7 @@ export default async function handler(
     console.timeEnd("pinata_image");
 
     const imageCid = imageRes.data.IpfsHash;
-    console.log("✅ Image CID:", imageCid);
+   //console.log("✅ Image CID:", imageCid);
 
     // 🔥 2. METADATA PROPRE (fix crash)
     const cleanMetadata = {
@@ -83,7 +83,7 @@ export default async function handler(
 
     };
 
-    console.log("📄 Metadata envoyée:", cleanMetadata);
+   //console.log("📄 Metadata envoyée:", cleanMetadata);
 
     // 🔥 3. UPLOAD METADATA
     console.time("pinata_metadata");
@@ -99,7 +99,7 @@ export default async function handler(
     );
     console.timeEnd("pinata_metadata");
 
-    console.log("✅ Metadata CID:", metadataRes.data.IpfsHash);
+   //console.log("✅ Metadata CID:", metadataRes.data.IpfsHash);
 
     return res.status(200).json({
       image: `ipfs://${imageCid}`,

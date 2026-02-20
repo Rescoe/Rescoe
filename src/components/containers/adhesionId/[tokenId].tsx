@@ -350,7 +350,7 @@ const TokenPage = () => {
         membership,
         membershipInfo,
       };
-      console.log(nftData);
+     //console.log(nftData);
 
       setNftCache(prev => ({ ...prev, [cacheKey]: nftData })); // ✅ CORRECTION: setNftCache
 
