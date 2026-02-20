@@ -6,6 +6,8 @@ import ABI from "@/components/ABI/ABIAdhesion.json";
 import { useAuth } from "@/utils/authContext";
 
 import { usePinataUpload } from "@/hooks/usePinataUpload";
+import { resolveIPFS } from "@/utils/resolveIPFS"; // ✅ TON UTILITAIRE
+
 
 // ✅ AJOUTE ÇA à la fin du hook, AVANT le return principal
 export type UseReproductionReturn = {
@@ -126,57 +128,65 @@ export const useReproduction = ({
     return web3 ? new web3.eth.Contract(ABI as any, contractAddress) : null;
   }, [contractAddress]);
 
-  // Fetch metadata token unique
-  // Fetch metadata token unique
-  // Fetch metadata token unique - SANS try/catch pour éviter erreurs
   const fetchTokenMetadata = useCallback(async (
-    tokenId: number,
-    contract: EthersContract
-  ): Promise<TokenWithMeta | null> => {
-    if (cacheRef.current[tokenId]) {
-      return cacheRef.current[tokenId];
-    }
+  tokenId: number,
+  contract: EthersContract
+): Promise<TokenWithMeta | null> => {
+  if (cacheRef.current[tokenId]) {
+    return cacheRef.current[tokenId];
+  }
 
-    try {
-      const [owner, role, mintTimestamp, price, nameOnChain, bio, remainingTime, forSale, levelFromDetails, autoEvolveFromDetails, expTimestamp] = await contract.getTokenDetails(tokenId);
+  try {
+    const [owner, role, mintTimestamp, price, nameOnChain, bio, remainingTime, forSale, levelFromDetails, autoEvolveFromDetails, expTimestamp] = await contract.getTokenDetails(tokenId);
 
-      const membershipRaw = await contract.getMembershipInfo(tokenId);
+    const membershipRaw = await contract.getMembershipInfo(tokenId);
 
-      const membershipInfo: MembershipInfo = {
-        level: Number(membershipRaw.level || levelFromDetails || 0),
-        autoEvolve: Boolean(membershipRaw.autoEvolve || autoEvolveFromDetails),
-        startTimestamp: Number(membershipRaw.startTimestamp),
-        expirationTimestamp: Number(membershipRaw.expirationTimestamp || expTimestamp),
-        totalYears: Number(membershipRaw.totalYears),
-        locked: Boolean(membershipRaw.locked),
-        isEgg: Boolean(membershipRaw.isEgg ?? false),
-      };
+    const membershipInfo: MembershipInfo = {
+      level: Number(membershipRaw.level || levelFromDetails || 0),
+      autoEvolve: Boolean(membershipRaw.autoEvolve || autoEvolveFromDetails),
+      startTimestamp: Number(membershipRaw.startTimestamp),
+      expirationTimestamp: Number(membershipRaw.expirationTimestamp || expTimestamp),
+      totalYears: Number(membershipRaw.totalYears),
+      locked: Boolean(membershipRaw.locked),
+      isEgg: Boolean(membershipRaw.isEgg ?? false),
+    };
 
-      const uri = await contract.tokenURI(tokenId);
-      const ipfsHash = uri.split("/").pop() || "";
-      const res = await fetch(`/api/proxyPinata?ipfsHash=${ipfsHash}`);
-      const metadata: EvolutionMetadata = await res.json();
+    const uri = await contract.tokenURI(tokenId);
 
-      const roleLabel = roleLabelResolver?.(Number(role)) ?? `Role #${Number(role)}`;
+    // ✅ RESOLVE IPFS (ton utilitaire !)
+    const resolvedUri = resolveIPFS(uri, true); // proxy prioritaire
+    if (!resolvedUri) return null;
 
-      const token: TokenWithMeta = {
-        tokenId,
-        owner: owner.toString(),
-        membershipInfo,
-        metadata,
-        tokenURI: uri,
-        image: metadata.image,
-        name: metadata.name || nameOnChain,
-        roleLabel,
-      };
+    //console.log(`📡 Fetching metadata: ${resolvedUri}`); // DEBUG
 
-      cacheRef.current[tokenId] = token;
-      return token;
-    } catch (e: any) {
-      console.error(`❌ #${tokenId}:`, e);
+    const res = await fetch(resolvedUri);
+    if (!res.ok) {
+      console.warn(`❌ Metadata failed ${tokenId}: ${res.status}`);
       return null;
     }
-  }, [roleLabelResolver]);
+
+    const metadata: EvolutionMetadata = await res.json();
+
+    const roleLabel = roleLabelResolver?.(Number(role)) ?? `Role #${Number(role)}`;
+
+    const token: TokenWithMeta = {
+      tokenId,
+      owner: owner.toString(),
+      membershipInfo,
+      metadata,
+      tokenURI: uri,
+      image: metadata.image,
+      name: metadata.name || nameOnChain,
+      roleLabel,
+    };
+
+    cacheRef.current[tokenId] = token;
+    return token;
+  } catch (e: any) {
+    console.error(`❌ #${tokenId}:`, e);
+    return null;
+  }
+}, [roleLabelResolver]);
 
 
 
@@ -336,6 +346,92 @@ const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<s
   }
 }, []);
 
+//A tester si bug
+/*
+const analyzeEggGif = useCallback(async (eggPathOrUri: string): Promise<Record<string, string | number>> => {
+  console.log(`🎨 ANALYSE: ${eggPathOrUri}`);
+
+  // 🛡️ DUMMY RAPIDE (fallback)
+  const dummy = {
+    Couleur1: "rgb(255,255,255)", Couleur2: "rgb(224,224,224)",
+    Couleur3: "rgb(192,192,192)", Couleur4: "rgb(160,160,160)",
+    Couleur5: "rgb(128,128,128)", Teinte: "0°", Saturation: "10%",
+    Luminosité: "80%", Colorful: "10%", Contraste: 45, Nettete: 65,
+    Entropie: 25.5, Frames: 1, Pixels: "50000", TailleBytes: "120KB"
+  };
+
+  try {
+    // ✅ RESOLVE LOCAL OU IPFS
+    const eggUrl = resolveIPFS(eggPathOrUri, false); // public direct (rapide)
+    if (!eggUrl) throw new Error("URL invalide");
+
+    console.log(`🎨 Fetching: ${eggUrl}`);
+    const response = await fetch(eggUrl);
+    if (!response.ok) {
+      console.warn(`🎨 404 → DUMMY`);
+      return dummy;
+    }
+
+    const blob = await response.blob();
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+
+    return new Promise((resolve) => {
+      img.onload = () => {
+        console.log(`🎨 LOADED: ${img.width}x${img.height}`);
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d')!;
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        const pixels: [number, number, number][] = [];
+
+        // Sample pixels (perf)
+        const step = Math.max(1, Math.floor(data.length / 4 / 1000));
+        for (let i = 0; i < data.length; i += step * 4) {
+          pixels.push([data[i], data[i+1], data[i+2]]);
+        }
+
+        // Top 5 couleurs (simplifié)
+        const colors = [
+          `rgb(${pixels[0]?.[0] || 255},${pixels[0]?.[1] || 255},${pixels[0]?.[2] || 255})`,
+          `rgb(${pixels[100]?.[0] || 224},${pixels[100]?.[1] || 224},${pixels[100]?.[2] || 224})`,
+          `rgb(${pixels[200]?.[0] || 192},${pixels[200]?.[1] || 192},${pixels[200]?.[2] || 192})`,
+          `rgb(${pixels[300]?.[0] || 160},${pixels[300]?.[1] || 160},${pixels[300]?.[2] || 160})`,
+          `rgb(${pixels[400]?.[0] || 128},${pixels[400]?.[1] || 128},${pixels[400]?.[2] || 128})`
+        ];
+
+        resolve({
+          Couleur1: colors[0], Couleur2: colors[1], Couleur3: colors[2],
+          Couleur4: colors[3], Couleur5: colors[4],
+          Teinte: "45°", Saturation: "25%", Luminosité: "75%",
+          Colorful: "25%", Contraste: 52, Nettete: 78,
+          Entropie: 3.21, Frames: 2,
+          Pixels: `${canvas.width * canvas.height}`,
+          TailleBytes: `${Math.round(blob.size / 1024)}KB`
+        });
+      };
+
+      img.onerror = () => {
+        console.warn("🎨 Image load failed → dummy");
+        resolve(dummy);
+      };
+
+      img.src = URL.createObjectURL(blob);
+
+      // Timeout 3s
+      setTimeout(() => resolve(dummy), 3000);
+    });
+  } catch (e) {
+    console.error("🎨 ERREUR:", e);
+    return dummy;
+  }
+}, []);
+
+*/
 
   // Metadata œuf → REMPLACE par ÇA
   const buildEggMetadata = useCallback((

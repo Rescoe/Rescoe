@@ -28,6 +28,8 @@ import { motion } from "framer-motion";
 import { JsonRpcProvider, Contract } from "ethers";
 import ABIRESCOLLECTION from "../../../ABI/ABI_Collections.json";
 import CollectionCard from "../CollectionCard";
+import { resolveIPFS } from "@/utils/resolveIPFS"; // ✅ Ton utilitaire
+
 const MotionBox = motion(Box);
 
 
@@ -384,35 +386,42 @@ const CollectionsByType: React.FC<{ creator: string }> = ({ creator }) => {
       setHasMore(newHasMore);
 
       const collectionsWithMetadata = await Promise.all(
-        collectionsData.map(async (col) => {
-          try {
-            let uri = col.uri;
-            if (!uri) {
-              uri = await contract.getCollectionURI(col.id.toString());
-            }
+    collectionsData.map(async (col) => {
+      try {
+        let uri = col.uri;
+        if (!uri) {
+          uri = await contract.getCollectionURI(col.id.toString());
+        }
 
-            const ipfsHash = uri?.split("/").pop();
-            if (!ipfsHash) return null;
+        // ✅ RESOLVE IPFS AVEC TON UTILITAIRE
+        const resolvedUri = resolveIPFS(uri, true); // true = proxy prioritaire
+        if (!resolvedUri) return null;
 
-            const response = await fetch(`/api/proxyPinata_Oeuvres?ipfsHash=${ipfsHash}`);
-            if (!response.ok) return null;
+        console.log(`📡 Fetching ${resolvedUri}`); // DEBUG
 
-            const metadata = await response.json();
-            return {
-              id: col.id.toString(),
-              name: col.name,
-              collectionType: col.collectionType,
-              creator: col.creator,
-              mintContractAddress: col.mintContractAddress,
-              imageUrl: metadata.image || "",
-              uri,
-            };
-          } catch (err) {
-            console.error(`Erreur pour collection ${col.id}:`, err);
-            return null;
-          }
-        })
-      );
+        const response = await fetch(resolvedUri);
+        if (!response.ok) {
+          console.warn(`❌ Fetch failed ${resolvedUri}: ${response.status}`);
+          return null;
+        }
+
+        const metadata = await response.json();
+        return {
+          id: col.id.toString(),
+          name: col.name,
+          collectionType: col.collectionType,
+          creator: col.creator,
+          mintContractAddress: col.mintContractAddress,
+          imageUrl: metadata.image || "",
+          uri: resolvedUri, // ou original uri
+        };
+      } catch (err) {
+        console.error(`Erreur collection ${col.id}:`, err);
+        return null;
+      }
+    })
+  );
+
 
       // Filtrer les collections invalides et les doublons
       /*

@@ -45,7 +45,6 @@ const CollectionCard: React.FC<CollectionCardProps> = ({ collection, type }) => 
         boxShadow="md"
         transition="all 0.3s"
         position="relative"
-        bg="white"
         height="full"
         display="flex"
         flexDirection="column"

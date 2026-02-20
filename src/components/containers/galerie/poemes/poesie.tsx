@@ -13,14 +13,35 @@ import {
   Divider,
   useMediaQuery,
   Button,
-  Input
+  Input,
+  VStack,
+  InputGroup,
+  InputLeftElement,
+  InputRightElement,
+  IconButton,
+  SimpleGrid,
+  Center,
+  useColorModeValue,
+  HStack,
+  Image,
+  Tag,
+  TagLabel
 } from "@chakra-ui/react";
+
+import {
+  FaSearch,
+  FaChevronLeft,
+  FaChevronRight,
+  FaRedo
+} from "react-icons/fa";
+
 import { JsonRpcProvider, Contract, BigNumberish, ethers } from "ethers";
 import { useRouter } from "next/router";
 import ABIRESCOLLECTION from "../../../ABI/ABI_Collections.json";
 import ABI from "../../../ABI/HaikuEditions.json";
 
 import { resolveIPFS } from "@/utils/resolveIPFS"; // ✅ COMME ART
+import { effects, gradients, animations, brandHover } from "@styles/theme";
 
 
 import { useAuth } from '../../../../utils/authContext';
@@ -332,198 +353,276 @@ const handleBurn = async (nft: Poem, tokenId: number) => {
     fetchPoetryCollections(currentPage);
   }, [currentPage]);
 
-
   return (
-    <Box p={6}>
-      <Heading mb={4}>Galerie de Poésie</Heading>
-
-      <form onSubmit={handleSearchSubmit}>
-  <Input
-    placeholder="Rechercher une collection..."
-    value={searchTerm}
-    onChange={(e) => setSearchTerm(e.target.value)}
-    mb={4}
-  />
-</form>
-
-      {isLoading && <Spinner />}
-
-      {showSearchResults && (
-  <Box mt={4}>
-    {searchResults.length > 0 ? (
-      <Grid templateColumns={{ base: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }} gap={6}>
-        {searchResults.map((collection) => (
-          <Box
-            key={collection.id}
-            borderWidth="1px"
-            borderRadius="lg"
-            p={4}
-            cursor="pointer"
-            onClick={() => handleCollectionClick(collection.id, collection.mintContractAddress)}
-          >
-            {collection.imageUrl && (
-              <Box width="100%" height="150px" overflow="hidden" borderRadius="md">
-                <img
-                  src={collection.imageUrl}
-                  alt={collection.name}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              </Box>
-            )}
-            <Text fontWeight="bold">{collection.name}</Text>
-          </Box>
-        ))}
-      </Grid>
-    ) : (
-      <Text>Aucune collection trouvée.</Text>
-    )}
-  </Box>
-)}
-
-
-
-      <Tabs index={currentTabIndex} onChange={(index) => {
-        setCurrentTabIndex(index);
-        if (index === 0) {
-          setPoems([]);
-          setSelectedCollectionId(null);
-        }
-      }}>
-      <TabList>
-        <Tab>Collections</Tab>
-        {poems.length > 0 && <Tab>Poèmes</Tab>}
-        {showSearchResults && <Tab>Résultats</Tab>} {/* Nouvel onglet pour la recherche */}
-      </TabList>
-
-      <TabPanels>
-        <TabPanel>
-          {/* Collections normales */}
-          <Grid templateColumns={{ base: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }} gap={6}>
-            {collections.map((collection) => (
-              <Box
-                key={collection.id}
-                borderWidth="1px"
-                borderRadius="lg"
-                p={4}
-                cursor="pointer"
-                onClick={() => handleCollectionClick(collection.id, collection.mintContractAddress)}
-              >
-                {collection.imageUrl && (
-                  <Box width="100%" height="150px" overflow="hidden" borderRadius="md">
-                    <img
-                      src={collection.imageUrl}
-                      alt={collection.name}
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                    />
-                  </Box>
-                )}
-                <Text>{collection.name}</Text>
-              </Box>
-            ))}
-          </Grid>
-
-          {/* Pagination */}
-          <Box mt={4} display="flex" justifyContent="center" gap={4}>
-            <Button
-              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 0))}
-              isDisabled={currentPage === 0}
-            >
-              Précédent
-            </Button>
-
-            <Text>
-              {currentPage + 1} / {Math.ceil(totalCollections / pageSize)}
-            </Text>
-
-            <Button
-              onClick={() =>
-                setCurrentPage((prev) =>
-                  prev + 1 < Math.ceil(totalCollections / pageSize) ? prev + 1 : prev
-                )
-              }
-              isDisabled={currentPage + 1 >= Math.ceil(totalCollections / pageSize)}
-            >
-              Suivant
-            </Button>
-          </Box>
-        </TabPanel>
-
-        <TabPanel>
-          {/* Poèmes */}
-          {isLoading && <Spinner />}
-          {poems.length > 0 ? (
-            <>
-              {/* Bloc infos du premier poème */}
-              <Box p={4} border="1px solid #ccc" borderRadius="10px" mb={4}>
-                {isOwner && (
-                  <Text color="orange.300" fontSize="sm" mb={2}>
-                    Vous êtes le créateur de ce recueil
-                  </Text>
-                )}
-
-                <Box>
-                  <Text fontSize="1rem" color="#aaa" mb={1}>
-                    <strong>Créateur :</strong> {poems[0].creatorAddress}
-                  </Text>
-                  <Text fontSize="1rem" color="#aaa" mb={1}>
-                    <strong>Contrat de Mint :</strong> {poems[0].mintContractAddress}
-                  </Text>
-                </Box>
-              </Box>
-
-              <Divider mb={3} />
-
-              <Grid templateColumns={{ base: 'repeat(1, 1fr)', md: 'repeat(2, 1fr)' }} gap={6}>
-                {poems.map((poem) => (
-                  <TextCard
-                    key={poem.tokenId}
-                    nft={poem}
-                    showBuyButton={true}
-                    onBuy={(tokenId) => handleBuy(poem, Number(tokenId))}
-                  />
-                ))}
-              </Grid>
-            </>
-          ) : (
-            <Text>Aucun poème disponible pour cette collection.</Text>
+    <Box p={{ base: 4, md: 6 }}>
+      {/* HEADER ÉPURÉ */}
+      <VStack spacing={6} align="start" mb={8}>
+        <Heading
+          size="lg"
+          bgGradient={useColorModeValue(
+            "linear(to-r, brand.navy, brand.blue)",
+            "linear(to-r, brand.gold, brand.cream)"
           )}
-        </TabPanel>
+          bgClip="text"
+        >
+          Galerie de Poésie
+        </Heading>
 
-        <TabPanel>
-          {/* Résultats de recherche */}
-          {searchResults.length > 0 ? (
-            <Grid templateColumns={{ base: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }} gap={6}>
-              {searchResults.map((collection) => (
+        {/* RECHERCHE INTÉGRÉE */}
+        <Box w="full" maxW="500px">
+          <InputGroup size="lg">
+            <InputLeftElement pointerEvents="none">
+              <FaSearch color="gray.400" />
+            </InputLeftElement>
+            <Input
+              placeholder="Rechercher une collection..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              borderRadius="2xl"
+              bg="whiteAlpha.100"
+              _focus={{ bg: "whiteAlpha.200" }}
+            />
+            <InputRightElement width="auto">
+              <IconButton
+                icon={<FaSearch />}
+                aria-label="Rechercher"
+                size="sm"
+                variant="ghost"
+                color="brand.gold"
+                onClick={() => handleSearchSubmit({} as any)}  // ✅ Ignore TS pour 1 cas
+              />
+            </InputRightElement>
+          </InputGroup>
+        </Box>
+      </VStack>
+
+      {isLoading && (
+        <Center py={12}>
+          <Spinner size="xl" color="brand.gold" />
+        </Center>
+      )}
+
+      {/* TABS ÉPURÉS */}
+      <Tabs
+        variant="line"
+        colorScheme="brand"
+        index={currentTabIndex}
+        onChange={(index) => {
+          setCurrentTabIndex(index);
+          if (index === 0) {
+            setPoems([]);
+            setSelectedCollectionId(null);
+          }
+        }}
+      >
+        <TabList justifyContent="center" mb={8}>
+          <Tab _selected={{ color: "brand.gold", borderColor: "brand.gold" }}>
+            Collections
+          </Tab>
+          {poems.length > 0 && (
+            <Tab _selected={{ color: "brand.gold", borderColor: "brand.gold" }}>
+              Poèmes
+            </Tab>
+          )}
+          {showSearchResults && (
+            <Tab _selected={{ color: "brand.gold", borderColor: "brand.gold" }}>
+              Résultats
+            </Tab>
+          )}
+        </TabList>
+
+        <TabPanels>
+          {/* COLLECTIONS */}
+          <TabPanel px={0}>
+            <SimpleGrid
+              columns={{ base: 2, md: 3, lg: 4 }}
+              spacing={4}
+              mb={8}
+            >
+              {collections.map((collection) => (
                 <Box
                   key={collection.id}
-                  borderWidth="1px"
+                  borderWidth={1}
+                  borderColor="rgba(255,255,255,0.2)"
                   borderRadius="lg"
                   p={4}
                   cursor="pointer"
+                  transition="all 0.2s"
+                  _hover={{
+                    boxShadow: "lg",
+                    transform: "translateY(-2px)",
+                    borderColor: "brand.gold"
+                  }}
                   onClick={() => handleCollectionClick(collection.id, collection.mintContractAddress)}
                 >
                   {collection.imageUrl && (
-                    <Box width="100%" height="150px" overflow="hidden" borderRadius="md">
-                      <img
+                    <Box
+                      w="full"
+                      h="120px"
+                      overflow="hidden"
+                      borderRadius="md"
+                      mb={3}
+                    >
+                      <Image
                         src={collection.imageUrl}
                         alt={collection.name}
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        w="full"
+                        h="full"
+                        objectFit="cover"
                       />
                     </Box>
                   )}
-                  <Text fontWeight="bold">{collection.name}</Text>
+                  <Text fontSize="sm" fontWeight="medium" noOfLines={1}>
+                    {collection.name}
+                  </Text>
                 </Box>
               ))}
-            </Grid>
-          ) : (
-            <Text>Aucune collection trouvée.</Text>
-          )}
-        </TabPanel>
-      </TabPanels>
+            </SimpleGrid>
 
+            {/* PAGINATION CENTRÉE */}
+            {collections.length > 0 && (
+              <Center>
+                <HStack spacing={4}>
+                  <Button
+                    size="sm"
+                    leftIcon={<FaChevronLeft />}
+                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 0))}
+                    isDisabled={currentPage === 0}
+                    variant="outline"
+                  >
+                    Précédent
+                  </Button>
+                  <Text fontSize="sm" minW="100px" textAlign="center">
+                    Page {currentPage + 1} / {Math.ceil(totalCollections / pageSize)}
+                  </Text>
+                  <Button
+                    size="sm"
+                    rightIcon={<FaChevronRight />}
+                    onClick={() =>
+                      setCurrentPage((prev) =>
+                        prev + 1 < Math.ceil(totalCollections / pageSize) ? prev + 1 : prev
+                      )
+                    }
+                    isDisabled={currentPage + 1 >= Math.ceil(totalCollections / pageSize)}
+                    variant="outline"
+                  >
+                    Suivant
+                  </Button>
+                </HStack>
+              </Center>
+            )}
+          </TabPanel>
+
+          {/* POÈMES */}
+          <TabPanel px={0}>
+            {poems.length > 0 ? (
+              <VStack spacing={6} align="start">
+                {/* Infos créateur discrètes */}
+                <Box
+                  p={4}
+                  borderWidth={1}
+                  borderColor="rgba(255,255,255,0.2)"
+                  borderRadius="lg"
+                  w="full"
+                >
+                  {isOwner && (
+                    <Tag size="sm" colorScheme="orange" mb={2}>
+                      <TagLabel>Créateur</TagLabel>
+                    </Tag>
+                  )}
+                  <HStack spacing={4} flexWrap="wrap">
+                    <Text fontSize="sm" color="gray.400">
+                      <strong>Créateur :</strong> {poems[0].creatorAddress}
+                    </Text>
+                    <Text fontSize="sm" color="gray.400">
+                      <strong>Contrat :</strong> {poems[0].mintContractAddress}
+                    </Text>
+                  </HStack>
+                </Box>
+
+                <SimpleGrid
+                  columns={{ base: 1, md: 2 }}
+                  spacing={6}
+                  w="full"
+                >
+                  {poems.map((poem) => (
+                    <TextCard
+                      key={poem.tokenId}
+                      nft={poem}
+                      showBuyButton={true}
+                      onBuy={(tokenId) => handleBuy(poem, Number(tokenId))}
+                    />
+                  ))}
+                </SimpleGrid>
+              </VStack>
+            ) : (
+              <Center py={12}>
+                <Text fontSize="md" opacity={0.7}>
+                  Aucun poème disponible pour cette collection.
+                </Text>
+              </Center>
+            )}
+          </TabPanel>
+
+          {/* RÉSULTATS RECHERCHE */}
+          <TabPanel px={0}>
+            {searchResults.length > 0 ? (
+              <SimpleGrid
+                columns={{ base: 2, md: 3 }}
+                spacing={4}
+              >
+                {searchResults.map((collection) => (
+                  <Box
+                    key={collection.id}
+                    borderWidth={1}
+                    borderColor="rgba(255,255,255,0.2)"
+                    borderRadius="lg"
+                    p={4}
+                    cursor="pointer"
+                    transition="all 0.2s"
+                    _hover={{
+                      boxShadow: "lg",
+                      transform: "translateY(-2px)",
+                      borderColor: "brand.gold"
+                    }}
+                    onClick={() => handleCollectionClick(collection.id, collection.mintContractAddress)}
+                  >
+                    {collection.imageUrl && (
+                      <Box
+                        w="full"
+                        h="120px"
+                        overflow="hidden"
+                        borderRadius="md"
+                        mb={3}
+                      >
+                        <Image
+                          src={collection.imageUrl}
+                          alt={collection.name}
+                          w="full"
+                          h="full"
+                          objectFit="cover"
+                        />
+                      </Box>
+                    )}
+                    <Text fontSize="sm" fontWeight="medium" noOfLines={1}>
+                      {collection.name}
+                    </Text>
+                  </Box>
+                ))}
+              </SimpleGrid>
+            ) : (
+              <Center py={12}>
+                <Text fontSize="md" opacity={0.7}>
+                  Aucune collection trouvée.
+                </Text>
+              </Center>
+            )}
+          </TabPanel>
+        </TabPanels>
       </Tabs>
     </Box>
   );
+
 };
 
 export default PoetryGallery;

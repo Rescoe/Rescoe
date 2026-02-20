@@ -15,6 +15,8 @@ import {
   Tab,
   TabPanel,
   Link,
+  SimpleGrid,
+  Center
 } from '@chakra-ui/react';
 import { JsonRpcProvider, Contract } from 'ethers';
 import ABI from '../../ABI/ABIAdhesion.json';
@@ -206,31 +208,32 @@ const PublicProfile: React.FC<PublicProfileProps> = ({ address }) => {
       </Box>
     );
   }
-
   return (
     <Box
-      mt={12}
-      w="100%"
-      maxW="1000px"
+      mt={2}
+      w="full"
+      maxW={{ base: "full", sm: "600px", lg: "full" }}
       mx="auto"
-      p={8}
-      borderRadius="2xl"
-      boxShadow="xl"
+      px={{ base: 4, sm: 6, md: 8, lg: 12 }}
+      py={{ base: 6, md: 8 }}
+      borderRadius={{ base: "xl", md: "2xl" }}
+      boxShadow={{ base: "md", md: "xl" }}
     >
-      {/* ================= HEADER ================= */}
-      <HStack spacing={8} align="center" flexWrap="wrap">
-        {/* Avatar avec gradient ring */}
+      {/* HEADER RESPONSIVE */}
+      <VStack spacing={{ base: 6, md: 8 }} align="center" w="full">
+        {/* Avatar centré mobile */}
         <Box
-          w="130px"
-          h="130px"
-          borderRadius="full"
-          bgGradient="linear(to-r, brand.mauve, brand.gold)"
-          p="4px"
+          w={{ base: "100px", sm: "120px", md: "130px" }}
+          h={{ base: "100px", sm: "120px", md: "130px" }}
+          borderRadius={{ base: "lg", md: "10px" }}
+          bgGradient="linear(to-r, brand.cream, brand.gold)"
+          p="1px"
+          mx="auto"
         >
           <Box
             w="100%"
             h="100%"
-            borderRadius="full"
+            borderRadius={{ base: "lg", md: "10px" }}
             overflow="hidden"
             bg={avatarBg}
           >
@@ -243,34 +246,24 @@ const PublicProfile: React.FC<PublicProfileProps> = ({ address }) => {
                 h="100%"
               />
             ) : (
-              <Box
-                w="100%"
-                h="100%"
-                bg={avatarFallbackBg}
-              />
+              <Box w="100%" h="100%" bg={avatarFallbackBg} />
             )}
           </Box>
         </Box>
 
-
-        {/* Infos utilisateur */}
-        <VStack align="start" spacing={3} flex="1">
-          <Heading size="lg">
+        {/* Infos centrées */}
+        <VStack align="center" spacing={3} w="full" maxW="500px">
+          <Heading size={{ base: "md", md: "lg" }} textAlign="center">
             {userData?.name || formatAddress(userData?.address)}
           </Heading>
 
-          <HStack spacing={3}>
+          <HStack spacing={2} flexWrap="wrap" justify="center">
             {userData?.ensName && (
-              <Text
-                fontSize="sm"
-                color="purple.500"
-                fontWeight="semibold"
-              >
+              <Text fontSize="sm" color="purple.500" fontWeight="semibold">
                 {userData.ensName}
               </Text>
             )}
-
-            <Text fontSize="sm">
+            <Text fontSize="sm" textAlign="center">
               {formatAddress(userData?.address)}
             </Text>
           </HStack>
@@ -278,6 +271,7 @@ const PublicProfile: React.FC<PublicProfileProps> = ({ address }) => {
           {userData?.biography && (
             <Text
               fontSize="sm"
+              textAlign="center"
               maxW="600px"
               lineHeight="1.6"
             >
@@ -285,129 +279,136 @@ const PublicProfile: React.FC<PublicProfileProps> = ({ address }) => {
             </Text>
           )}
         </VStack>
-      </HStack>
+      </VStack>
 
-      <Divider my={10} />
+      <Divider my={{ base: 6, md: 10 }} />
 
-      {/* ================= TABS ================= */}
-      <Tabs variant="soft-rounded" colorScheme="purple" isFitted>
-        <TabList>
-          <Tab>Collections</Tab>
-          <Tab>Adhésion</Tab>
+      {/* TABS RESPONSIVE */}
+      <Tabs variant="line" colorScheme="brand" mt={{ base: 4, md: 8 }}>
+        <TabList
+          justifyContent="center"
+          flexWrap="wrap"
+          gap={{ base: 1, md: 0 }}
+        >
+          <Tab
+            flex="1"
+            minW={{ base: "120px", md: "auto" }}
+            _selected={{ color: "brand.gold", borderColor: "brand.gold" }}
+          >
+            Collections
+          </Tab>
+          <Tab
+            flex="1"
+            minW={{ base: "120px", md: "auto" }}
+            _selected={{ color: "brand.gold", borderColor: "brand.gold" }}
+          >
+            Adhésion
+          </Tab>
         </TabList>
 
-        <TabPanels mt={8}>
-          {/* ================= COLLECTIONS ================= */}
-          <TabPanel px={0}>
+        <TabPanels>
+          {/* COLLECTIONS */}
+          <TabPanel px={0} py={6}>
             <Box
-              p={6}
-              borderWidth="1px"
+              p={{ base: 4, md: 6 }}
+              borderWidth={1}
+              borderColor="rgba(255,255,255,0.2)"
               borderRadius="xl"
             >
-              <Heading size="md" mb={6}>
-                Collections de{" "}
-                {userData?.name || formatAddress(userData?.address)}
+              <Heading size="md" mb={6} textAlign="center">
+                Collections de {userData?.name || formatAddress(userData?.address)}
               </Heading>
 
               {userCollections?.length > 0 ? (
-                <FilteredCollectionsCarousel
-                  creator={userData?.address}
-                />
+                <FilteredCollectionsCarousel creator={userData?.address} />
               ) : (
-                <Text>
-                  Aucune collection trouvée.
-                </Text>
+                <Center py={12}>
+                  <Text fontSize="md" opacity={0.7}>
+                    Aucune collection trouvée.
+                  </Text>
+                </Center>
               )}
             </Box>
           </TabPanel>
 
-          {/* ================= ADHÉSION ================= */}
-          <TabPanel px={0}>
+          {/* ADHÉSION */}
+          <TabPanel px={0} py={6}>
             <Box
-              p={6}
-              borderWidth="1px"
+              p={{ base: 4, md: 6 }}
+              borderWidth={1}
+              borderColor="rgba(255,255,255,0.2)"
               borderRadius="xl"
             >
-              {/* Stats */}
-              <HStack
-                spacing={10}
+              {/* Stats responsive */}
+              <SimpleGrid
+                columns={{ base: 1, md: 3 }}
+                spacing={6}
                 mb={8}
-                flexWrap="wrap"
+                w="full"
               >
-                <VStack align="start">
-                  <Text fontSize="sm">
-                    Points RESCOE
-                  </Text>
-                  <Text size="md">
+                <VStack align="center" spacing={1}>
+                  <Text fontSize="sm" opacity={0.8}>Points RESCOE</Text>
+                  <Text fontSize="lg" fontWeight="semibold">
                     {userData?.rewardPoints ?? 0} 🐝
                   </Text>
                 </VStack>
 
-                <VStack align="start">
-                  <Text fontSize="sm">
-                    Collections créées
-                  </Text>
-                  <Text size="md">
+                <VStack align="center" spacing={1}>
+                  <Text fontSize="sm" opacity={0.8}>Collections créées</Text>
+                  <Text fontSize="lg" fontWeight="semibold">
                     {userData?.userCollectionsCount ?? 0}
                   </Text>
                 </VStack>
 
-                <VStack align="start">
-                  <Text fontSize="sm">
-                    Collections restantes
-                  </Text>
-                  <Text size="md">
+                <VStack align="center" spacing={1}>
+                  <Text fontSize="sm" opacity={0.8}>Restantes</Text>
+                  <Text fontSize="lg" fontWeight="semibold">
                     {userData?.remainingCollections ?? 0}
                   </Text>
                 </VStack>
-              </HStack>
+              </SimpleGrid>
 
               <Divider mb={6} />
 
-              <Heading size="md" mb={6}>
+              <Heading size="md" mb={6} textAlign="center">
                 Jetons d'adhésion
               </Heading>
 
-              <Box
-                display="grid"
-                gridTemplateColumns="repeat(auto-fill, minmax(140px, 1fr))"
-                gap={6}
+              <SimpleGrid
+                columns={{ base: 2, sm: 3, md: 4 }}
+                spacing={{ base: 3, md: 6 }}
+                w="full"
               >
                 {userData?.nfts?.length > 0 ? (
-                  userData.nfts.map((nft) => (
+                  userData.nfts.slice(0, 8).map((nft) => (
                     <Link
                       key={nft.tokenId}
                       href={`/AdhesionId/${contractAdhesion}/${nft.tokenId}`}
                     >
                       <Box
-                        borderWidth="1px"
-                        borderRadius="xl"
+                        borderWidth={1}
+                        borderColor="rgba(255,255,255,0.2)"
+                        borderRadius="lg"
                         overflow="hidden"
                         transition="all 0.2s ease"
                         _hover={{
                           boxShadow: "lg",
-                          transform: "translateY(-3px)",
+                          transform: "translateY(-2px)",
                         }}
+                        minH="160px"
                       >
                         <Image
                           src={nft.image}
                           alt={`NFT #${nft.tokenId}`}
-                          h="140px"
+                          h={{ base: "100px", md: "140px" }}
                           w="100%"
                           objectFit="cover"
                         />
-
-                        <Box p={3}>
-                          <Text
-                            fontSize="sm"
-                            fontWeight="medium"
-                            noOfLines={1}
-                          >
+                        <Box p={{ base: 2, md: 3 }}>
+                          <Text fontSize={{ base: "xs", md: "sm" }} fontWeight="medium" noOfLines={1}>
                             {nft.name}
                           </Text>
-                          <Text
-                            fontSize="xs"
-                          >
+                          <Text fontSize="xs" opacity={0.7}>
                             #{nft.tokenId}
                           </Text>
                         </Box>
@@ -415,17 +416,20 @@ const PublicProfile: React.FC<PublicProfileProps> = ({ address }) => {
                     </Link>
                   ))
                 ) : (
-                  <Text>
-                    Aucun NFT trouvé.
-                  </Text>
+                  <Center py={12} gridColumn="1 / -1">
+                    <Text fontSize="md" opacity={0.7}>
+                      Aucun NFT trouvé.
+                    </Text>
+                  </Center>
                 )}
-              </Box>
+              </SimpleGrid>
             </Box>
           </TabPanel>
         </TabPanels>
       </Tabs>
     </Box>
   );
+
 };
 
 

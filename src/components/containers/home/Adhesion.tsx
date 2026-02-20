@@ -56,7 +56,7 @@ const RoleBasedNFTPage = () => {
 
   const [selectedRole, setSelectedRole] = useState<string>("");
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
-  const [roleConfirmed, setRoleConfirmed] = useState<boolean>(false);
+  //const [roleConfirmed, setRoleConfirmed] = useState<boolean>(false);
 
   const [name, setName] = useState<string>("");
   const [bio, setBio] = useState<string>("");
@@ -76,7 +76,8 @@ const RoleBasedNFTPage = () => {
   const [mintRestant, setMintRestant] = useState<number>(0);
   const [maxMint, setMaxMint] = useState<number>(0);
 
-  const [isReadyToMint, setIsReadyToMint] = useState<boolean>(false);
+  //const [isReadyToMint, setIsReadyToMint] = useState<boolean>(false);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
   const [insectData, setInsectData] = useState<any>(null);
 
@@ -219,79 +220,82 @@ const [simulatedInsect, setSimulatedInsect] = useState<any | null>(null);
 };
 
 
+const handleAdhere = async () => {
+  if (!name || !bio || !selectedRole) {
+    alert("⚠️ Remplissez nom, bio et rôle");
+    return;
+  }
 
-const handleConfirmRole = async () => {
-  if (!name || !bio || !selectedRole || !insectData) return alert("Champs incomplets");
+  if (mintRestant <= 0) {
+    alert("❌ Quota annuel épuisé");
+    return;
+  }
+
+  if (!web3 || !account){
+    alert("Assurez-vous d'être connecté, d'avoir généré l'IPFS et d'avoir sélectionné un rôle.");
+    return;
+  }
 
   try {
-    setRoleConfirmed(true);
+    setIsProcessing(true);
 
-    // 🔥 PROFIL COULEUR EXACT
-    const spriteFilename = insectData.spriteName;
-    const familyKey = (insectData.folder) as FamilyKey;
+    // 🔥 ÉTAPE 1 : Génération insecte + attributs
+    const data = getRandomInsectGif(0);
+    if (!data || !data.attributes || !data.imageUrl) {
+      throw new Error("Génération insecte échouée");
+    }
+
+    const familyKey = data.folder as FamilyKey;
+    const spriteFilename = data.spriteName;
 
     const profiles = colorProfilesJson.families[familyKey];
+    const colorProfile = profiles?.find(p => p.filename === spriteFilename) ?? profiles?.[0];
 
-    const colorProfile =
-      profiles?.find(p => p.filename === spriteFilename) ??
-      profiles?.[0];
-
-    // ✅ ATTRIBUTS INSECTE + COULEUR COMPLÈTES
     const insectAttributes = [
-      ...insectData.attributes,  //  15 traits morpho
-
-      // 🔥 MÉTAS INSECTE
+      ...(data.attributes || []),
       { trait_type: "Famille", value: familyKey },
       { trait_type: "1er Propriétaire", value: name },
-      { trait_type: "Insect name", value: insectData.display_name },
-      { trait_type: "Lore", value: insectData.lore },
-      { trait_type: "TotalFamille", value: insectData.total_in_family },
+      { trait_type: "Insect name", value: data.display_name || "Insecte ResCoe" },
+      { trait_type: "Lore", value: data.lore || "Badge d'adhésion ResCoe" },
+      { trait_type: "TotalFamille", value: data.total_in_family || 0 },
       { trait_type: "Sprite", value: spriteFilename }
     ];
 
-    // 🔥 COULEURS MAX (OpenSea adore !)
     const colorAttributes = colorProfile ? [
-      // 🎨 COULEURS DOMINANTES (Top 5)
       { trait_type: "Couleur1", value: colorProfile.dominant_colors.hex[0] },
       { trait_type: "Couleur2", value: colorProfile.dominant_colors.hex[1] },
       { trait_type: "Couleur3", value: colorProfile.dominant_colors.hex[2] },
       { trait_type: "Couleur4", value: colorProfile.dominant_colors.hex[3] },
       { trait_type: "Couleur5", value: colorProfile.dominant_colors.hex[4] },
-
-      // 🌈 HSV COMPLET
       { trait_type: "Teinte", value: Math.round(colorProfile.hsv.mean[0]) + "°" },
       { trait_type: "Saturation", value: Math.round(colorProfile.hsv.mean[1] * 100) + "%" },
       { trait_type: "Luminosité", value: Math.round(colorProfile.hsv.mean[2] * 100) + "%" },
-
-      // 📊 MÉTRIQUES TECHNIQUES
       { trait_type: "Colorful", value: Math.round(colorProfile.metrics.colorfulness * 100) + "%" },
       { trait_type: "Contraste", value: Math.round(colorProfile.metrics.contrast) },
       { trait_type: "Nettete", value: Math.round(colorProfile.metrics.sharpness) },
       { trait_type: "Entropie", value: Math.round(colorProfile.metrics.entropy * 10) / 10 },
-
-      // 🎬 TECH GIF
       { trait_type: "Frames", value: colorProfile.frame_count },
       { trait_type: "Pixels", value: colorProfile.total_pixels_analyzed.toLocaleString() },
       { trait_type: "TailleBytes", value: (colorProfile.gif_info.size_bytes / 1000).toFixed(1) + "KB" }
     ] : [];
 
     const fullAttributes = [
-      ...insectAttributes.filter(attr => !["Niveau"].includes(attr.trait_type)),
+      ...insectAttributes.filter(attr => attr?.trait_type && !["Niveau"].includes(attr.trait_type)),
       { trait_type: "Niveau", value: 0 },
-      ...colorAttributes  // 🔥 20+ couleur traits
+      ...colorAttributes
     ];
 
-    //console.log(`🚀 ${insectAttributes} attributs générés !`);
-    //const data = getRandomInsectGif(0);
-    //console.log("INSECT DATA =", data);
-    //console.log(`🚀 ${fullAttributes.length} attributs OpenSea générés !`);
+    console.log(`🚀 ${insectAttributes} attributs générés !`);
+    console.log("INSECT DATA =", data);
+    console.log(`🚀 ${fullAttributes.length} attributs OpenSea générés !`);
 
-    //console.log("UPLOAD IMAGE =", insectData.imageUrl)
+    console.log("UPLOAD IMAGE =", data.imageUrl)
 
 
+    // 📤 UPLOAD IPFS
     await uploadToIPFS({
       scope: "badges",
-      imageUrl: insectData.imageUrl,
+      imageUrl: data.imageUrl,
       name,
       bio,
       role: selectedRole,
@@ -304,69 +308,194 @@ const handleConfirmRole = async () => {
       color_profile: colorProfile
     });
 
+    if (!metadataUri) throw new Error("Upload IPFS échoué");
 
-    //console.log("METADATA URI =", metadataUri);
+    // 🔥 ÉTAPE 2 : MINT DIRECT
 
-    setIsReadyToMint(true);
+const contract = new web3.eth.Contract(ABI as any, contractAddress);
 
-   //console.log(metadataUri, selectedRole, web3, account);
-  } catch (error) {
-    console.error("IPFS:", error);
-    setRoleConfirmed(false);
-    setIsReadyToMint(false);
+    const priceInWei = web3.utils.toWei(requiredPriceEth.toString(), "ether");
+    const gasPrice = await web3.eth.getGasPrice();
+
+    const roleValue = roleMapping[selectedRole as RoleKey];
+    const tx = await contract.methods
+      .safeMint(metadataUri, roleValue, name, bio, isAnnual, autoEvolve)
+      .send({
+        from: account,
+        value: priceInWei,
+        gasPrice: gasPrice.toString(),
+        maxFeePerGas: null as any,
+        maxPriorityFeePerGas: null as any,
+      });
+
+    console.log('✅ Adhésion réussie ! Tx:', tx.transactionHash);
+
+    // 🎉 SUCCÈS
+    setShowBananas(true);
+    startLoadingAndRedirect();
+
+  } catch (error: any) {
+    console.error("❌ Erreur adhésion:", error);
+    alert(`❌ Erreur : ${error.message || "Vérifiez console"}`);
+  } finally {
+    setIsProcessing(false);
   }
 };
 
 
 
+/*
 
-
-  const mintNFT = async () => {
-
-    if (!metadataUri || !selectedRole || !web3 || !account){
-      alert("Assurez-vous d'être connecté, d'avoir généré l'IPFS et d'avoir sélectionné un rôle.");
-      return;
-    }
+  const handleConfirmRole = async () => {
+    if (!name || !bio || !selectedRole || !insectData) return alert("Champs incomplets");
 
     try {
-      setIsMinting(true);
+      setRoleConfirmed(true);
 
-      const contract = new web3.eth.Contract(ABI as any, contractAddress);
-      const priceInWei = web3.utils.toWei(requiredPriceEth.toString(), "ether");
+      // 🔥 PROFIL COULEUR EXACT
+      const spriteFilename = insectData.spriteName;
+      const familyKey = (insectData.folder) as FamilyKey;
 
-      const gasPrice = await web3.eth.getGasPrice(); // ✅ IDENTIQUE
+      const profiles = colorProfilesJson.families[familyKey];
 
-      if (roleMapping.hasOwnProperty(selectedRole)) {
-        const roleValue = roleMapping[selectedRole as RoleKey];
+      const colorProfile =
+        profiles?.find(p => p.filename === spriteFilename) ??
+        profiles?.[0];
 
-        // ✅ COPIE EXACTE de ton code qui marche
-        const tx = await contract.methods
-        .safeMint(metadataUri, roleValue, name, bio, isAnnual, autoEvolve)
-          .send({
-            from: account,
-            value: priceInWei,
-            gasPrice: gasPrice.toString(),      // ✅ force string
-            maxFeePerGas: null as any,           // ✅ TS ok
-            maxPriorityFeePerGas: null as any    // ✅ legacy tx
-          });
+      // ✅ ATTRIBUTS INSECTE + COULEUR COMPLÈTES
+      const insectAttributes = [
+        ...insectData.attributes,  //  15 traits morpho
 
-        //console.log('✅ Mint OK - Gas utilisé:', tx.gasUsed);
+        // 🔥 MÉTAS INSECTE
+        { trait_type: "Famille", value: familyKey },
+        { trait_type: "1er Propriétaire", value: name },
+        { trait_type: "Insect name", value: insectData.display_name },
+        { trait_type: "Lore", value: insectData.lore },
+        { trait_type: "TotalFamille", value: insectData.total_in_family },
+        { trait_type: "Sprite", value: spriteFilename }
+      ];
 
-        setShowBananas(true);
-        startLoadingAndRedirect();
+      // 🔥 COULEURS MAX (OpenSea adore !)
+      const colorAttributes = colorProfile ? [
+        // 🎨 COULEURS DOMINANTES (Top 5)
+        { trait_type: "Couleur1", value: colorProfile.dominant_colors.hex[0] },
+        { trait_type: "Couleur2", value: colorProfile.dominant_colors.hex[1] },
+        { trait_type: "Couleur3", value: colorProfile.dominant_colors.hex[2] },
+        { trait_type: "Couleur4", value: colorProfile.dominant_colors.hex[3] },
+        { trait_type: "Couleur5", value: colorProfile.dominant_colors.hex[4] },
 
-      } else {
-        console.error(`Rôle "${selectedRole}" non trouvé`);
-      }
+        // 🌈 HSV COMPLET
+        { trait_type: "Teinte", value: Math.round(colorProfile.hsv.mean[0]) + "°" },
+        { trait_type: "Saturation", value: Math.round(colorProfile.hsv.mean[1] * 100) + "%" },
+        { trait_type: "Luminosité", value: Math.round(colorProfile.hsv.mean[2] * 100) + "%" },
+
+        // 📊 MÉTRIQUES TECHNIQUES
+        { trait_type: "Colorful", value: Math.round(colorProfile.metrics.colorfulness * 100) + "%" },
+        { trait_type: "Contraste", value: Math.round(colorProfile.metrics.contrast) },
+        { trait_type: "Nettete", value: Math.round(colorProfile.metrics.sharpness) },
+        { trait_type: "Entropie", value: Math.round(colorProfile.metrics.entropy * 10) / 10 },
+
+        // 🎬 TECH GIF
+        { trait_type: "Frames", value: colorProfile.frame_count },
+        { trait_type: "Pixels", value: colorProfile.total_pixels_analyzed.toLocaleString() },
+        { trait_type: "TailleBytes", value: (colorProfile.gif_info.size_bytes / 1000).toFixed(1) + "KB" }
+      ] : [];
+
+      const fullAttributes = [
+        ...insectAttributes.filter(attr => !["Niveau"].includes(attr.trait_type)),
+        { trait_type: "Niveau", value: 0 },
+        ...colorAttributes  // 🔥 20+ couleur traits
+      ];
+
+      //console.log(`🚀 ${insectAttributes} attributs générés !`);
+      //const data = getRandomInsectGif(0);
+      //console.log("INSECT DATA =", data);
+      //console.log(`🚀 ${fullAttributes.length} attributs OpenSea générés !`);
+
+      //console.log("UPLOAD IMAGE =", insectData.imageUrl)
+
+
+      await uploadToIPFS({
+        scope: "badges",
+        imageUrl: insectData.imageUrl,
+        name,
+        bio,
+        role: selectedRole,
+        level: 0,
+        attributes: fullAttributes,
+        family: familyKey,
+        sprite_name: spriteFilename,
+        previousImage: null,
+        evolutionHistory: [],
+        color_profile: colorProfile
+      });
+
+
+      //console.log("METADATA URI =", metadataUri);
+
+      setIsReadyToMint(true);
+
+     //console.log(metadataUri, selectedRole, web3, account);
     } catch (error) {
-      console.error("❌ Erreur minting:", error);
-      alert("Erreur minting. Vérifiez console.");
-    } finally {
-      setIsMinting(false);
+      console.error("IPFS:", error);
+      setRoleConfirmed(false);
+      setIsReadyToMint(false);
     }
   };
 
 
+
+
+
+    const mintNFT = async () => {
+
+      if (!metadataUri || !selectedRole || !web3 || !account){
+        alert("Assurez-vous d'être connecté, d'avoir généré l'IPFS et d'avoir sélectionné un rôle.");
+        return;
+      }
+
+      try {
+        setIsMinting(true);
+
+        const contract = new web3.eth.Contract(ABI as any, contractAddress);
+        const priceInWei = web3.utils.toWei(requiredPriceEth.toString(), "ether");
+
+        const gasPrice = await web3.eth.getGasPrice(); // ✅ IDENTIQUE
+
+        if (roleMapping.hasOwnProperty(selectedRole)) {
+          const roleValue = roleMapping[selectedRole as RoleKey];
+
+          // ✅ COPIE EXACTE de ton code qui marche
+          const tx = await contract.methods
+          .safeMint(metadataUri, roleValue, name, bio, isAnnual, autoEvolve)
+            .send({
+              from: account,
+              value: priceInWei,
+              gasPrice: gasPrice.toString(),      // ✅ force string
+              maxFeePerGas: null as any,           // ✅ TS ok
+              maxPriorityFeePerGas: null as any    // ✅ legacy tx
+            });
+
+          //console.log('✅ Mint OK - Gas utilisé:', tx.gasUsed);
+
+          setShowBananas(true);
+          startLoadingAndRedirect();
+
+        } else {
+          console.error(`Rôle "${selectedRole}" non trouvé`);
+        }
+      } catch (error) {
+        console.error("❌ Erreur minting:", error);
+        alert("Erreur minting. Vérifiez console.");
+      } finally {
+        setIsMinting(false);
+      }
+    };
+
+
+*/
+
+/*
   const handleMint = async () => {
     if (isReadyToMint) {
       await mintNFT();
@@ -374,6 +503,7 @@ const handleConfirmRole = async () => {
       alert("Les conditions ne sont pas remplies pour le mint.");
     }
   };
+*/
 
   const startLoadingAndRedirect = () => {
     const countdownInterval = setInterval(() => {
@@ -632,6 +762,7 @@ mb={4}
               </Box>
 
               {/* BOUTONS */}
+              {/*
               <VStack spacing={3}>
                 <Button
                   w="full"
@@ -655,6 +786,30 @@ mb={4}
                   {mintRestant > 1 ? `Adhérer (${mintRestant} restantes)` : "Adhérer (dernière !)"}
                 </Button>
               </VStack>
+              */}
+
+              <VStack spacing={3}>
+                <Button
+                  w="full"
+                  colorScheme="teal"
+                  size="lg"
+                  onClick={handleAdhere}
+                  isLoading={isProcessing || isUploading}
+                  loadingText={
+                    isUploading
+                      ? "📤 Upload IPFS en cours..."
+                      : "🔨 Finalisation mint..."
+                  }
+                  isDisabled={!selectedRole || !name || !bio || mintRestant <= 0}
+                >
+                  {mintRestant > 1
+                    ? `🎉 Adhérer (${mintRestant} restantes)`
+                    : "🎉 Adhérer (dernière !)"
+                  }
+                </Button>
+              </VStack>
+
+
             </>
           )}
 

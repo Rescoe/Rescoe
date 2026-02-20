@@ -297,16 +297,13 @@ const handleConfirmRole = async (): Promise<void> => {
         ...insectAttributes.filter(attr => !["Niveau", "Level"].includes(attr.trait_type)),  // Robuste
         { trait_type: "Niveau", value: 0 },
         ...colorAttributes,  // 🔥 20+ couleur
-        // ✅ ADMIN UNIQUEMENT (après couleurs, pas de conflit)
-        { trait_type: "Role", value: parseInt(adhesion.role) || 0 },
-        { trait_type: "Name", value: adhesion.name || "Membre" }
       ];
 
       // 🔥 UPLOAD (même params que V1)
       const result = await uploadToIPFS({
         scope: "badges",
         imageUrl,
-        name: insectData.display_name || adhesion.name || `Membre ${index + 1}`,
+        name: adhesion.name || `Membre ${index + 1}`,
         bio: adhesion.bio || "",
         role: adhesion.role,
         level: 0,

@@ -26,6 +26,11 @@ import {
   AlertIcon,
   Icon,
   Link,
+  Card,
+  CardBody,
+  Flex,
+  useColorModeValue,
+  Textarea
 } from '@chakra-ui/react';
 import { FaCheckCircle } from 'react-icons/fa';
 
@@ -45,6 +50,8 @@ import { useReproduction } from '@/hooks/useReproduction';
 import { ReproductionPanel, ParentSelector } from '@/components/Reproduction';
 import EvolutionHistoryTimeline from '@/utils/EvolutionHistoryTimeline'; // ✅ ERREUR 2: import corrigé (pas d'espace)
 import { resolveIPFS } from '@/utils/resolveIPFS';
+
+import { effects, gradients, animations, brandHover } from "@styles/theme";
 
 interface NFTData {
   owner: string;
@@ -599,235 +606,391 @@ const TokenPage = () => {
 };
 
 
-
-  return (
-    <Box
-      textAlign="center"
-      mt={10}
-      p={6}
-      maxW="100vw"
-      overflowX="hidden"
-    >      <Heading as="h1" fontSize="3xl" mb={6}>
+return (
+  <Box
+    textAlign="center"
+    mt={10}
+    p={{ base: 6, md: 8 }}
+    maxW="100vw"
+    mx="auto"
+    position="relative"
+  //  borderRadius={6}
+    minH="auto"
+  /*  boxShadow={useColorModeValue(effects.glowLight, effects.glowDark)}
+    bg={useColorModeValue("brand.cream", "brand.navy")}
+    overflow="hidden"
+    _before={{
+      content: '""',
+      position: "absolute",
+      inset: 0,
+      padding: "1px",
+      background: useColorModeValue(
+        gradients.cardBorderLight,
+        gradients.cardBorderDark
+      ),
+      WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
+      WebkitMaskComposite: "xor",
+      maskComposite: "exclude",
+      animation: animations.borderGlow,
+      borderRadius: 6
+    }}
+    */
+  >
+    {/* HEADER RESCOE */}
+    <Box position="relative" mb={8} zIndex={1}>
+      <Heading
+        as="h1"
+        size="xl"
+        mb={4}
+        bgGradient={useColorModeValue(
+          "linear(to-r, brand.navy, brand.blue)",
+          "linear(to-r, brand.gold, brand.cream)"
+        )}
+        bgClip="text"
+      >
         Carte d'adhésion de {nftData.name}
       </Heading>
 
-      <Image
-        src={resolveIPFS(nftData.image, true) || '/fallback-image.png'}
-        alt={nftData.name}
-        maxWidth="400px"
-        mx="auto"
+      <Box
+         position="relative"
+         mx="auto"
+         maxW={{ base: "280px", sm: "340px", md: "360px" }}
+         w="full"
+         px={{ base: 2, md: 0 }}
+       >
+         <Image
+           src={resolveIPFS(nftData.image, true) || '/fallback-image.png'}
+           alt={nftData.name}
+           w="full"
+           maxW={{ base: "280px", sm: "340px", md: "360px" }}
+           maxH={{ base: "280px", sm: "340px", md: "360px" }}
+           mx="auto"
+           borderRadius={{ base: 2, md: 4 }}
+           boxShadow={useColorModeValue("lg", "dark-lg")}
+           objectFit="cover"
+           transition="all 0.3s ease"
+           _hover={{
+             transform: { base: "scale(1.01)", md: "scale(1.02)" },
+             boxShadow: useColorModeValue("2xl", "2xl")
+           }}
+         />
+
+         {/* Badge responsive */}
+         {membershipInfo && (
+           <Box
+             position="absolute"
+             bottom={{ base: 2, md: 4 }}
+             left="50%"
+             transform="translateX(-50%)"
+             bg="brand.gold"
+             color="brand.navy"
+             px={{ base: 3, md: 4 }}
+             py={{ base: 1, md: 1 }}
+             borderRadius="full"
+             fontSize={{ base: "xs", md: "sm" }}
+             fontWeight="semibold"
+             boxShadow="md"
+             whiteSpace="nowrap"
+             minW="80px"
+           >
+             Niveau {membershipInfo.level}
+           </Box>
+         )}
+       </Box>
+     </Box>
+
+    {/* TABS ÉPURÉS RESCOE */}
+    <Tabs variant="line" colorScheme="brand">
+      <Box
+        overflowX="auto"
+        pb={2}
+        sx={{ '::-webkit-scrollbar': { display: 'none' } }}
         mb={6}
-      />
-
-
-      <Tabs variant="enclosed" colorScheme="teal">
-      <Box overflowX="auto" pb={2} sx={{ '::-webkit-scrollbar': { display: 'none' } }}>
-      <TabList minW="max-content">
-        <Tab>Détails</Tab>
-        {isOwner && isVendable && <Tab>Mise en vente</Tab>}
-        {isOwner && <Tab>Mise à jour</Tab>}
-        {!isOwner && canPurchase && <Tab>Achat</Tab>}
-
-        {/* ✅ 1 ONGLETT DYNAMIQUE */}
-        {isOwner && (
+      >
+        <TabList gap={1}>
           <Tab
-            color={
-              nftData?.membershipInfo?.isEgg ? "yellow.400" :
-              membershipInfo?.level === 0 ? "yellow.500" :
-              membershipInfo?.level === 1 ? "blue.400" :
-              membershipInfo?.level === 2 ? "blue.600" : "green.400"
-            }
-            fontWeight="extrabold"
+            px={6}
+            py={3}
+            _selected={{
+              color: "brand.gold",
+              borderBottomColor: "brand.gold",
+              borderBottomWidth: 3
+            }}
+            _hover={{ bg: useColorModeValue("gray.50", "whiteAlpha.50") }}
           >
-            {nftData?.membershipInfo?.isEgg ? "🥚 Éclosion" :
-             membershipInfo?.level < 3 ? `🧬 Évolutions LVL${membershipInfo.level}` : "🐛 Reproduction"}
+            Détails
           </Tab>
-        )}
-      </TabList>
 
+          {isOwner && isVendable && (
+            <Tab
+              px={6}
+              py={3}
+              _selected={{
+                color: "brand.gold",
+                borderBottomColor: "brand.gold",
+                borderBottomWidth: 3
+              }}
+              _hover={{ bg: useColorModeValue("gray.50", "whiteAlpha.50") }}
+            >
+            Mise en vente</Tab>
+          )}
+          {isOwner &&
+            <Tab
+              px={6}
+              py={3}
+              _selected={{
+                color: "brand.gold",
+                borderBottomColor: "brand.gold",
+                borderBottomWidth: 3
+              }}
+              _hover={{ bg: useColorModeValue("gray.50", "whiteAlpha.50") }}
+            >
+            Modifier Profil</Tab>}
+          {!isOwner && canPurchase && (
 
+            <Tab
+              px={6}
+              py={3}
+              _selected={{
+                color: "brand.gold",
+                borderBottomColor: "brand.gold",
+                borderBottomWidth: 3
+              }}
+              _hover={{ bg: useColorModeValue("gray.50", "whiteAlpha.50") }}
+            >
+            Achat</Tab>
+          )}
+
+          {/* Onglet dynamique discret */}
+          {isOwner && (
+            <Tab
+              color={
+                nftData?.membershipInfo?.isEgg ? "yellow.500" :
+                membershipInfo?.level === 0 ? "yellow.500" :
+                membershipInfo?.level === 1 ? "blue.500" :
+                membershipInfo?.level === 2 ? "blue.600" : "green.500"
+              }
+              fontWeight="semibold"
+              _selected={{ color: "brand.gold", borderBottomColor: "brand.gold" }}
+              px={6}
+              py={3}
+            >
+              {nftData?.membershipInfo?.isEgg ? "🥚 Éclosion" :
+               membershipInfo?.level < 3 ? `🧬 LVL${membershipInfo.level}` : "🐛 Reproduction"}
+            </Tab>
+          )}
+        </TabList>
       </Box>
 
-        <TabPanels>
-          {/* Détails */}
-          <TabPanel>
-            <VStack spacing={4} alignItems="start" mb={6}>
-              <Text fontSize="lg"><strong>Nom :</strong> {nftData.name}</Text>
-              <Text fontSize="lg"><strong>Adresse du propriétaire :</strong> <CopyableAddress address={nftData.owner}/> </Text>
-
-              <Text fontSize="lg">
+      <TabPanels>
+        {/* DÉTAILS - Layout propre */}
+        <TabPanel p={0}>
+          <VStack spacing={6} alignItems="start" w="full">
+            {/* Infos principales */}
+            <VStack spacing={4} w="full" alignItems="start">
+              <Text fontSize="lg" fontWeight="medium">
+                <strong>Propriétaire :</strong> <CopyableAddress address={nftData.owner}/>
+              </Text>
+              <Text fontSize="lg" fontWeight="medium">
                 <strong>Rôle :</strong> {roleLabels[roles[nftData.role]] || 'Inconnu'}
               </Text>
               <Text fontSize="lg"><strong>Bio :</strong> {nftData.bio}</Text>
+            </VStack>
+
+            {/* Statut adhésion */}
+            <VStack spacing={4} w="full" p={6} bg="whiteAlpha.50" borderRadius={4} alignItems="start">
               {isForSale && (
-                <Text fontSize="lg">
-                  <strong>Prix :</strong> {nftData.price} ETH
+                <Text fontSize="lg" color="brand.gold" fontWeight="medium">
+                  💰 À vendre : {nftData.price} ETH
                 </Text>
               )}
-              <Text fontSize="lg"><strong>Durée restante d'adhésion :</strong> {nftData.remainingTime}</Text>
-              <Text fontSize="lg"><strong>Soit le :</strong> {nftData.fin}</Text>
-              <Text>
-                <strong>Niveau actuel :</strong>{" "}
-                {membershipInfo ? membershipInfo.level : "—"}
-              </Text>
-              <Divider my={4} />
-
-              // Remplace ton ancien historique par :
-              {evolutionHistory.length > 0 && (
-                <EvolutionHistoryTimeline evolutionHistory={evolutionHistory} />
-              )}
-
+              <Text fontSize="lg"><strong>Durée restante :</strong> {nftData.remainingTime}</Text>
+              <Text fontSize="lg"><strong>Fin :</strong> {nftData.fin}</Text>
               {isOwner && (
                 <Button
-                  colorScheme="blue"
-                  mt={4}
+                  size="sm"
+                  px={4}
+                  py={2}
+                  borderRadius="full"
+                  bgGradient="linear(to-r, brand.gold, brand.cream)"
+                  color="brand.navy"
+                  fontSize="xs"
+                  fontWeight="semibold"
+                  boxShadow="sm"
+                  _hover={brandHover}
                   onClick={handleRenewMembership}
                 >
-                  Renouveler adhésion – {renewPriceEth} ETH
+                  Renouveler l'adhésion : {renewPriceEth} ETH
                 </Button>
               )}
-
-
-              <Divider my={6} borderColor="purple.700" w="95%" mx="auto" />
-
-              {nftData && nftData.owner && <PublicProfile address={nftData.owner} />}
             </VStack>
-          </TabPanel>
 
-          {/* Mise en vente */}
-          {isOwner && isVendable && (
-            <TabPanel>
-              <FormControl mt={4}>
-                <FormLabel htmlFor="price">Prix pour mise en vente</FormLabel>
+            {evolutionHistory.length > 0 && (
+              <EvolutionHistoryTimeline evolutionHistory={evolutionHistory} />
+            )}
+
+            <Divider borderColor="rgba(255,255,255,0.2)" />
+            {nftData && nftData.owner && <PublicProfile address={nftData.owner} />}
+          </VStack>
+        </TabPanel>
+
+        {/* Autres panels - même structure épurée */}
+        {isOwner && isVendable && (
+          <TabPanel p={0}>
+            <VStack spacing={6} align="start">
+              <FormControl>
+                <FormLabel fontWeight="medium">Prix (ETH)</FormLabel>
                 <Input
-                  id="price"
-                  type="text"
+                  type="number"
+                  step="0.001"
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
-                  placeholder="Ex: 0.01"
+                  size="lg"
+                  bg="whiteAlpha.100"
                 />
                 <Button
-                isDisabled={!rawMembershipInfo?.expirationTimestamp}
-                colorScheme="teal" mt={4} onClick={handleListForSale}>
+                  mt={4}
+                  w="full"
+                  size="lg"
+                  borderRadius="2xl"
+                  bgGradient="linear(to-r, brand.gold, brand.cream)"
+                  color="brand.navy"
+                  _hover={brandHover}
+                  isDisabled={!rawMembershipInfo?.expirationTimestamp}
+                  onClick={handleListForSale}
+                >
                   Mettre en vente
                 </Button>
               </FormControl>
-            </TabPanel>
-          )}
+            </VStack>
+          </TabPanel>
+        )}
 
-          {/* Mise à jour */}
-          {isOwner && (
-            <TabPanel>
-              <FormControl mt={4}>
-                <FormLabel htmlFor="name">Nom</FormLabel>
+        {isOwner && (
+          <TabPanel p={0}>
+            <VStack spacing={6} align="start">
+              <FormControl>
+                <FormLabel fontWeight="medium">Nom</FormLabel>
                 <Input
                   id="name"
-                  type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Entrez votre nom"
+                  size="lg"
                 />
-                <FormLabel htmlFor="bio">Biographie</FormLabel>
-                <Input
+              </FormControl>
+              <FormControl>
+                <FormLabel fontWeight="medium">Biographie</FormLabel>
+                <Textarea
                   id="bio"
-                  type="text"
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
-                  placeholder="Entrez votre biographie"
+                  size="lg"
+                  rows={3}
                 />
-                <Button colorScheme="blue" mt={4} onClick={handleUpdateInfo}>
-                  Mettre à jour
-                </Button>
               </FormControl>
-            </TabPanel>
-          )}
-
-          {/* Achat */}
-          {!isOwner && canPurchase && (
-            <TabPanel>
-              <Button colorScheme="green" mt={4} onClick={handlePurchase}>
-                Acheter ce NFT
+              {/* ✅ Bouton après les deux FormControl */}
+              <Button
+                mt={4}
+                w="full"
+                size="lg"
+                borderRadius="2xl"
+                bgGradient="linear(to-r, brand.gold, brand.cream)"
+                color="brand.navy"
+                _hover={brandHover}
+                onClick={handleUpdateInfo}
+              >
+                Mettre à jour
               </Button>
-            </TabPanel>
-          )}
+            </VStack>
+          </TabPanel>
+        )}
 
-          {isOwner && (
-            <TabPanel>
-              {/* ✅ HEADER DYNAMIQUE + COULEUR INTENSITÉ */}
-              <Heading as="h2" fontSize="xl" mb={6} color={
+
+        {!isOwner && canPurchase && (
+          <TabPanel py={12}>
+            <Button
+              size="lg"
+              w="full"
+              h="16"
+              borderRadius="3xl"
+              bgGradient="linear(to-r, brand.gold, brand.mauve)"
+              color="brand.navy"
+              fontSize="lg"
+              fontWeight="extrabold"
+              boxShadow={useColorModeValue(effects.glowLight, effects.glowDark)}
+              _hover={brandHover}
+              onClick={handlePurchase}
+            >
+              Acheter ({nftData.price} ETH)
+            </Button>
+          </TabPanel>
+        )}
+
+        {/* Onglet dynamique */}
+        {isOwner && (
+          <TabPanel p={0}>
+            <Heading
+              as="h2"
+              size="md"
+              mb={6}
+              color={
                 nftData?.membershipInfo?.isEgg ? "yellow.600" :
-                membershipInfo?.level === 0 ? "yellow.700" :
-                membershipInfo?.level === 1 ? "blue.500" :
-                membershipInfo?.level === 2 ? "blue.700" : "green.600"
-              }>
-                {nftData?.membershipInfo?.isEgg ? "🥚 Éclosion de l'œuf" :
-                 membershipInfo?.level < 3 ? `🧬 Évolution vers niveau ${membershipInfo.level + 1}` :
-                 "🐛 Création d'œufs"}
-              </Heading>
+                membershipInfo?.level < 3 ? "blue.600" : "green.600"
+              }
+            >
+              {nftData?.membershipInfo?.isEgg ? "🥚 Éclosion" :
+               membershipInfo?.level < 3 ? `🧬 Évolution LVL${membershipInfo.level}` :
+               "🐛 Reproduction"}
+            </Heading>
 
-              {/* ✅ CONTENU DYNAMIQUE */}
-              {nftData?.membershipInfo?.isEgg ? (
-                /* ÉCLOSION */
-                <HatchEggPanel
-                  tokenId={Number(tokenId)}
-                  hatch={hatch}
-                  contractAddress={contractAdhesion}
-                />
-              ) : membershipInfo?.level < 3 ? (
-                /* ÉVOLUTIONS (TON CODE EXACT) */
-                <VStack align="start" spacing={3}>
-                  <Text><strong>Niveau actuel :</strong> {membershipInfo.level}</Text>
-                  <Text><strong>Auto-évolution :</strong> {membershipInfo.autoEvolve ? "Oui" : "Non"}</Text>
-                  <Text><strong>Années cumulées :</strong> {membershipInfo.totalYears}</Text>
-                  <Text><strong>Début de ce niveau :</strong> {formatDateTime(membershipInfo.startTimestamp)}</Text>
-                  <Text><strong>Expiration actuelle :</strong> {formatDateTime(membershipInfo.expirationTimestamp)}</Text>
-                  <Text><strong>État :</strong> {membershipInfo.locked ? "Verrouillé" : "Ouvert"}</Text>
-
-                  <Divider my={4} />
-
-                  <Text><strong>Prochaine étape :</strong> Niveau {membershipInfo.level + 1}</Text>
-                  <Text><strong>Prêt à évoluer :</strong> {isready ? "Oui" : "Pas encore"}</Text>
-                  <Text><strong>Coût :</strong> {evolvePriceEth} ETH</Text>
-
-                  <Button
-                    colorScheme="purple"
-                    mt={2}
-                    onClick={prepareEvolution}
-                    isLoading={isUploadingEvolve}
-                  >
-                    Préparer l'image d'évolution
-                  </Button>
-{/*
-                  {previewImageUrl && (
-                    <>
-                      <Text mt={2}>Aperçu prochaine forme :</Text>
-                      <Image src={previewImageUrl} alt="Preview" maxW="300px" borderRadius="md" />
-                    </>
-                  )}
-*/}
-                  <Button
-                    colorScheme="teal"
-                    mt={4}
-                    onClick={evolve}
-                    isDisabled={!isManualEvolveReady || !evolveIpfsUrl}
-                    isLoading={isEvolving}
-                    loadingText="Évolution en cours..."
-                  >
-                    Faire évoluer le badge
-                  </Button>
+            {nftData?.membershipInfo?.isEgg ? (
+              <HatchEggPanel tokenId={Number(tokenId)} hatch={hatch} contractAddress={contractAdhesion} />
+            ) : membershipInfo?.level < 3 ? (
+              <VStack spacing={6} align="start">
+                <VStack spacing={3} align="start">
+                  <Text fontWeight="medium">Niveau actuel : {membershipInfo.level}</Text>
+                  <Text>Auto-évolution : {membershipInfo.autoEvolve ? "Oui" : "Non"}</Text>
+                  <Text>Années : {membershipInfo.totalYears}</Text>
                 </VStack>
-              ) : (
-                /* REPRODUCTION */
-                <ReproductionPanel reproduction={reproduction as any} renewPriceEth={renewPriceEth} />
-              )}
-            </TabPanel>
-          )}
 
+                <Divider />
 
-        </TabPanels>
-      </Tabs>
-    </Box>
-  );
+                <VStack spacing={3} align="start">
+                  <Text fontWeight="medium">Prochaine étape : Niveau {membershipInfo.level + 1}</Text>
+                  <Text>Prêt : {isready ? "Oui" : "Non"}</Text>
+                  <Text>Coût : {evolvePriceEth} ETH</Text>
+                </VStack>
+
+                <Button
+                  mt={2}
+                  onClick={prepareEvolution}
+                  isLoading={isUploadingEvolve}
+                  colorScheme="purple"
+                >
+                  Préparer image
+                </Button>
+
+                <Button
+                  size="lg"
+                  w="full"
+                  colorScheme="teal"
+                  onClick={evolve}
+                  isDisabled={!isManualEvolveReady || !evolveIpfsUrl}
+                  isLoading={isEvolving}
+                >
+                  Faire évoluer
+                </Button>
+              </VStack>
+            ) : (
+              <ReproductionPanel reproduction={reproduction as any} renewPriceEth={renewPriceEth} />
+            )}
+          </TabPanel>
+        )}
+      </TabPanels>
+    </Tabs>
+  </Box>
+);
+
 };
 
 export default TokenPage;

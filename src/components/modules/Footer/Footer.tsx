@@ -9,12 +9,16 @@ import {
   Center,
   Grid,
   useColorModeValue,
+  Divider
 } from "@chakra-ui/react";
 
 import NextLink from "next/link";
 import { motion } from "framer-motion";
 import { FaInstagram, FaQuestionCircle, FaGraduationCap, FaGithub } from "react-icons/fa";
 import { SiBluesky } from "react-icons/si";
+
+import { useAuth } from '@/utils/authContext'; // Ajuste le chemin
+
 
 import { effects, gradients, animations, brandHover } from "@styles/theme";
 
@@ -30,6 +34,11 @@ const links = {
 };
 
 export default function Footer() {
+
+  const { address, isAuthenticated } = useAuth(); // ✅ Récupère l'état auth
+
+  const showJoinButton = !isAuthenticated || !address; // Masqué si connecté ET a un address
+
   const glow = useColorModeValue(effects.glowLight, effects.glowDark);
   const borderGradient = useColorModeValue(
     gradients.cardBorderLight,
@@ -38,7 +47,7 @@ export default function Footer() {
 
   return (
     <MotionBox
-      mt={20}
+      mt={10}
       px={{ base: 6, md: 12, lg: 20, xl: 24 }}
       py={{ base: 12, md: 16, lg: 20 }}
       position="relative"
@@ -63,7 +72,7 @@ export default function Footer() {
       }}
     >
       <VStack
-        spacing={{ base: 8, md: 12 }}
+        spacing={{ base: 8, md: 8 }}
         position="relative"
         zIndex={1}
         align="center"
@@ -72,7 +81,7 @@ export default function Footer() {
         mx="auto"
       >
         {/* BRAND - Toujours centré */}
-        <Heading size={{ base: "lg", md: "xl" }} textAlign="center" mb={2}>
+        <Heading size={{ base: "lg", md: "xl" }} textAlign="center" mb={1}>
           RESCOE
         </Heading>
         <Text as="span" fontWeight="medium" color="brand.gold" fontSize="sm">
@@ -80,24 +89,57 @@ export default function Footer() {
         </Text>
 
         {/* CTA PRINCIPAL - En haut pour impact max */}
-        <motion.div whileHover={{ scale: 1.05 }} style={{ zIndex: 2 }}>
-          <NextLink href={links.adhesion} passHref>
-            <Button
-              px={12}
-              py={6}
-              rounded="2xl"
-              fontSize={{ base: "md", md: "lg" }}
-              fontWeight="extrabold"
-              bgGradient="linear(to-r, brand.gold,brand.cream, brand.cream,brand.cream, brand.gold)"
-              color="brand.navy"
-              boxShadow={glow}
-              _hover={{ ...brandHover, transform: "scale(1.05)" }}
-              size="lg"
-            >
-              🚀 Rejoindre RESCOE
-            </Button>
-          </NextLink>
-        </motion.div>
+        {showJoinButton ? (
+                  <motion.div whileHover={{ scale: 1.05 }} style={{ zIndex: 2 }}>
+                    <NextLink href={links.adhesion} passHref>
+                      <Button
+                        px={12}
+                        py={6}
+                        rounded="2xl"
+                        fontSize={{ base: "md", md: "lg" }}
+                        fontWeight="extrabold"
+                        bgGradient="linear(to-r, brand.gold,brand.cream, brand.cream,brand.cream, brand.gold)"
+                        color="brand.navy"
+                        boxShadow={glow}
+                        _hover={{ ...brandHover, transform: "scale(1.05)" }}
+                        size="lg"
+                      >
+                        🚀 Rejoindre RESCOE
+                      </Button>
+                    </NextLink>
+                  </motion.div>
+                ) : <Divider />}  {/* ✅ Rien si adhérent
+                  <Box
+                  p={4}
+                  borderWidth={2}
+                  borderColor="brand.gold"
+                  borderRadius="2xl"
+                  bg="transparent"
+                  textAlign="center"
+                  boxShadow="md"
+                  _hover={{ borderColor: "brand.mauve" }}
+                >
+
+                    <Text fontSize="sm" fontWeight="medium" mb={1}>
+                      👋 Bienvenue {address}
+                    </Text>
+                    <NextLink href="/mon-profil" passHref>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      color="brand.gold"  // ✅ Or initial
+                      _hover={{
+                        bg: "brand.gold",  // ✅ Fond or
+                        color: "brand.navy" // ✅ Texte navy
+                      }}
+                    >
+                      Mon profil
+                    </Button>
+
+                    </NextLink>
+                  </Box>
+                )}
+                */}
 
         {/* DESCRIPTION PRINCIPALE */}
         <VStack spacing={2} maxW={{ base: "320px", md: "500px", lg: "560px" }} w="full">
