@@ -170,7 +170,7 @@ const RoleMenu: React.FC<RoleMenuProps> = ({ config, isResident = false }) => {
           </HStack>
         </MotionMenuButton>
 
-        <MenuList bg="gray.800" borderColor="purple.600">
+        <MenuList bg="gray.800" borderColor="brand.gold">
         <ConnectBouton />
 
           {config.items.map((item) => (
@@ -309,6 +309,7 @@ useEffect(() => {
       ref={headerRef}
       borderBottom="1px"
       role="banner"
+        borderBottomColor="brand.gold"
       aria-label="En-tête du site"
       shadow="md"
       px={{ base: 2, md: 4 }}  // ✅ PX=1 base (anti-bord)
@@ -331,7 +332,7 @@ useEffect(() => {
         >
           {/* Logo */}
           <Box
-            style={{ minWidth: '150px', maxWidth: '150px', height: 'auto' }}
+            style={{ minWidth: '150px', maxWidth: '200px', height: 'auto' }}
             aria-label="Logo de l'association"
           >
             <GenerativeLogo />
@@ -401,7 +402,7 @@ useEffect(() => {
                 >
                   Connecté (non-adhérent)
                 </MotionMenuButton>
-                <MenuList bg="gray.800" borderColor="purple.600">
+                <MenuList bg="gray.800" borderColor="brand.cream">
                   <NextLink href="/adhesion" passHref>
                     <MenuItem as="a">Devenir adhérent</MenuItem>
                   </NextLink>
@@ -418,7 +419,7 @@ useEffect(() => {
                       <FaBug />
                     </Button>
                   </MenuButton>
-                  <MenuList bg="gray.800" borderColor="purple.600" minW="180px">
+                  <MenuList bg="gray.800" borderColor="brand.gold" minW="180px">
                     <Box mt={4} display="flex" justifyContent="center" />
                     <MenuItem onClick={toggleInsectVisibility}>
                       {isInsectVisible ? (
@@ -455,23 +456,28 @@ useEffect(() => {
               <>
                 {/* Menu simple - FIXED */}
                 <Menu>
-                    <MotionMenuButton
-                      as={Button}
-                      px={10}
-                      py={6}
-                      fontSize="sm"
-                      fontWeight="bold"
-                      borderRadius="full"
-                      boxShadow="lg"
-                      border="1px solid whiteAlpha.300"
-                      whileHover={{ scale: 1.03, boxShadow: boxShadowHover }}
-                      _hover={{ ...hoverStyles.brandHover._hover, ...brandHover }}
-                      _active={{ transform: "scale(0.98)" }}
-                      transition={{ duration: 0.25, ease: "easeInOut" }}
-                    >
-                      Découvrir
-                    </MotionMenuButton>
-                    <MenuList bg="gray.800" borderColor="purple.600">
+                <MotionMenuButton
+                  as={Button}
+                  py={4}
+                  minW="auto"
+                  maxW={{ base: "calc(100vw - 40px)", md: "160px" }}
+                  fontSize={{ base: "sm", md: "md" }}
+                  fontWeight={600}
+                  borderRadius="full"
+                  letterSpacing={0.5}
+                  whiteSpace="nowrap"
+                  boxShadow="0 10px 40px rgba(238,212,132,0.25)"
+                  border="1px solid brand.cream"
+                  whileTap={{ scale: 0.98 }}
+                  _active={{ transform: "scale(0.98)" }}
+                  mx={1}
+                  bg="brand.navy"
+                  color="brand.gold"
+                  _hover={{ bg: "brand.blue" }}
+                >
+                  Découvrir
+                </MotionMenuButton>
+                    <MenuList bg="gray.800" borderColor="brand.gold">
 
                     <NextLink href="/association/rescoe" passHref>
                       <MenuItem as="a">L'association</MenuItem>
@@ -532,17 +538,22 @@ useEffect(() => {
           <DrawerOverlay />
           <DrawerContent bg="gray.900" color="gray.100">
             <DrawerCloseButton _focus={{ boxShadow: 'outline' }} />
-            <DrawerHeader borderBottomWidth="1px" borderBottomColor="purple.600">
-              Menu
+            <DrawerHeader
+              borderBottomWidth="1px"
+              borderBottomColor="brand.gold"
+              display="flex"
+              alignItems="center"
+              justifyContent="space-between"
+              pr={12}   // espace pour la croix
+            >
+              <Box>Menu</Box>
+              <ColorModeButton />
             </DrawerHeader>
+
             <DrawerBody>
               <VStack align="start" spacing={4}>
                 <NavBar />
               </VStack>
-
-              <Box py={6} borderRadius="full">
-                <ColorModeButton />
-              </Box>
 
             </DrawerBody>
           </DrawerContent>

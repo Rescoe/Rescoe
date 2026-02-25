@@ -146,30 +146,33 @@ const ConnectBouton: React.FC = () => {
   if (!isAuthenticated) {
     return (
       <Menu>
-        <MotionMenuButton
-          as={Button}
-          py={4}
-          minW="auto"
-          maxW={{ base: "calc(100vw - 40px)", md: "160px" }}
-          fontSize={{ base: "sm", md: "md" }}
-          fontWeight="600"
-          borderRadius="full"
-          letterSpacing={0.5}
-          whiteSpace="nowrap"
-          bg="brand.gold"
-          color="black"
-          boxShadow="0 10px 40px rgba(238,212,132,0.25)"
-          border="1px solid rgba(238,212,132,0.3)"
-          whileHover={isDesktop ? { scale: 1.05, boxShadow: "0 20px 60px rgba(238,212,132,0.35)", y: -2 } : {}}
-          whileTap={{ scale: 0.98 }}
-          _hover={{ bg: "brand.gold" }}
-          _active={{ transform: "scale(0.98)" }}
-          data-loading={isConnecting}
-          //isDisabled={isConnecting}
-          mx={1}
-        >
-          Se connecter
-        </MotionMenuButton>
+      <MotionMenuButton
+        as={Button}
+        py={4}
+        minW="auto"
+        maxW={{ base: "calc(100vw - 40px)", md: "160px" }}
+        fontSize={{ base: "sm", md: "md" }}
+        fontWeight={600}
+        borderRadius="full"
+        letterSpacing={0.5}
+        whiteSpace="nowrap"
+        boxShadow="0 10px 40px rgba(238,212,132,0.25)"
+        border="1px solid rgba(238,212,132,0.3)"
+        whileHover={
+          isDesktop
+            ? { scale: 1.05, y: -2, boxShadow: "0 20px 60px rgba(238,212,132,0.35)" }
+            : {}
+        }
+        whileTap={{ scale: 0.98 }}
+        _active={{ transform: "scale(0.98)" }}
+        mx={1}
+        bg="brand.gold"
+        color="black"
+        _hover={{ bg: "brand.gold" }}
+        data-loading={isConnecting}
+      >
+        Se connecter
+      </MotionMenuButton>
 
         <MenuList
           backdropFilter="blur(18px)"

@@ -52,7 +52,6 @@ export default function Residents() {
                         <Badge colorScheme="purple" variant="subtle">{resident.role}</Badge>
                       </Box>
 
-                      // ✅ AJOUTE ÇA ligne 55
                       <Tooltip label="Copier adresse">
                         <IconButton
                           aria-label="Copier adresse"  // ← AJOUTE ÇA
