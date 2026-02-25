@@ -6,6 +6,9 @@ import haikuContractABI from '../../ABI/HaikuEditions.json';
 import nftContractABI from '../../ABI/ABI_ART.json';
 import ABIRESCOLLECTION from '../../ABI/ABI_Collections.json';
 
+import { resolveIPFS } from '../../../utils/resolveIPFS';  // ← AJOUTE ÇA EN HAUT
+
+
 /* ------------------------------------------------------------------ */
 /* CONFIG */
 /* ------------------------------------------------------------------ */
@@ -95,13 +98,10 @@ export const useRescoeData = (): UseRescoeDataReturn => {
   /* ------------------------------------------------------------------ */
   /* COLLECTIONS */
   /* ------------------------------------------------------------------ */
-
+  /* ------------------------------------------------------------------ */
+  /* COLLECTIONS (DÉJÀ OK - mais harmonisé) */
   const fetchCollections = useCallback(async () => {
     setIsLoading(true);
-
-    // ✅ 1. hydrate depuis cache si valide
-    const cached = loadCacheArray<Collection>('featured_collections');
-    if (cached) setCollections(cached);
 
     try {
       const total = await contract.getTotalCollectionsMinted();
@@ -112,27 +112,36 @@ export const useRescoeData = (): UseRescoeDataReturn => {
           if (!tuple || !tuple[6]) return null;
 
           const uri = await contract.getCollectionURI(tuple[0]);
+          const mintContractAddress = Array.isArray(tuple[4]) ? tuple[4][0] : tuple[4];
+
+          // ✅ CACHE localStorage comme galerie
+          const cachedMetadata = localStorage.getItem(uri);
           let metadata: any = {};
 
-          try {
-            const res = await fetch(`/api/proxyPinata_Oeuvres?ipfsHash=${uri.split('/').pop()}`);
+          if (cachedMetadata) {
+            metadata = JSON.parse(cachedMetadata);
+          } else {
+            // ✅ Nettoyage IPFS + API /api/ipfs/ comme galerie
+            const cleanURI = uri.replace("ipfs://", "");
+            const cid = cleanURI.split("/")[0];
+            const res = await fetch(`/api/ipfs/${cid}`);
             metadata = await res.json();
-          } catch {}
+            localStorage.setItem(uri, JSON.stringify(metadata));
+          }
 
           return {
             id: tuple[0].toString(),
             name: tuple[1],
             collectionType: tuple[2],
             artist: tuple[3],
-            imageUrl: metadata.image || '/default.png',
-            mintContractAddress: Array.isArray(tuple[4]) ? tuple[4][0] : tuple[4],
+            imageUrl: resolveIPFS(metadata.image, true),  // ✅ PROXY /api/ipfs/
+            mintContractAddress,
             isFeatured: tuple[6],
           };
         })
       );
 
       const featured = data.filter(Boolean) as Collection[];
-
       setCollections(featured);
       saveCache('featured_collections', featured);
     } catch (e) {
@@ -143,92 +152,138 @@ export const useRescoeData = (): UseRescoeDataReturn => {
   }, []);
 
   /* ------------------------------------------------------------------ */
-  /* POEMS */
-  /* ------------------------------------------------------------------ */
-
+  /* POEMS (FIXÉ comme galerie) */
   const fetchPoems = useCallback(async (collectionId: string, address: string) => {
     const cacheKey = `haikus_${collectionId}`;
 
     const cached = loadCacheArray<Haiku>(cacheKey);
-    if (cached) {
+    if (cached?.length) {
       setHaikusByCollection(p => ({ ...p, [collectionId]: cached }));
+      console.log(`[POEMS ${collectionId}] Cache: ${cached.length}`);
       return;
     }
 
     try {
       const contract = new Contract(address, haikuContractABI, provider);
       const count = Number(await contract.getLastUniqueHaikusMinted());
-      if (!count) return;
+      if (!count) {
+        console.log(`[POEMS ${collectionId}] No haikus`);
+        return;
+      }
 
       const max = Math.min(5, count);
-      const tokenIds = Array.from({ length: max }, (_, i) => i); // ✅ START AT 0
+      const tokenIds = Array.from({ length: max }, (_, i) => i);
 
       const poems = (await Promise.all(
         tokenIds.map(async (id) => {
           try {
             const data = await contract.getTokenFullDetails(id);
+            const poemText = data.map((t: any) => t.toString());
+
+            // ✅ MINIMUM 7 lignes pour GridLayout
+            while (poemText.length < 8) poemText.push(`Ligne ${poemText.length + 1}`);
+
             return {
-              poemText: data.map((t: any) => t.toString()),
+              poemText,
               mintContractAddress: address,
               uniqueIdAssociated: id.toString(),
             };
-          } catch {
+          } catch (e) {
+            console.warn(`[POEM ${id}] Skip:`, e);
             return null;
           }
         })
       )).filter(Boolean) as Haiku[];
 
+      console.log(`[POEMS ${collectionId}] Found ${poems.length}`);
       setHaikusByCollection(p => ({ ...p, [collectionId]: poems }));
       saveCache(cacheKey, poems);
     } catch (e) {
-      console.error('[POEMS] error', e);
+      console.error(`[POEMS ${collectionId}] Error:`, e);
     }
   }, []);
 
   /* ------------------------------------------------------------------ */
-  /* NFTS */
-  /* ------------------------------------------------------------------ */
-
+  /* NFTS (FIXÉ EXACTEMENT comme ta galerie) */
   const fetchNFTs = useCallback(async (collectionId: string, address: string) => {
     const cacheKey = `nfts_${collectionId}`;
 
+    if (!address || address === "0x0000000000000000000000000000000000000000") {
+      console.log(`[NFTS ${collectionId}] Invalid address: ${address}`);
+      return;
+    }
+
     const cached = loadCacheArray<Nft>(cacheKey);
-    if (cached) {
+    if (cached?.length) {
       setNftsByCollection(p => ({ ...p, [collectionId]: cached }));
+      console.log(`[NFTS ${collectionId}] Cache: ${cached.length}`);
       return;
     }
 
     try {
       const contract = new Contract(address, nftContractABI, provider);
-      let max = Number(await contract.getLastMintedTokenId());
-      max = Math.min(max, 9);
 
-      const tokenIds = Array.from({ length: max + 1 }, (_, i) => i);
+      // ✅ Comme galerie : getTokenPaginated(0, 19)
+      const tokenIds: string[] = await contract.getTokenPaginated(0, 19);
 
       const nfts = (await Promise.all(
-        tokenIds.map(async (id) => {
+        tokenIds.map(async (tokenId: string) => {
           try {
-            const uri = await contract.tokenURI(id);
-            const meta = await fetch(`/api/proxyPinata_Oeuvres?ipfsHash=${uri.split('/').pop()}`).then(r => r.json());
+            const tokenURI = await contract.tokenURI(tokenId);
+
+            // ✅ Nettoyage IPFS comme galerie
+            const cleanURI = tokenURI.replace("ipfs://", "");
+            const cid = cleanURI.split("/")[0];
+
+            if (!cid) {
+              console.warn(`[NFT ${tokenId}] No CID`);
+              return null;
+            }
+
+            // ✅ CACHE localStorage comme galerie
+            const cachedMetadata = localStorage.getItem(tokenURI);
+            let metadata: any;
+
+            if (cachedMetadata) {
+              metadata = JSON.parse(cachedMetadata);
+            } else {
+              const response = await fetch(`/api/ipfs/${cid}`);  // ✅ /api/ipfs/ comme galerie
+
+              if (!response.ok) {
+                console.warn(`[NFT ${tokenId}] API fail ${response.status}`);
+                return null;
+              }
+
+              const text = await response.text();
+              metadata = JSON.parse(text);
+              localStorage.setItem(tokenURI, JSON.stringify(metadata));
+            }
+
             return {
-              id: id.toString(),
-              image: meta.image,
-              name: meta.name,
-              artist: meta.artist,
-              content: { tokenId: id.toString(), mintContractAddress: address },
+              id: tokenId.toString(),
+              image: resolveIPFS(metadata.image, true),  // ✅ PROXY /api/ipfs/
+              name: metadata.name,
+              artist: metadata.artist,
+              content: {
+                tokenId: tokenId.toString(),
+                mintContractAddress: address
+              },
             };
-          } catch {
+          } catch (error) {
+            console.warn(`[NFT ${tokenId}] Skip:`, error);
             return null;
           }
         })
       )).filter(Boolean) as Nft[];
 
+      console.log(`[NFTS ${collectionId}] Found ${nfts.length}`);
       setNftsByCollection(p => ({ ...p, [collectionId]: nfts }));
       saveCache(cacheKey, nfts);
     } catch (e) {
-      console.error('[NFTS] error', e);
+      console.error(`[NFTS ${collectionId}] Error:`, e);
     }
   }, []);
+
 
   /* ------------------------------------------------------------------ */
   /* ORCHESTRATION */

@@ -20,6 +20,7 @@ import { brandHover, hoverStyles } from "@styles/theme"; //Style
 
 import FaucetWidget from '@/utils/Faucet/Faucet'; // Assurez-vous d'importer le bon chemin
 
+import { resolveIPFS } from '../../../utils/resolveIPFS';
 
 import RelatedFull from '../../../utils/RelatedFull'; // Assurez-vous d'importer le bon chemin
 import RelatedFullPoems from '../../../utils/RelatedFullPoemes'; // Assurez-vous d'importer le bon chemin
@@ -174,6 +175,17 @@ const getRandomItems = <T,>(array: T[], count: number): T[] => {
     ? array.sort(() => 0.5 - Math.random()).slice(0, Math.min(count, array.length))
     : [];
 };
+
+useEffect(() => {
+  console.log('🚀 useRescoeData DATA:', {
+    isLoading,
+    allNfts: allNfts.length,
+    allHaikus: allHaikus.length,
+    allNftsSample: allNfts.slice(0, 3),
+    allHaikusSample: allHaikus.slice(0, 3),
+    collections: collections.length,
+  });
+}, [isLoading, allNfts, allHaikus, collections]);
 
     const maxBoxHeight = "150px"; // Hauteur max pour toutes les boîtes
 

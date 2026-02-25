@@ -42,6 +42,8 @@ const PoetryGallery: React.FC<PoetryGalleryProps> = ({ collectionAddress }) => {
       setIsLoading(true);
       try {
         const uniqueHaikuCount: BigNumberish = await contract.getLastUniqueHaikusMinted();
+
+
         const poemsData: Poem[] = await Promise.all(
           Array.from({ length: Number(uniqueHaikuCount) }, (_, i) => i).map(async (uniqueHaikuId) => {
             const [firstTokenId, nombreHaikusParSerie] = await contract.getHaikuInfoUnique(uniqueHaikuId);
@@ -50,6 +52,12 @@ const PoetryGallery: React.FC<PoetryGalleryProps> = ({ collectionAddress }) => {
 
             const priceEur = convertEthToEur(tokenDetails.currentPrice.toString());
 
+            // ⭐ IMPORTANT — même logique que galerie
+            const tokenIdsForSale = await fetchTokenIdsForSale(
+              contract,
+              Number(firstTokenId),
+              Number(nombreHaikusParSerie)
+            );
 
             return {
               tokenId: firstTokenId.toString(),
@@ -61,11 +69,14 @@ const PoetryGallery: React.FC<PoetryGalleryProps> = ({ collectionAddress }) => {
               priceEur: priceEur ? priceEur.toFixed(2) : "0", // €
               totalMinted: (Number(nombreHaikusParSerie) - Number(availableEditions)).toString(),
               availableEditions: availableEditions.toString(),
-              isForSale: tokenDetails.forSale,
-              tokenIdsForSale: [], // Ce champ peut être rempli selon votre logique
+              isForSale: tokenIdsForSale.length > 0,
+              tokenIdsForSale,
             };
           })
         );
+
+        console.log(poemsData);
+
         setPoems(poemsData);
       } catch (err) {
         console.error("Erreur fetchPoems :", err);
@@ -76,6 +87,25 @@ const PoetryGallery: React.FC<PoetryGalleryProps> = ({ collectionAddress }) => {
 
     loadPoems();
   }, [collectionAddress]);
+
+  const fetchTokenIdsForSale = async (
+    collectionContract: Contract,
+    premierIDDeLaSerie: number,
+    nombreHaikusParSerie: number
+  ): Promise<number[]> => {
+    const tokenIdsForSale: number[] = [];
+
+    for (let id = premierIDDeLaSerie; id < premierIDDeLaSerie + nombreHaikusParSerie; id++) {
+      console.log(nombreHaikusParSerie);
+      const forSale: boolean = await collectionContract.isNFTForSale(id);
+      if (forSale) {
+        tokenIdsForSale.push(id);
+      }
+    }
+
+    return tokenIdsForSale;
+  };
+
 
   // Fonction d'achat
   const handleBuy = async (tokenId: string) => {
@@ -99,12 +129,12 @@ const PoetryGallery: React.FC<PoetryGalleryProps> = ({ collectionAddress }) => {
       {isLoading ? (
         <Spinner />
       ) : (
-        poems.map((poem) => (
+        poems.map((poem) => (  // ✅ poem défini ICI dans .map()
           <TextCard
             key={poem.tokenId}
             nft={poem}
-            showBuyButton={poem.isForSale} // Affiche le bouton si le poème est en vente
-            onBuy={handleBuy} // Passer la nouvelle fonction handleBuy
+            showBuyButton={poem.isForSale}  // ✅ Dynamique
+            onBuy={handleBuy}  // ✅ Direct (1 paramètre)
           />
         ))
       )}

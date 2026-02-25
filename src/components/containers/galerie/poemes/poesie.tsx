@@ -84,7 +84,6 @@ const PoetryGallery: React.FC = () => {
   const [currentTabIndex, setCurrentTabIndex] = useState<number>(0);
   const [isMobile] = useMediaQuery('(max-width: 768px)');
   const { web3, address } = useAuth();
-  const [tokenIdsForSale, setTokenIdsForSale] = useState<number[]>([]);
   const [isOwner, setIsOwner] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<number>(0);
   const pageSize = 10; // 20 collections par page
@@ -201,6 +200,7 @@ const fetchPoetryCollections = async (page: number) => {
     const tokenIdsForSale: number[] = [];
 
     for (let id = premierIDDeLaSerie; id < premierIDDeLaSerie + nombreHaikusParSerie; id++) {
+      console.log(nombreHaikusParSerie);
       const forSale: boolean = await collectionContract.isNFTForSale(id);
       if (forSale) {
         tokenIdsForSale.push(id);
@@ -239,6 +239,13 @@ const fetchPoetryCollections = async (page: number) => {
 
 
           // 📌 On construit un poème avec `tokenIdsForSale` et `availableEditions` en "pending"
+          //const tokenIdsForSale = await fetchTokenIdsForSale(collectionContract, Number(firstTokenId), nombreHaikusParSerie);
+          console.log('premierToDernier:', premierToDernier);
+          console.log('premierIDDeLaSerie:', premierIDDeLaSerie, typeof premierIDDeLaSerie);
+          console.log('nombreHaikusParSerie:', nombreHaikusParSerie, typeof nombreHaikusParSerie);
+          const tokenIdsForSale = await fetchTokenIdsForSale(collectionContract, premierIDDeLaSerie, nombreHaikusParSerie);
+          console.log('tokenIdsForSale RESULT:', tokenIdsForSale);
+
           const poem: Poem = {
             tokenId: Number(firstTokenId).toString(),
             poemText: tokenDetails.haiku_,
@@ -248,25 +255,10 @@ const fetchPoetryCollections = async (page: number) => {
             price: tokenDetails.currentPrice.toString(),
             priceEur: priceInEuro ? priceInEuro.toFixed(2) : "0",
             totalMinted: totalMinted.toString(),
-            availableEditions: "...", // ⏳ placeholder
+            availableEditions: tokenIdsForSale.length.toString(), // ✅ direct
             isForSale: tokenDetails.forSale,
-            tokenIdsForSale: [], // ⏳ placeholder
+            tokenIdsForSale, // ✅ direct
           };
-
-          // 🔹 On lance la récupération "asynchrone" après coup
-          fetchTokenIdsForSale(collectionContract, premierIDDeLaSerie, nombreHaikusParSerie)
-            .then((tokenIdsForSale) => {
-              const nbAVendre = tokenIdsForSale.length;
-
-              // Mise à jour en remplaçant uniquement les champs dépendants
-              setPoems((prevPoems) =>
-                prevPoems.map((p) =>
-                  p.tokenId === poem.tokenId
-                    ? { ...p, availableEditions: nbAVendre.toString(), tokenIdsForSale }
-                    : p
-                )
-              );
-            });
 
           return poem; // On renvoie déjà la version "incomplète"
         })
@@ -302,7 +294,7 @@ const fetchPoetryCollections = async (page: number) => {
 
 
 
-        if (Number(nft.tokenIdsForSale) <= 0) {
+if (!nft.tokenIdsForSale || nft.tokenIdsForSale.length === 0){
             alert("Plus d'éditions disponibles.");
             return;
         }
@@ -545,14 +537,14 @@ const handleBurn = async (nft: Poem, tokenId: number) => {
                   spacing={6}
                   w="full"
                 >
-                  {poems.map((poem) => (
-                    <TextCard
-                      key={poem.tokenId}
-                      nft={poem}
-                      showBuyButton={true}
-                      onBuy={(tokenId) => handleBuy(poem, Number(tokenId))}
-                    />
-                  ))}
+                {poems.map((poem) => (
+                  <TextCard
+                    key={poem.tokenId}
+                    nft={poem}   // ✅ garder les données du poème
+                    showBuyButton={true}
+                    onBuy={(tokenId) => handleBuy(poem, Number(tokenId))}
+                  />
+                ))}
                 </SimpleGrid>
               </VStack>
             ) : (
