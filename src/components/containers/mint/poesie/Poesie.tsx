@@ -9,6 +9,12 @@ import {
   useToast,
   Alert,
   AlertIcon,
+  VStack,
+  Heading,
+  Divider,
+  Flex,
+  Text
+
 } from "@chakra-ui/react";
 import { JsonRpcProvider, Contract } from "ethers";
 import { ethers } from "ethers";
@@ -18,6 +24,17 @@ import ABI from "../../../ABI/HaikuEditions.json";
 import { useAuth } from "@/utils/authContext";
 import useEstimateGas from "@/hooks/useEstimateGas"; // Importez votre hook d'estimation de gas
 
+import {
+  config,
+  colors,
+  styles,
+  components,
+  hoverStyles,
+  gradients,
+  effects,
+  animations,
+  brandHover,
+} from "@styles/theme"
 
 interface Collection {
   id: string;
@@ -254,84 +271,171 @@ const PoemMintingPage: React.FC = () => {
       editionsForSale < 0 ||
       editionsForSale > editions;
 
+      return (
+        <Box
+          maxW="720px"
+          mx="auto"
+          mt={10}
+          p={10}
+          borderRadius="3xl"
+          boxShadow="dark-lg"
+          border="1px solid"
+          borderColor="brand.cream"
+        >
+          <VStack align="stretch" spacing={8}>
+            <Heading
+              size="xl"
+              textAlign="center"
+              fontWeight="black"
+              bgGradient="linear(to-r, brand.gold, brand.cream)"
+              bgClip="text"
+            >
+              Mint Poème
+            </Heading>
 
-  return (
-    <Box p={5} maxWidth="640px" mx="auto">
-      <FormLabel>Poème</FormLabel>
-      <Textarea
-        value={poemText}
-        onChange={(e) => setPoemText(e.target.value)}
-        placeholder={"Écris ton poème ici (tu peux utiliser des retours à la ligne)."}
-        rows={6}
-      />
+            {/* ================= COLLECTION ================= */}
+            <VStack align="stretch" spacing={3}>
+              <FormLabel fontWeight="bold" color="brand.cream">
+                Collection
+              </FormLabel>
 
-      <FormLabel mt={5}>Sélectionnez la collection</FormLabel>
-      <Select
-        value={selectedCollectionId}
-        onChange={(e) => {
-          setSelectedCollectionId(e.target.value);
-          fetchMintingContractAddress(e.target.value);
-        }}
-        placeholder={loading ? "Chargement..." : "Sélectionnez une collection de poésie"}
-      >
-        {collections.map((collection) => (
-          <option key={collection.id} value={collection.id}>
-            {collection.name}
-          </option>
-        ))}
-      </Select>
+              <Select
+                value={selectedCollectionId}
+                onChange={(e) => {
+                  setSelectedCollectionId(e.target.value);
+                  fetchMintingContractAddress(e.target.value);
+                }}
+                placeholder={loading ? "Chargement…" : "Sélectionnez une collection de poésie"}
+                bg="blackAlpha.300"
+                borderColor="brand.cream"
+              >
+                {collections.map((collection) => (
+                  <option
+                    key={collection.id}
+                    value={collection.id}
+                    style={{ background: "#1A202C", color: "white" }}
+                  >
+                    {collection.name}
+                  </option>
+                ))}
+              </Select>
+            </VStack>
 
-      <FormLabel mt={5}>Nombre d'éditions</FormLabel>
-      <Input
-        type="number"
-        min="1"
-        value={editions}
-        onChange={(e) => setEditions(Number(e.target.value))}
-        placeholder="Nombre d'éditions"
-      />
+            {/* ================= POEM ================= */}
+            <VStack align="stretch" spacing={3}>
+              <FormLabel fontWeight="bold" color="brand.cream">
+                Poème
+              </FormLabel>
 
-      <FormLabel mt={5}>Nombre d'éditions à vendre</FormLabel>
-      <Input
-        type="number"
-        min="0"
-        max={editions}
-        value={editionsForSale}
-        onChange={(e) => setEditionsForSale(Number(e.target.value))}
-        placeholder="Éditions à vendre (0 au total)"
-      />
+              <Textarea
+                value={poemText}
+                onChange={(e) => setPoemText(e.target.value)}
+                placeholder="Écris ton poème ici… (retours à la ligne autorisés)"
+                minH="180px"
+                resize="vertical"
+                bg="blackAlpha.300"
+                borderColor="brand.cream"
+              />
+            </VStack>
 
-      <FormLabel mt={5}>Prix de vente (en ETH)</FormLabel>
-      <Input
-        type="text"
-        value={salePrice}
-        onChange={(e) => setSalePrice(e.target.value)}
-        placeholder="ex: 0.001 (laisser vide = gratuit)"
-      />
+            {/* ================= EDITIONS ================= */}
+            <VStack align="stretch" spacing={4}>
+              <Box>
+                <FormLabel fontWeight="bold" color="brand.cream">
+                  Nombre d’éditions
+                </FormLabel>
+                <Input
+                  type="number"
+                  min={1}
+                  value={editions}
+                  onChange={(e) => setEditions(Number(e.target.value))}
+                  placeholder="Nombre total"
+                  bg="blackAlpha.300"
+                  borderColor="brand.cream"
+                />
+              </Box>
 
-      {salePrice.trim() === "" && editionsForSale > 0 && (
-        <Alert status="warning" mt={3} borderRadius="md">
-          <AlertIcon />
-          Attention : ce poème sera listé pour <strong>0 ETH</strong> si vous laissez le prix vide.
-        </Alert>
-      )}
+              <Box>
+                <FormLabel fontWeight="bold" color="brand.cream">
+                  Éditions à vendre
+                </FormLabel>
+                <Input
+                  type="number"
+                  min={0}
+                  max={editions}
+                  value={editionsForSale}
+                  onChange={(e) => setEditionsForSale(Number(e.target.value))}
+                  placeholder="0 = aucune"
+                  bg="blackAlpha.300"
+                  borderColor="brand.cream"
+                />
+              </Box>
+            </VStack>
 
-      <Button
-          mt={4}
-          colorScheme="teal"
-          onClick={mintPoem}
-          isLoading={isMinting}
-          isDisabled={isMintDisabled} // Utilisez une fonction pour déterminer si le bouton est désactivé
-      >
-          Mint Poème
-          {isEstimating && <span>...Estimating gas costs...</span>}
-          {estimatedCost && !isEstimating && (
-              <span> - Estimated cost: {estimatedCostEuro} €</span>
-          )}
-      </Button>
+            {/* ================= SALE ================= */}
+            <VStack align="stretch" spacing={3}>
+              <FormLabel fontWeight="bold" color="brand.cream">
+                Prix de vente (ETH)
+              </FormLabel>
 
+              <Input
+                type="text"
+                value={salePrice}
+                onChange={(e) => setSalePrice(e.target.value)}
+                placeholder="ex: 0.001 — vide = gratuit"
+                bg="blackAlpha.300"
+                borderColor="brand.cream"
+              />
 
-    </Box>
-  );
+              {salePrice.trim() === "" && editionsForSale > 0 && (
+                <Alert
+                  status="warning"
+                  borderRadius="lg"
+                  bg="orange.900/40"
+                  border="1px solid"
+                  borderColor="orange.400"
+                >
+                  <AlertIcon />
+                  Ce poème sera listé pour <b>0 ETH</b>.
+                </Alert>
+              )}
+            </VStack>
+
+            <Divider borderColor="brand.cream" />
+
+            {/* ================= ACTION ================= */}
+            <Flex direction="column" align="center" gap={4}>
+              <Button
+                px={10}
+                py={6}
+                fontSize="lg"
+                borderRadius="full"
+                borderWidth="1px"
+                borderColor="brand.cream"
+                bgGradient="linear(to-r, brand.navy, brand.navy)"
+                color="brand.gold"
+                onClick={mintPoem}
+                isLoading={isMinting}
+                isDisabled={isMintDisabled}
+              >
+                Mint Poème
+              </Button>
+
+              {isEstimating && (
+                <Text fontSize="sm" color="gray.400">
+                  Estimation du gas…
+                </Text>
+              )}
+
+              {estimatedCost && !isEstimating && (
+                <Text fontSize="sm" color="gray.400">
+                  Coût estimé : {estimatedCostEuro} €
+                </Text>
+              )}
+            </Flex>
+          </VStack>
+        </Box>
+      );
 };
 
 export default PoemMintingPage;

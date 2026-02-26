@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Box, Heading, VStack, Divider, Flex, HStack, Input, Button, Text, FormLabel, useToast, Image, Select, Progress } from "@chakra-ui/react";
+import { Box, Heading, VStack, Divider, Flex, HStack, Input, Button, Text, FormLabel, useToast, Image, Select, Progress, useColorModeValue, useColorMode, useTheme } from "@chakra-ui/react";
 import { JsonRpcProvider, Contract } from "ethers";
 import { useAuth } from '@/utils/authContext';
 import { handleMessageTransactions } from '@/utils/handleMessageTransactions';
@@ -9,6 +9,17 @@ import ABI_ART_FACTORY from '@/components/ABI/Factories/ABI_ART_FACTORY.json';
 import ABI_POESIE_FACTORY from '@/components/ABI/Factories/ABI_POESIE_FACTORY.json';
 import ABI_Adhesion from '@/components/ABI/ABIAdhesion.json';
 import { usePinataUpload } from "@/hooks/usePinataUpload"; // ✅ NOUVEAU
+import {
+  config,
+  colors,
+  styles,
+  components,
+  hoverStyles,
+  gradients,
+  effects,
+  animations,
+brandHover,
+ } from "@styles/theme"; //Style
 
 
 import Web3 from "web3";
@@ -44,6 +55,8 @@ const CreateCollection: React.FC = () => {
   const [royaltyData, setRoyaltyData] = useState<{ address: string; value: string }[]>([{ address: "", value: "" }]);
   const [maxEditions, setMaxEditions] = useState<number>(1);
 
+  const { colorMode } = useColorMode();  // ✅ AJOUTEZ CETTE LIGNE
+  const theme = useTheme();
 
   const canUpload =
     file &&
@@ -449,186 +462,391 @@ const tx = await handleMessageTransactions(
     }
   };
 
-
   // Render UI
   return (
-    <Box maxW="700px" mx="auto" mt={10} p={10} borderRadius="3xl" boxShadow="dark-lg" border="1px solid" borderColor="purple.300">
-      <Heading size="2xl" mb={6} textAlign="center" fontWeight="black" bgGradient="linear(to-r, purple.400, pink.400)" bgClip="text" letterSpacing="tight">
+    <Box
+      maxW="700px"
+      mx="auto"
+      mt={10}
+      p={10}
+      borderRadius="3xl"
+      boxShadow="dark-lg"
+      bg={
+        colorMode === "light"
+          ? "rgba(253, 251, 212, 0.9)"  // cream avec transparence
+          : "rgba(1, 28, 57, 0.95)"     // navy avec transparence
+      }
+      border="1px solid"
+      borderColor={colorMode === "light" ? "brand.navy" : "brand.cream"}
+      backdropFilter="blur(12px)"
+    >
+      <Heading
+        size="2xl"
+        mb={6}
+        textAlign="center"
+        {...(colorMode === "light" ?
+          { bgGradient: "linear(to-r, brand.navy, brand.navy)" } :
+          { bgGradient: "linear(to-r, brand.cream, brand.cream)" }
+        )}
+      >
         Créez une collection
       </Heading>
 
-      <HStack mx="auto" mb={6} textAlign="center" fontWeight="black" bgGradient="linear(to-r, purple.400, pink.400)" bgClip="text" letterSpacing="tight">
-        <Text mt={4}>Collections crées : {userCollections} - </Text>
-        <Text mt={4}>Collections restantes : {remainingCollections}</Text>
+      <HStack mx="auto" mb={6} textAlign="center" fontWeight="black">
+        <Text mt={4} color={colorMode === "light" ? "brand.navy" : "brand.cream"}>
+          Collections crées : {userCollections}
+        </Text>
+        <Text mt={4} color={colorMode === "light" ? "brand.navy" : "brand.cream"}>
+          Collections restantes : {remainingCollections}
+        </Text>
       </HStack>
 
       {/* 🔥 File Input + Feedback PRO */}
-  <FormLabel fontWeight="bold" color="gray.200">
-    Image de la collection
-  </FormLabel>
+      <FormLabel fontWeight="bold" color={colorMode === "light" ? "brand.navy" : "brand.textLight"}>
+        Image de la collection
+      </FormLabel>
 
-  <Box>
-    {/* Input principal */}
-    <Input
-      type="file"
-      onChange={handleFileChange}
-      mb={file ? 3 : 2}
-      border="2px dashed"
-      borderColor={file?.size! > 8*1024*1024 ? "orange.400" : "purple.400"}
-      bg="blackAlpha.300"
-      color="white"
-      py={2}
-      accept="image/jpeg,image/png,image/webp"
-      _hover={{ borderColor: "pink.400" }}
-    />
-
-    {/* Feedback si fichier sélectionné */}
-    {file && (
-      <Box mt={3} p={3} bg="gray.900/80" borderRadius="lg" border="1px solid" borderColor="purple.400">
-        <HStack justify="space-between" mb={1}>
-          <Text fontSize="sm" color="gray.300">
-            📁 <b>{file.name}</b>
-          </Text>
-          <Text fontSize="sm" fontWeight="bold" color="purple.300">
-            {(file.size / 1024 / 1024).toFixed(1)} Mo
-          </Text>
-        </HStack>
-
-        {/* Barre progression */}
-        <Progress
-          value={Math.min((file.size / (3 * 1024 * 1024)) * 100, 100)}
-          size="xs"
-          colorScheme={
-            file.size < 2 * 1024 * 1024 ? "green" :
-            file.size < 3 * 1024 * 1024 ? "yellow" : "orange"
+      <Box>
+        {/* Input principal */}
+        <Input
+          type="file"
+          onChange={handleFileChange}
+          mb={file ? 3 : 2}
+          border="2px dashed"
+          borderColor={
+            file?.size! > 8*1024*1024
+              ? "orange.400"
+              : colorMode === "light" ? "brand.navy" : "brand.cream"
           }
-          mb={2}
+          bg={colorMode === "light" ? "brand.cream" : "blackAlpha.400"}
+          color={colorMode === "light" ? "brand.navy" : "brand.textLight"}
+          py={2}
+          accept="image/jpeg,image/png,image/webp"
+          _hover={{
+            borderColor: colorMode === "light" ? "brand.blue" : "brand.mauve",
+            ...hoverStyles.brandHover._hover
+          }}
         />
 
-        {/* Temps estimé */}
-        <Text fontSize="xs" color="gray.400">
-          ⏱️ Estimé :
-          <span style={{
-            color: file.size < 5*1024*1024 ? "#10b981" : "#f59e0b",
-            fontWeight: "bold"
-          }}>
-            {(file.size / 1024 / 1024 * 4).toFixed(0)}s
-          </span>
-        </Text>
+        {/* Feedback si fichier sélectionné */}
+        {file && (
+          <Box
+            mt={3}
+            p={4}
+            borderRadius="xl"
+            border="1px solid"
+            borderColor={colorMode === "light" ? "brand.navy" : "brand.cream"}
+            bgGradient={
+              colorMode === "light"
+                ? "linear(to-r, brand.cream, whiteAlpha.800)"
+                : gradients.cardBorderDark
+            }
+            boxShadow={colorMode === "light" ? effects.glowLight : effects.glowDark}
+          >
+            <HStack justify="space-between" mb={2}>
+              <Text fontSize="sm" color={colorMode === "light" ? "brand.navy" : "brand.textLight"}>
+                📁 <b>{file.name}</b>
+              </Text>
+              <Text
+                fontSize="sm"
+                fontWeight="bold"
+                color={colorMode === "light" ? "brand.navy" : "brand.gold"}
+              >
+                {(file.size / 1024 / 1024).toFixed(1)} Mo
+              </Text>
+            </HStack>
 
-        {/* Avertissement volumineux */}
-        {file.size > 3 * 1024 * 1024 && (
-          <Text fontSize="xs" color="orange.400" fontWeight="bold" mt={1}>
-            ⚠️ Volumineux : patience 45s+
+            {/* Barre progression */}
+            <Progress
+              value={Math.min((file.size / (3 * 1024 * 1024)) * 100, 100)}
+              size="xs"
+              colorScheme={
+                file.size < 2 * 1024 * 1024 ? "green" :
+                file.size < 3 * 1024 * 1024 ? "yellow" : "orange"
+              }
+              mb={2}
+            />
+
+            {/* Temps estimé */}
+            <Text fontSize="xs" color={colorMode === "light" ? "brand.navy" : "gray.400"}>
+              ⏱️ Estimé :
+              <span style={{
+                color: file.size < 5*1024*1024 ? "#10b981" : "#f59e0b",
+                fontWeight: "bold"
+              }}>
+                {(file.size / 1024 / 1024 * 4).toFixed(0)}s
+              </span>
+            </Text>
+
+            {/* Avertissement volumineux */}
+            {file.size > 3 * 1024 * 1024 && (
+              <Text
+                fontSize="xs"
+                color="orange.400"
+                fontWeight="bold"
+                mt={1}
+              >
+                ⚠️ Volumineux : patience 45s+
+              </Text>
+            )}
+          </Box>
+        )}
+
+        {/* Placeholder vide */}
+        {!file && (
+          <Text
+            fontSize="xs"
+            color={colorMode === "light" ? "brand.navy" : "gray.500"}
+            mt={2}
+            textAlign="center"
+          >
+            📸 JPG/PNG/WebP &lt;3Mo (1-2Mo optimal)
           </Text>
         )}
       </Box>
-    )}
 
-    {/* Placeholder vide */}
-    {!file && (
-      <Text fontSize="xs" color="gray.500" mt={2} textAlign="center">
-        📸 JPG/PNG/WebP &lt;3Mo (1-2Mo optimal)
-      </Text>
-    )}
-  </Box>
-
-  {/* Preview (après feedback) */}
-  {previewUrl && (
-    <Box mt={4} borderRadius="xl" overflow="hidden" boxShadow="md" mb={6} border="1px solid" borderColor="purple.300">
-      <Image
-        src={previewUrl}
-        alt="Preview"
-        boxSize="300px"
-        objectFit="cover"
-        mx="auto"
-        transition="transform 0.3s ease"
-        _hover={{ transform: "scale(1.05)" }}
-      />
-    </Box>
-  )}
-
+      {/* Preview (après feedback) */}
+      {previewUrl && (
+        <Box
+          mt={6}
+          borderRadius="2xl"
+          overflow="hidden"
+          boxShadow={colorMode === "light" ? "md" : "dark-lg"}
+          mb={6}
+          border="1px solid"
+          borderColor={colorMode === "light" ? "brand.navy" : "brand.cream"}
+          bgGradient={gradients.cardBorderLight}
+          animation={animations.borderGlow}
+        >
+          <Image
+            src={previewUrl}
+            alt="Preview"
+            boxSize="300px"
+            objectFit="cover"
+            mx="auto"
+            transition="all 0.4s cubic-bezier(0.4, 0, 0.2, 1)"
+            _hover={{
+              transform: "scale(1.05)",
+              boxShadow: colorMode === "light" ? effects.glowLight : effects.glowDark
+            }}
+          />
+        </Box>
+      )}
 
       <VStack spacing={4} align="stretch">
-        <Input placeholder="Nom de la collection" name="name" value={metadata.name} onChange={handleMetadataChange} bg="blackAlpha.300" color="white" borderColor="purple.300" />
-        <Input placeholder="Description" name="description" value={metadata.description} onChange={handleMetadataChange} bg="blackAlpha.300" color="white" borderColor="purple.300" />
-        <Input placeholder="Tags (séparés par des virgules)" name="tags" value={metadata.tags} onChange={handleMetadataChange} bg="blackAlpha.300" color="white" borderColor="purple.300" />
+        <Input
+          placeholder="Nom de la collection"
+          name="name"
+          value={metadata.name}
+          onChange={handleMetadataChange}
+          bg={colorMode === "light" ? "whiteAlpha.800" : "blackAlpha.400"}
+          color={colorMode === "light" ? "brand.navy" : "brand.textLight"}
+          borderColor={colorMode === "light" ? "brand.navy" : "brand.cream"}
+          _hover={{
+            borderColor: colorMode === "light" ? "brand.blue" : "brand.mauve",
+            boxShadow: colorMode === "light" ? effects.glowLight : effects.glowDark
+          }}
+          _focus={{
+            borderColor: "brand.cream",
+            boxShadow: "0 0 0 3px rgba(238, 212, 132, 0.1)"
+          }}
+        />
+        <Input
+          placeholder="Description"
+          name="description"
+          value={metadata.description}
+          onChange={handleMetadataChange}
+          bg={colorMode === "light" ? "whiteAlpha.800" : "blackAlpha.400"}
+          color={colorMode === "light" ? "brand.navy" : "brand.textLight"}
+          borderColor={colorMode === "light" ? "brand.navy" : "brand.cream"}
+          _hover={{
+            borderColor: colorMode === "light" ? "brand.blue" : "brand.mauve",
+            boxShadow: colorMode === "light" ? effects.glowLight : effects.glowDark
+          }}
+        />
+        <Input
+          placeholder="Tags (séparés par des virgules)"
+          name="tags"
+          value={metadata.tags}
+          onChange={handleMetadataChange}
+          bg={colorMode === "light" ? "whiteAlpha.800" : "blackAlpha.400"}
+          color={colorMode === "light" ? "brand.navy" : "brand.textLight"}
+          borderColor={colorMode === "light" ? "brand.navy" : "brand.cream"}
+          _hover={{
+            borderColor: colorMode === "light" ? "brand.blue" : "brand.mauve",
+            boxShadow: colorMode === "light" ? effects.glowLight : effects.glowDark
+          }}
+        />
       </VStack>
 
-      <FormLabel mt={6} color="gray.300" fontWeight="bold">Type de collection</FormLabel>
-      <Select placeholder="Sélectionnez un type" value={collectionType} onChange={(e) => setCollectionType(e.target.value)} bg="blackAlpha.300" color="white" borderColor="purple.300" mb={4}>
-        <option style={{ backgroundColor: "#1A202C" }} value="Art">Art</option>
-        <option style={{ backgroundColor: "#1A202C" }} value="Poesie">Poésie</option>
+      <FormLabel mt={6} color={colorMode === "light" ? "brand.navy" : "brand.textLight"} fontWeight="bold">
+        Type de collection
+      </FormLabel>
+      <Select
+        placeholder="Sélectionnez un type"
+        value={collectionType}
+        onChange={(e) => setCollectionType(e.target.value)}
+        bg={colorMode === "light" ? "whiteAlpha.800" : "blackAlpha.400"}
+        color={colorMode === "light" ? "brand.navy" : "brand.textLight"}
+        borderColor={colorMode === "light" ? "brand.navy" : "brand.cream"}
+        mb={4}
+        _hover={{
+          borderColor: colorMode === "light" ? "brand.blue" : "brand.mauve",
+        }}
+      >
+        <option style={{ backgroundColor: colorMode === "light" ? "#FDFBD4" : "#011C39" }} value="Art">
+          Art
+        </option>
+        <option style={{ backgroundColor: colorMode === "light" ? "#FDFBD4" : "#011C39" }} value="Poesie">
+          Poésie
+        </option>
       </Select>
 
-       {/*royalties*/}
-        <Box mt={6} p={4} border="1px solid" borderColor="purple.300" borderRadius="xl">
-          <Heading size="md" mb={4} color="purple.300">Partage de royalties sur la collection :</Heading>
-          <FormLabel color="gray.300" fontWeight="bold">Nombre maximum d’éditions</FormLabel>
-          <Input type="number" min={1} value={maxEditions} onChange={(e) => setMaxEditions(Number(e.target.value))} bg="blackAlpha.300" color="white" borderColor="purple.300" mb={4} />
+      {/* Royalties */}
+      <Box
+        mt={6}
+        p={6}
+        border="1px solid"
+        borderColor={colorMode === "light" ? "brand.navy" : "brand.cream"}
+        borderRadius="2xl"
+        bg={colorMode === "light" ? "whiteAlpha.600" : "blackAlpha.500"}
+        boxShadow={colorMode === "light" ? "md" : "dark-lg"}
+      >
+        <Heading size="md" mb={4} color={colorMode === "light" ? "brand.navy" : "brand.gold"}>
+          Royalties sur la collection :
+        </Heading>
 
-          <HStack mb={4}>
-            <input type="checkbox" checked={!splitRoyalties} onChange={() => {
+        <FormLabel color={colorMode === "light" ? "brand.navy" : "brand.textLight"} fontWeight="bold">
+          Nombre maximum d'éditions
+        </FormLabel>
+        <Input
+          type="number"
+          min={1}
+          value={maxEditions}
+          onChange={(e) => setMaxEditions(Number(e.target.value))}
+          bg={colorMode === "light" ? "whiteAlpha.800" : "blackAlpha.400"}
+          color={colorMode === "light" ? "brand.navy" : "brand.textLight"}
+          borderColor={colorMode === "light" ? "brand.navy" : "brand.cream"}
+          mb={4}
+        />
+
+        <HStack mb={4} spacing={3}>
+          <input
+            type="checkbox"
+            checked={!splitRoyalties}
+            onChange={() => {
               if (!splitRoyalties) {
                 setRoyaltyData([{ address: address || "", value: "90" }]);
               }
               setSplitRoyalties(!splitRoyalties);
-            }} />
-            <Text color="white">Ne pas split (royalties 100% créateur)</Text>
-          </HStack>
+            }}
+            style={{
+              width: "20px",
+              height: "20px",
+              accentColor: colorMode === "light" ? "#00416A" : "#EED484"
+            }}
+          />
+          <Text color={colorMode === "light" ? "brand.navy" : "brand.textLight"}>
+            Ne pas split (royalties 100% créateur)
+          </Text>
+        </HStack>
 
-          {splitRoyalties && (
-            <VStack spacing={3} align="stretch">
-              {royaltyData.map((row, index) => (
-                <HStack key={index}>
-                  <Input placeholder="Adresse" value={row.address} onChange={e => handleRoyaltyChange(index, "address", e.target.value)} bg="blackAlpha.300" color="white" borderColor="purple.300" />
-                  <Input placeholder="%" type="number" value={row.value} onChange={e => handleRoyaltyChange(index, "value", e.target.value)} bg="blackAlpha.300" color="white" borderColor="purple.300" w="100px" />
-                  <Button size="sm" colorScheme="red" onClick={() => removeRoyaltyLine(index)}>-</Button>
-                </HStack>
-              ))}
-              <Button size="sm" colorScheme="purple" onClick={addRoyaltyLine}>+ Ajouter une adresse</Button>
-            </VStack>
-          )}
-        </Box>
+        {splitRoyalties && (
+          <VStack spacing={4} align="stretch">
+            {royaltyData.map((row, index) => (
+              <HStack key={index} spacing={3}>
+                <Input
+                  placeholder="Adresse"
+                  value={row.address}
+                  onChange={e => handleRoyaltyChange(index, "address", e.target.value)}
+                  bg={colorMode === "light" ? "whiteAlpha.800" : "blackAlpha.400"}
+                  color={colorMode === "light" ? "brand.navy" : "brand.textLight"}
+                  borderColor={colorMode === "light" ? "brand.navy" : "brand.cream"}
+                  flex={1}
+                />
+                <Input
+                  placeholder="%"
+                  type="number"
+                  value={row.value}
+                  onChange={e => handleRoyaltyChange(index, "value", e.target.value)}
+                  bg={colorMode === "light" ? "whiteAlpha.800" : "blackAlpha.400"}
+                  color={colorMode === "light" ? "brand.navy" : "brand.textLight"}
+                  borderColor={colorMode === "light" ? "brand.navy" : "brand.cream"}
+                  w="100px"
+                />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  colorScheme="red"
+                  onClick={() => removeRoyaltyLine(index)}
+                  _hover={{ bg: "red.500/20" }}
+                >
+                  −
+                </Button>
+              </HStack>
+            ))}
+            <Button
+              size="sm"
+              variant="outline"
+              colorScheme="brand"
+              onClick={addRoyaltyLine}
+              borderColor={colorMode === "light" ? "brand.navy" : "brand.cream"}
+            >
+              + Ajouter une adresse
+            </Button>
+          </VStack>
+        )}
+      </Box>
 
+      <Button
+        w="full"
+        variant="solid"
+        mt={6}
+        onClick={uploadFileToIPFS}
+        isLoading={isUploading || pinataUploading}
+        isDisabled={!canUpload}
+        {...hoverStyles.brandHover}
+      >
+        {isUploading && !pinataUploading ? "Factory..." :
+         pinataUploading ? "IPFS..." : "🚀 Config + IPFS"}
+      </Button>
 
-        <Button
-          w="full"
-          bgGradient="linear(to-r, teal.500, green.400)"
-          onClick={uploadFileToIPFS}
-          isLoading={isUploading || pinataUploading}
-          isDisabled={!canUpload}
-        >
-          {isUploading && !pinataUploading ? "Factory..." :
-           pinataUploading ? "IPFS..." : "🚀 Config + IPFS"}
-        </Button>
-
-
-
-{/*
-      {ipfsUrl && <Text mt={3} wordBreak="break-word">IPFS URL: {ipfsUrl}</Text>}
-*/}
-
-      <Divider my={10} borderColor="purple.300" />
+      <Divider my={10} borderColor={colorMode === "light" ? "brand.navy" : "brand.gold"} />
 
       <Flex justify="center">
         <VStack>
-
           <Button
             onClick={handleCreateCollection}
-            px={10} py={6} fontSize="lg" fontWeight="bold"
-            borderRadius="full" bgGradient="linear(to-r, purple.700, pink.600)"
-            color="white" boxShadow="lg"
-            _hover={{ transform: "scale(1.05)", boxShadow: "2xl" }}
+            px={12}
+            py={8}
+            fontSize="xl"
+            fontWeight="extrabold"
+            borderRadius="full"
+            bgGradient={
+              colorMode === "light"
+                ? "linear(to-r, brand.blue, brand.blue)"
+                : "linear(to-r, brand.cream, brand.cream)"
+            }
+            color="brand.navy"
+            boxShadow="xl"
+            h="auto"
+            minH="60px"
+            _hover={{
+              transform: brandHover.transform,
+              boxShadow: "2xl",
+              animation: "none"
+            }}
+            transition="all 0.4s cubic-bezier(0.4, 0, 0.2, 1)"
             isLoading={loading}
+            isDisabled={!ipfsUrl}
           >
             🎨 Créer la collection
           </Button>
-
         </VStack>
       </Flex>
     </Box>
   );
+
 };
 
 export default CreateCollection;

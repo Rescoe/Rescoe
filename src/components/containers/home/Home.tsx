@@ -260,7 +260,7 @@ useEffect(() => {
                 <Text
                   fontSize="xl"
                   fontWeight="bold"
-                  color="purple.500"
+                  color="brand.cream"
                   mb={6}
                 >
                   Un réseau d’art numérique et de poésie, ouvert à tou·tes.
@@ -286,21 +286,22 @@ useEffect(() => {
                   py={8}
                   fontSize="lg"
                   fontWeight="bold"
-                  color="white"
+                  borderColor="brand.cream"
+                  color="brand.gold"
+                  bg="brand.navy"
                   borderRadius="full"
                   animation={`${pulse} 2.5s infinite`}
                   mb={8}
                   boxShadow="2xl"
                   _hover={{
-                    ...hoverStyles.brandHover._hover,
                     ...brandHover,
                     transform: "scale(1.05)",
                   }}
                 >
-                  Rejoindre RESCOE
+                  Rejoindre le réseau
                 </Button>
 
-                <Divider my={12} borderColor={useColorModeValue("brand.navy/70", "brand.gold/60")} />
+                <Divider my={12} borderColor={"brand.cream"} />
               </Box>
             </motion.div>
 
@@ -415,7 +416,7 @@ useEffect(() => {
                         </Flex>
                         */}
 
-                        <Divider my={12} borderColor={useColorModeValue("brand.navy/70", "brand.gold/60")} />
+                        <Divider my={12} borderColor={"brand.cream"} />
 
                         {/*
 
@@ -525,7 +526,7 @@ useEffect(() => {
                 </SimpleGrid>
 
                 {/* ===== 4. ARTISTES EN RÉSIDENCE (Fusionné dans même bloc) ===== */}
-                <Divider my={12} borderColor={useColorModeValue("brand.navy/70", "brand.gold/60")} />
+                <Divider my={12} borderColor={"brand.cream"} />
 
                 <Heading
                   mb={6}
@@ -549,7 +550,7 @@ useEffect(() => {
               transition={{ duration: 1 }}
               viewport={{ once: true }}
             >
-            <Divider my={12} borderColor={useColorModeValue("brand.navy/70", "brand.gold/60")} />
+            <Divider my={12} borderColor={"brand.cream"} />
               <Box maxW="1100px" mx="auto">
                 <Heading
                   mb={12}
@@ -611,7 +612,7 @@ useEffect(() => {
               <VStack
                 borderRadius="3xl"
                 border="1px solid"
-                borderColor="purple.700"
+                borderColor="brand.cream"
                 bg={cardBg}
                 p={{ base: 12, md: 16 }}
                 maxW="95%"
@@ -752,7 +753,7 @@ useEffect(() => {
   </SimpleGrid>
 
 
-  <Divider my={12} borderColor={useColorModeValue("brand.navy/70", "brand.gold/60")} />
+  <Divider my={12} borderColor={"brand.cream"} />
 
                 <motion.div
                   initial={{ opacity: 0, y: 30 }}

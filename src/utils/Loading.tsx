@@ -434,7 +434,7 @@ const RescoeNetworkLoader = ({
                 fontWeight="900"
                 color={isDark ? "#EFD484" : "#011C39"}
               >
-                IPFS
+                On-chain
               </Text>
               <Text
                 fontSize="2xs"

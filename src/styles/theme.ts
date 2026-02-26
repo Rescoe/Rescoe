@@ -1,7 +1,7 @@
 import { extendTheme, ThemeConfig, StyleFunctionProps } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 
-const config: ThemeConfig = {
+export const config: ThemeConfig = {
   initialColorMode: "dark",
   useSystemColorMode: false,
 };
@@ -21,13 +21,13 @@ export const borderAnimation = keyframes`
 `;
 
 //Fond cream
-const colors = {
+export const colors = {
   brand: {
     gold: "#EED484",   // accent principal, lumineux et chaleureux
     mauve: "#B4A6D5",  // teinte artistique et douce
     blue: "#00416A",   // ton profond, tech
     navy: "#011C39",   // fond sombre principal
-    cream: "#F7F5EC",  // fond clair
+    cream: "#FDFBD4",  // fond clair
     textDark: "#1A1A1A", // texte foncé pour light mode
     textLight: "#F7F5EC", // texte clair pour dark mode
 
@@ -111,7 +111,7 @@ export const animations = {
 };
 
 
-const components = {
+export const components = {
   Card: {
     baseStyle: (props: StyleFunctionProps) => ({
       bg:
@@ -206,7 +206,8 @@ const theme = extendTheme({
   gradients,
   effects,
   animations,
-
+brandHover,
+pulse,
 });
 
 export default theme;

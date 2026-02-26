@@ -146,53 +146,74 @@ const ConnectBouton: React.FC = () => {
   if (!isAuthenticated) {
     return (
       <Menu>
-      <MotionMenuButton
-        as={Button}
-        py={4}
-        minW="auto"
-        maxW={{ base: "calc(100vw - 40px)", md: "160px" }}
-        fontSize={{ base: "sm", md: "md" }}
-        fontWeight={600}
-        borderRadius="full"
-        letterSpacing={0.5}
-        whiteSpace="nowrap"
-        boxShadow="0 10px 40px rgba(238,212,132,0.25)"
-        border="1px solid rgba(238,212,132,0.3)"
-        whileHover={
-          isDesktop
-            ? { scale: 1.05, y: -2, boxShadow: "0 20px 60px rgba(238,212,132,0.35)" }
-            : {}
-        }
-        whileTap={{ scale: 0.98 }}
-        _active={{ transform: "scale(0.98)" }}
-        mx={1}
-        bg="brand.gold"
-        color="black"
-        _hover={{ bg: "brand.gold" }}
-        data-loading={isConnecting}
-      >
-        Se connecter
-      </MotionMenuButton>
+        <MotionMenuButton
+          as={Button}
+          px={5}
+          py={4}
+          minW="auto"
+          maxW={{ base: "calc(100vw - 40px)", md: "180px" }}
+          fontSize={{ base: "sm", md: "md" }}
+          fontWeight={600}
+          borderRadius="full"
+          letterSpacing={0.5}
+          whiteSpace="nowrap"
+          bg="brand.cream"
+          color="black"
+          border="1px solid"
+          borderColor="brand.goldAlpha"
+          boxShadow="0 10px 40px rgba(238,212,132,0.25)"
+          backdropFilter="blur(10px)"
+          whileHover={
+            isDesktop
+              ? {
+                  scale: 1.05,
+                  y: -2,
+                  boxShadow: "0 20px 60px rgba(238,212,132,0.35)",
+                  backgroundColor: "var(--chakra-colors-brand-gold)",
+                }
+              : {}
+          }
+          whileTap={{ scale: 0.98 }}
+          _active={{ transform: "scale(0.98)" }}
+          mx={1}
+          data-loading={isConnecting}
+        >
+          Se connecter
+        </MotionMenuButton>
 
         <MenuList
+          p={2}
+          borderRadius="2xl"
           backdropFilter="blur(18px)"
           bg="rgba(20,20,24,0.95)"
-          border="1px solid whiteAlpha.200"
-          shadow="lg"
+          border="1px solid"
+          boxShadow="0 20px 80px rgba(0,0,0,0.45)"
           minW="280px"
         >
           <MenuItem
+            borderRadius="xl"
+            fontWeight={500}
+            _hover={{
+              bg: "brand.navy",
+              color: "brand.cream",
+            }}
             onClick={async () => {
               await connectWallet();
               if (address) await handleAuth(address);
             }}
-            _hover={{ bg: "whiteAlpha.100" }}
           >
             🦊 MetaMask / Wallet
           </MenuItem>
+
           <MenuItem
+            mt={1}
+            borderRadius="xl"
+            fontWeight={500}
+            _hover={{
+              bg: "brand.navy",
+              color: "brand.cream",
+            }}
             onClick={connectWithEmail}
-            _hover={{ bg: "whiteAlpha.100" }}
           >
             📧 Email (Web3Auth)
           </MenuItem>
@@ -203,53 +224,91 @@ const ConnectBouton: React.FC = () => {
 
   // ========== CONNECTED - NOUVEAU BOUTON PETIT + COMPACT ✅ ==========
   const { onCopy, hasCopied } = useClipboard(address || "");
-
   return (
     <Menu placement="bottom-end">
       <Tooltip
         label={
-          <VStack align="start" spacing={1} p={2}>
-            <Text fontSize="sm" fontWeight="500">{getUserRole()}</Text>
-            <Text fontSize="xs" color="gray.400">Base • {balance} ETH</Text>
+          <VStack align="start" spacing={0.5}>
+            <Text fontSize="sm" fontWeight="600" color="brand.cream">
+              {getUserRole()}
+            </Text>
+            <Text fontSize="xs" color="brand.cream" opacity={0.6}>
+              Base • {balance} ETH
+            </Text>
           </VStack>
         }
         hasArrow
         placement="bottom-start"
-        bg="gray.800"
-        color="white"
+        bg="brand.navy"
+        color="brand.cream"
       >
-        <MotionMenuButton
-          as={Button}
-          px={2.5} py={2}             // ✅ COMPACT
-          borderRadius="full"
-          bg="whiteAlpha.100"
-          border="1px solid whiteAlpha.200"
-          backdropFilter="blur(10px)"
-          whileHover={isDesktop ? { scale: 1.05 } : {}}
-          _hover={{ bg: "whiteAlpha.200" }}
-        >
-          {/* Layout ultra-compact : Logo + Badge + Adresse + Solde */}
+      <MotionMenuButton
+        as={Button}
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        mx="auto"
+        px={4}
+        py={2.5}
+        minW="140px"
+        borderRadius="full"
+        fontWeight={600}
+        letterSpacing={0.4}
+        bg="brand.navy"
+        color="brand.cream"
+        backdropFilter="blur(12px)"
+        boxShadow="0 8px 28px rgba(0,0,0,0.35)"
+        whileHover={
+          isDesktop
+            ? {
+                scale: 1.05,
+                y: -1,
+                boxShadow: "0 14px 40px rgba(0,0,0,0.45)",
+              }
+            : {}
+        }
+        _hover={{
+          borderColor: "brand.gold",
+          bg: "brand.navy",
+        }}
+        _active={{ transform: "scale(0.97)" }}
+      >
           <HStack spacing={1.5} w="full">
-
-            {/* Rôle + Adresse + Solde */}
             <Flex align="center" gap={1} flex={1} minW={0}>
               <Badge
-                colorScheme={role === "admin" ? "purple" : "green"}
-                fontSize="2xs" px={1.5} borderRadius="full" flexShrink={0}
+                fontSize="2xs"
+                px={1.5}
+                borderRadius="full"
+                bg="brand.cream/15"
+                color="brand.cream"
+                border="1px solid"
+                borderColor="brand.cream/40"
+                flexShrink={0}
               >
                 {getUserRole().slice(0, 3)}
               </Badge>
+
               <Text
                 fontSize="xs"
                 fontFamily="mono"
                 noOfLines={1}
-                overflow="hidden"
-                textOverflow="ellipsis"
                 flex={1}
+                color="brand.cream"
+                opacity={0.9}
               >
                 {getEllipsisTxt(address!)}
               </Text>
-              <Badge fontSize="2xs" colorScheme="gray" variant="subtle" px={1} flexShrink={0}>
+
+              <Badge
+                fontSize="2xs"
+                px={1.5}
+                borderRadius="full"
+                bg="brand.gold/20"
+                color="brand.gold"
+                border="1px solid"
+                borderColor="brand.gold/40"
+                flexShrink={0}
+              >
                 {balance} Ξ
               </Badge>
             </Flex>
@@ -257,65 +316,82 @@ const ConnectBouton: React.FC = () => {
         </MotionMenuButton>
       </Tooltip>
 
-      {/* Ton MenuList parfait (inchangé) */}
       <MenuList
         backdropFilter="blur(18px)"
-        bg="rgba(20,20,24,0.95)"
-        border="1px solid whiteAlpha.200"
+        bg="brand.navy"
+        border="1px solid"
+        borderColor="brand.cream/30"
         minW={{ base: "300px", md: "320px" }}
-        maxW="90vw"
+        p={0}
       >
-        <MenuItem p={4} borderBottom="1px" borderColor="gray.700">
-          <VStack align="start" spacing={2} w="full">
-            <Text fontSize="xs" color="gray.400" textTransform="uppercase">Adresse</Text>
+        {/* HEADER WALLET */}
+        <Box p={4} borderBottom="1px solid" borderColor="brand.cream/20">
+          <VStack align="start" spacing={1}>
+            <Text
+              fontSize="xs"
+              color="brand.cream"
+              opacity={0.6}
+              textTransform="uppercase"
+            >
+              Wallet
+            </Text>
+
             <HStack justify="space-between" w="full">
-              <Text fontSize="sm" fontFamily="mono" color="white" noOfLines={1}>
+              <Text fontSize="sm" fontFamily="mono" color="brand.cream" noOfLines={1}>
                 {getEllipsisTxt(address!)}
               </Text>
+
               <IconButton
-                aria-label={hasCopied ? "Copié !" : "Copier"}
-                icon={hasCopied ? <CopyIcon color="green.400" /> : <LinkIcon />}
+                aria-label={hasCopied ? "Copié" : "Copier"}
+                icon={<CopyIcon />}
                 size="sm"
                 variant="ghost"
-                colorScheme="purple"
+                color="brand.cream"
                 onClick={onCopy}
-                title={hasCopied ? "Copié !" : "Copier"}
-                animation={hasCopied ? "pulse 0.5s" : "none"}
-                _hover={{ bg: "purple.600" }}
+                _hover={{ bg: "brand.cream/10" }}
               />
             </HStack>
           </VStack>
-        </MenuItem>
+        </Box>
 
-        <MenuItem py={3} px={4}>
+        {/* BALANCE */}
+        <MenuItem py={3} px={4} _hover={{ bg: "brand.cream/5" }}>
           <HStack>
-            <Box w={3} h={3} bg="green.400" borderRadius="full" />
+            <Box w={2.5} h={2.5} bg="brand.gold" borderRadius="full" />
             <VStack align="start" spacing={0}>
-              <Text fontWeight="500">Solde</Text>
-              <Text fontSize="sm" color="green.400">{balance} ETH</Text>
+              <Text color="brand.cream">Solde</Text>
+              <Text fontSize="sm" color="brand.gold">
+                {balance} ETH
+              </Text>
             </VStack>
           </HStack>
         </MenuItem>
 
-        <MenuItem py={3} px={4}>
+        {/* CHAIN */}
+        <MenuItem py={3} px={4} _hover={{ bg: "brand.cream/5" }}>
           <HStack>
-            <Box w={2} h={2} bg="blue.400" borderRadius="full" />
-            <Text>Base ({selectedChainId})</Text>
+            <Box w={2} h={2} bg="brand.cream" borderRadius="full" />
+            <Text color="brand.cream">Base ({selectedChainId})</Text>
           </HStack>
         </MenuItem>
 
-        <MenuItem
-          onClick={handleDisconnect}
-          mt={2}
-          _hover={{ bg: "red.600", color: "white" }}
-          fontWeight="600"
-          borderTop="1px"
-          borderColor="gray.700"
-          borderRadius="md"
-          color="red.300"
-        >
-          Se déconnecter
-        </MenuItem>
+        {/* DISCONNECT */}
+        <Box p={2} pt={1}>
+          <MenuItem
+            onClick={handleDisconnect}
+            borderRadius="md"
+            border="1px solid"
+            borderColor="brand.cream/30"
+            color="brand.cream"
+            _hover={{
+              bg: "brand.gold",
+              color: "black",
+              borderColor: "brand.gold",
+            }}
+          >
+            Se déconnecter
+          </MenuItem>
+        </Box>
       </MenuList>
     </Menu>
   );

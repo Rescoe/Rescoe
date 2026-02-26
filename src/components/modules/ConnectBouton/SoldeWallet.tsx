@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";  // ✅ + useRef
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   Box,
   Text,
@@ -30,7 +30,7 @@ const SoldeWallet: React.FC<SoldeWalletProps> = ({
   const [web3, setWeb3] = useState<Web3 | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const previousBalanceRef = useRef<string>("0.00");  // 🔥 OPTIM : old balance
+  const previousBalanceRef = useRef<string>("0.00");
 
   const isDesktop = useBreakpointValue({ base: false, md: true });
 
@@ -40,8 +40,7 @@ const SoldeWallet: React.FC<SoldeWalletProps> = ({
       try {
         const provider = await detectEthereumProvider();
         if (provider) {
-          const web3Instance = new Web3(provider as any);
-          setWeb3(web3Instance);
+          setWeb3(new Web3(provider as any));
         }
       } catch (error) {
         console.error("Erreur init Web3:", error);
@@ -50,7 +49,7 @@ const SoldeWallet: React.FC<SoldeWalletProps> = ({
     initWeb3();
   }, []);
 
-  // ✅ FETCH avec COMPARAISON (NO RE-RENDER si identique)
+  // ✅ FETCH BALANCE
   const fetchBalance = useCallback(async () => {
     if (!web3 || !address) {
       setBalance("0.00");
@@ -63,11 +62,9 @@ const SoldeWallet: React.FC<SoldeWalletProps> = ({
       const bal = await web3.eth.getBalance(address);
       const newBalance = parseFloat(formatUnits(bal, 18)).toFixed(4);
 
-      // 🔥 SKIP UPDATE si PAS CHANGÉ → NO RERENDER
       if (newBalance !== previousBalanceRef.current) {
         setBalance(newBalance);
         previousBalanceRef.current = newBalance;
-       //console.log(`💰 Balance mise à jour: ${newBalance} ETH`);
       }
     } catch (error) {
       console.error("Erreur balance:", error);
@@ -86,33 +83,39 @@ const SoldeWallet: React.FC<SoldeWalletProps> = ({
   useEffect(() => {
     if (isAuthenticated && web3 && address) {
       fetchBalance();
-      const interval = setInterval(fetchBalance, 10000); // 10s
+      const interval = setInterval(fetchBalance, 10000);
       return () => clearInterval(interval);
     }
   }, [fetchBalance, isAuthenticated, web3, address]);
 
-  // Pas connecté
+  // ❌ Pas connecté
   if (!isAuthenticated || !address) {
     return (
       <Badge
-        colorScheme="gray"
-        variant="subtle"
+        bg="brand.navy"
+        color="brand.cream"
+        variant="solid"
         fontSize={compact ? "2xs" : "xs"}
-        px={compact ? 1 : 1.5}
+        px={compact ? 1 : 2}
+        py={0.5}
+        borderRadius="full"
       >
         -- Ξ
       </Badge>
     );
   }
 
-  // Loading
+  // ⏳ Loading
   if (isLoading) {
     return (
       <Badge
-        colorScheme="gray"
-        variant="subtle"
+        bg="brand.navy"
+        color="brand.cream"
+        variant="solid"
         fontSize={compact ? "2xs" : "xs"}
-        px={1}
+        px={compact ? 1 : 2}
+        py={0.5}
+        borderRadius="full"
       >
         ...
       </Badge>
@@ -123,7 +126,7 @@ const SoldeWallet: React.FC<SoldeWalletProps> = ({
     <Tooltip
       label={
         <Flex direction="column" gap={1} p={2}>
-          <Text fontSize="xs" fontWeight="500">
+          <Text fontSize="xs" fontWeight="500" color="brand.cream">
             {balance} ETH
           </Text>
           <Text fontSize="2xs" color="gray.400">
@@ -141,9 +144,14 @@ const SoldeWallet: React.FC<SoldeWalletProps> = ({
           </Text>
         )}
         <Badge
+          bg="brand.cream"
+          color="black"
           variant="solid"
           fontSize={compact ? "2xs" : "xs"}
-          px={compact ? 1 : 1.5}
+          px={compact ? 1 : 2}
+          py={0.5}
+          borderRadius="full"
+          boxShadow="0 0 8px rgba(238,212,132,0.35)"
           cursor="default"
         >
           {balance} Ξ

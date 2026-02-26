@@ -15,6 +15,19 @@ import ABIRESCOLLECTION from '../../../ABI/ABI_Collections.json';
 import { useAuth } from '../../../../utils/authContext';
 import { useRouter } from 'next/router';
 
+import {
+  config,
+  colors,
+  styles,
+  components,
+  hoverStyles,
+  gradients,
+  effects,
+  animations,
+  brandHover,
+} from "@styles/theme"
+
+
 import CollaboratorsChart from "@/utils/ColabChart"
 
 import dynamic from 'next/dynamic';
@@ -36,7 +49,8 @@ import {
   CloseButton,
   Divider,
   Flex,
-  useToast
+  useToast,
+  Textarea,
 } from "@chakra-ui/react";
 
 interface Metadata {
@@ -128,7 +142,7 @@ const [currentIpfsForMint, setCurrentIpfsForMint] = useState<string | null>(null
   const [collectionMint, setCollectionMint] = useState<string>("");
   const [showPriceInput, setShowPriceInput] = useState(false);
   const [manualPrice, setManualPrice] = useState("");
-  const [editions, setEditions] = useState<number>(1);
+  const [editions, setEditions] = useState<number>(10);
 
   const [selectedCollection, setSelectedCollection] = useState<string>("");
 const [maxSupply, setMaxSupply] = useState<number | null>(null);
@@ -765,6 +779,8 @@ useEffect(() => {
   };
 
 
+
+
   const PublishToast = ({
     tokenId,
     collectionMintAddress,
@@ -776,76 +792,84 @@ useEffect(() => {
   const [showPriceInput, setShowPriceInput] = useState(false);
   const [customPrice, setCustomPrice] = useState("");
 
-  return (
-    <Box
-  bg="white"
-  color="black"
-  p={6}
-  borderRadius="xl"
-  boxShadow="xl"
-  textAlign="center"
-  maxW="sm"
-  mx="auto"
-  mt={10}
-  position="relative" // 👈 important pour positionner le bouton de fermeture
->
-  {/* 🔹 Bouton de fermeture en haut à droite */}
-  <CloseButton
-    position="absolute"
-    top="2"
-    right="2"
-    onClick={onClose}
-  />
+      return (
+      <Box
+        bg="white"
+        color="black"
+        p={6}
+        borderRadius="xl"
+        boxShadow="xl"
+        textAlign="center"
+        maxW="sm"
+        mx="auto"
+        mt={10}
+        position="relative"
+      >
+        <CloseButton position="absolute" top="2" right="2" onClick={onClose} />
 
-  <Text fontSize="xl" fontWeight="bold" mb={2}>🎉 Félicitations !</Text>
-  <Text mb={4}>Votre œuvre est publiée{ isSaleListing ? " et listée à la vente!" : " !" }</Text>
+        <Text fontSize="xl" fontWeight="bold" mb={2}>
+          🎉 Félicitations !
+        </Text>
+        <Text mb={4}>
+          Votre œuvre est publiée
+          {isSaleListing ? " et listée à la vente !" : " !"}
+        </Text>
 
-  <Stack direction="column" spacing={4} justify="center">
-    <Button colorScheme="blue" onClick={() => { onClose(); mintAgain(); }}>
-      Mint une autre
-    </Button>
-    <Button
-      colorScheme="green"
-      variant="outline"
-      onClick={() => router.push(`/oeuvresId/${collectionMintAddress}/${tokenId}`)}
-    >
-      Voir l'œuvre
-    </Button>
+        <Stack direction="column" spacing={4} justify="center">
+          <Button
+            colorScheme="blue"
+            onClick={() => {
+              onClose();
+              mintAgain();
+            }}
+          >
+            Mint une autre
+          </Button>
 
-    {!isSaleListing && !showPriceInput && (
-      <Button colorScheme="blue" onClick={() => setShowPriceInput(true)}>
-        Mettre en vente
-      </Button>
-    )}
+          <Button
+            colorScheme="green"
+            variant="outline"
+            onClick={() =>
+              router.push(`/oeuvresId/${collectionMintAddress}/${tokenId}`)
+            }
+          >
+            Voir l'œuvre
+          </Button>
 
-    {!isSaleListing && showPriceInput && (
-      <>
-        <Input
-          type="number"
-          placeholder="Prix en ETH"
-          value={customPrice}
-          variant="outline"
-          onChange={(e) => setCustomPrice(e.target.value)}
-        />
-        <Button colorScheme="teal"
-        onClick={async () => { //Ne se ferme que si la vente réussi !
-              try {
-                await listForSale(customPrice);
-                onClose();
-              } catch (error) {
-                console.error("Erreur lors de la mise en vente :", error);
-                // Optionnel : afficher une alerte ou un message d’erreur ici
-              }
-            }}>
-          Confirmer la vente
-        </Button>
-      </>
-    )}
-  </Stack>
-</Box>
+          {!isSaleListing && !showPriceInput && (
+            <Button colorScheme="blue" onClick={() => setShowPriceInput(true)}>
+              Mettre en vente
+            </Button>
+          )}
 
-  );
-};
+          {!isSaleListing && showPriceInput && (
+            <>
+              <Input
+                type="number"
+                placeholder="Prix en ETH"
+                value={customPrice}
+                variant="outline"
+                onChange={(e) => setCustomPrice(e.target.value)}
+              />
+              <Button
+                colorScheme="teal"
+                onClick={async () => {
+                  try {
+                    await listForSale(customPrice);
+                    onClose(); // Ne se ferme que si la vente réussit
+                  } catch (error) {
+                    console.error("Erreur lors de la mise en vente :", error);
+                  }
+                }}
+              >
+                Confirmer la vente
+              </Button>
+            </>
+          )}
+        </Stack>
+      </Box>
+    );
+  };
 
 
   const mintAgain = () => {
@@ -860,325 +884,262 @@ useEffect(() => {
 };
 
 
-
 return (
   <Box
-    maxW="700px"
+    maxW="720px"
     mx="auto"
     mt={10}
     p={10}
     borderRadius="3xl"
     boxShadow="dark-lg"
     border="1px solid"
-    borderColor="purple.300"
+    borderColor="brand.cream"
   >
-    <Heading
-      size="2xl"
-      mb={6}
-      textAlign="center"
-      fontWeight="black"
-      bgGradient="linear(to-r, purple.400, pink.400)"
-      bgClip="text"
-      letterSpacing="tight"
-    >
-      Mintez
-    </Heading>
-
-    {/* 🖼️ UPLOAD FICHIER */}
-    <FormLabel fontWeight="bold" color="gray.200">
-      Choisir un fichier à minter
-    </FormLabel>
-    <Input
-      type="file"
-      onChange={handleFileChange}
-      mb={5}
-      border="2px dashed"
-      borderColor="purple.400"
-      bg="blackAlpha.300"
-      color="white"
-      _hover={{ bg: "blackAlpha.400" }}
-      _focus={{
-        borderColor: "pink.400",
-        boxShadow: "0 0 0 2px rgba(236, 72, 153, 0.4)",
-      }}
-      py={2}
-    />
-
-    {previewUrl && (
-      <Box
-        borderRadius="xl"
-        overflow="hidden"
-        boxShadow="md"
-        mb={6}
-        border="1px solid"
-        borderColor="purple.300"
+    {/* HEADER */}
+    <VStack spacing={8} align="stretch">
+      <Heading
+        size="2xl"
+        textAlign="center"
+        fontWeight="black"
+        bgGradient="linear(to-r, brand.gold, brand.cream)"
+        bgClip="text"
+        letterSpacing="tight"
       >
-        <Image
-          src={previewUrl}
-          alt="Preview"
-          boxSize="300px"
-          objectFit="cover"
-          mx="auto"
-          transition="transform 0.3s ease"
-          _hover={{ transform: "scale(1.05)" }}
-        />
-      </Box>
-    )}
+        Mintez
+      </Heading>
 
-    {/* 📝 FORMULAIRE MÉTADONNÉES - DESCRIPTION EN TEXTAREA LARGE */}
-    <VStack spacing={4} align="stretch">
-      <Input
-        placeholder="Nom de l’œuvre"
-        name="name"
-        value={metadata.name}
-        onChange={handleMetadataChange}
-        bg="blackAlpha.300"
-        color="white"
-        _placeholder={{ color: "gray.400" }}
-        borderColor="purple.300"
-      />
-
-      {/* 🔥 TEXTAREA LARGE POUR DESCRIPTION */}
-      <Box>
-        <FormLabel fontSize="sm" color="gray.400" mb={2}>
-          Description (avec votre nom d'artiste)
+      {/* ================= UPLOAD ================= */}
+      <VStack align="stretch" spacing={3}>
+        <FormLabel fontWeight="bold" color="brand.cream">
+          Fichier
         </FormLabel>
-        <textarea
-          placeholder="Décrivez votre œuvre en détail..."
+
+        <Input
+          type="file"
+          onChange={handleFileChange}
+          border="2px dashed"
+          borderColor="brand.cream"
+          bg="blackAlpha.300"
+          _hover={{ bg: "blackAlpha.400" }}
+          _focus={{
+            borderColor: "brand.gold",
+            boxShadow: "0 0 0 2px rgba(238,212,132,0.35)",
+          }}
+          py={2}
+        />
+
+        {previewUrl && (
+          <Box
+            borderRadius="xl"
+            overflow="hidden"
+            border="1px solid"
+            borderColor="brand.cream"
+            boxShadow="md"
+          >
+            <Image
+              src={previewUrl}
+              alt="Preview"
+              boxSize="320px"
+              objectFit="cover"
+              mx="auto"
+              transition="0.25s"
+              _hover={{ transform: "scale(1.05)" }}
+            />
+          </Box>
+        )}
+      </VStack>
+
+      {/* ================= METADATA ================= */}
+      <VStack align="stretch" spacing={5}>
+        <FormLabel fontWeight="bold" color="brand.cream">
+          Titre
+        </FormLabel>
+        <Input
+          placeholder="Nom de l’œuvre"
+          name="name"
+          value={metadata.name}
+          onChange={handleMetadataChange}
+          bg="blackAlpha.300"
+          borderColor="brand.cream"
+        />
+
+        <FormLabel fontWeight="bold" color="brand.cream">
+          Description
+        </FormLabel>
+        <Textarea
+          placeholder="Décrivez votre œuvre (avec votre nom d’artiste)…"
           name="description"
           value={metadata.description}
-          onChange={(e) => setMetadata(prev => ({ ...prev, description: e.target.value }))}
-          rows={4} // Hauteur fixe
-          style={{
-            width: '100%',
-            minHeight: '120px',
-            padding: '12px 16px',
-            border: '2px solid #9333ea',
-            borderRadius: '12px',
-            backgroundColor: 'rgba(26, 32, 44, 0.7)',
-            color: 'white',
-            fontSize: '16px',
-            fontFamily: 'inherit',
-            resize: 'vertical',
-            outline: 'none',
-            transition: 'all 0.2s ease'
-          }}
-          onFocus={(e) => {
-            e.target.style.borderColor = '#ec4899';
-            e.target.style.boxShadow = '0 0 0 3px rgba(236, 72, 153, 0.2)';
-          }}
-          onBlur={(e) => {
-            e.target.style.borderColor = '#9333ea';
-            e.target.style.boxShadow = 'none';
-          }}
+          onChange={(e) =>
+            setMetadata((prev) => ({ ...prev, description: e.target.value }))
+          }
+          bg="blackAlpha.300"
+          borderColor="brand.cream"
+          minH="130px"
+          resize="vertical"
         />
-      </Box>
 
-      <Input
-        placeholder="Tags (séparés par des virgules)"
-        name="tags"
-        value={metadata.tags}
-        onChange={handleMetadataChange}
-        bg="blackAlpha.300"
-        color="white"
-        _placeholder={{ color: "gray.400" }}
-        borderColor="purple.300"
-      />
+        <FormLabel fontWeight="bold" color="brand.cream">
+          Tags
+        </FormLabel>
+        <Input
+          placeholder="tags, séparés par des virgules"
+          name="tags"
+          value={metadata.tags}
+          onChange={handleMetadataChange}
+          bg="blackAlpha.300"
+          borderColor="brand.cream"
+        />
 
-      <Input
-        mt={4}
-        type="number"
-        placeholder="Nombre d'éditions"
-        value={editions}
-        max={remaining ?? undefined}
-        onChange={(e) => setEditions(Number(e.target.value))}
-        isDisabled={remaining !== null && remaining <= 0}
-        bg="blackAlpha.300"
-        color="white"
-        borderColor="purple.300"
-        _placeholder={{ color: "gray.400" }}
-      />
-    </VStack>
+        <FormLabel fontWeight="bold" color="brand.cream">
+          Éditions
+        </FormLabel>
+        <Input
+          type="number"
+          value={editions}
+          max={remaining ?? undefined}
+          onChange={(e) => setEditions(Number(e.target.value))}
+          isDisabled={remaining !== null && remaining <= 0}
+          bg="blackAlpha.300"
+          borderColor="brand.cream"
+        />
+      </VStack>
 
-    {/* COLLECTION & RESTE DE L'UI (inchangé) */}
-    <FormLabel mt={8} color="gray.300" fontWeight="bold">
-      Choisir une collection
-    </FormLabel>
-    <Select
-      placeholder="Sélectionnez une collection"
-      onChange={(e) => {
-        const id = e.target.value;
-        setSelectedCollectionId(id);
-      }}
-      bg="blackAlpha.300"
-      color="white"
-      borderColor="purple.300"
-      mb={4}
-    >
-      {collections.map((collection) => (
-        <option
-          key={collection.id}
-          value={collection.id.toString()}
-          style={{ backgroundColor: "#1A202C", color: "white" }}
+      {/* ================= COLLECTION ================= */}
+      <VStack align="stretch" spacing={4}>
+        <FormLabel fontWeight="bold" color="brand.cream">
+          Collection
+        </FormLabel>
+
+        <Select
+          placeholder="Sélectionnez une collection"
+          onChange={(e) => setSelectedCollectionId(e.target.value)}
+          bg="blackAlpha.300"
+          borderColor="brand.cream"
         >
-          {collection.name}
-        </option>
-      ))}
-    </Select>
+          {collections.map((c) => (
+            <option
+              key={c.id}
+              value={c.id.toString()}
+              style={{ background: "#1A202C", color: "white" }}
+            >
+              {c.name}
+            </option>
+          ))}
+        </Select>
 
-    <Box>
-      <Button
-        onClick={handleFetchCollection}
-        isDisabled={!selectedCollectionId || loadingInfo}
-        colorScheme="purple"
-        mb={4}
-      >
-        {loadingInfo ? <Spinner size="sm" /> : "Voir détails de la collection"}
-      </Button>
+        <Button
+          onClick={handleFetchCollection}
+          isDisabled={!selectedCollectionId || loadingInfo}
+        >
+          {loadingInfo ? <Spinner size="sm" /> : "Voir détails"}
+        </Button>
 
-      {maxSupply !== null && totalSupply !== null && remaining !== null && (
-        <Box mt={3} p={3} borderWidth="1px" rounded="md" borderColor="purple.400">
-          <Text color="gray.200">
-            💠 Max Supply : <b>{maxSupply}</b>
-          </Text>
-          <Text color="gray.200">
-            🧮 Déjà minté : <b>{totalSupply}</b>
-          </Text>
-          <Text color="gray.200">
-            🟣 Éditions restantes :{" "}
-            <b style={{ color: remaining > 0 ? "lightgreen" : "red" }}>
-              {remaining}
-            </b>
-          </Text>
+        {maxSupply !== null && totalSupply !== null && remaining !== null && (
+          <Box p={4} borderWidth="1px" rounded="lg" borderColor="brand.cream">
+            <Text>Max Supply : <b>{maxSupply}</b></Text>
+            <Text>Minté : <b>{totalSupply}</b></Text>
+            <Text>
+              Restant :
+              <b style={{ color: remaining > 0 ? "lightgreen" : "red" }}>
+                {" "}{remaining}
+              </b>
+            </Text>
 
-          <CollaboratorsChart collab={collab} percent={percent} />
+            <CollaboratorsChart collab={collab} percent={percent} />
 
-          <Text fontSize="sm" mb={4}>
-                🔗 <a
-                  href={`${ETHERSCAN_PREFIX}${selectedCollection}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: "#9F7AEA", fontWeight: "bold" }}
-                >
-                  Voir sur Etherscan
-                </a>
-              </Text>
+            <Text fontSize="sm" mt={2}>
+              🔗{" "}
+              <a
+                href={`${ETHERSCAN_PREFIX}${selectedCollection}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "#9F7AEA", fontWeight: "bold" }}
+              >
+                Etherscan
+              </a>
+            </Text>
+          </Box>
+        )}
+      </VStack>
 
-        </Box>
-      )}
-    </Box>
+      {/* ================= SALE ================= */}
+      <VStack align="stretch" spacing={3}>
+        <Checkbox
+          isChecked={isSaleListing}
+          onChange={(e) => setIsSaleListing(e.target.checked)}
+          colorScheme="brand.cream"
+        >
+          Mettre en vente
+        </Checkbox>
 
+        {isSaleListing && (
+          <Input
+            type="number"
+            placeholder="Prix (ETH)"
+            value={salePrice}
+            onChange={(e) => setSalePrice(e.target.value)}
+            bg="blackAlpha.300"
+            borderColor="brand.cream"
+          />
+        )}
+      </VStack>
 
-    <Checkbox
-      mt={4}
-      isChecked={isSaleListing}
-      onChange={(e) => setIsSaleListing(e.target.checked)}
-      colorScheme="purple"
-    >
-      Mettre en vente
-    </Checkbox>
+      <Divider borderColor="brand.cream" />
 
-    {isSaleListing && (
-      <Input
-        mt={3}
-        type="number"
-        placeholder="Prix de vente (ETH)"
-        value={salePrice}
-        onChange={(e) => setSalePrice(e.target.value)}
-        bg="blackAlpha.300"
-        color="white"
-        _placeholder={{ color: "gray.400" }}
-        borderColor="purple.300"
-      />
-    )}
-
-    <Divider my={10} borderColor="purple.300" />
-{/*
-
-    <Flex justify="center" mt={8}>
-      <Button
-        px={10}
-        py={6}
-        fontSize="lg"
-        fontWeight="bold"
-        borderRadius="full"
-        bgGradient="linear(to-r, purple.700, pink.600)"
-        color="white"
-        boxShadow="lg"
-        _hover={{
-          transform: "scale(1.05)",
-          boxShadow: "2xl",
-        }}
-        _active={{
-          transform: "scale(0.98)",
-        }}
-        transition="all 0.25s ease"
-        isLoading={isMinting}
-        isDisabled={!ipfsUrl || !selectedCollectionId}
-        onClick={mintNFT}
-      >
-        💾 Créer l'œuvre
-      </Button>
-    </Flex>
-*/}
-
-    {/* 🔥 BOUTON UNIQUE UPLOAD & MINT */}
-    <Flex justify="center" mt={8} direction="column" align="center">
-      <Button
-        px={12}
-        py={6}
-        fontSize="lg"
-        fontWeight="bold"
-        borderRadius="full"
-        bgGradient={
-          uploadAndMintStep === 'success'
-            ? "linear(to-r, green.500, green.400)"
-            : "linear(to-r, purple.700, pink.600)"
-        }
-        color="white"
-        boxShadow="lg"
-        _hover={{
-          transform: "scale(1.05)",
-          boxShadow: "2xl",
-        }}
-        transition="all 0.25s ease"
-        isDisabled={uploadAndMintStep !== 'idle'}
-        onClick={handleUploadAndMint}
-        size="lg"
-      >
-        {uploadAndMintStep === 'idle' && '🚀 Upload & Mint'}
-        {uploadAndMintStep === 'uploading' && '⏳ Upload IPFS...'}
-        {uploadAndMintStep === 'minting' && '⚡ Mint en cours...'}
-        {uploadAndMintStep === 'success' && '✅ Terminé!'}
+      {/* ================= ACTION ================= */}
+      <Flex direction="column" align="center" gap={4}>
+        <Button
+          px={12}
+          py={6}
+          fontSize="lg"
+          borderRadius="full"
+          borderWidth="1px"
+          borderColor="brand.cream"
+          bgGradient="linear(to-r, brand.navy, brand.navy)"
+          color="brand.gold"
+          isDisabled={uploadAndMintStep !== "idle"}
+          onClick={handleUploadAndMint}
+        >
+          {uploadAndMintStep === "idle" && "🚀 Upload & Mint"}
+          {uploadAndMintStep === "uploading" && "⏳ Upload IPFS…"}
+          {uploadAndMintStep === "minting" && "⚡ Mint…"}
+          {uploadAndMintStep === "success" && "✅ Terminé"}
+        </Button>
 
         {countdown > 0 && (
-          <Text fontSize="sm" fontWeight="bold" ml={2}>
-            ({countdown})
-          </Text>
+          <Box
+            px={4}
+            py={2}
+            bg="brand.navy"
+            borderRadius="full"
+            border="2px solid"
+            borderColor="brand.cream"
+          >
+            <Text fontWeight="bold">
+              Mint auto dans {countdown}s
+            </Text>
+          </Box>
         )}
-      </Button>
 
-      {/* 🔥 COUNTDOWN VISUEL */}
-      {countdown > 0 && (
-        <Box mt={3} p={3} bg="purple.900/80" borderRadius="full" border="2px solid" borderColor="purple.400">
-          <Text fontSize="md" fontWeight="bold" color="purple.200">
-            Mint automatique dans <span style={{ color: 'white', fontSize: '1.2em' }}>{countdown}s</span> ⏳
-          </Text>
-        </Box>
-      )}
+        {ipfsUrl && (
+          <Box
+            p={3}
+            border="1px solid"
+            borderColor="green.400"
+            borderRadius="md"
+          >
+            <Text fontSize="sm">
+              IPFS : <code>{ipfsUrl.slice(0, 50)}...</code>
+            </Text>
+          </Box>
+        )}
+      </Flex>
 
-      {ipfsUrl && (
-        <Box mt={4} p={3} bg="green.900/20" borderRadius="md" borderColor="green.400" borderWidth="1px">
-          <Text fontSize="sm" color="green.200">
-            ✅ IPFS: <code>{ipfsUrl.slice(0, 50)}...</code>
-          </Text>
-        </Box>
-      )}
-    </Flex>
-
-    <Text mt={6} textAlign="center" color="gray.400" fontSize="sm">
-      Wallet connecté : <b>{address}</b>
-    </Text>
+      <Text textAlign="center" fontSize="sm" color="gray.400">
+        Wallet : <b>{address}</b>
+      </Text>
+    </VStack>
   </Box>
 );
 

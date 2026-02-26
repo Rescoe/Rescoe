@@ -114,77 +114,75 @@ const RoleMenu: React.FC<RoleMenuProps> = ({ config, isResident = false }) => {
 
   return (
     <Tooltip
-      label={isResident ? "Résident vérifié ✅" : ""}
-      hasArrow
-      placement="top"
-      shouldWrapChildren
-    >
-      <Menu>
-        <MotionMenuButton
-          as={Button}
-          px={10}
-          py={6}
-          fontSize="sm"
-          fontWeight="bold"
-          borderRadius="full"
-          boxShadow="lg"
-          border="1px solid"
-          color="white"
-          whileHover={{
-            scale: 1.03,
-            boxShadow: boxShadowHover,
-          }}
-          _hover={{
-            ...hoverStyles.brandHover._hover,
-            ...brandHover,
-          }}
-          _active={{
-            transform: "scale(0.98)",
-          }}
-          transition={{ duration: 0.25, ease: "easeInOut" }}
-        >
+    label={isResident ? "Résident vérifié ✅" : ""}
+    hasArrow
+    placement="top"
+    shouldWrapChildren
+  >
+    <Menu>
+      <MotionMenuButton
+        as={Button}
+        px={6}
+        py={3}
+        fontSize="sm"
+        fontWeight={600}
+        borderRadius="full"
+        letterSpacing={0.4}
+        bg="brand.navy"
+        color="brand.cream"
+        boxShadow="0 8px 28px rgba(0,0,0,0.35)"
+        whileHover={{
+          scale: 1.03,
+          boxShadow: boxShadowHover,
+        }}
+        _hover={{
+          borderColor: "brand.gold",
+          bg: "brand.navy",
+        }}
+        _active={{
+          transform: "scale(0.97)",
+        }}
+        transition={{ duration: 0.25, ease: "easeInOut" }}
+      >
+        {/* CONTENU */}
+        <HStack spacing={2} w="100%" justify="center">
+          <Box>{config.label} |</Box>
 
+          <SoldeWallet compact={false} showAddress={false} />
 
-          {/* ✅ CONTENU : RÔLE + MACARON À L'INTÉRIEUR */}
-          <HStack spacing={1} w="100%" justify="center">
+          {isResident && (
+            <Badge
+              bg="brand.gold"
+              color="black"
+              variant="solid"
+              px={1.5}
+              fontSize="9px"
+              h="16px"
+              borderRadius="full"
+              boxShadow="0 0 10px rgba(238,212,132,0.45)"
+              title="Résident vérifié"
+            >
+              ✓
+            </Badge>
+          )}
+        </HStack>
+      </MotionMenuButton>
 
-            <Box>{config.label} | </Box>
-            <SoldeWallet compact={false} showAddress={false} />
-
-
-            {isResident && (
-              <Badge
-                colorScheme="green"
-                variant="solid"
-                size="xs"
-                px={1}
-                fontSize="9px"
-                h="16px"
-                borderRadius="full"
-                boxShadow="sm"
-                title="Résident vérifié"
-              >
-                ✓
-              </Badge>
-            )}
-          </HStack>
-        </MotionMenuButton>
-
-        <MenuList bg="gray.800" borderColor="brand.gold">
+      <MenuList
+        backdropFilter="blur(18px)"
+        bg="rgba(20,20,24,0.95)"
+        border="1px solid whiteAlpha.200"
+      >
         <ConnectBouton />
 
-          {config.items.map((item) => (
-            <NextLink key={item.href} href={item.href} passHref>
-              <MenuItem as="a">{item.label}</MenuItem>
-            </NextLink>
-          ))}
-
-
-        </MenuList>
-      </Menu>
-
-
-    </Tooltip>
+        {config.items.map((item) => (
+          <NextLink key={item.href} href={item.href} passHref>
+            <MenuItem as="a">{item.label}</MenuItem>
+          </NextLink>
+        ))}
+      </MenuList>
+    </Menu>
+  </Tooltip>
   );
 };
 
@@ -309,7 +307,7 @@ useEffect(() => {
       ref={headerRef}
       borderBottom="1px"
       role="banner"
-        borderBottomColor="brand.gold"
+        borderBottomColor="brand.cream"
       aria-label="En-tête du site"
       shadow="md"
       px={{ base: 2, md: 4 }}  // ✅ PX=1 base (anti-bord)
@@ -419,7 +417,7 @@ useEffect(() => {
                       <FaBug />
                     </Button>
                   </MenuButton>
-                  <MenuList bg="gray.800" borderColor="brand.gold" minW="180px">
+                  <MenuList bg="gray.800" borderColor="brand.cream" minW="180px">
                     <Box mt={4} display="flex" justifyContent="center" />
                     <MenuItem onClick={toggleInsectVisibility}>
                       {isInsectVisible ? (
@@ -472,12 +470,12 @@ useEffect(() => {
                   _active={{ transform: "scale(0.98)" }}
                   mx={1}
                   bg="brand.navy"
-                  color="brand.gold"
+                  color="brand.cream"
                   _hover={{ bg: "brand.blue" }}
                 >
                   Découvrir
                 </MotionMenuButton>
-                    <MenuList bg="gray.800" borderColor="brand.gold">
+                    <MenuList bg="gray.800" borderColor="brand.cream">
 
                     <NextLink href="/association/rescoe" passHref>
                       <MenuItem as="a">L'association</MenuItem>
@@ -540,7 +538,7 @@ useEffect(() => {
             <DrawerCloseButton _focus={{ boxShadow: 'outline' }} />
             <DrawerHeader
               borderBottomWidth="1px"
-              borderBottomColor="brand.gold"
+              borderBottomColor="brand.cream"
               display="flex"
               alignItems="center"
               justifyContent="space-between"
