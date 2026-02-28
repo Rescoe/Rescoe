@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { InfoOutlineIcon } from "@chakra-ui/icons";
-import { Box, Tooltip, Icon, Image, Heading, VStack, Stack, Button, Text, Link, HStack, Grid, Tab, TabList, TabPanel, TabPanels, Tabs, FormLabel, Spinner, Divider, useToast } from '@chakra-ui/react';
-import * as jdenticon from 'jdenticon';
+import { FaBoxes } from 'react-icons/fa'; // ajout en haut
+
+import { Box, Flex, Tooltip, Icon, Image, Heading,Tag, VStack, Stack, Button, Text, Link, HStack, Grid, Tab, TabList, TabPanel, TabPanels, Tabs, FormLabel, Spinner, Divider, useToast, Badge } from '@chakra-ui/react';
+
+import { useColorModeValue } from '@chakra-ui/react'
+import { colors, effects, hoverStyles } from '@/styles/theme'  // Ajuste chemin
+
 
 import { useAuth } from "@/utils/authContext";
 import { JsonRpcProvider } from 'ethers';
@@ -389,274 +394,521 @@ const Dashboard = () => {
   };
 
   return (
-    <Box mt={10} textAlign="center" w="100%" maxW="1200px" mx="auto">
-      {loading ? (
-        <Spinner size="xl" />
-      ) : (
-        <>
-          <Box display="flex" justifyContent="center" alignItems="center">
-            <HStack spacing={4}>
+    <Box
+      mt={10}
+      textAlign="center"
+      w="100%"
+      maxW="1200px"
+      mx="auto"
+      p={{ base: 4, md: 8 }}
+    >
+    {loading ? (
+      <Spinner
+        size="xl"
+        color={useColorModeValue('brand.navy', 'brand.gold')}
+        thickness="4px"
+      />
+    ) : (
+      <>
+        {/* Header - Disposition ORIGINALE gardée */}
+        <Box display="flex" justifyContent="center" alignItems="center">
+        <Flex
+          direction={{ base: "column", md: "row" }}
+          align="center"
+          justify="center"
+          textAlign={{ base: "center", md: "left" }}
+          gap={{ base: 6, md: 10 }}
+        >
             <Box
               w="100px"
               h="100px"
               borderRadius="full"
               overflow="hidden"
               mb={2}
+              boxShadow={useColorModeValue(
+                "0 8px 25px rgba(1,28,57,0.15)",
+                `${effects.glowDark}`
+              )}
+              border="3px solid"
+              borderColor={useColorModeValue('brand.navy', 'brand.gold')}
             >
-            {userData.avatarSvg ? (
-              <Image
-                src={userData.avatarSvg || "/fallback-image.png"}
-                alt="Avatar"
-                objectFit="cover"
-                w="100%"
-                h="100%"
-              />
-            ) : (
-              <Box w="100%" h="100%" bg="gray.300" />
-            )}
+              {userData.avatarSvg ? (
+                <Image
+                  src={userData.avatarSvg || "/fallback-image.png"}
+                  alt="Avatar"
+                  objectFit="cover"
+                  w="100%"
+                  h="100%"
+                />
+              ) : (
+                <Box
+                  w="100%"
+                  h="100%"
+                  bg={useColorModeValue('gray.200', 'gray.700')}
+                />
+              )}
             </Box>
 
-              <Box textAlign="center" w="100%">
-                <Heading mb={2}>{userData.name}</Heading>
-                <Text fontSize="xl">{userData.roles[0]}</Text>
-                <Text fontSize="xl">{userData.biography}</Text>
+            <Box textAlign="center" w="100%">
+            <VStack >
+              <Heading
+                mb={2}
+                bgGradient={useColorModeValue(
+                  `linear(to-r, brand.navy, brand.blue)`,
+                  `linear(to-r, brand.gold, #F0D98E)`
+                )}
+                bgClip="text"
+              >
+                {userData.name}
+              </Heading>
+              <Text
+                fontSize="xl"
+                color={useColorModeValue('brand.navy', 'brand.cream')}
+                fontWeight="bold"
+              >
+                {userData.roles[0]}
+              </Text>
+              <Text
+                fontSize="xl"
+                color={useColorModeValue('gray.600', 'gray.300')}
+              >
+                {userData.biography}
+              </Text>
 
-                <Divider my={6} borderColor="purple.700" w="80%" mx="auto" />
-
-
-                <Text fontSize="s">
-                  <strong>Fin de l'adhésion</strong> le {userData.finAdhesion ? new Date(userData.finAdhesion).toLocaleDateString("fr-FR") : ""}
+              <Box
+                as="button"
+                w="full"
+                p={3}
+                transition="all 0.2s"
+                _hover={{
+                  bg: useColorModeValue('brand.navy10', 'brand.gold10'),
+                  transform: "translateX(4px)"
+                }}
+                onClick={() => {
+                  if (userData.address) {
+                    navigator.clipboard.writeText(userData.address)
+                    toast({ title: 'Adresse copiée !', status: 'success' })
+                  }
+                }}
+              >
+                <Text color={useColorModeValue('brand.navy', 'brand.gold')}>
+                  {formatAddress(userData.address)}
                 </Text>
 
               </Box>
-            </HStack>
-          </Box>
+              <Divider
+                my={6}
+                borderColor={useColorModeValue('brand.navy', 'brand.gold')}
+                w="20%"
+                mx="auto"
+              />
 
-          <Divider my={4} />
+              <Text
+                fontSize="s"
+                color={useColorModeValue('brand.navy', 'brand.textLight')}
+                fontWeight="medium"
+              >
+                <strong>Fin de l&apos;adhésion</strong> le {userData.finAdhesion ? new Date(userData.finAdhesion).toLocaleDateString("fr-FR") : ""}
+              </Text>
+              </VStack>
 
-          <Tabs variant="soft-rounded" colorScheme="purple" isFitted>
-            <TabList mb={2}>
-              <Tab>Profil adhérent</Tab>
-            {/*  <Tab>Créer une Collection</Tab> */}
-              <Tab>Collections et oeuvres</Tab>
-              <Tab>Economie</Tab>
+            </Box>
+          </Flex>
+        </Box>
 
-            </TabList>
+        <Divider my={4} borderColor={useColorModeValue('brand.navy', 'brand.gold')} />
 
-            <TabPanels>
-              <TabPanel>
-                <Grid templateColumns={{ base: "1fr", md: "1fr 1fr" }} gap={6}>
-                  <Box borderWidth="1px" borderRadius="xl" p={4} shadow="md" w="100%">
-                    <Heading size="md" mb={3}>Jetons d'Adhésion</Heading>
-                    <HStack spacing={4} flexWrap="wrap" w="full">
-                      {userData.nfts.length > 0 ? (
-                        userData.nfts.map((nft, index) => (
-                          <Box
-                            key={nft.tokenId}                    // ✅ key stable
-                            w="140px"
-                            h="180px"
-                            borderRadius="lg"
-                            shadow="md"
-                            borderWidth={2}
-                            p={3}
-                            textAlign="center"
-                            cursor="pointer"
-                            _hover={{
-                              shadow: "xl",
-                              transform: "translateY(-2px)",
-                              borderColor: "blue.400",
-                            }}
-                            transition="all 0.2s ease-in-out"
-                            onClick={() => goToToken(Number(nft.tokenId))}
-                            flexShrink={0}                       // ✅ Pas de rétrécissement
+
+                {/* Tabs thémés */}
+                <Tabs
+                  variant="soft-rounded"
+                  colorScheme={useColorModeValue('brand.navy', 'brand.gold')}
+                  isFitted
+                  mb={8}
+                >
+                  <TabList mb={6} borderColor={useColorModeValue('brand.navy', 'brand.gold')}>
+                    <Tab
+                      _selected={{
+                        color: useColorModeValue('brand.navy', 'brand.gold'),
+                        borderColor: useColorModeValue('brand.navy', 'brand.gold'),
+                        bg: useColorModeValue('brand.cream10', 'brand.gold10')
+                      }}
+                    >
+                      Profil adhérent
+                    </Tab>
+                    <Tab
+                      _selected={{
+                        color: useColorModeValue('brand.navy', 'brand.gold'),
+                        borderColor: useColorModeValue('brand.navy', 'brand.gold'),
+                        bg: useColorModeValue('brand.cream10', 'brand.gold10')
+                      }}
+                    >
+                      Collections et oeuvres
+                    </Tab>
+                    <Tab
+                      _selected={{
+                        color: useColorModeValue('brand.navy', 'brand.gold'),
+                        borderColor: useColorModeValue('brand.navy', 'brand.gold'),
+                        bg: useColorModeValue('brand.cream10', 'brand.gold10')
+                      }}
+                    >
+                      Economie
+                    </Tab>
+                  </TabList>
+
+                  <TabPanels>
+                    <TabPanel p={0}>
+                      <Grid templateColumns={{ base: "1fr", md: "1fr 1fr" }} gap={6}>
+
+                        {/* Jetons d'Adhésion */}
+                        <Box
+                          borderWidth="1px"
+                          borderRadius="xl"
+                          p={{ base: 4, md: 6 }}
+                          shadow={useColorModeValue('md', 'dark-lg')}
+                          w="100%"
+                          borderColor={useColorModeValue('brand.navy', 'brand.gold')}
+                          bg={useColorModeValue(
+                            'rgba(253,251,212,0.4)',
+                            'rgba(1,28,57,0.2)'
+                          )}
+                          backdropFilter="blur(8px)"
+                          transition="all 0.3s ease"
+                          _hover={{
+                            boxShadow: useColorModeValue(
+                              `0 12px 40px rgba(1,28,57,0.15)`,
+                              `${effects.glowDark}`
+                            )
+                          }}
+                        >
+                          <Heading
+                            size="md"
+                            mb={6}
+                            bgGradient={useColorModeValue(
+                              `linear(to-r, ${colors.brand.navy}, ${colors.brand.blue})`,
+                              `linear(to-r, ${colors.brand.gold}, #F0D98E)`
+                            )}
+                            bgClip="text"
                           >
-                            {/* IMAGE CARRÉE */}
-                            <Box
-                              w="80px"
-                              h="80px"
-                              mx="auto"
-                              mb={2}
-                              borderRadius="lg"
-                              overflow="hidden"
+                            Jetons d&apos;Adhésion
+                          </Heading>
+
+                          <HStack spacing={4} flexWrap="wrap" w="full" justify="center">
+                            {userData.nfts.length > 0 ? (
+                              userData.nfts.map((nft) => (
+                                <Box
+                                  key={nft.tokenId}
+                                  w={"140px"}
+                                  h={"180px"}
+                                  borderRadius="lg"
+                                  shadow="md"
+                                  borderWidth={2}
+                                  p={3}
+                                  textAlign="center"
+                                  cursor="pointer"
+                                  borderColor={useColorModeValue('brand.navy', 'brand.gold')}
+                                  bg={useColorModeValue('whiteAlpha.800', 'blackAlpha.300')}
+                                  transition="all 0.3s cubic-bezier(0.4,0,0.2,1)"
+                                  _hover={{
+                                    ...hoverStyles.brandHover._hover,
+                                    borderColor: useColorModeValue('brand.blue', 'brand.mauve'),
+                                    transform: "translateY(-4px)",
+                                  }}
+                                  onClick={() => goToToken(Number(nft.tokenId))}
+                                  flexShrink={0}
+                                >
+                                  {/* Image */}
+                                  <Box
+                                    w="80px"
+                                    h="80px"
+                                    mx="auto"
+                                    mb={3}
+                                    borderRadius="lg"
+                                    overflow="hidden"
+                                    boxShadow="sm"
+                                  >
+                                    <Image
+                                      src={nft.image || "/fallback-image.png"}
+                                      alt={`Jeton ${nft.tokenId}`}
+                                      w="full"
+                                      h="full"
+                                      objectFit="cover"
+                                      transition="transform 0.3s ease"
+                                      _hover={{ transform: "scale(1.05)" }}
+                                    />
+                                  </Box>
+
+                                  {/* Infos */}
+                                  <Heading size="xs" fontWeight="bold" mb={1} noOfLines={1}
+                                    color={useColorModeValue('brand.navy', 'brand.gold')}
+                                  >
+                                    #{nft.tokenId}
+                                  </Heading>
+                                  <Text
+                                    fontSize="xs"
+                                    color={useColorModeValue('gray.600', 'gray.300')}
+                                    noOfLines={1}
+                                  >
+                                    {userData.name}
+                                  </Text>
+
+                                  {/* Status */}
+                                  <HStack justify="center" mt={2} spacing={1}>
+                                    <Box
+                                      w={2.5}
+                                      h={2.5}
+                                      borderRadius="full"
+                                      bg={(nft as any).remainingTime && (nft as any).remainingTime !== '0j 0h 0m 0s'
+                                        ? "green.400"
+                                        : "orange.400"
+                                      }
+                                      boxShadow={`0 0 0 2px ${useColorModeValue('white', 'brand.navy')}`}
+                                    />
+                                    <Text
+                                      fontSize="9px"
+                                      color={useColorModeValue('gray.500', 'gray.400')}
+                                      fontWeight="500"
+                                    >
+                                      {nft.remainingTime?.slice(0, 4) || '0j'}
+                                    </Text>
+                                  </HStack>
+                                </Box>
+                              ))
+                            ) : (
+                              <Box p={8} textAlign="center" w="full">
+                                <Icon as={FaBoxes} boxSize={12} color="gray.400" mb={2} />
+                                <Text color="gray.500" fontSize="sm">
+                                  Aucun jeton trouvé.
+                                </Text>
+                              </Box>
+                            )}
+                          </HStack>
+
+                          {/* Acheter points */}
+                          <Divider my={6} borderColor={useColorModeValue('brand.navy', 'brand.gold')} />
+
+                          <FormLabel
+                            htmlFor="pointsToBuy"
+                            display="flex"
+                            alignItems="center"
+                            mb={3}
+                            color={useColorModeValue('brand.navy', 'brand.textLight')}
+                            fontWeight="bold"
+                          >
+                            Acheter des points :
+                            <Tooltip
+                              label="La création d'une collection coûte 5 points..."
+                              fontSize="sm"
+                              hasArrow
+                              bg={useColorModeValue('brand.navy', 'brand.gold')}
+                              color="white"
                             >
-                            <Image
-                              src={nft.image || "/fallback-image.png"}
-                              alt={`Jeton ${nft.tokenId}`}
-                              w="full"
-                              h="full"
-                              objectFit="cover"
-                              transition="transform 0.2s"
-                            />
+                              <Icon as={InfoOutlineIcon} ml={2} color="gray.500" cursor="pointer" boxSize={4} />
+                            </Tooltip>
+                          </FormLabel>
 
-                            </Box>
-
-                            {/* INFO */}
-                            <Heading size="xs" fontWeight="bold" mb={1} noOfLines={1}>
-                              #{nft.tokenId}
-                            </Heading>
-
-                            <Text fontSize="xs" color="gray.600" noOfLines={1}>
-                              {userData.name}
+                          <HStack spacing={3} justify="center" mb={6}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              colorScheme="teal"
+                              borderColor={useColorModeValue('brand.navy', 'brand.gold')}
+                              onClick={() => setPointsToBuy(Math.max(0, pointsToBuy - 10))}
+                              isDisabled={pointsToBuy <= 0}
+                              _hover={{ bg: 'teal.50' }}
+                            >
+                              -
+                            </Button>
+                            <Text
+                              px={4}
+                              py={2}
+                              bg={useColorModeValue('brand.cream', 'brand.navy')}
+                              borderRadius="md"
+                              fontWeight="bold"
+                              minW="60px"
+                            >
+                              {pointsToBuy}
                             </Text>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              colorScheme="teal"
+                              borderColor={useColorModeValue('brand.navy', 'brand.gold')}
+                              onClick={() => setPointsToBuy(pointsToBuy + 10)}
+                              _hover={{ bg: 'teal.50' }}
+                            >
+                              +
+                            </Button>
+                          </HStack>
 
-                            {/* STATUS */}
-                            <HStack justify="center" mt={1} spacing={1}>
-                              <Box
-                                w={2.5}
-                                h={2.5}
-                                borderRadius="full"
-                                bg={(nft as any).remainingTime && (nft as any).remainingTime !== '0j 0h 0m 0s' ? "green.400" : "orange.400"}
-                                boxShadow="0 0 0 2px white"
-                              />
-                              <Text fontSize="9px" color="gray.500" fontWeight="500">
-                                {nft.remainingTime?.slice(0, 4) || '0j'}
-                              </Text>
-                            </HStack>
-                          </Box>
-                        ))
-                      ) : (
-                        <Box p={8} textAlign="center" w="full">
-                          <Text color="gray.500" fontSize="sm">
-                            Aucun jeton trouvé.
-                          </Text>
+                          <Button
+                            w="full"
+                            size="lg"
+                            colorScheme="brand"
+                            borderRadius="full"
+                            px={8}
+                            py={6}
+                            fontSize="lg"
+                            fontWeight="extrabold"
+                            bgGradient={useColorModeValue(
+                              `linear(to-r, ${colors.brand.blue}, ${colors.brand.navy})`,
+                              `linear(to-r, ${colors.brand.gold}, #F0D98E)`
+                            )}
+                            color="white"
+                            boxShadow="xl"
+                            _hover={{
+                              ...hoverStyles.brandHover._hover,
+                              bgGradient: `linear(to-r, ${colors.brand.gold}, ${colors.brand.gold})`
+                            }}
+                            onClick={() => buyAdhesionPoints(userData.address)}
+                          >
+                            Acheter {pointsToBuy} points 🐝
+                          </Button>
                         </Box>
-                      )}
-                    </HStack>
 
+                        {/* Statistiques */}
+                        <Box
+                          borderWidth="1px"
+                          borderRadius="xl"
+                          p={{ base: 4, md: 6 }}
+                          shadow={useColorModeValue('md', 'dark-lg')}
+                          w="100%"
+                          borderColor={useColorModeValue('brand.navy', 'brand.gold')}
+                          bg={useColorModeValue(
+                            'rgba(253,251,212,0.4)',
+                            'rgba(1,28,57,0.2)'
+                          )}
+                          backdropFilter="blur(8px)"
+                        >
+                          <Heading
+                            size="md"
+                            mb={6}
+                            bgGradient={useColorModeValue(
+                              `linear(to-r, ${colors.brand.navy}, ${colors.brand.blue})`,
+                              `linear(to-r, ${colors.brand.gold}, #F0D98E)`
+                            )}
+                            bgClip="text"
+                          >
+                            Statistiques
+                          </Heading>
 
-                    <Divider my={4} />
+                          <VStack justify="space-between" w="full">
 
-                    <FormLabel htmlFor="pointsToBuy" display="flex" alignItems="center">
-                      Acheter des points :
-                      <Tooltip
-                        label="La création d'une collection coûte 5 points..."
-                        fontSize="sm"
-                        hasArrow
+                            <Divider borderColor={useColorModeValue('brand.navy', 'brand.gold')} />
+
+                              <Text color={useColorModeValue('brand.navy', 'brand.textLight')}>
+                                <strong>Collections créées:</strong> {userData.userCollections}
+                              </Text>
+                              {userData.remainingCollections !== undefined && (
+                                <Tag
+                                  colorScheme={userData.remainingCollections > 0 ? "green" : "orange"}
+                                  size="sm"
+                                >
+                                  {userData.remainingCollections} restantes
+                                </Tag>
+                              )}
+
+                            <Text fontSize="lg" fontWeight="bold" color={useColorModeValue('brand.navy', 'brand.gold')}>
+                              <strong>Points RESCOE:</strong> {userData.rewardPoints || 'Chargement...'} 🐝
+                            </Text>
+                            <Text>
+                            {userData.pendingPoints > 0 && (
+                              <Badge ml={2} colorScheme="yellow" fontSize="xs">
+                                +{userData.pendingPoints} en attente
+                              </Badge>
+                            )}
+                            </Text>
+                          </VStack>
+                        </Box>
+                      </Grid>
+                    </TabPanel>
+
+                    {/* Autres TabPanels inchangés mais thémés pareil */}
+                    <TabPanel p={0}>
+                      <Box
+                        borderWidth="1px"
+                        borderRadius="xl"
+                        p={6}
+                        shadow="md"
+                        w="100%"
+                        borderColor={useColorModeValue('brand.navy', 'brand.gold')}
+                        bg={useColorModeValue('rgba(253,251,212,0.3)', 'rgba(1,28,57,0.15)')}
                       >
-                        <span>
-                          <Icon as={InfoOutlineIcon} ml={2} color="gray.500" cursor="pointer" />
-                        </span>
-                      </Tooltip>
-                    </FormLabel>
+                        <Heading
+                          size="md"
+                          mb={6}
+                          bgGradient={useColorModeValue(
+                            `linear(to-r, ${colors.brand.navy}, ${colors.brand.blue})`,
+                            `linear(to-r, ${colors.brand.gold}, #F0D98E)`
+                          )}
+                          bgClip="text"
+                        >
+                          Mes Collections
+                        </Heading>
+                        <Box mt={4} overflow="hidden" w="100%">
+                          {userData.address && <FilteredCollectionsCarousel creator={userData.address} />}
+                        </Box>
+                        <Divider my={6} borderColor={useColorModeValue('brand.navy', 'brand.gold')} />
+                      </Box>
 
-                    <HStack>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        colorScheme="teal"
-                        onClick={() => setPointsToBuy(Math.max(0, pointsToBuy - 10))}
-                        isDisabled={pointsToBuy <= 0}
+                      <Box
+                        borderWidth="1px"
+                        borderRadius="xl"
+                        p={6}
+                        shadow="md"
+                        w="100%"
+                        borderColor={useColorModeValue('brand.navy', 'brand.gold')}
+                        bg={useColorModeValue('rgba(253,251,212,0.3)', 'rgba(1,28,57,0.15)')}
                       >
-                        -
-                      </Button>
-                      <Text>{pointsToBuy}</Text>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        colorScheme="teal"
-                        onClick={() => setPointsToBuy(pointsToBuy + 10)}
+                        <Heading
+                          size="md"
+                          mb={6}
+                          bgGradient={useColorModeValue(
+                            `linear(to-r, ${colors.brand.navy}, ${colors.brand.blue})`,
+                            `linear(to-r, ${colors.brand.gold}, #F0D98E)`
+                          )}
+                          bgClip="text"
+                        >
+                          Mes oeuvres et poèmes
+                        </Heading>
+                        <Box mt={4} overflow="hidden" w="100%">
+                          {userData.address && <UserNFTFeed walletAddress={userData.address} />}
+                        </Box>
+                      </Box>
+                    </TabPanel>
+
+                    <TabPanel p={0}>
+                      <Box
+                        borderWidth="1px"
+                        borderRadius="xl"
+                        p={6}
+                        shadow="md"
+                        w="100%"
+                        borderColor={useColorModeValue('brand.navy', 'brand.gold')}
+                        bg={useColorModeValue('rgba(253,251,212,0.3)', 'rgba(1,28,57,0.15)')}
                       >
-                        +
-                      </Button>
-
-                      <Divider my={6} borderColor="purple.700" />
-
-
-                      <Button
-                        size="sm"
-                        colorScheme="purple"
-                        borderRadius="full"
-                        px={6}
-                        onClick={() => buyAdhesionPoints(userData.address)}
-                      >
-                        Acheter
-                      </Button>
-                    </HStack>
-                  </Box>
-
-                  <Box borderWidth="1px" borderRadius="xl" p={4} shadow="md" w="100%">
-                    <Heading size="md" mb={3}>Statistiques</Heading>
-                    <VStack align="start" spacing={3}>
-                      <Text>
-                        <strong>Nom :</strong> {userData.name || 'Non défini'}
-                      </Text>
-                      <Text>
-                        <strong>Bio :</strong> {userData.biography}
-                      </Text>
-
-                      <Text
-                        cursor="pointer"
-                        onClick={() => {
-                          if (userData.address) {
-                            navigator.clipboard.writeText(userData.address);
-                            alert("Adresse Ethereum copiée !");
-                          }
-                        }}
-                      >
-                        <strong>Adresse Ethereum: </strong> {formatAddress(userData.address)}
-                      </Text>
-
-                      <Divider />
-                      <Text>
-                        <strong>Collections créées :</strong> {userData.userCollections}
-                      </Text>
-
-                      <Text>
-                        <strong>Collections restantes :</strong> {userData.remainingCollections}
-                      </Text>
-
-                      <strong>Points RESCOE en attente</strong>
-                      {userData.pendingPoints && userData.pendingPoints > 0n ? `${userData.pendingPoints} 🐝` : '0 🐝'}
-
-                      <Text>
-                        <strong>Points RESCOE :</strong> {userData.rewardPoints || 'Chargement...'} 🐝
-                      </Text>
-                    </VStack>
-                  </Box>
-                </Grid>
-              </TabPanel>
-
-{/*
-              <TabPanel>
-                <CreateCollection />
-              </TabPanel>
-*/}
-              <TabPanel>
-                <Box borderWidth="1px" borderRadius="xl" p={6} shadow="md" w="100%">
-                  <Heading size="md" mb={4}>Mes Collections</Heading>
-                  <Box mt={1} overflow="hidden" w="100%">
-                    {userData.address && <FilteredCollectionsCarousel creator={userData.address} />}
-                  </Box>
-                  <Divider my={6} borderColor="purple.700" />
-                </Box>
-
-                <Box borderWidth="1px" borderRadius="xl" p={6} shadow="md" w="100%">
-                  <Heading size="md" mb={4}>Mes oeuvres et poèmes</Heading>
-                  <Box mt={1} overflow="hidden" w="100%">
-                    {userData.address && <UserNFTFeed walletAddress={userData.address} />}
-                  </Box>
-                  <Divider my={6} borderColor="purple.700" />
-                </Box>
-
-              </TabPanel>
-
-              <TabPanel>
-                <Box borderWidth="1px" borderRadius="xl" p={6} shadow="md" w="100%">
-                  <Heading size="md" mb={4}>Transactions</Heading>
-                  <Box mt={1} overflow="hidden" w="100%">
-                    {userData.address && <UserTransactionsFeed walletAddress={userData.address} />}
-                  </Box>
-                  <Divider my={6} borderColor="purple.700" />
-                </Box>
-              </TabPanel>
-
-
-            </TabPanels>
-          </Tabs>
-        </>
-      )}
-    </Box>
-  );
-};
+                        <Heading
+                          size="md"
+                          mb={6}
+                          bgGradient={useColorModeValue(
+                            `linear(to-r, ${colors.brand.navy}, ${colors.brand.blue})`,
+                            `linear(to-r, ${colors.brand.gold}, #F0D98E)`
+                          )}
+                          bgClip="text"
+                        >
+                          Transactions
+                        </Heading>
+                        <Box mt={4} overflow="hidden" w="100%">
+                          {userData.address && <UserTransactionsFeed walletAddress={userData.address} />}
+                        </Box>
+                      </Box>
+                    </TabPanel>
+                  </TabPanels>
+                </Tabs>
+              </>
+            )}
+          </Box>
+        );
+      };
 
 export default Dashboard;

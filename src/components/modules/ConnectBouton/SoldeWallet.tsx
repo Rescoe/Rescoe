@@ -83,7 +83,7 @@ const SoldeWallet: React.FC<SoldeWalletProps> = ({
   useEffect(() => {
     if (isAuthenticated && web3 && address) {
       fetchBalance();
-      const interval = setInterval(fetchBalance, 10000);
+      const interval = setInterval(fetchBalance, 60000); // toutes les 60s au lieu de 10s
       return () => clearInterval(interval);
     }
   }, [fetchBalance, isAuthenticated, web3, address]);
