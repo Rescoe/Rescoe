@@ -1,5 +1,6 @@
 import React from "react";
-import { useAuth } from '../../../utils/authContext';
+import { useAuth } from '@/utils/authContext';
+import useEthToEur from '@/hooks/useEuro';  // ✅ Import ton hook
 import { resolveIPFS } from "@/utils/resolveIPFS";
 import {
   Box,
@@ -8,7 +9,8 @@ import {
   Button,
   useColorModeValue,
   useColorMode,
-  HStack
+  HStack,
+  Skeleton
 } from '@chakra-ui/react';
 import theme from '@/styles/theme'; // ✅ Import complet
 
@@ -42,6 +44,8 @@ const NFTCard: React.FC<NFTCardProps> = ({ nft, buyNFT }) => {
   const isOwner = authAddress && authAddress.toLowerCase() === nft.owner.toLowerCase();
   const canPurchase = !isOwner && isForSaleLocal;
   const imageSrc = resolveIPFS(nft.image, true) || '/fallback-nft.png';
+  const { convertEthToEur, loading: ethLoading } = useEthToEur();
+
 
   return (
     <Box
@@ -94,11 +98,11 @@ const NFTCard: React.FC<NFTCardProps> = ({ nft, buyNFT }) => {
           borderRadius="full" boxShadow="lg"
           backdropFilter="blur(20px)"
           bgGradient={canPurchase
-            ? `linear(to-r, ${brand.blue}, ${brand.mauve})`
+            ? `linear(to-r, ${brand.gold}, ${brand.gold})`
             : isOwner
-            ? `linear(to-r, ${brand.gold}, orange.400)`
+            ? `linear(to-r, ${brand.cream}, ${brand.cream})`
             : "gray.500"}
-          color="white"
+          color="brand.navy"
         >
           {canPurchase ? "À vendre" : isOwner ? "Propriétaire" : "Vendu"}
         </Badge>
@@ -146,20 +150,38 @@ const NFTCard: React.FC<NFTCardProps> = ({ nft, buyNFT }) => {
         <HStack justify="space-between" align="center" mb={4} spacing={4}>
           {canPurchase ? (
             <>
-              <Box>
+            <Box>
+              <HStack spacing={1} align="baseline" mb={-1}>  {/* ✅ ETH inline petit */}
                 <Text
                   fontSize={["lg", "2xl"]}
                   fontWeight="black"
                   color={useColorModeValue(brand.blue, brand.gold)}
                   lineHeight={1}
-                  mb={-1}
                 >
                   {nft.price.toFixed(4)}
                 </Text>
-                <Text fontSize="sm" color="gray.600" fontWeight="medium">
+                <Text
+                  fontSize={["xs", "sm"]}  // ✅ PETIT à côté
+                  fontWeight="medium"
+                  color="gray.500"
+                  lineHeight={1}
+                >
                   ETH
                 </Text>
-              </Box>
+              </HStack>
+
+              {ethLoading ? (
+                <Skeleton h="12px" w="40px" />  // ✅ Loading smooth
+              ) : (
+                <Text
+                  fontSize="xs"
+                  color="gray.600"
+                  fontWeight="medium"
+                >
+                  ≈ {convertEthToEur(nft.price)?.toLocaleString()} €
+                </Text>
+              )}
+            </Box>
 
               <Button
                 size="md"
@@ -170,8 +192,8 @@ const NFTCard: React.FC<NFTCardProps> = ({ nft, buyNFT }) => {
                   if (!authAddress) connectWallet();
                   else buyNFT?.(nft);
                 }}
-                bgGradient={`linear(to-r, ${brand.blue}, ${brand.mauve})`}
-                color="white"
+                bgGradient={`linear(to-r, ${brand.cream}, ${brand.cream})`}
+                color="brand.navy"
                 fontWeight="bold"
                 borderRadius="xl"
                 _hover={{

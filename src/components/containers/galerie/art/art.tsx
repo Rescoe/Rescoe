@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Heading,
@@ -78,6 +78,9 @@ const UniqueArtGalerie: React.FC = () => {
 
   const router = useRouter();
   const { web3, address } = useAuth();
+
+  const nftSectionRef = useRef<HTMLDivElement>(null);  // ✅ Ref pour la section NFTs
+
 
   const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!;
   const FALLBACK_IMAGE = "/fallback-placeholder.png";
@@ -320,6 +323,17 @@ const UniqueArtGalerie: React.FC = () => {
     setCurrentTabIndex(2);
   };
 
+  // ✅ NOUVEAU : Scroll auto après chargement NFTs
+  useEffect(() => {
+    if (selectedCollectionId && nftSectionRef.current && nfts.length > 0) {
+      setTimeout(() => {  // ✅ Délai pour render complet
+        nftSectionRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start'
+        });
+      }, 100);
+    }
+  }, [selectedCollectionId, nfts.length]);  // ✅ Déclenche sur NFTs loaded
 
   useEffect(() => {
     fetchCollections();
@@ -405,18 +419,47 @@ const UniqueArtGalerie: React.FC = () => {
 
       {/* 🆕 SECTION NFTs - L'INTÉGRATION MANQUANTE */}
       {selectedCollectionId && (
-        <Box mt={24} mb={12}>
-          <Flex align="center" mb={8} gap={4}>
-            <Heading size="lg">
-              🎨 NFTs de la collection "
-              {collections.find((c) => c.id === selectedCollectionId)?.name}"
-            </Heading>
-            <Badge colorScheme="green" fontSize="md">
+        <Box
+          ref={nftSectionRef}  // ✅ AJOUTÉ : la ref ici !
+          mt={24}
+          mb={12}
+          id="nft-section"  // ✅ Bonus : ancre pour scroll manuel si besoin
+        >
+          <Flex
+          align="center"
+          mb={8}
+          gap={{ base: 2, md: 4 }}
+          direction={{ base: "column", md: "row" }}  // ✅ Stack mobile, row desktop
+          alignItems={{ base: "stretch", md: "center" }}  // ✅ Étire Heading mobile
+          w="100%"  // ✅ Largeur safe
+        >
+          <Heading
+            size={{ base: "md", md: "lg" }}  // ✅ Plus petit mobile
+            mb={{ base: 2, md: 0 }}  // ✅ Marge bottom mobile
+            textAlign={{ base: "center", md: "left" }}
+          >
+            🎨 "{collections.find((c) => c.id === selectedCollectionId)?.name}"
+          </Heading>
+
+          <Flex
+            direction={{ base: "column", sm: "row" }}  // ✅ Badge+Button stack XS, row SM+
+            gap={2}
+            align="center"
+            w={{ base: "full", md: "auto" }}  // ✅ Plein largeur mobile
+            justify={{ base: "center", md: "flex-start" }}
+          >
+            <Badge
+              colorScheme="green"
+              fontSize={{ base: "sm", md: "md" }}
+              w={{ base: "auto", md: "auto" }}
+            >
               {nfts.length} œuvres disponibles
             </Badge>
             <Button
               variant="ghost"
-              size="sm"
+              size={{ base: "sm", md: "sm" }}
+              minW={{ base: "auto", md: "120px" }}  // ✅ Compact mobile
+              flexShrink={1}  // ✅ Rétrécit si besoin
               onClick={() => {
                 setSelectedCollectionId(null);
                 setNfts([]);
@@ -425,6 +468,8 @@ const UniqueArtGalerie: React.FC = () => {
               ← Retour collections
             </Button>
           </Flex>
+        </Flex>
+
 
           {isLoading ? (
             <Flex justify="center" py={20}>

@@ -299,7 +299,7 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
             collectionId: Number(collectionId),
         };
 
-
+console.log(nftData);
 
 
 
@@ -632,8 +632,10 @@ const handleCopy = () => {
                         </Text>
                       )}
 
+                      {nftData.collectionId && (
+                    <Text fontSize="lg"><strong>Collection ID :</strong> {nftData.collectionId}</Text>
+                      )}
 
-                    <Text fontSize="lg"><strong>Collection ID :</strong> {nftData.collectionId ? nftData.collectionId.toString() : 'Aucune collection'}</Text>
                     <Text fontSize="lg" cursor="pointer" onClick={handleCopy}>  <strong>Adresse de contrat :</strong>{' '}{contractAddress ? formatAddress(contractAddress) : 'Adresse inconnue'}</Text>
                 </VStack>
               </Stack>

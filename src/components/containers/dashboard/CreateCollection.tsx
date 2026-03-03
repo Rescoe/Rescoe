@@ -519,7 +519,6 @@ const tx = await handleMessageTransactions(
               : colorMode === "light" ? "brand.navy" : "brand.cream"
           }
           bg={colorMode === "light" ? "brand.cream" : "blackAlpha.400"}
-          color={colorMode === "light" ? "brand.navy" : "brand.textLight"}
           py={2}
           accept="image/jpeg,image/png,image/webp"
           _hover={{
@@ -535,12 +534,6 @@ const tx = await handleMessageTransactions(
             p={4}
             borderRadius="xl"
             border="1px solid"
-            borderColor={colorMode === "light" ? "brand.navy" : "brand.cream"}
-            bgGradient={
-              colorMode === "light"
-                ? "linear(to-r, brand.cream, whiteAlpha.800)"
-                : gradients.cardBorderDark
-            }
             boxShadow={colorMode === "light" ? effects.glowLight : effects.glowDark}
           >
             <HStack justify="space-between" mb={2}>
@@ -550,7 +543,6 @@ const tx = await handleMessageTransactions(
               <Text
                 fontSize="sm"
                 fontWeight="bold"
-                color={colorMode === "light" ? "brand.navy" : "brand.gold"}
               >
                 {(file.size / 1024 / 1024).toFixed(1)} Mo
               </Text>
@@ -817,9 +809,9 @@ const tx = await handleMessageTransactions(
         <VStack>
           <Button
             onClick={handleCreateCollection}
-            px={12}
-            py={8}
-            fontSize="xl"
+            px={4}
+            py={2}
+            fontSize="l"
             fontWeight="extrabold"
             borderRadius="full"
             bgGradient={
@@ -828,12 +820,12 @@ const tx = await handleMessageTransactions(
                 : "linear(to-r, brand.cream, brand.cream)"
             }
             color="brand.navy"
-            boxShadow="xl"
+            boxShadow="l"
             h="auto"
             minH="60px"
             _hover={{
               transform: brandHover.transform,
-              boxShadow: "2xl",
+              boxShadow: "xl",
               animation: "none"
             }}
             transition="all 0.4s cubic-bezier(0.4, 0, 0.2, 1)"

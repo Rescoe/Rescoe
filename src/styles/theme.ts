@@ -23,11 +23,11 @@ export const borderAnimation = keyframes`
 //Fond cream
 export const colors = {
   brand: {
-    gold: "#EED484",   // accent principal, lumineux et chaleureux
-    mauve: "#B4A6D5",  // teinte artistique et douce
+    gold: "#FFEDA6",   // accent principal, lumineux et chaleureux
+    mauve: "#0F314F",  // teinte artistique et douce
     blue: "#00416A",   // ton profond, tech
     navy: "#011C39",   // fond sombre principal
-    cream: "#FDFBD4",  // fond clair
+    cream: "#FFFBE8",  // fond clair
     textDark: "#1A1A1A", // texte foncé pour light mode
     textLight: "#F7F5EC", // texte clair pour dark mode
 

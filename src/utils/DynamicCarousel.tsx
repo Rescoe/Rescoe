@@ -55,18 +55,20 @@ const GridLayout: React.FC<GridLayoutProps> = ({
 
   // ✅ DEBUG PROPS + CONFIRMATION 10/10
   useEffect(() => {
+    /*
    console.log('[GRIDLAYOUT] ✅ Props OK:', {
       nftsCount: nfts.length,
       haikusCount: haikus.length,
       nftsSample: nfts.slice(0, 3).map(n => n.id),
       haikusSample: haikus.slice(0, 3).map(h => h.uniqueIdAssociated?.slice(0, 8))
     });
+    */
   }, [nfts.length, haikus.length]);
 
   // ✅ USEEFFECT PRINCIPAL - Paire NFT/Haiku
   useEffect(() => {
     if (!Array.isArray(nfts) || !Array.isArray(haikus) || nfts.length === 0 || haikus.length === 0) {
-      console.log('[GRID] ⏳ Attente data...');
+      //console.log('[GRID] ⏳ Attente data...');
       return;
     }
 
@@ -83,7 +85,7 @@ const GridLayout: React.FC<GridLayoutProps> = ({
       .map(id => haikus.find(h => h.uniqueIdAssociated === id)!)
       .slice(0, maxHaikus);
 
-    console.log('[GRID] 🔄 Uniques:', uniqueNfts.length, 'NFTs +', uniqueHaikus.length, 'Haikus');
+    //console.log('[GRID] 🔄 Uniques:', uniqueNfts.length, 'NFTs +', uniqueHaikus.length, 'Haikus');
 
     const combined: AlternatingItem[] = [];
     const addressesToFetch: string[] = [];
@@ -107,12 +109,12 @@ const GridLayout: React.FC<GridLayoutProps> = ({
       if (nft.artist) addressesToFetch.push(nft.artist);
     });
 
-    console.log('[GRID] ✅ Items créés:', combined.length);
+    //console.log('[GRID] ✅ Items créés:', combined.length);
     setItems(combined);
 
-    console.log(items);
+    //console.log(items);
 
-    
+
 /*
     if (addressesToFetch.length > 0) {
       fetchENSForAddresses(Array.from(new Set(addressesToFetch)));
