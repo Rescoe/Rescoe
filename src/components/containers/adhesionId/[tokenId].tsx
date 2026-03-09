@@ -931,164 +931,247 @@ return (
           </TabPanel>
         )}
 
-        {/* Onglet dynamique - VERSION PRO */}
+        {/* Onglet dynamique - VERSION PRO RESPONSIVE */}
         {isOwner && (
-          <TabPanel p={{ base: 6, md: 8 }}>
-            <VStack spacing={8} w="full" align="start">
+          <TabPanel p={0}>
+            <VStack spacing={{ base: 4, md: 6 }} w="full" align="stretch">
 
-              {/* HEADER ÉTAT ACTUEL - GARDÉ */}
+              {/* HEADER ÉTAT ACTUEL */}
               <Card
                 variant="elevated"
                 w="full"
-                bgGradient="linear(to-r, brand.navy, brand.blue)"
+                bgGradient="linear(to-r, brand.navy, #1a3a52)"
                 color="brand.cream"
-                shadow="xl"
+                shadow="lg"
+                borderRadius={{ base: "lg", md: "xl" }}
               >
-                <CardBody p={{ base: 6, md: 8 }}>
-                  <HStack justify="space-between" align="start" w="full">
-                    <VStack align="start" spacing={3}>
-                      <Heading size={{ base: "lg", md: "xl" }} color="brand.gold">
-                        {membershipInfo?.isEgg ? "🥚 Œuf prêt à éclore" :
-                         membershipInfo?.level === 0 ? "🧬 Niveau 0 → 1" :
-                         membershipInfo?.level === 1 ? "🧬 Niveau 1 → 2" :
-                         membershipInfo?.level === 2 ? "🧬 Niveau 2 → 3" : "🐛 Max niveau"}
-                      </Heading>
-                      <HStack spacing={3}>
+                <CardBody p={{ base: 4, md: 6 }}>
+                  <VStack align="start" spacing={{ base: 3, md: 4 }} w="full">
+                    {/* Titre principal */}
+                    <Heading
+                      size={{ base: "md", md: "lg" }}
+                      color="brand.gold"
+                      noOfLines={2}
+                    >
+                      {membershipInfo?.isEgg ? "🥚 Œuf prêt à éclore" :
+                       membershipInfo?.level === 0 ? "🧬 Niveau 0 → 1" :
+                       membershipInfo?.level === 1 ? "🧬 Niveau 1 → 2" :
+                       membershipInfo?.level === 2 ? "🧬 Niveau 2 → 3" : "🐛 Niveau maximum"}
+                    </Heading>
+
+                    {/* Badges - Stack responsive */}
+                    <Flex
+                      gap={2}
+                      flexWrap="wrap"
+                      w="full"
+                    >
+                      <Badge
+                        colorScheme={membershipInfo?.locked ? "red" : "green"}
+                        fontSize={{ base: "xs", md: "sm" }}
+                        px={3}
+                        py={1}
+                        borderRadius="full"
+                      >
+                        {membershipInfo?.locked ? "🔒 Verrouillé" : "✅ Débloqué"}
+                      </Badge>
+                      <Badge
+                        colorScheme={membershipInfo?.autoEvolve ? "purple" : "gray"}
+                        fontSize={{ base: "xs", md: "sm" }}
+                        px={3}
+                        py={1}
+                        borderRadius="full"
+                      >
+                        {membershipInfo?.autoEvolve ? "🤖 Auto" : "✋ Manuel"}
+                      </Badge>
+                      {membershipInfo?.isAnnual && (
                         <Badge
-                          colorScheme={membershipInfo?.locked ? "red" : "green"}
-                          fontSize={{ base: "sm", md: "md" }}
-                          px={4} py={2}
+                          colorScheme="orange"
+                          fontSize={{ base: "xs", md: "sm" }}
+                          px={3}
+                          py={1}
+                          borderRadius="full"
                         >
-                          {membershipInfo?.locked ? "🔒 Verrouillé" : "✅ Débloqué"}
+                          📅 {membershipInfo?.totalYears || 0} ans
                         </Badge>
-                        <Badge
-                          colorScheme={membershipInfo?.autoEvolve ? "purple" : "gray"}
-                          fontSize={{ base: "sm", md: "md" }}
-                          px={4} py={2}
-                        >
-                          {membershipInfo?.autoEvolve ? "🤖 Auto" : "✋ Manuel"}
-                        </Badge>
-                        {membershipInfo?.isAnnual && (
-                          <Badge colorScheme="orange" fontSize={{ base: "sm", md: "md" }} px={4} py={2}>
-                            📅 Annuel ({membershipInfo?.totalYears || 0} ans)
-                          </Badge>
-                        )}
-                      </HStack>
-                    </VStack>
-                    <Box textAlign="right">
-                      <Text fontSize={{ base: "2xl", md: "3xl" }} fontWeight="extrabold" color="brand.gold">
-                        Niveau {membershipInfo?.level || 0}/3
+                      )}
+                    </Flex>
+
+                    {/* Info niveau */}
+                    <HStack justify="space-between" w="full" pt={2}>
+                      <Text fontSize={{ base: "sm", md: "md" }} opacity={0.9}>
+                        Depuis {formatDateTime(membershipInfo?.startTimestamp || 0)}
                       </Text>
-                      <Text fontSize="sm" opacity={0.9}>
-                        Start: {formatDateTime(membershipInfo?.startTimestamp || 0)}
+                      <Text
+                        fontSize={{ base: "2xl", md: "3xl" }}
+                        fontWeight="extrabold"
+                        color="brand.gold"
+                      >
+                        {membershipInfo?.level || 0}/3
                       </Text>
-                    </Box>
-                  </HStack>
+                    </HStack>
+                  </VStack>
                 </CardBody>
               </Card>
 
-              {/* ÉTATS ESSENTIELS */}
-              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6} w="full">
-                <Card variant="outline" p={6}>
-                  <Text fontWeight="bold" color="brand.navy" mb={2}>Durée niveau actuel</Text>
-                  <Text fontSize="lg" color={isManualEvolveReady ? "green.600" : "orange.600"} fontWeight="semibold">
-                    {isManualEvolveReady ? "✅ PRÊT À ÉVOLUER" : "⏳ Temps restant"}
-                  </Text>
+              {/* INFOS ESSENTIELLES - Grid responsive */}
+              <SimpleGrid
+                columns={{ base: 2, md: 2 }}
+                spacing={{ base: 3, md: 4 }}
+                w="full"
+              >
+                <Card
+                  variant="outline"
+                  p={{ base: 3, md: 4 }}
+                  borderColor="brand.navy"
+                  bg="white"
+                >
+                  <CardBody p={0}>
+                    <VStack align="start" spacing={1}>
+                      <Text
+                        fontWeight="600"
+                        color="brand.navy"
+                        fontSize={{ base: "xs", md: "sm" }}
+                      >
+                        État
+                      </Text>
+                      <Text
+                        fontSize={{ base: "md", md: "lg" }}
+                        fontWeight="bold"
+                        color={isManualEvolveReady ? "green.600" : "orange.600"}
+                      >
+                        {isManualEvolveReady ? "✅ PRÊT" : "⏳ En attente"}
+                      </Text>
+                    </VStack>
+                  </CardBody>
                 </Card>
-                <Card variant="outline" p={6}>
-                  <Text fontWeight="bold" color="brand.navy" mb={2}>Coût évolution</Text>
-                  <Text fontSize="2xl" fontWeight="extrabold" color="brand.gold">
-                    {evolvePriceEth} ETH
-                  </Text>
-                  <Text fontSize="sm" color="brand.navy" mt={1}>Prochain niveau</Text>
+
+                <Card
+                  variant="outline"
+                  p={{ base: 3, md: 4 }}
+                  borderColor="brand.gold"
+                  bg="rgba(212, 175, 55, 0.05)"
+                >
+                  <CardBody p={0}>
+                    <VStack align="start" spacing={1}>
+                      <Text
+                        fontWeight="600"
+                        color="brand.navy"
+                        fontSize={{ base: "xs", md: "sm" }}
+                      >
+                        Coût
+                      </Text>
+                      <Text
+                        fontSize={{ base: "lg", md: "xl" }}
+                        fontWeight="extrabold"
+                        color="brand.gold"
+                      >
+                        {evolvePriceEth.toFixed(4)} Ξ
+                      </Text>
+                    </VStack>
+                  </CardBody>
                 </Card>
               </SimpleGrid>
 
-              {/* ACTIONS PRINCIPALES */}
-              <Card w="full" bgGradient="linear(to-b, brand.cream, gray.50)" shadow="lg">
-                <CardBody p={{ base: 8, md: 10 }}>
+              {/* CONTENU PRINCIPAL */}
+              <Card
+                w="full"
+                bg="white"
+                shadow="md"
+                borderRadius={{ base: "lg", md: "xl" }}
+              >
+                <CardBody p={{ base: 4, md: 6 }}>
                   {membershipInfo?.isEgg ? (
-                    <HatchEggPanel tokenId={Number(tokenId)} hatch={hatch} contractAddress={contractAdhesion} />
+                    <HatchEggPanel
+                      tokenId={Number(tokenId)}
+                      hatch={hatch}
+                      contractAddress={contractAdhesion}
+                    />
                   ) : membershipInfo?.level < 3 ? (
-                    <VStack spacing={6} w="full" align="center">
+                    <VStack spacing={{ base: 4, md: 6 }} w="full" align="center">
 
-                      {/* PREVIEW */}
+                      {/* PREVIEW IMAGE */}
                       {previewImageUrl && (
-                        <Box w="full" maxW="400px">
+                        <Box w="full">
                           <Image
                             src={previewImageUrl}
-                            alt={`Prévisualisation niveau ${membershipInfo?.level! + 1}`}
+                            alt={`Aperçu niveau ${membershipInfo?.level! + 1}`}
                             w="full"
-                            h={64}
+                            maxW="100%"
+                            h={{ base: "200px", md: "300px" }}
                             objectFit="cover"
-                            borderRadius="2xl"
-                            shadow="2xl"
-                            borderWidth={4}
-                            borderColor={isManualEvolveReady ? "green.400" : "gray.300"}
+                            borderRadius={{ base: "lg", md: "xl" }}
+                            shadow="md"
+                            border={`3px solid ${isManualEvolveReady ? "#48bb78" : "#cbd5e0"}`}
+                            transition="all 0.3s ease"
                           />
                         </Box>
                       )}
 
                       {/* BOUTONS */}
-                      <VStack spacing={4} w="full" maxW="500px">
+                      <VStack spacing={3} w="full">
+                        {/* Générer aperçu */}
                         <Button
-                          size="lg"
-                          h={14}
+                          size={{ base: "md", md: "lg" }}
                           w="full"
                           colorScheme="purple"
-                          leftIcon={<Icon boxSize={6}>🔄</Icon>}
+                          variant="outline"
+                          leftIcon={<Icon boxSize={{ base: 5, md: 6 }}>🎨</Icon>}
                           onClick={prepareEvolution}
                           isLoading={isUploadingEvolve}
-                          loadingText="Génération aperçu..."
-                          borderRadius="2xl"
+                          loadingText="Génération..."
+                          borderRadius="lg"
+                          fontSize={{ base: "sm", md: "md" }}
+                          fontWeight="600"
+                          _hover={{
+                            bg: "purple.50",
+                            borderColor: "purple.500"
+                          }}
                         >
-                          🎨 Générer prévisualisation
+                          Générer aperçu
                         </Button>
 
+                        {/* Bouton ÉVOLUER - Principal */}
                         <Button
-                          size="xl"
-                          h={20}
+                          size={{ base: "lg", md: "lg" }}
                           w="full"
-                          bgGradient="linear(to-r, green.500, teal.500)"
-                          color="white"
-                          fontSize="xl"
+                          h={{ base: "48px", md: "56px" }}
+                          bgGradient="linear(to-r, brand.gold, #d4af37)"
+                          color="brand.navy"
+                          fontSize={{ base: "md", md: "lg" }}
                           fontWeight="extrabold"
-                          boxShadow="2xl"
-                          borderRadius="3xl"
+                          boxShadow="0 4px 12px rgba(212, 175, 55, 0.4)"
+                          borderRadius="lg"
                           _hover={{
-                            boxShadow: "3xl",
-                            transform: "translateY(-2px)",
-                            bgGradient: "linear(to-r, green.600, teal.600)"
+                            boxShadow: "0 6px 16px rgba(212, 175, 55, 0.6)",
+                            transform: "translateY(-1px)",
                           }}
-                          transition="all 0.3s ease"
+                          _active={{
+                            transform: "translateY(0)"
+                          }}
+                          transition="all 0.2s ease"
                           onClick={evolve}
                           isDisabled={!isManualEvolveReady || !evolveIpfsUrl || isEvolving}
                           isLoading={isEvolving}
-                          loadingText="Évolution en cours..."
+                          loadingText="Transaction..."
+                          leftIcon={<Icon boxSize={{ base: 5, md: 6 }}>🧬</Icon>}
                         >
-                          🧬 ÉVOLUER → Niveau {membershipInfo?.level! + 1}
+                          Évoluer → Niveau {membershipInfo?.level! + 1}
                         </Button>
 
-                        <Button
-                          variant="ghost"
-                          size="md"
-                          leftIcon={<Icon boxSize={5}>🔄</Icon>}
-                          onClick={refreshEvolution}
-                          color="brand.navy"
-                          _hover={{ bg: "brand.cream", color: "brand.navy" }}
-                        >
-                          🔄 Actualiser
-                        </Button>
                       </VStack>
                     </VStack>
                   ) : (
-                    <ReproductionPanel reproduction={reproduction as any} renewPriceEth={renewPriceEth} />
+                    <ReproductionPanel
+                      reproduction={reproduction as any}
+                      renewPriceEth={renewPriceEth}
+                    />
                   )}
                 </CardBody>
               </Card>
             </VStack>
           </TabPanel>
         )}
+
 
       </TabPanels>
     </Tabs>

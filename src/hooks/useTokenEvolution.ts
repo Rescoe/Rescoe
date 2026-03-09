@@ -9,7 +9,7 @@ import { useRouter } from 'next/router';
 import {
   buildEvolutionHistory,
   EvolutionStep
-} from '@/utils/evolutionHistory';  // Votre fichier
+} from '@/utils/evolutionHistory';
 import { resolveIPFS } from "@/utils/resolveIPFS";
 
 
@@ -20,8 +20,8 @@ interface MembershipRaw {
   expirationTimestamp: string | number;
   totalYears: string | number;
   locked: boolean;
-  isEgg: boolean;           // ✅ AJOUT
-  isAnnual: boolean;        // ✅ AJOUT
+  isEgg: boolean;
+  isAnnual: boolean;
 }
 
 
@@ -32,8 +32,8 @@ export interface MembershipInfo {
   expirationTimestamp: number;
   totalYears: number;
   locked: boolean;
-  isEgg: boolean;           // ✅ AJOUT
-  isAnnual: boolean;        // ✅ AJOUT
+  isEgg: boolean;
+  isAnnual: boolean;
 }
 
 
@@ -60,11 +60,15 @@ export const useTokenEvolution = ({
   const [isUploadingEvolve, setIsUploadingEvolve] = useState(false);
   const [isEvolving, setIsEvolving] = useState(false);
 
-  const { uploadToIPFS, imageUri: ipfsUrl, metadataUri } = usePinataUpload();
+  // 🔥 AJOUT : Stocker les URIs séparément
+  const [evolveImageUri, setEvolveImageUri] = useState<string | null>(null);
+  const [evolveMetadataUri, setEvolveMetadataUri] = useState<string | null>(null);
+
+  const { uploadToIPFS, isUploading } = usePinataUpload();
   const { address: account, web3, isAuthenticated } = useAuth();
   const router = useRouter();
 
-  const [hatchPriceEth, setHatchPriceEth] = useState(0);  // ✅ AJOUT
+  const [hatchPriceEth, setHatchPriceEth] = useState(0);
 
 
   /* =======================
@@ -106,14 +110,12 @@ export const useTokenEvolution = ({
         let priceEth = 0;
         if (!info.isEgg) {
           try {
-            // baseEvolvePrice(level) → uint256 direct
             const basePriceWei = await contract.methods.baseEvolvePrice(info.level).call();
             const basePrice = Number(basePriceWei);
 
-            // Réplique _computeEvolvePrice interne
             let finalPriceWei = basePrice;
             if (!info.autoEvolve && info.totalYears >= 1) {
-              finalPriceWei = Math.floor(basePrice / 10);  // /10 annual manuel
+              finalPriceWei = Math.floor(basePrice / 10);
             }
 
             priceEth = finalPriceWei / 1e18;
@@ -173,7 +175,6 @@ export const useTokenEvolution = ({
       const tokenUriRaw: any = await contract.methods.tokenURI(tokenId).call();
       let tokenUri: string | null = Array.isArray(tokenUriRaw) ? tokenUriRaw[0] as string : tokenUriRaw as string;
 
-      // ✅ FIX AWAIT + NULL CHECK
       const resolvedTokenUri = await resolveIPFS(tokenUri!, true) as string;
       if (!resolvedTokenUri) {
         console.warn("❌ tokenUri invalide:", tokenId, tokenUri);
@@ -246,7 +247,7 @@ export const useTokenEvolution = ({
 
 
       /* ============================
-         UPLOAD IPFS
+         UPLOAD IPFS - 🔥 RÉCUPÉRER LES 2 URIs
       ============================ */
 
       const uploadResult = await uploadToIPFS({
@@ -277,8 +278,9 @@ export const useTokenEvolution = ({
 
       });
 
-
-
+      // 🔥 STOCKER LES DEUX URIs
+      setEvolveImageUri(uploadResult.imageUri);
+      setEvolveMetadataUri(uploadResult.metadataUri);
       setPreviewImageUrl(uploadResult.imageUri);
 
 
@@ -327,12 +329,13 @@ export const useTokenEvolution = ({
 
 
   /* =======================
-     EVOLVE ON-CHAIN
+     EVOLVE ON-CHAIN - 🔥 ENVOYER LE METADATA URI
   ======================= */
 
   const evolve = useCallback(async () => {
-  if (!ipfsUrl || !contractAddress || tokenId === undefined) return;
-      if (!isAuthenticated || !account || !web3) {
+    // 🔥 UTILISER metadataUri AU LIEU DE imageUri
+    if (!evolveMetadataUri || !contractAddress || tokenId === undefined) return;
+    if (!isAuthenticated || !account || !web3) {
       alert("Connexion requise");
       return;
     }
@@ -343,36 +346,32 @@ export const useTokenEvolution = ({
       const gasPrice = await web3.eth.getGasPrice();
       const contract = new web3.eth.Contract(ABI as any, contractAddress);
 
-      const receipt = await contract.methods.evolve(tokenId, ipfsUrl).send({
+      // 🔥 ENVOYER evolveMetadataUri AU CONTRAT
+      const receipt = await contract.methods.evolve(tokenId, evolveMetadataUri).send({
         from: account,
         value: web3.utils.toWei(evolvePriceEth.toString(), "ether"),
         gasPrice: gasPrice.toString(),
       });
 
-      // ✅ GESTION NOUVEAU TOKEN ID
       console.log("✅ ÉVOLUTION OK - Gas:", receipt.gasUsed.toString());
 
       let newTokenId = null;
 
-      // 1️⃣ Event LevelEvolved (PRIORITÉ)
       if (receipt.events?.LevelEvolved) {
         newTokenId = receipt.events.LevelEvolved.returnValues.tokenId;
       }
 
-      // 2️⃣ Fallback totalSupply
       if (!newTokenId) {
         const totalSupply = await contract.methods.totalSupply().call();
         newTokenId = totalSupply;
       }
 
-      // 3️⃣ Ultime fallback
       if (!newTokenId) {
         newTokenId = (Number(tokenId) + 1).toString();
       }
 
       console.log("🎉 Nouveau token ID:", newTokenId);
 
-      // ✅ SPA REDIRECTION
       router.push(`/AdhesionId/${contractAddress}/${newTokenId}`);
 
     } catch (e) {
@@ -381,18 +380,21 @@ export const useTokenEvolution = ({
     } finally {
       setIsEvolving(false);
     }
-  }, [ipfsUrl, contractAddress, tokenId, evolvePriceEth, account, web3, isAuthenticated]);
+  }, [evolveMetadataUri, contractAddress, tokenId, evolvePriceEth, account, web3, isAuthenticated]);
 
 
   const refreshEvolution = useCallback(() => {
     setPreviewImageUrl(null);
     setIsManualEvolveReady(false);
+    setEvolveImageUri(null);
+    setEvolveMetadataUri(null);
   }, []);
 
 
-  // ✅ AJOUT À LA FIN (avant return)
+  // ✅ HATCH EGG - 🔥 AUSSI UTILISER METADATA URI
   const hatchEgg = useCallback(async () => {
-    if (!ipfsUrl || !contractAddress || tokenId === undefined) return;
+    // 🔥 UTILISER metadataUri AU LIEU DE imageUri
+    if (!evolveMetadataUri || !contractAddress || tokenId === undefined) return;
     if (!isAuthenticated || !account || !web3) {
       alert("Connexion requise");
       return;
@@ -403,15 +405,15 @@ export const useTokenEvolution = ({
       const gasPrice = await web3.eth.getGasPrice();
       const contract = new web3.eth.Contract(ABI as any, contractAddress);
 
-      const receipt = await contract.methods.hatchEgg(tokenId, ipfsUrl).send({
+      // 🔥 ENVOYER evolveMetadataUri AU CONTRAT
+      const receipt = await contract.methods.hatchEgg(tokenId, evolveMetadataUri).send({
         from: account,
-        value: '0',  // ✅ GRATUIT
+        value: '0',
         gasPrice: gasPrice.toString(),
       });
 
       console.log("🥚 ÉCLOS OK:", receipt);
 
-      // Même logique newTokenId qu'evolve
       let newTokenId = (Number(tokenId) + 1).toString();
 
       if (receipt.events?.EggHatched?.returnValues) {
@@ -426,32 +428,31 @@ export const useTokenEvolution = ({
 
       router.push(`/u/dashboard`);
 
-      //router.push(`/AdhesionId/${contractAddress}/${newTokenId}`);
     } catch (e) {
       console.error("❌ hatch error:", e);
       alert("Erreur éclosion");
     } finally {
       setIsEvolving(false);
     }
-  }, [ipfsUrl, contractAddress, tokenId, account, web3, isAuthenticated]);
+  }, [evolveMetadataUri, contractAddress, tokenId, account, web3, isAuthenticated]);
 
 
 
   return {
     membershipInfo,
     evolvePriceEth,
-    hatchPriceEth,        // ✅
+    hatchPriceEth,
     isManualEvolveReady,
-    evolveIpfsUrl: ipfsUrl,     // ✅ imageUri aliasé
-    metadataUri,
+    evolveImageUri,           // 🔥 NOUVEAU
+    evolveMetadataUri,        // 🔥 NOUVEAU
     isUploadingEvolve,
     isEvolving,
-    prepareEvolution,     // Utilise pour œufs ET évolutions
-    evolve,               // UNIQUEMENT évolutions
-    hatchEgg,             // ✅ NOUVEAU
+    prepareEvolution,
+    evolve,
+    hatchEgg,
     refreshEvolution,
     updateCurrentMetadata,
-    isEgg: membershipInfo?.isEgg || false,  // ✅
+    isEgg: membershipInfo?.isEgg || false,
   };
 
 };
