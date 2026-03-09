@@ -10,6 +10,8 @@ import {
   buildEvolutionHistory,
   EvolutionStep
 } from '@/utils/evolutionHistory';  // Votre fichier
+import { resolveIPFS } from "@/utils/resolveIPFS";
+
 
 interface MembershipRaw {
   level: string | number;
@@ -66,9 +68,8 @@ export const useTokenEvolution = ({
 
 
   /* =======================
-     FETCH ON-CHAIN MEMBERSHIP
+     FETCH ON-CHAIN MEMBERSHIP + PRIX EXACT
   ======================= */
-
   useEffect(() => {
     if (!contractAddress || tokenId === undefined) return;
 
@@ -77,7 +78,7 @@ export const useTokenEvolution = ({
         const web3Instance = new Web3((window as any).ethereum);
         const contract = new web3Instance.eth.Contract(ABI as any, contractAddress);
 
-        // ✅ FIX : Try spécifique + fallback
+        // Info membre
         let infoRaw: MembershipRaw = { level: '0', autoEvolve: false, startTimestamp: '0',
           expirationTimestamp: '0', totalYears: '0', locked: false, isEgg: false, isAnnual: false };
 
@@ -99,31 +100,43 @@ export const useTokenEvolution = ({
         };
 
         setMembershipInfo(info);
-        //console.log('🧬 TOKEN INFO OK:', info);
+        console.log('🧬 TOKEN INFO OK:', info);
 
-        // Prix (inchangé)
-        let priceWei = "0";
-        if (info.isEgg) {
-          setHatchPriceEth(0);
-        } else {
+        // ✅ PRIX EXACT = LOGIQUE CONTRAT
+        let priceEth = 0;
+        if (!info.isEgg) {
           try {
-            priceWei = await contract.methods.baseEvolvePrice(info.level).call();
-            setEvolvePriceEth(Number(priceWei) / 1e18);
-          } catch {
+            // baseEvolvePrice(level) → uint256 direct
+            const basePriceWei = await contract.methods.baseEvolvePrice(info.level).call();
+            const basePrice = Number(basePriceWei);
+
+            // Réplique _computeEvolvePrice interne
+            let finalPriceWei = basePrice;
+            if (!info.autoEvolve && info.totalYears >= 1) {
+              finalPriceWei = Math.floor(basePrice / 10);  // /10 annual manuel
+            }
+
+            priceEth = finalPriceWei / 1e18;
+            setEvolvePriceEth(priceEth);
+            console.log(`💰 Prix lvl${info.level}: ${priceEth.toFixed(6)} ETH
+              (base:${(basePrice/1e18).toFixed(6)}, /10:${!info.autoEvolve && info.totalYears >= 1})`);
+          } catch (priceErr) {
+            console.error('❌ Prix fail:', priceErr);
             setEvolvePriceEth(0);
           }
+        } else {
+          setHatchPriceEth(0);
         }
       } catch (e) {
         console.error("❌ fetchMembership TOTAL error:", e);
-        // Fallback safe
         setMembershipInfo({ level: 0, autoEvolve: false, startTimestamp: 0, expirationTimestamp: 0,
           totalYears: 0, locked: false, isEgg: false, isAnnual: false });
       }
     };
 
-
     fetchMembership();
   }, [contractAddress, tokenId]);
+
 
   /* =======================
      METADATA SYNC (UI ONLY)
@@ -143,7 +156,7 @@ export const useTokenEvolution = ({
   const prepareEvolution = useCallback(async () => {
     if (isUploadingEvolve || isManualEvolveReady) return;
     if (!membershipInfo || !contractAddress || tokenId === undefined) {
-      alert("Données d'évolution indisponibles");
+      alert("Données indisponibles");
       return;
     }
 
@@ -152,125 +165,151 @@ export const useTokenEvolution = ({
 
       const currentLevel = Number(membershipInfo.level);
       const targetLevel = currentLevel + 1;
+      if (currentLevel >= 3) throw new Error("Niveau max");
 
-      if (currentLevel >= 3) {
-        throw new Error("Niveau maximum atteint");
-      }
-
-      // 🔗 TOKENURI → METADATA DÉJÀ CHARGÉE (logs confirment)
       const web3Instance = new Web3((window as any).ethereum);
       const contract = new web3Instance.eth.Contract(ABI as any, contractAddress);
+
       const tokenUriRaw: any = await contract.methods.tokenURI(tokenId).call();
-      let tokenUri: string | null = null;
+      let tokenUri: string | null = Array.isArray(tokenUriRaw) ? tokenUriRaw[0] as string : tokenUriRaw as string;
 
-      if (Array.isArray(tokenUriRaw)) {
-        tokenUri = tokenUriRaw[0] as string;
-      } else if (typeof tokenUriRaw === 'string') {
-        tokenUri = tokenUriRaw;
+      // ✅ FIX AWAIT + NULL CHECK
+      const resolvedTokenUri = await resolveIPFS(tokenUri!, true) as string;
+      if (!resolvedTokenUri) {
+        console.warn("❌ tokenUri invalide:", tokenId, tokenUri);
+        return;
       }
 
-      if (!tokenUri) {
-        console.warn('⚠️ tokenURI invalide:', tokenUriRaw);
-        return;  // Skip si pas d'URI
-      }
+      const response = await fetch(resolvedTokenUri);
+      const currentMetadataJson = await response.json();
 
-      const response = await fetch(tokenUri);
-      const currentMetadata = await response.json();
-      //console.log("currentMetadata attributes[15]:", currentMetadata.attributes[15]);
 
-      // ✅ ATTRS DICT D'ABORD
+      /* ============================
+         ATTRIBUTES → DICTIONARY
+      ============================ */
+
       const currentAttrs = Object.fromEntries(
-        (currentMetadata.attributes || []).map((a: any) => [a.trait_type, a.value])
+        (currentMetadataJson.attributes || []).map((a: any) => [a.trait_type, a.value])
       );
 
-      // ✅ PRIORITÉ : ATTRS (case sensitive)
-      let currentFamily = currentAttrs.Famille ||
-                         currentAttrs.family ||
-                         currentAttrs.Family ||
-                         currentMetadata.family ||
-                         currentMetadata.famille ||
-                         'unknown';
+      const currentFamily =
+        currentAttrs.Famille ||
+        currentAttrs.family ||
+        currentMetadataJson.family ||
+        "unknown";
 
-      //console.log("currentAttrs keys:", Object.keys(currentAttrs));  // Debug
-      //console.log("currentFamily RAW:", currentFamily);
 
-      /*console.log('🚀 CURRENT DIRECT:', {
-        family: currentFamily,  // ✅ "Gravix"
-        level: currentLevel,
-        attrsKeys: Object.keys(currentAttrs).slice(0,5),
-        image: currentMetadata.image?.slice(-30),
-        debugFamille: currentAttrs.Famille  // "Gravix"
-      });
-*/
-      const finalWallet = walletAddress || account || "0x0000000000000000000000000000000000";
 
-      // 🔥 ENGINE (NO undefined → DIRECT attrs)
+      /* ============================
+         EVOLUTION ENGINE
+      ============================ */
+
+      const finalWallet = walletAddress || account;
+
       const evolutionData = evolutionEngine(
-        { family: currentFamily, attributes: currentAttrs }, // ✅ SANS extractIPFS
+        { family: currentFamily, attributes: currentAttrs },
         currentLevel,
         targetLevel,
         finalWallet,
         tokenId
       );
-      //console.log("evolutionData", evolutionData);
 
       setPreviewImageUrl(evolutionData.imageUrl);
 
-      // 📜 HISTORIQUE (votre logique existante)
-      const history = Array.isArray(currentMetadata.evolutionHistory)
-        ? [...currentMetadata.evolutionHistory]
-        : [];
+
+
+      /* ============================
+         HISTORIQUE BULLET PROOF
+      ============================ */
+
+      let history: any[] = [];
+
+      if (Array.isArray(currentMetadataJson["histoire de l'évolution"])) {
+        history = [...currentMetadataJson["histoire de l'évolution"]];
+      }
+      else if (Array.isArray(currentMetadataJson.evolutionHistory)) {
+        history = [...currentMetadataJson.evolutionHistory];
+      }
+      else if (Array.isArray(currentMetadataJson.evolution_history)) {
+        history = [...currentMetadataJson.evolution_history];
+      }
 
       history.push({
         niveau: currentLevel,
         uri: tokenUri,
-        image: currentMetadata.image,
-        family: currentMetadata.family,
-        sprite_name: currentMetadata.sprite_name,
-        horodatage: Math.floor(Date.now() / 1000),
+        image: currentMetadataJson.image,
+        family: currentMetadataJson.family,
+        sprite_name: currentMetadataJson.sprite_name,
+        horodatage: Math.floor(Date.now() / 1000)
       });
 
-      // ☁️ IPFS (IDENTIQUE)
-      // Dans prepareEvolution, REMPLACE le bloc upload (ligne ~200)
-      const pinataResult = await uploadToIPFS({
-        scope: "badges",  // ✅ OBLIGATOIRE
+
+
+      /* ============================
+         UPLOAD IPFS
+      ============================ */
+
+      const uploadResult = await uploadToIPFS({
+
+        scope: "badges",
+
         imageUrl: evolutionData.imageUrl,
-        name: evolutionData.display_name || currentName || "Évolution Adhesion",
+
+        name: evolutionData.display_name || currentName || "Adhésion",
+
         bio: currentBio || "",
+
         role: currentRoleLabel || "Membre",
+
         level: targetLevel,
+
         attributes: evolutionData.attributes,
+
         family: evolutionData.family,
+
         sprite_name: evolutionData.sprite_name,
+
         color_profile: evolutionData.color_profile,
-        previousImage: currentMetadata.image,
-        evolutionHistory: history,
+
+        previousImage: currentMetadataJson.image,
+
+        evolutionHistory: history
+
       });
 
-      // ✅ Utilise imageUri (pas .url)
-      if (!pinataResult.imageUri) {
-        throw new Error("Upload IPFS image échoué");
-      }
-
-      setPreviewImageUrl(pinataResult.imageUri);  // Preview image
 
 
-      updateCurrentMetadata({
-        ...currentMetadata,
+      setPreviewImageUrl(uploadResult.imageUri);
+
+
+
+      const newMetadata = {
+        ...currentMetadataJson,
         ...evolutionData,
         level: targetLevel,
-        image: evolutionData.imageUrl,
-        evolutionHistory: history,
-      });
+        image: uploadResult.imageUri,
+        evolutionHistory: history
+      };
+
+      updateCurrentMetadata(newMetadata);
 
       setIsManualEvolveReady(true);
 
-    } catch (e: any) {
-      console.error("❌ prepareEvolution error:", e);
-      alert(e.message || "Erreur évolution");
-    } finally {
-      setIsUploadingEvolve(false);
     }
+
+    catch (e: any) {
+
+      console.error("prepareEvolution error:", e);
+      alert(e.message);
+
+    }
+
+    finally {
+
+      setIsUploadingEvolve(false);
+
+    }
+
   }, [
     membershipInfo,
     contractAddress,
@@ -279,11 +318,11 @@ export const useTokenEvolution = ({
     account,
     uploadToIPFS,
     updateCurrentMetadata,
-    isUploadingEvolve,
-    isManualEvolveReady,
     currentName,
     currentBio,
-    currentRoleLabel
+    currentRoleLabel,
+    isUploadingEvolve,
+    isManualEvolveReady
   ]);
 
 
@@ -311,7 +350,7 @@ export const useTokenEvolution = ({
       });
 
       // ✅ GESTION NOUVEAU TOKEN ID
-      //console.log("✅ ÉVOLUTION OK - Gas:", receipt.gasUsed.toString());
+      console.log("✅ ÉVOLUTION OK - Gas:", receipt.gasUsed.toString());
 
       let newTokenId = null;
 
@@ -331,7 +370,7 @@ export const useTokenEvolution = ({
         newTokenId = (Number(tokenId) + 1).toString();
       }
 
-      //console.log("🎉 Nouveau token ID:", newTokenId);
+      console.log("🎉 Nouveau token ID:", newTokenId);
 
       // ✅ SPA REDIRECTION
       router.push(`/AdhesionId/${contractAddress}/${newTokenId}`);
@@ -370,7 +409,7 @@ export const useTokenEvolution = ({
         gasPrice: gasPrice.toString(),
       });
 
-      //console.log("🥚 ÉCLOS OK:", receipt);
+      console.log("🥚 ÉCLOS OK:", receipt);
 
       // Même logique newTokenId qu'evolve
       let newTokenId = (Number(tokenId) + 1).toString();
@@ -404,7 +443,7 @@ export const useTokenEvolution = ({
     hatchPriceEth,        // ✅
     isManualEvolveReady,
     evolveIpfsUrl: ipfsUrl,     // ✅ imageUri aliasé
-    metadataUri, 
+    metadataUri,
     isUploadingEvolve,
     isEvolving,
     prepareEvolution,     // Utilise pour œufs ET évolutions

@@ -176,6 +176,7 @@ const getRandomItems = <T,>(array: T[], count: number): T[] => {
     : [];
 };
 
+/*
 useEffect(() => {
   console.log('🚀 useRescoeData DATA:', {
     isLoading,
@@ -186,6 +187,7 @@ useEffect(() => {
     collections: collections.length,
   });
 }, [isLoading, allNfts, allHaikus, collections]);
+*/
 
     const maxBoxHeight = "150px"; // Hauteur max pour toutes les boîtes
 

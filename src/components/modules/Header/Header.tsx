@@ -1,6 +1,5 @@
-import { Box, Tooltip, Container, Button, Menu, MenuButton, MenuList, MenuItem, Drawer, DrawerBody, DrawerCloseButton, DrawerContent, DrawerHeader, DrawerOverlay, useDisclosure, HStack, VStack, Flex, useColorModeValue, useTheme } from '@chakra-ui/react';
+import { Box, Badge, Tooltip, Container, Button, Menu, MenuButton, MenuList, MenuItem, Drawer, DrawerBody, DrawerCloseButton, DrawerContent, DrawerHeader, DrawerOverlay, useDisclosure, HStack, VStack, Flex, useColorModeValue, useTheme } from '@chakra-ui/react';
 import { FaBug, FaEye, FaEyeSlash, FaBars } from 'react-icons/fa';
-import { Badge } from '@chakra-ui/react'; // ✅ À ajouter en haut si pas déjà
 
 import { ChevronDownIcon } from '@chakra-ui/icons';
 import React, { useRef, useState, useEffect } from 'react';
@@ -191,6 +190,9 @@ const Header = () => {
   const headerRef = useRef<HTMLDivElement>(null);
   const theme = useTheme();
 
+  const MotionButton = motion(Button)
+  const MotionBadge = motion(Badge);
+
   const {
     isAuthenticated,
     isAdmin,
@@ -212,6 +214,7 @@ const Header = () => {
 
   // ✅ ÉTAT CENTRALISÉ : est-ce que l'utilisateur actuel est résident ?
   const [isResident, setIsResident] = useState(false);
+  const [evolutionCount, setEvolutionCount] = useState(0);
 
   // ✅ boxShadowHover DÉPLACÉ ICI (FIX ERREUR)
   const boxShadowHover = useColorModeValue(
@@ -297,6 +300,27 @@ useEffect(() => {
       }
     }
   }, []);
+
+  useEffect(() => {
+
+  const handleEvolutionUpdate = (event: any) => {
+    const count = event?.detail ?? 0;
+    setEvolutionCount(count);
+  };
+
+  window.addEventListener(
+    "RESCOE_EVOLUTION_COUNT",
+    handleEvolutionUpdate as EventListener
+  );
+
+  return () => {
+    window.removeEventListener(
+      "RESCOE_EVOLUTION_COUNT",
+      handleEvolutionUpdate as EventListener
+    );
+  };
+
+}, []);
 
   useEffect(() => {
     localStorage.setItem('insectVisibility', JSON.stringify(isInsectVisible));
@@ -412,13 +436,43 @@ useEffect(() => {
             {isAuthenticated && isMember && role !== "non-member" && (
               <HStack spacing={4} cursor="pointer" aria-label="Menu insecte">
                 <Menu>
-                  <MenuButton as="div">
-                    <Button size="sm" aria-haspopup="true" aria-expanded="false">
-                      <FaBug />
-                    </Button>
-                  </MenuButton>
-                  <MenuList bg="gray.800" borderColor="brand.cream" minW="180px">
-                    <Box mt={4} display="flex" justifyContent="center" />
+                <MotionMenuButton
+                  as={Button}
+                  position="relative"
+                >
+                  <FaBug />
+                  {evolutionCount > 0 && (
+                    <MotionBadge
+                      position="absolute"
+                      top="-6px"
+                      right="-6px"
+                      bg="brand.gold"
+                      color="black"
+                      fontSize="9px"
+                      borderRadius="full"
+                      px={1.5}
+                      animate={{
+                        scale: [1, 1.25, 1],
+                        opacity: [1, 0.6, 1]
+                      }}
+                      transition={{
+                        duration: 1.2,
+                        repeat: Infinity
+                      }}
+                    >
+                      {evolutionCount}
+                    </MotionBadge>
+                  )}
+                </MotionMenuButton>
+
+                  <MenuList
+                    bg="gray.800"
+                    borderColor="brand.cream"
+                    minW="0"
+                    w={{ base: "92vw", md: "320px" }}
+                    maxW="92vw"
+                    overflowX="hidden"
+                  >                    <Box mt={4} display="flex" justifyContent="center" />
                     <MenuItem onClick={toggleInsectVisibility}>
                       {isInsectVisible ? (
                         <>
@@ -432,7 +486,7 @@ useEffect(() => {
                         </>
                       )}
                     </MenuItem>
-                    <Box as="div" p={2}>
+                    <Box as="div" p={2} w="100%" maxW="100%" overflow="hidden">
                       <SelectInsect onSelect={handleSelectInsect} />
                     </Box>
                   </MenuList>

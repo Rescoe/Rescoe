@@ -30,7 +30,8 @@ import {
   CardBody,
   Flex,
   useColorModeValue,
-  Textarea
+  Textarea,
+  Badge
 } from '@chakra-ui/react';
 import { FaCheckCircle } from 'react-icons/fa';
 
@@ -262,6 +263,8 @@ const TokenPage = () => {
     onMetadataLoaded: updateCurrentMetadata,
   }) as any;  // ← Force le type
 
+  console.log(evolutionResult);
+
   const rawMembershipInfo: MembershipInfo | null = evolutionResult.membershipInfo || null;
   const evolvePriceEth = evolutionResult.evolvePriceEth || "0";
   const isManualEvolveReady = evolutionResult.isManualEvolveReady || false;
@@ -272,6 +275,8 @@ const TokenPage = () => {
   const prepareEvolution = evolutionResult.prepareEvolution || (() => {});
   const evolve = evolutionResult.evolve || (() => {});
   const refreshEvolution = evolutionResult.refreshEvolution || (() => {});
+
+console.log(previewImageUrl);
 
   const membershipInfo = rawMembershipInfo || {
     level: Number(nftData?.level || 0),
@@ -926,66 +931,165 @@ return (
           </TabPanel>
         )}
 
-        {/* Onglet dynamique */}
+        {/* Onglet dynamique - VERSION PRO */}
         {isOwner && (
-          <TabPanel p={0}>
-            <Heading
-              as="h2"
-              size="md"
-              mb={6}
-              color={
-                nftData?.membershipInfo?.isEgg ? "yellow.600" :
-                membershipInfo?.level < 3 ? "blue.600" : "green.600"
-              }
-            >
-              {nftData?.membershipInfo?.isEgg ? "🥚 Éclosion" :
-               membershipInfo?.level < 3 ? `🧬 Évolution LVL${membershipInfo.level}` :
-               "🐛 Reproduction"}
-            </Heading>
+          <TabPanel p={{ base: 6, md: 8 }}>
+            <VStack spacing={8} w="full" align="start">
 
-            {nftData?.membershipInfo?.isEgg ? (
-              <HatchEggPanel tokenId={Number(tokenId)} hatch={hatch} contractAddress={contractAdhesion} />
-            ) : membershipInfo?.level < 3 ? (
-              <VStack spacing={6} align="start">
-                <VStack spacing={3} align="start">
-                  <Text fontWeight="medium">Niveau actuel : {membershipInfo.level}</Text>
-                  <Text>Auto-évolution : {membershipInfo.autoEvolve ? "Oui" : "Non"}</Text>
-                  <Text>Années : {membershipInfo.totalYears}</Text>
-                </VStack>
+              {/* HEADER ÉTAT ACTUEL - GARDÉ */}
+              <Card
+                variant="elevated"
+                w="full"
+                bgGradient="linear(to-r, brand.navy, brand.blue)"
+                color="brand.cream"
+                shadow="xl"
+              >
+                <CardBody p={{ base: 6, md: 8 }}>
+                  <HStack justify="space-between" align="start" w="full">
+                    <VStack align="start" spacing={3}>
+                      <Heading size={{ base: "lg", md: "xl" }} color="brand.gold">
+                        {membershipInfo?.isEgg ? "🥚 Œuf prêt à éclore" :
+                         membershipInfo?.level === 0 ? "🧬 Niveau 0 → 1" :
+                         membershipInfo?.level === 1 ? "🧬 Niveau 1 → 2" :
+                         membershipInfo?.level === 2 ? "🧬 Niveau 2 → 3" : "🐛 Max niveau"}
+                      </Heading>
+                      <HStack spacing={3}>
+                        <Badge
+                          colorScheme={membershipInfo?.locked ? "red" : "green"}
+                          fontSize={{ base: "sm", md: "md" }}
+                          px={4} py={2}
+                        >
+                          {membershipInfo?.locked ? "🔒 Verrouillé" : "✅ Débloqué"}
+                        </Badge>
+                        <Badge
+                          colorScheme={membershipInfo?.autoEvolve ? "purple" : "gray"}
+                          fontSize={{ base: "sm", md: "md" }}
+                          px={4} py={2}
+                        >
+                          {membershipInfo?.autoEvolve ? "🤖 Auto" : "✋ Manuel"}
+                        </Badge>
+                        {membershipInfo?.isAnnual && (
+                          <Badge colorScheme="orange" fontSize={{ base: "sm", md: "md" }} px={4} py={2}>
+                            📅 Annuel ({membershipInfo?.totalYears || 0} ans)
+                          </Badge>
+                        )}
+                      </HStack>
+                    </VStack>
+                    <Box textAlign="right">
+                      <Text fontSize={{ base: "2xl", md: "3xl" }} fontWeight="extrabold" color="brand.gold">
+                        Niveau {membershipInfo?.level || 0}/3
+                      </Text>
+                      <Text fontSize="sm" opacity={0.9}>
+                        Start: {formatDateTime(membershipInfo?.startTimestamp || 0)}
+                      </Text>
+                    </Box>
+                  </HStack>
+                </CardBody>
+              </Card>
 
-                <Divider />
+              {/* ÉTATS ESSENTIELS */}
+              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6} w="full">
+                <Card variant="outline" p={6}>
+                  <Text fontWeight="bold" color="brand.navy" mb={2}>Durée niveau actuel</Text>
+                  <Text fontSize="lg" color={isManualEvolveReady ? "green.600" : "orange.600"} fontWeight="semibold">
+                    {isManualEvolveReady ? "✅ PRÊT À ÉVOLUER" : "⏳ Temps restant"}
+                  </Text>
+                </Card>
+                <Card variant="outline" p={6}>
+                  <Text fontWeight="bold" color="brand.navy" mb={2}>Coût évolution</Text>
+                  <Text fontSize="2xl" fontWeight="extrabold" color="brand.gold">
+                    {evolvePriceEth} ETH
+                  </Text>
+                  <Text fontSize="sm" color="brand.navy" mt={1}>Prochain niveau</Text>
+                </Card>
+              </SimpleGrid>
 
-                <VStack spacing={3} align="start">
-                  <Text fontWeight="medium">Prochaine étape : Niveau {membershipInfo.level + 1}</Text>
-                  <Text>Prêt : {isready ? "Oui" : "Non"}</Text>
-                  <Text>Coût : {evolvePriceEth} ETH</Text>
-                </VStack>
+              {/* ACTIONS PRINCIPALES */}
+              <Card w="full" bgGradient="linear(to-b, brand.cream, gray.50)" shadow="lg">
+                <CardBody p={{ base: 8, md: 10 }}>
+                  {membershipInfo?.isEgg ? (
+                    <HatchEggPanel tokenId={Number(tokenId)} hatch={hatch} contractAddress={contractAdhesion} />
+                  ) : membershipInfo?.level < 3 ? (
+                    <VStack spacing={6} w="full" align="center">
 
-                <Button
-                  mt={2}
-                  onClick={prepareEvolution}
-                  isLoading={isUploadingEvolve}
-                  colorScheme="purple"
-                >
-                  Préparer image
-                </Button>
+                      {/* PREVIEW */}
+                      {previewImageUrl && (
+                        <Box w="full" maxW="400px">
+                          <Image
+                            src={previewImageUrl}
+                            alt={`Prévisualisation niveau ${membershipInfo?.level! + 1}`}
+                            w="full"
+                            h={64}
+                            objectFit="cover"
+                            borderRadius="2xl"
+                            shadow="2xl"
+                            borderWidth={4}
+                            borderColor={isManualEvolveReady ? "green.400" : "gray.300"}
+                          />
+                        </Box>
+                      )}
 
-                <Button
-                  size="lg"
-                  w="full"
-                  colorScheme="teal"
-                  onClick={evolve}
-                  isDisabled={!isManualEvolveReady || !evolveIpfsUrl}
-                  isLoading={isEvolving}
-                >
-                  Faire évoluer
-                </Button>
-              </VStack>
-            ) : (
-              <ReproductionPanel reproduction={reproduction as any} renewPriceEth={renewPriceEth} />
-            )}
+                      {/* BOUTONS */}
+                      <VStack spacing={4} w="full" maxW="500px">
+                        <Button
+                          size="lg"
+                          h={14}
+                          w="full"
+                          colorScheme="purple"
+                          leftIcon={<Icon boxSize={6}>🔄</Icon>}
+                          onClick={prepareEvolution}
+                          isLoading={isUploadingEvolve}
+                          loadingText="Génération aperçu..."
+                          borderRadius="2xl"
+                        >
+                          🎨 Générer prévisualisation
+                        </Button>
+
+                        <Button
+                          size="xl"
+                          h={20}
+                          w="full"
+                          bgGradient="linear(to-r, green.500, teal.500)"
+                          color="white"
+                          fontSize="xl"
+                          fontWeight="extrabold"
+                          boxShadow="2xl"
+                          borderRadius="3xl"
+                          _hover={{
+                            boxShadow: "3xl",
+                            transform: "translateY(-2px)",
+                            bgGradient: "linear(to-r, green.600, teal.600)"
+                          }}
+                          transition="all 0.3s ease"
+                          onClick={evolve}
+                          isDisabled={!isManualEvolveReady || !evolveIpfsUrl || isEvolving}
+                          isLoading={isEvolving}
+                          loadingText="Évolution en cours..."
+                        >
+                          🧬 ÉVOLUER → Niveau {membershipInfo?.level! + 1}
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="md"
+                          leftIcon={<Icon boxSize={5}>🔄</Icon>}
+                          onClick={refreshEvolution}
+                          color="brand.navy"
+                          _hover={{ bg: "brand.cream", color: "brand.navy" }}
+                        >
+                          🔄 Actualiser
+                        </Button>
+                      </VStack>
+                    </VStack>
+                  ) : (
+                    <ReproductionPanel reproduction={reproduction as any} renewPriceEth={renewPriceEth} />
+                  )}
+                </CardBody>
+              </Card>
+            </VStack>
           </TabPanel>
         )}
+
       </TabPanels>
     </Tabs>
   </Box>
