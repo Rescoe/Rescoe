@@ -2,11 +2,10 @@ import { useState, useCallback, useEffect } from "react";
 import {
   Box, Text, VStack, HStack, Image, Modal,
   ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalCloseButton,
-  Badge, SimpleGrid, Spinner, Center
+  Badge, SimpleGrid, Spinner, Center, Tooltip
 } from "@chakra-ui/react";
 import { EvolutionStep, enrichHistoryWithRealMetadata, FullNFTMetadata } from "@/utils/evolutionHistory";
 import { resolveIPFS } from "@/utils/resolveIPFS";
-
 
 export default function EvolutionHistoryTimeline({
   evolutionHistory: rawHistory
@@ -16,14 +15,59 @@ export default function EvolutionHistoryTimeline({
   const [historyWithMetadata, setHistoryWithMetadata] = useState<EvolutionStep[]>([]);
   const [selectedStepIndex, setSelectedStepIndex] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showAllAttributes, setShowAllAttributes] = useState(false);
+
+  const getFamilyName = (metadata: FullNFTMetadata | null) => {
+    // 👈 SAFE : any seulement sur props incertaines
+    const meta = metadata as any;
+    return meta?.family ||
+           meta?.family_name ||
+           meta?.Famille ||
+           metadata?.attributes?.find((a: any) => a.trait_type === "Famille")?.value ||
+           metadata?.attributes?.find((a: any) => a.trait_type === "family")?.value ||
+           'Inconnu';
+  };
+
+  const getLore = (metadata: FullNFTMetadata | null) => {
+    const meta = metadata as any;
+    return meta?.custom_data?.lore ||
+           meta?.lore ||
+           meta?.Lore ||
+           metadata?.attributes?.find((a: any) => a.trait_type === "Lore")?.value ||
+           '';
+  };
+
+
+  const getAllAttributes = useCallback((metadata: FullNFTMetadata | null, step: EvolutionStep | null) => {
+    console.log('🔧 getAllAttributes appelé avec:', {
+      metadata: !!metadata,
+      metaAttrs: metadata?.attributes?.length || 0,
+      step: !!step,
+      stepMetaAttrs: step?.fullMetadata?.attributes?.length || 0
+    });
+
+    // 1. Priorité : metadata.attributes (lvl 1+)
+    if (metadata?.attributes && metadata.attributes.length > 0) {
+      console.log('✅ Retournant metadata.attributes:', metadata.attributes.length);
+      return metadata.attributes;
+    }
+
+    // 2. Fallback lvl0 : step.fullMetadata.attributes
+    if (step?.fullMetadata?.attributes && step.fullMetadata.attributes.length > 0) {
+      console.log('✅ Retournant step.fullMetadata.attributes:', step.fullMetadata.attributes.length);
+      return step.fullMetadata.attributes;
+    }
+
+    console.log('⚠️ Aucun attribut trouvé');
+    return [];
+  }, []);
 
   useEffect(() => {
     const loadMetadata = async () => {
-      //console.log('🔍 Loading metadata for:', rawHistory.length, 'steps');
       setIsLoading(true);
       try {
         const enriched = await enrichHistoryWithRealMetadata(rawHistory);
-        //console.log('✅ Enriched history:', enriched.length);
+        console.log('✅ Enriched:', enriched);
         setHistoryWithMetadata(enriched);
       } catch (e) {
         console.error('❌ Load failed:', e);
@@ -42,18 +86,27 @@ export default function EvolutionHistoryTimeline({
   }, [rawHistory]);
 
   const handleStepClick = useCallback((index: number) => {
-    //console.log('🔥 CLICK lvl0 index:', index, 'total:', historyWithMetadata.length);
+    console.log('🔥 Clique:', index, historyWithMetadata[index]);
     if (index >= 0 && index < historyWithMetadata.length) {
-      const step = historyWithMetadata[index];
-      //console.log('✅ SELECT:', step.lvlPrevious, step.fullMetadata?.name);
       setSelectedStepIndex(index);
-    } else {
-      console.error('❌ Index invalide:', index);
+      setShowAllAttributes(false);
     }
   }, [historyWithMetadata]);
 
+  // ✅ CALCUL DANS LE RENDU PRINCIPAL
   const selectedStep = selectedStepIndex !== null ? historyWithMetadata[selectedStepIndex] : null;
   const selectedMetadata = selectedStep?.fullMetadata as FullNFTMetadata | null;
+  const allAttributes = getAllAttributes(selectedMetadata, selectedStep);
+  const visibleAttributes = allAttributes.slice(0, 8);
+  const hasMoreAttributes = allAttributes.length > 8;
+
+  console.log('🔍 RENDU PRINCIPAL lvl:', selectedStep?.lvlPrevious, {
+    metadata: !!selectedMetadata,
+    stepFullMeta: !!selectedStep?.fullMetadata,
+    metaAttrs: selectedMetadata?.attributes?.length || 0,
+    stepAttrs: selectedStep?.fullMetadata?.attributes?.length || 0,
+    allAttrs: allAttributes.length
+  });
 
   if (rawHistory.length === 0) return null;
 
@@ -71,7 +124,6 @@ export default function EvolutionHistoryTimeline({
           </Center>
         ) : (
           <>
-            {/* MOBILE */}
             <Box display={{ base: "block", md: "none" }}>
               <VStack align="stretch" spacing={4} position="relative" pl={4}
                 _before={{
@@ -115,7 +167,7 @@ export default function EvolutionHistoryTimeline({
                     >
                       <HStack spacing={3}>
                         <Image
-                        src={step.image || "/fallback-image.png"}
+                          src={step.image || "/fallback-image.png"}
                           boxSize="90px"
                           objectFit="cover"
                           borderRadius="md"
@@ -124,7 +176,7 @@ export default function EvolutionHistoryTimeline({
                         />
                         <VStack align="flex-start" spacing={1}>
                           <Text fontSize="xs" textTransform="uppercase" color="brand.cream">
-                            Étape {idx + 1}
+                            Niveau {idx + 1}
                           </Text>
                           <Text fontSize="sm" fontWeight="semibold">
                             {step.lvlPrevious !== undefined ? `Niv. ${step.lvlPrevious}` : "🥚 Œuf"}
@@ -140,7 +192,6 @@ export default function EvolutionHistoryTimeline({
               </VStack>
             </Box>
 
-            {/* DESKTOP */}
             <Box display={{ base: "none", md: "block" }}>
               <Box overflowX="auto" py={4} px={2} sx={{ "&::-webkit-scrollbar": { display: "none" } }}>
                 <HStack spacing={6} align="center" minW="max-content">
@@ -164,11 +215,11 @@ export default function EvolutionHistoryTimeline({
                         onClick={() => handleStepClick(idx)}
                         cursor="pointer"
                       >
-                        <Image   src={step.image || "/fallback-image.png"}
-                                  w="100%" h="120px" objectFit="cover" />
+                        <Image src={step.image || "/fallback-image.png"}
+                               w="100%" h="120px" objectFit="cover" />
                         <Box p={3}>
                           <Text fontSize="xs" textTransform="uppercase" color="brand.cream">
-                            Étape {idx + 1}
+                            Niveau {idx + 1}
                           </Text>
                           <Text fontSize="sm" fontWeight="semibold" noOfLines={1}>
                             {step.fullMetadata?.name || (step.lvlPrevious === 0 ? '🥚 Œuf' : 'Unknown')}
@@ -202,54 +253,119 @@ export default function EvolutionHistoryTimeline({
           </>
         )}
 
-        {/* MODAL */}
-        <Modal isOpen={Boolean(selectedStepIndex)} onClose={() => setSelectedStepIndex(null)} size="5xl">
+        {/* ========== MODAL ========== */}
+        <Modal isOpen={Boolean(selectedStepIndex !== null)} onClose={() => setSelectedStepIndex(null)} size="6xl">
           <ModalOverlay />
           <ModalContent maxH="90vh" overflowY="auto">
-            <ModalHeader>{selectedMetadata?.name || 'Insecte'}</ModalHeader>
+
+          <ModalHeader>
+            {selectedMetadata?.name ||
+             selectedStep?.fullMetadata?.name ||
+             'Étape d\'évolution'}
+          </ModalHeader>
+
             <ModalCloseButton />
             <ModalBody p={8}>
-              {selectedMetadata ? (
+              {selectedStep ? (
                 <VStack spacing={8} align="stretch">
+                  {/* IMAGE ET INFOS */}
                   <VStack spacing={6} align="center">
-                  <Image
-                    src={
-                      resolveIPFS(selectedMetadata?.image, true) ||
-                      selectedStep?.image ||
-                      "/fallback-image.png"
-                    }
-                    boxSize="300px"
-                    borderRadius="2xl"
+                    <Image
+                      src={
+                        resolveIPFS(selectedMetadata?.image, true) ||
+                        selectedStep?.image ||
+                        "/fallback-image.png"
+                      }
+                      boxSize="300px"
+                      borderRadius="2xl"
+                      objectFit="cover"
                     />
 
                     <Box textAlign="center">
-                      <Text fontSize="2xl" fontWeight="bold">{selectedMetadata.name}</Text>
-                      <Text fontSize="lg" fontWeight="semibold">
-                        {selectedMetadata.famille || selectedStep?.lvlPrevious === 0 ? 'Œuf' : 'Inconnu'}
+                    <Text fontSize="2xl" fontWeight="bold">
+                      {selectedMetadata?.name || selectedStep?.fullMetadata?.name || 'Insecte'}
+                    </Text>
+
+                      <Text fontSize="lg" fontWeight="semibold" color="brand.gold">
+                        {getFamilyName(selectedMetadata)}
                       </Text>
-                      {selectedMetadata.description && (
-                        <Text fontStyle="italic" color="gray.600">{selectedMetadata.description}</Text>
+                      {getLore(selectedMetadata) && (
+                        <Text fontSize="md" fontStyle="italic" color="gray.400" mt={2}>
+                          "{getLore(selectedMetadata)}"
+                        </Text>
+                      )}
+                      {selectedMetadata?.description && (
+                        <Text fontSize="sm" color="gray.600">{selectedMetadata.description}</Text>
                       )}
                     </Box>
                   </VStack>
 
+                  {/* ATTRIBUTS */}
                   <Box>
-                    <Text fontWeight="bold" fontSize="lg" mb={6}>
-                      Attributs ({selectedMetadata.attributes?.length || 0})
-                    </Text>
-                    <SimpleGrid columns={{ base: 2, lg: 4 }} spacing={3}>
-                      {selectedMetadata.attributes?.map((attr: any, i: number) => (
-                        <Badge key={i} colorScheme="purple" p={3} borderRadius="lg" minH="70px" textAlign="center">
-                          <Text fontSize="xs" fontWeight="bold">{attr.trait_type}</Text>
-                          <Text fontSize="sm">{attr.value}</Text>
-                        </Badge>
-                      )) || <Text>Aucun attribut</Text>}
-                    </SimpleGrid>
+                    <HStack justify="space-between" mb={4}>
+                      <Text fontWeight="bold" fontSize="lg">
+                        Attributs ({allAttributes.length})
+                      </Text>
+                      {hasMoreAttributes && (
+                        <Text
+                          fontSize="sm"
+                          color="blue.400"
+                          cursor="pointer"
+                          onClick={() => setShowAllAttributes(!showAllAttributes)}
+                          fontWeight="medium"
+                        >
+                          {showAllAttributes ? 'Moins' : `+${allAttributes.length - 8}`}
+                        </Text>
+                      )}
+                    </HStack>
+
+                    {allAttributes && allAttributes.length > 0 ? (
+                      <SimpleGrid columns={{ base: 2, md: 3, lg: 4 }} spacing={3}>
+                        {(showAllAttributes ? allAttributes : visibleAttributes).map((attr: any, i: number) => (
+                          <Tooltip
+                            key={`attr-${i}-${attr.trait_type}`}
+                            label={`${attr.trait_type}: ${attr.value}`}
+                            placement="top"
+                          >
+                            <Badge
+                              colorScheme="purple"
+                              p={3}
+                              borderRadius="lg"
+                              minH="70px"
+                              textAlign="center"
+                              maxW="100%"
+                              whiteSpace="normal"
+                              overflow="hidden"
+                              display="flex"
+                              flexDirection="column"
+                              justifyContent="center"
+                            >
+                              <Text fontSize="xs" fontWeight="bold" noOfLines={1}>
+                                {attr.trait_type}
+                              </Text>
+                              <Text fontSize="sm" noOfLines={2}>
+                                {attr.value}
+                              </Text>
+                            </Badge>
+                          </Tooltip>
+                        ))}
+                      </SimpleGrid>
+                    ) : (
+                      <Center p={8} color="gray.500">
+                        <VStack>
+                          <Text>Aucun attribut disponible</Text>
+                          <Text fontSize="xs" opacity={0.6}>
+                            lvl: {selectedStep?.lvlPrevious}, attrs: {allAttributes.length}
+                          </Text>
+                        </VStack>
+                      </Center>
+                    )}
                   </Box>
+
                 </VStack>
               ) : (
                 <Center p={12}>
-                  <Text>Détails en chargement... {selectedStep?.lvlPrevious || 'N/A'}</Text>
+                  <Text>Sélectionnez une étape...</Text>
                 </Center>
               )}
             </ModalBody>

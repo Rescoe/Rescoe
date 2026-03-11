@@ -148,6 +148,16 @@ const TokenPage = () => {
   const [evolutionRefreshFlag, setEvolutionRefreshFlag] = useState<number>(0);
   const [reproRefreshFlag, setReproRefreshFlag] = useState<number>(0);
 
+  const [isBurning, setIsBurning] = useState(false);
+  const [burnGasEstimate, setBurnGasEstimate] = useState<string | null>(null);
+
+  const [isProcessing, setIsProcessing] = useState(false);
+const [phase, setPhase] = useState<'idle' | 'uploading' | 'evolving'>('idle');
+
+const [canEvolve, setCanEvolve] = useState(false);
+
+
+
 
   useEffect(() => {
     // ✅ RESTAURE AUTH APRÈS NAVIGATION
@@ -252,6 +262,8 @@ const TokenPage = () => {
     // Cette fonction sera passée au hook useTokenEvolution
   }, []);
 
+
+
   // ✅ REMPLACE TOUT ÇA (du début du hook jusqu'à membershipInfo) PAR ÇA EN ENTIER :
   const evolutionResult = useTokenEvolution({
     contractAddress: contractAdhesion,
@@ -262,6 +274,8 @@ const TokenPage = () => {
     currentRoleLabel: nftData ? (roles[nftData.role] || "Member") : "Member",
     onMetadataLoaded: updateCurrentMetadata,
   }) as any;  // ← Force le type
+
+
 
   console.log(evolutionResult);
 
@@ -276,7 +290,19 @@ const TokenPage = () => {
   const evolve = evolutionResult.evolve || (() => {});
   const refreshEvolution = evolutionResult.refreshEvolution || (() => {});
 
-console.log(previewImageUrl);
+  // Dans [tokenId].tsx, après const evolutionResult = useTokenEvolution(...)
+useEffect(() => {
+  if (effectiveTokenId !== undefined) {
+    refreshEvolution();  // Reset URIs + isManualEvolveReady
+  }
+}, [effectiveTokenId, refreshEvolution]);  // Dépend de tokenId !
+
+// Bonus : Force refresh membership après navigation
+useEffect(() => {
+  if (nftData) {
+    setEvolutionRefreshFlag(prev => prev + 1);  // Déclenche re-fetch
+  }
+}, [router.asPath]);  // À chaque route
 
   const membershipInfo = rawMembershipInfo || {
     level: Number(nftData?.level || 0),
@@ -315,39 +341,53 @@ console.log(previewImageUrl);
       const [membership, realName, realBio] = await contract.getUserInfo(owner);
       const uri = await contract.tokenURI(tokenIdNumber);
 
+      // ✅ RÉCUPÉRATION ROBUSTE MÉTADONNÉES (gère image directe + JSON fail)
+      let metadata: Partial<EvolutionMetadata> = {};
+      let imageUrl = '';
 
-      const metadataUrl = resolveIPFS(uri, true);
-
-      if (!metadataUrl) {
-        throw new Error("metadataUrl is undefined");
+      try {
+        const metadataUrl = resolveIPFS(uri, true);
+        if (metadataUrl && metadataUrl.match(/\.(png|jpg|jpeg|gif|svg)$/i)) {
+          // URI = image directe → fallback
+          imageUrl = metadataUrl;
+        } else if (metadataUrl) {
+          const res = await fetch(metadataUrl);
+          if (res.ok) {
+            const data = await res.json().catch(() => null);
+            if (data) {
+              metadata = data;
+              if (data.image) {
+                const resolved = resolveIPFS(data.image, true);
+                if (resolved) imageUrl = resolved;
+              }
+            }
+          }
+        }
+      } catch (fetchErr) {
+        console.warn('Metadata fetch échoué, fallback on-chain:', fetchErr);
       }
 
-      const res = await fetch(metadataUrl);
-      const metadata: EvolutionMetadata = await res.json();
+      const finalImage = imageUrl;
 
       const finAdhesion = new Date(
         (Number(mintTimestamp) + Number(remainingTime)) * 1000
       ).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' });
 
-
-
       const membershipInfoRaw = await contract.getMembershipInfo(tokenIdNumber);
-
-              const membershipInfo: MembershipInfo = {  // ✅ AJOUT
-              level: Number(membershipInfoRaw.level),
-              autoEvolve: Boolean(membershipInfoRaw.autoEvolve),
-              startTimestamp: Number(membershipInfoRaw.startTimestamp),
-              expirationTimestamp: Number(membershipInfoRaw.expirationTimestamp),
-              totalYears: Number(membershipInfoRaw.totalYears),
-              locked: Boolean(membershipInfoRaw.locked),
-              isEgg: Boolean(membershipInfoRaw.isEgg),      // ✅
-              isAnnual: Boolean(membershipInfoRaw.isAnnual),
-            };
-
-
+      const membershipInfo: MembershipInfo = {
+        level: Number(membershipInfoRaw.level),
+        autoEvolve: Boolean(membershipInfoRaw.autoEvolve),
+        startTimestamp: Number(membershipInfoRaw.startTimestamp),
+        expirationTimestamp: Number(membershipInfoRaw.expirationTimestamp),
+        totalYears: Number(membershipInfoRaw.totalYears),
+        locked: Boolean(membershipInfoRaw.locked),
+        isEgg: Boolean(membershipInfoRaw.isEgg),
+        isAnnual: Boolean(membershipInfoRaw.isAnnual),
+      };
 
       const nftData: NFTData = {
-        ...metadata,
+        ...metadata as any,  // level, attributes, etc. si dispo
+        image: finalImage,
         tokenURI: uri,
         uri: uri,
         owner,
@@ -362,17 +402,18 @@ console.log(previewImageUrl);
         membership,
         membershipInfo,
       };
-     //console.log(nftData);
 
-      setNftCache(prev => ({ ...prev, [cacheKey]: nftData })); // ✅ CORRECTION: setNftCache
+      console.log('NFTData généré:', nftData);
+      setNftCache(prev => ({ ...prev, [cacheKey]: nftData }));
 
+      // Update evolution si metadata partielle
       updateCurrentMetadata({
         level: Number(metadata.level || 0),
         family: metadata.family,
         sprite_name: metadata.sprite_name,
         attributes: metadata.attributes || [],
         evolution_history: metadata.evolution_history || [],
-        image: metadata.image
+        image: metadata.image || finalImage
       });
 
       return nftData;
@@ -380,8 +421,124 @@ console.log(previewImageUrl);
       console.error('Erreur lors de la récupération des données NFT:', err);
       throw new Error('Erreur lors de la récupération des données NFT.');
     }
-  }, [nftCache, updateCurrentMetadata]); // ✅ Dépendances ajoutées
+  }, [nftCache, updateCurrentMetadata]);
 
+
+  //vérification de la possibilité d'evolution
+    useEffect(() => {
+      const computeCanEvolve = async () => {
+        if (!membershipInfo) return;
+
+        try {
+          const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!);
+          const contract = new EthersContract(contractAdhesion, ABI, provider);
+
+          const durationsRaw = await Promise.all([
+            contract.levelDurations(0),
+            contract.levelDurations(1),
+            contract.levelDurations(2),
+          ]);
+          const levelDurations = durationsRaw.map((d) => Number(d));
+
+          const now = Math.floor(Date.now() / 1000);
+
+          const ok =
+            !membershipInfo.isEgg &&
+            membershipInfo.level < 3 &&
+            !membershipInfo.locked &&
+            now >= membershipInfo.startTimestamp + levelDurations[membershipInfo.level];
+
+          setCanEvolve(ok);
+        } catch (e) {
+          console.error("computeCanEvolve error:", e);
+          setCanEvolve(false);
+        }
+      };
+
+      computeCanEvolve();
+    }, [membershipInfo]);
+
+
+    const handleSingleEvolve = async () => {
+      if (!canEvolve) {
+        alert("Insecte pas encore eligible.");
+        return;
+      }
+
+      try {
+        console.log("🔥 SINGLE EVOLVE - Upload");
+
+        // 1. Récupère + stocke le résultat DIRECT
+        const result = await prepareEvolution();
+        console.log("📤 Upload result:", result);
+
+        if (!result?.isReady || !result.metadataUri) {
+          throw new Error("Upload IPFS échoué: " + JSON.stringify(result));
+        }
+
+        // 2. SUPPRIME LE POLLING - utilise result.metadataUri direct
+        console.log("🚀 State OK direct:", result.metadataUri);
+
+        // 3. Temporise 500ms pour laisser le state se sync (sécurité)
+        await new Promise(r => setTimeout(r, 500));
+
+        // 4. Transaction
+        console.log("💥 EVOLVE!");
+        await evolve();  // Le hook checkera son propre state interne
+
+      } catch (e: any) {
+        console.error("💥 ERROR:", e);
+        alert(e.message);
+      }
+    };
+
+
+
+//###################################################### burnNFT
+
+const handleBurn = async () => {
+  if (!contractAdhesion || Array.isArray(contractAdhesion)) {
+    console.error('Adresse de contrat invalide');
+    return;
+  }
+  if (!authWeb3 || !authAddress) {
+    alert('Veuillez vous connecter à MetaMask.');
+    return;
+  }
+
+  try {
+    // ✅ Fix: window.ethereum direct (comme handleRenewMembership)
+    const web3 = new Web3(window.ethereum as any);
+    const contract = new web3.eth.Contract(ABI as any, contractAdhesion);
+
+    const gasPrice = await web3.eth.getGasPrice();
+
+
+    const gas = await contract.methods
+      .burnNFT(Number(tokenId))  // ou burn selon ton ABI
+      .estimateGas({
+        from: authAddress,
+      });
+
+    await contract.methods.burnNFT(Number(tokenId)).send({
+      from: authAddress,
+      gas: Math.floor(Number(gas) * 1.2).toString(),
+      gasPrice: gasPrice.toString()
+
+    });
+
+    alert('NFT brûlé avec succès.');
+    router.push('/');
+  } catch (err) {
+    console.error('Erreur lors du burn:', err);
+    alert('Erreur lors du burn. Voir console.');
+  }
+};
+
+
+
+
+//######################################################## Renouveler adhesion
   // Reste des fonctions handle... (inchangées)
   const handleRenewMembership = async () => {
     if (!contractAdhesion || Array.isArray(contractAdhesion)) {
@@ -392,6 +549,7 @@ console.log(previewImageUrl);
       alert('Veuillez vous connecter à MetaMask.');
       return;
     }
+
 
     try {
       const contract = new (authWeb3 as Web3).eth.Contract(ABI as any, contractAdhesion);
@@ -784,6 +942,9 @@ return (
                membershipInfo?.level < 3 ? `🧬 LVL${membershipInfo.level}` : "🐛 Reproduction"}
             </Tab>
           )}
+
+          {isOwner && <Tab px={6} py={3}>Brûler NFT</Tab>}
+
         </TabList>
       </Box>
 
@@ -1022,8 +1183,7 @@ return (
                 <Card
                   variant="outline"
                   p={{ base: 3, md: 4 }}
-                  borderColor="brand.navy"
-                  bg="white"
+                  borderColor="brand.gold"
                 >
                   <CardBody p={0}>
                     <VStack align="start" spacing={1}>
@@ -1037,10 +1197,11 @@ return (
                       <Text
                         fontSize={{ base: "md", md: "lg" }}
                         fontWeight="bold"
-                        color={isManualEvolveReady ? "green.600" : "orange.600"}
+                        color={canEvolve ? "green.600" : "orange.600"}
                       >
-                        {isManualEvolveReady ? "✅ PRÊT" : "⏳ En attente"}
+                        {canEvolve ? "✅ PRÊT" : "Préparez l'évolution"}
                       </Text>
+
                     </VStack>
                   </CardBody>
                 </Card>
@@ -1049,7 +1210,6 @@ return (
                   variant="outline"
                   p={{ base: 3, md: 4 }}
                   borderColor="brand.gold"
-                  bg="rgba(212, 175, 55, 0.05)"
                 >
                   <CardBody p={0}>
                     <VStack align="start" spacing={1}>
@@ -1075,8 +1235,9 @@ return (
               {/* CONTENU PRINCIPAL */}
               <Card
                 w="full"
-                bg="white"
-                shadow="md"
+                variant="outline"
+                borderWidth="1px"
+                borderColor="brand.gold"
                 borderRadius={{ base: "lg", md: "xl" }}
               >
                 <CardBody p={{ base: 4, md: 6 }}>
@@ -1089,74 +1250,37 @@ return (
                   ) : membershipInfo?.level < 3 ? (
                     <VStack spacing={{ base: 4, md: 6 }} w="full" align="center">
 
-                      {/* PREVIEW IMAGE */}
-                      {previewImageUrl && (
-                        <Box w="full">
-                          <Image
-                            src={previewImageUrl}
-                            alt={`Aperçu niveau ${membershipInfo?.level! + 1}`}
-                            w="full"
-                            maxW="100%"
-                            h={{ base: "200px", md: "300px" }}
-                            objectFit="cover"
-                            borderRadius={{ base: "lg", md: "xl" }}
-                            shadow="md"
-                            border={`3px solid ${isManualEvolveReady ? "#48bb78" : "#cbd5e0"}`}
-                            transition="all 0.3s ease"
-                          />
-                        </Box>
-                      )}
-
                       {/* BOUTONS */}
                       <VStack spacing={3} w="full">
-                        {/* Générer aperçu */}
-                        <Button
-                          size={{ base: "md", md: "lg" }}
-                          w="full"
-                          colorScheme="purple"
-                          variant="outline"
-                          leftIcon={<Icon boxSize={{ base: 5, md: 6 }}>🎨</Icon>}
-                          onClick={prepareEvolution}
-                          isLoading={isUploadingEvolve}
-                          loadingText="Génération..."
-                          borderRadius="lg"
-                          fontSize={{ base: "sm", md: "md" }}
-                          fontWeight="600"
-                          _hover={{
-                            bg: "purple.50",
-                            borderColor: "purple.500"
-                          }}
-                        >
-                          Générer aperçu
-                        </Button>
+                      <Button
+                        size={{ base: "lg", md: "lg" }}
+                        w="full"
+                        h={{ base: "48px", md: "56px" }}
+                        bgGradient="linear(to-r, brand.gold, #d4af37)"
+                        color="brand.navy"
+                        fontSize={{ base: "md", md: "lg" }}
+                        fontWeight="extrabold"
+                        boxShadow="0 4px 12px rgba(212, 175, 55, 0.4)"
+                        borderRadius="lg"
+                        _hover={{
+                          boxShadow: "0 6px 16px rgba(212, 175, 55, 0.6)",
+                          transform: "translateY(-1px)",
+                        }}
+                        _active={{ transform: "translateY(0)" }}
+                        transition="all 0.2s ease"
+                        onClick={handleSingleEvolve}
+                        isDisabled={!canEvolve || isUploadingEvolve || isEvolving}
+                        isLoading={isUploadingEvolve || isEvolving}
+                        loadingText={
+                          isUploadingEvolve
+                            ? "Génération..."
+                            : "Transaction..."
+                        }
+                        leftIcon={<Icon boxSize={{ base: 5, md: 6 }}>🧬</Icon>}
+                      >
+                        {isManualEvolveReady ? "Valider l'évolution" : "Générer et évoluer"}
+                      </Button>
 
-                        {/* Bouton ÉVOLUER - Principal */}
-                        <Button
-                          size={{ base: "lg", md: "lg" }}
-                          w="full"
-                          h={{ base: "48px", md: "56px" }}
-                          bgGradient="linear(to-r, brand.gold, #d4af37)"
-                          color="brand.navy"
-                          fontSize={{ base: "md", md: "lg" }}
-                          fontWeight="extrabold"
-                          boxShadow="0 4px 12px rgba(212, 175, 55, 0.4)"
-                          borderRadius="lg"
-                          _hover={{
-                            boxShadow: "0 6px 16px rgba(212, 175, 55, 0.6)",
-                            transform: "translateY(-1px)",
-                          }}
-                          _active={{
-                            transform: "translateY(0)"
-                          }}
-                          transition="all 0.2s ease"
-                          onClick={evolve}
-                          isDisabled={!isManualEvolveReady || !evolveIpfsUrl || isEvolving}
-                          isLoading={isEvolving}
-                          loadingText="Transaction..."
-                          leftIcon={<Icon boxSize={{ base: 5, md: 6 }}>🧬</Icon>}
-                        >
-                          Évoluer → Niveau {membershipInfo?.level! + 1}
-                        </Button>
 
                       </VStack>
                     </VStack>
@@ -1168,6 +1292,33 @@ return (
                   )}
                 </CardBody>
               </Card>
+            </VStack>
+          </TabPanel>
+        )}
+
+        {isOwner && (
+          <TabPanel p={0}>
+            <VStack spacing={6} align="start">
+              <Alert status="warning" borderRadius="lg">
+                <AlertIcon />
+                Action <strong> IRREVERSIBLE </strong> : Le badge sera détruit à jamais.
+              </Alert>
+
+              <Button
+                size="lg"
+                w="full"
+                borderRadius="2xl"
+                bgGradient="linear(to-r, red.500, red.600)"
+                color="white"
+                fontWeight="extrabold"
+                boxShadow="lg"
+                isDisabled={isBurning}
+                isLoading={isBurning}
+                loadingText="Burn en cours..."
+                onClick={handleBurn}
+              >
+                🔥 Brûler NFT #{tokenId}
+              </Button>
             </VStack>
           </TabPanel>
         )}

@@ -1,5 +1,5 @@
 // components/AdminPage.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Web3 from 'web3';
 //import getRandomInsectGif from '@/utils/GenInsect25';
 import ABI from '@/components/ABI/ABIAdhesion.json';
@@ -35,6 +35,9 @@ import {
     FormControl,
     FormLabel,
     Textarea,
+    NumberInput,
+    NumberInputField,
+    SimpleGrid
 } from '@chakra-ui/react';
 import detectEthereumProvider from '@metamask/detect-provider';
 import ManageContracts from './ManageSolidity/MasterFactoryManagement'
@@ -45,7 +48,7 @@ type Collection =  {
   id: string;
   name: string;
   imageUrl: string;
-  mintContractAddress: string;
+  mintcontractAdhesion: string;
   isFeatured: boolean;
   creator: string;        // Ajouté
   collectionType: string; // Ajouté
@@ -159,7 +162,7 @@ const AdminPage: React.FC = () => {
         Trainee: 3,
     };
 
-    const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS as string;
+    const contractAdhesion = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS as string;
     const contratRescollection = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT as string;
     const contratAdhesionManagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGER as string;
 
@@ -364,7 +367,7 @@ const generateImageForAdhesion = async (adhesion: Adhesion): Promise<string> => 
 const handleMintMultiple = async (): Promise<void> => {
     if (window.ethereum) {
         const web3 = new Web3(window.ethereum as any);
-        const contract = new web3.eth.Contract(ABI, contractAddress);
+        const contract = new web3.eth.Contract(ABI, contractAdhesion);
 
         // Récupérer les détails au moment de l'appel de mint
         const details = adhesionData.map(adhesion => ({
@@ -621,7 +624,7 @@ const handleSetMintPrice = async (): Promise<void> => {
   const sender = account || authAddress;
 
     if (window.ethereum && web3 && sender) {
-        const contract = new web3.eth.Contract(ABI, contractAddress);
+        const contract = new web3.eth.Contract(ABI, contractAdhesion);
         try {
             const priceInWei = web3.utils.toWei(mintPrice.toString(), 'ether'); // Convertir le prix en wei
             await contract.methods.setMintPrice(priceInWei).send({ from: sender });
@@ -635,10 +638,123 @@ const handleSetMintPrice = async (): Promise<void> => {
     }
 };
 
+//############################################################# => Gestion de la durée des adhesions
+// État des durées (par niveau)
+const [levelDurations, setLevelDurations] = useState<{
+  days: number;
+  hours: number;
+  minutes: number;
+}[]>([
+  { days: 30, hours: 0, minutes: 0 },  // LVL0
+  { days: 60, hours: 0, minutes: 0 },  // LVL1
+  { days: 90, hours: 0, minutes: 0 },  // LVL2
+  { days: 185, hours: 0, minutes: 0 }  // LVL3
+]);
+
+const [durationSeconds, setDurationSeconds] = useState<bigint[]>([0n, 0n, 0n, 0n]);
+const [isUpdatingDurations, setIsUpdatingDurations] = useState(false);
+
+// Mise à jour d'un niveau
+const updateDuration = useCallback((index: number, newDuration: any) => {
+  setLevelDurations(prev => {
+    const newLevels = [...prev];
+    newLevels[index] = newDuration;
+    return newLevels;
+  });
+}, []);
+
+// Calcul secondes en live
+useEffect(() => {
+  const seconds = levelDurations.map(({ days, hours, minutes }) => {
+    const totalSec = BigInt(days * 86400 + hours * 3600 + minutes * 60);
+    return totalSec;
+  });
+  setDurationSeconds(seconds);
+}, [levelDurations]);
+
+// Vérif si au moins une durée valide
+const hasValidDurations = (): boolean => {
+  return durationSeconds.some(sec => sec > 0n);
+};
+
+// Formatage affichage
+const formatDuration = (seconds: bigint): string => {
+  const days = Number(seconds / 86400n);
+  const hours = Number((seconds % 86400n) / 3600n);
+  const minutes = Number((seconds % 3600n) / 60n);
+  return `${days}d ${hours}h ${minutes}m`;
+};
+
+
+
+const handleSetLevelDurations = async (durations: bigint[]): Promise<void> => {
+  if (window.ethereum && web3 && account) {
+    const contract = new web3.eth.Contract(ABI, contractAdhesion);
+
+    try {
+      // Conversion bigint → string array pour web3 (uint256[])
+      const durationsStr = durations.map(bn => bn.toString());
+
+
+      const gasEstimate = await contract.methods.setLevelDurations(durationsStr)
+      .estimateGas({ from: account});
+
+      const gasPrice = await web3.eth.getGasPrice();
+
+     //console.log("gasEstimate");
+
+      const tx = await contract.methods.setLevelDurations(durationsStr)
+      .send({
+            from: account,
+            gas: Math.floor(Number(gasEstimate) * 1).toString(),
+            gasPrice: gasPrice.toString()
+          });
+
+
+
+      alert('✅ Durées des niveaux mises à jour !');
+    } catch (error: any) {
+      console.error('Erreur setLevelDurations:', error);
+
+      // Messages d'erreur plus précis
+      if (error.message.includes('onlyOwner')) {
+        alert('❌ Seulement le owner peut modifier !');
+      } else if (error.message.includes('Must provide 4 durations')) {
+        alert('❌ Exactement 4 durées requises !');
+      } else {
+        alert(`❌ Échec : ${error.message}`);
+      }
+    }
+  } else {
+    alert('⚠️ Connectez-vous d\'abord avec MetaMask');
+  }
+};
+
+
+const handleUpdateDurations = async () => {
+  setIsUpdatingDurations(true);
+
+  // Filtre les 0 et vérifie 4 durées
+  const validDurations = durationSeconds.filter(sec => sec > 0n);
+  if (validDurations.length !== 4) {
+    alert('❌ Remplissez exactement 4 durées (laissez 0 si pas utilisé)');
+    setIsUpdatingDurations(false);
+    return;
+  }
+
+  // Appel direct avec bigint[]
+  await handleSetLevelDurations(durationSeconds);
+
+  setIsUpdatingDurations(false);
+  alert('✅ Durées appliquées avec succès !');
+};
+
+
+
 //############################################################# => Gestion du retrait de l'argent des adhesions
 const handleWithdrawAdhesion = async (): Promise<void> => {
     if (window.ethereum && web3 && account) {
-        const contract = new web3.eth.Contract(ABI, contractAddress);
+        const contract = new web3.eth.Contract(ABI, contractAdhesion);
 
         try {
             await contract.methods.withdraw().send({ from: account });
@@ -672,7 +788,7 @@ const handleWithdrawPoints = async (): Promise<void> => {
 
 const handlePutNFTForSale = async (): Promise<void> => {
     if (window.ethereum && web3 && account) {
-        const contract = new web3.eth.Contract(ABI, contractAddress);
+        const contract = new web3.eth.Contract(ABI, contractAdhesion);
         try {
             const salePriceInWei = web3.utils.toWei(salePrice.toString(), 'ether'); // Convertir le prix en wei
             await contract.methods.putNFTForSale(nftId, salePriceInWei).send({ from: account });
@@ -688,7 +804,7 @@ const handlePutNFTForSale = async (): Promise<void> => {
 
 const handleBurnNFT = async (): Promise<void> => {
     if (window.ethereum && web3 && account) {
-        const contract = new web3.eth.Contract(ABI, contractAddress);
+        const contract = new web3.eth.Contract(ABI, contractAdhesion);
         try {
             await contract.methods.burnNFT(nftId).send({ from: account });
             alert('NFT brûlé avec succès!');
@@ -971,6 +1087,89 @@ const ManageFeaturedCollections = () => {
               Prêt pour mint: {adhesionData.filter(ad => ad.metadataUri).length}/{adhesionData.length} URIs générées
           </Text>
       )}
+
+      <Divider />
+
+      <Box mt={6} p={6} borderWidth={1} borderRadius="lg" boxShadow="md">
+        <Heading size="md" mb={4}>Durées des niveaux</Heading>
+
+        <VStack spacing={6} align="stretch">
+          <Text fontSize="sm" color="gray.600">
+            Remplissez jours/heure/minutes. Laissez 0 si pas utilisé.
+          </Text>
+
+          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+    {[
+      { label: 'Niveau 0', key: 0 },
+      { label: 'Niveau 1', key: 1 },
+      { label: 'Niveau 2', key: 2 },
+      { label: 'Niveau 3', key: 3 }
+    ].map(({ label, key }) => {
+      const level = levelDurations[key];
+
+      return (
+        <FormControl key={`level-${key}`} id={`level-${key}`}>
+          <FormLabel fontSize="sm">{label}</FormLabel>
+          <HStack spacing={3}>
+            {/* JOURS */}
+            <NumberInput
+              min={0} max={365}
+              value={level.days}
+              onChange={(v) => updateDuration(key, { ...level, days: Number(v) })}
+              w="90px"
+              keepWithinRange clampValueOnBlur
+            >
+              <NumberInputField id={`days-${key}`} />
+            </NumberInput>
+            <Text fontSize="sm" color="gray.500">j</Text>
+
+            {/* HEURES */}
+            <NumberInput
+              min={0} max={23}
+              value={level.hours}
+              onChange={(v) => updateDuration(key, { ...level, hours: Number(v) })}
+              w="90px"
+              keepWithinRange clampValueOnBlur
+            >
+              <NumberInputField id={`hours-${key}`} />
+            </NumberInput>
+            <Text fontSize="sm" color="gray.500">h</Text>
+
+            {/* MINUTES */}
+            <NumberInput
+              min={0} max={59}
+              value={level.minutes}
+              onChange={(v) => updateDuration(key, { ...level, minutes: Number(v) })}
+              w="90px"
+              keepWithinRange clampValueOnBlur
+            >
+              <NumberInputField id={`min-${key}`} />
+            </NumberInput>
+            <Text fontSize="sm" color="gray.500">min</Text>
+          </HStack>
+
+          {durationSeconds[key] > 0n && (
+            <Text fontSize="xs" color="green.600" mt={1}>
+              {formatDuration(durationSeconds[key])} ({durationSeconds[key]}s)
+            </Text>
+          )}
+        </FormControl>
+      );
+    })}
+  </SimpleGrid>
+
+          <Button
+            colorScheme="green"
+            size="lg"
+            onClick={handleUpdateDurations}
+            isLoading={isUpdatingDurations}
+            isDisabled={!hasValidDurations()}
+          >
+            {isUpdatingDurations ? 'Application...' : 'Appliquer'}
+          </Button>
+        </VStack>
+      </Box>
+
   </VStack>
 
     );
@@ -1032,26 +1231,28 @@ const ManageFeaturedCollections = () => {
     const Settings = () => (
 
       <VStack>
-                  <HStack spacing={4}>
-                      <Button
-                          onClick={() => setActiveSettingsTab('MintPrice')}
-                          variant={activeSettingsTab === 'MintPrice' ? 'solid' : 'outline'}
-                      >
-                          Changer le prix de l'adhésion
-                      </Button>
-                      <Button
-                          onClick={() => setActiveSettingsTab('PointPrice')}
-                          variant={activeSettingsTab === 'PointPrice' ? 'solid' : 'outline'}
-                      >
-                          Changer le prix des points de récompense
-                      </Button>
-                      <Button
-                          onClick={() => setActiveSettingsTab('Withdraw')}
-                          variant={activeSettingsTab === 'Withdraw' ? 'solid' : 'outline'}
-                      >
-                          Retirer des fonds
-                      </Button>
-                  </HStack>
+        <HStack spacing={4}>
+          <Button
+            onClick={() => setActiveSettingsTab('MintPrice')}
+            variant={activeSettingsTab === 'MintPrice' ? 'solid' : 'outline'}
+          >
+            Changer le prix de l'adhésion
+          </Button>
+          <Button
+            onClick={() => setActiveSettingsTab('PointPrice')}
+            variant={activeSettingsTab === 'PointPrice' ? 'solid' : 'outline'}
+          >
+            Changer le prix des points de récompense
+          </Button>
+
+          <Button
+            onClick={() => setActiveSettingsTab('Withdraw')}
+            variant={activeSettingsTab === 'Withdraw' ? 'solid' : 'outline'}
+          >
+            Retirer des fonds
+          </Button>
+        </HStack>
+
 
                   <Divider />
 
@@ -1088,6 +1289,7 @@ const ManageFeaturedCollections = () => {
                           </Button>
                       </VStack>
                   )}
+
 
                   {activeSettingsTab === 'Withdraw' && (
                       <VStack>

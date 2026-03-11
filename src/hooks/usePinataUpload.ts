@@ -133,8 +133,11 @@ export const usePinataUpload = (): UsePinataUploadReturn => {
           ...metadata,
           description: description || "",
           ...(artist && { artist }),
-          tags: tags ? tags.split(',').map(t => t.trim()) : ["Oeuvre"],
-          // 🔥 PRIORITÉ custom_data d'ABORD
+          tags: Array.isArray(tags)
+            ? tags
+            : tags
+              ? tags.split(',').map(t => t.trim())
+              : ["Oeuvre"],          // 🔥 PRIORITÉ custom_data d'ABORD
           ...custom_data,
           // 🔥 ENSUITE collectionType/maxEditions (avec check explicite)
           collectionType: custom_data?.collectionType || collectionType || "solo",

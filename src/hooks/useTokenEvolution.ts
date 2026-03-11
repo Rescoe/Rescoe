@@ -11,6 +11,8 @@ import {
   EvolutionStep
 } from '@/utils/evolutionHistory';
 import { resolveIPFS } from "@/utils/resolveIPFS";
+import colorProfilesJson from '@/data/gif_profiles_smart_colors.json';
+
 
 
 interface MembershipRaw {
@@ -155,11 +157,22 @@ export const useTokenEvolution = ({
   /* =======================
      PREPARE EVOLUTION (CLEAN)
   ======================= */
-  const prepareEvolution = useCallback(async () => {
-    if (isUploadingEvolve || isManualEvolveReady) return;
+  const prepareEvolution = useCallback(async (): Promise<{
+    imageUri: string | null;
+    metadataUri: string | null;
+    isReady: boolean;
+  }> => {
+    if (isUploadingEvolve || isManualEvolveReady) {
+      return {
+        imageUri: evolveImageUri,
+        metadataUri: evolveMetadataUri,
+        isReady: !!evolveMetadataUri
+      };
+    }
+
     if (!membershipInfo || !contractAddress || tokenId === undefined) {
       alert("Données indisponibles");
-      return;
+      return { imageUri: null, metadataUri: null, isReady: false };
     }
 
     try {
@@ -167,151 +180,177 @@ export const useTokenEvolution = ({
 
       const currentLevel = Number(membershipInfo.level);
       const targetLevel = currentLevel + 1;
-      if (currentLevel >= 3) throw new Error("Niveau max");
+      if (currentLevel >= 3) throw new Error("Niveau max atteint");
 
+      // ON-CHAIN → TOKEN URI
       const web3Instance = new Web3((window as any).ethereum);
       const contract = new web3Instance.eth.Contract(ABI as any, contractAddress);
-
       const tokenUriRaw: any = await contract.methods.tokenURI(tokenId).call();
-      let tokenUri: string | null = Array.isArray(tokenUriRaw) ? tokenUriRaw[0] as string : tokenUriRaw as string;
+      const tokenUri = Array.isArray(tokenUriRaw) ? tokenUriRaw[0] as string : tokenUriRaw as string;
 
-      const resolvedTokenUri = await resolveIPFS(tokenUri!, true) as string;
+      // IPFS → METADATA JSON
+      const resolvedTokenUri = await resolveIPFS(tokenUri, true) as string;
       if (!resolvedTokenUri) {
         console.warn("❌ tokenUri invalide:", tokenId, tokenUri);
-        return;
+        return { imageUri: null, metadataUri: null, isReady: false };
       }
 
       const response = await fetch(resolvedTokenUri);
       const currentMetadataJson = await response.json();
 
-
-      /* ============================
-         ATTRIBUTES → DICTIONARY
-      ============================ */
-
-      const currentAttrs = Object.fromEntries(
+      // ATTRIBUTES → DICT
+      const attrsDict = Object.fromEntries(
         (currentMetadataJson.attributes || []).map((a: any) => [a.trait_type, a.value])
       );
 
-      const currentFamily =
-        currentAttrs.Famille ||
-        currentAttrs.family ||
-        currentMetadataJson.family ||
-        "unknown";
+      const currentData = {
+        level: currentMetadataJson.level ?? 0,
+        name: currentMetadataJson.name ?? "",
+        display_name: currentMetadataJson.display_name ?? "",
+        family: currentMetadataJson.family ?? currentMetadataJson.family_name ?? "",
+        family_name: currentMetadataJson.family_name ?? "",
+        image: currentMetadataJson.image ?? "",
+        full_path: currentMetadataJson.full_path ?? "",
+        image_path: currentMetadataJson.image_path ?? "",
+        lore: currentMetadataJson.lore ?? "",
+        dominant_color: currentMetadataJson.dominant_color ?? "",
+        color_rgb: currentMetadataJson.color_rgb ?? [],
+        sprite_name: currentMetadataJson.sprite_name ?? "",
+        total_in_family: currentMetadataJson.total_in_family ?? 0,
+        evolutionHistory: currentMetadataJson.evolutionHistory || [],
+        ...attrsDict,
+        attributes: attrsDict, // 👈 Important pour evolutionEngine
+      };
 
-
-
-      /* ============================
-         EVOLUTION ENGINE
-      ============================ */
-
+      // EVOLUTION ENGINE 🚀 - RETOURNE LES BONNES DONNÉES
       const finalWallet = walletAddress || account;
-
-      const evolutionData = evolutionEngine(
-        { family: currentFamily, attributes: currentAttrs },
+      const evolutionDataRaw = evolutionEngine(
+        currentData,
         currentLevel,
         targetLevel,
         finalWallet,
         tokenId
       );
 
-      setPreviewImageUrl(evolutionData.imageUrl);
-
-
-
-      /* ============================
-         HISTORIQUE BULLET PROOF
-      ============================ */
-
-      let history: any[] = [];
-
-      if (Array.isArray(currentMetadataJson["histoire de l'évolution"])) {
-        history = [...currentMetadataJson["histoire de l'évolution"]];
-      }
-      else if (Array.isArray(currentMetadataJson.evolutionHistory)) {
-        history = [...currentMetadataJson.evolutionHistory];
-      }
-      else if (Array.isArray(currentMetadataJson.evolution_history)) {
-        history = [...currentMetadataJson.evolution_history];
+      if (!evolutionDataRaw || !evolutionDataRaw.imageUrl) {
+        throw new Error("Génération évolution échouée");
       }
 
+      console.log("✅ evolutionDataRaw COMPLET:", evolutionDataRaw);
+      console.log("✅ evolutionDataRaw.lore:", evolutionDataRaw.lore);
+      console.log("✅ evolutionDataRaw.display_name:", evolutionDataRaw.display_name);
+
+      setPreviewImageUrl(evolutionDataRaw.imageUrl);
+
+      // 🔥 UTILISER DIRECTEMENT LES DONNÉES DE evolutionEngine
+      const familyKey = evolutionDataRaw.family_name as keyof typeof colorProfilesJson.families;
+      const spriteFilename = evolutionDataRaw.sprite_name;
+      const profiles = (colorProfilesJson.families as any)[familyKey] as any[];
+      const colorProfile = profiles?.find(p => p.filename === spriteFilename) ?? profiles?.[0];
+
+      // 👉 LES ATTRIBUTS VIENNENT DE evolutionEngine
+      const insectAttributes = [
+        ...(evolutionDataRaw.attributes || []),
+        { trait_type: "Famille", value: familyKey },
+        { trait_type: "1er Propriétaire", value: finalWallet },
+        { trait_type: "Insect name", value: evolutionDataRaw.display_name || "Insecte ResCoe" },
+        { trait_type: "Lore", value: evolutionDataRaw.lore || "Badge d'évolution ResCoe" }, // 👈 DU evolutionEngine
+        { trait_type: "TotalFamille", value: currentData.total_in_family || 0 },
+        { trait_type: "Sprite", value: spriteFilename }
+      ];
+
+      const colorAttributes = colorProfile ? [
+        { trait_type: "Couleur1", value: colorProfile.dominant_colors.hex[0] },
+        { trait_type: "Couleur2", value: colorProfile.dominant_colors.hex[1] },
+        { trait_type: "Couleur3", value: colorProfile.dominant_colors.hex[2] },
+        { trait_type: "Couleur4", value: colorProfile.dominant_colors.hex[3] },
+        { trait_type: "Couleur5", value: colorProfile.dominant_colors.hex[4] },
+        { trait_type: "Teinte", value: Math.round(colorProfile.hsv.mean[0]) + "°" },
+        { trait_type: "Saturation", value: Math.round(colorProfile.hsv.mean[1] * 100) + "%" },
+        { trait_type: "Luminosité", value: Math.round(colorProfile.hsv.mean[2] * 100) + "%" },
+        { trait_type: "Colorful", value: Math.round(colorProfile.metrics.colorfulness * 100) + "%" },
+        { trait_type: "Contraste", value: Math.round(colorProfile.metrics.contrast) },
+        { trait_type: "Nettete", value: Math.round(colorProfile.metrics.sharpness) },
+        { trait_type: "Entropie", value: Math.round(colorProfile.metrics.entropy * 10) / 10 },
+        { trait_type: "Frames", value: colorProfile.frame_count },
+        { trait_type: "Pixels", value: colorProfile.total_pixels_analyzed.toLocaleString() },
+        { trait_type: "TailleBytes", value: (colorProfile.gif_info.size_bytes / 1000).toFixed(1) + "KB" }
+      ] : [];
+
+      const fullAttributes = [
+        ...insectAttributes.filter(attr => attr?.trait_type && !["Niveau"].includes(attr.trait_type)),
+        { trait_type: "Niveau", value: targetLevel },
+        ...colorAttributes
+      ];
+
+      // HISTORIQUE
+      let history = currentData.evolutionHistory || [];
+      const startOfDayUTC = Math.floor(new Date(Date.now()).setUTCHours(0, 0, 0, 0) / 1000);
       history.push({
         niveau: currentLevel,
         uri: tokenUri,
         image: currentMetadataJson.image,
-        family: currentMetadataJson.family,
-        sprite_name: currentMetadataJson.sprite_name,
-        horodatage: Math.floor(Date.now() / 1000)
+        family: currentData.family,
+        sprite_name: currentData.sprite_name,
+        horodatage: startOfDayUTC,
       });
 
+      console.log(`🚀 ${fullAttributes.length} attributs générés`);
+      console.log("✅ Lore final uploading:", evolutionDataRaw.lore);
 
-
-      /* ============================
-         UPLOAD IPFS - 🔥 RÉCUPÉRER LES 2 URIs
-      ============================ */
-
+      // 📤 UPLOAD IPFS
       const uploadResult = await uploadToIPFS({
-
         scope: "badges",
-
-        imageUrl: evolutionData.imageUrl,
-
-        name: evolutionData.display_name || currentName || "Adhésion",
-
+        imageUrl: evolutionDataRaw.imageUrl,
+        name: currentName || evolutionDataRaw.display_name || "Adhesion",
         bio: currentBio || "",
-
         role: currentRoleLabel || "Membre",
-
         level: targetLevel,
-
-        attributes: evolutionData.attributes,
-
-        family: evolutionData.family,
-
-        sprite_name: evolutionData.sprite_name,
-
-        color_profile: evolutionData.color_profile,
-
+        attributes: fullAttributes,
+        family: familyKey,
+        sprite_name: spriteFilename,
+        color_profile: colorProfile,
         previousImage: currentMetadataJson.image,
+        evolutionHistory: history,
+        custom_data: {
+          lore: evolutionDataRaw.lore,  // ✅ PARFAIT - sera dans JSON final
+        }
+        });
 
-        evolutionHistory: history
+      if (!uploadResult.metadataUri) throw new Error("Upload IPFS échoué");
 
-      });
-
-      // 🔥 STOCKER LES DEUX URIs
       setEvolveImageUri(uploadResult.imageUri);
       setEvolveMetadataUri(uploadResult.metadataUri);
       setPreviewImageUrl(uploadResult.imageUri);
 
-
-
+      // METADATA UPDATE
       const newMetadata = {
         ...currentMetadataJson,
-        ...evolutionData,
         level: targetLevel,
         image: uploadResult.imageUri,
-        evolutionHistory: history
+        display_name: evolutionDataRaw.display_name,
+        lore: evolutionDataRaw.lore, // 👈 DU evolutionEngine
+        family_name: familyKey,
+        sprite_name: spriteFilename,
+        evolutionHistory: history,
+        attributes: fullAttributes,
       };
-
       updateCurrentMetadata(newMetadata);
-
       setIsManualEvolveReady(true);
 
-    }
+      return {
+        imageUri: uploadResult.imageUri,
+        metadataUri: uploadResult.metadataUri,
+        isReady: true,
+      };
 
-    catch (e: any) {
-
-      console.error("prepareEvolution error:", e);
-      alert(e.message);
-
-    }
-
-    finally {
-
+    } catch (e: any) {
+      console.error("❌ prepareEvolution:", e);
+      alert(e.message || "Erreur évolution");
+      return { imageUri: null, metadataUri: null, isReady: false };
+    } finally {
       setIsUploadingEvolve(false);
-
     }
-
   }, [
     membershipInfo,
     contractAddress,
@@ -324,7 +363,10 @@ export const useTokenEvolution = ({
     currentBio,
     currentRoleLabel,
     isUploadingEvolve,
-    isManualEvolveReady
+    isManualEvolveReady,
+    evolveImageUri,
+    evolveMetadataUri,
+    colorProfilesJson
   ]);
 
 
@@ -439,20 +481,36 @@ export const useTokenEvolution = ({
 
 
   return {
+    // États principaux
     membershipInfo,
     evolvePriceEth,
     hatchPriceEth,
+
+    // États évolution
+    previewImageUrl,
     isManualEvolveReady,
-    evolveImageUri,           // 🔥 NOUVEAU
-    evolveMetadataUri,        // 🔥 NOUVEAU
+    evolveImageUri,
+    evolveMetadataUri,
     isUploadingEvolve,
     isEvolving,
-    prepareEvolution,
-    evolve,
+
+    // États œuf
+    isEgg: membershipInfo?.isEgg || false,
+
+    // 🔥 NOUVEAU : getter synchrone
+    getReadyState: () => ({
+      isReady: !!evolveMetadataUri && isManualEvolveReady,
+      metadataUri: evolveMetadataUri || null,
+      imageUri: evolveImageUri || null
+    }),
+
+    // Fonctions
+    prepareEvolution,        // ✅ MAINTENANT retourne Promise<{imageUri, metadataUri, isReady}>
+    evolve,                  // utilise evolveMetadataUri interne
     hatchEgg,
     refreshEvolution,
-    updateCurrentMetadata,
-    isEgg: membershipInfo?.isEgg || false,
+    updateCurrentMetadata
   };
+
 
 };

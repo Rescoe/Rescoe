@@ -1,3 +1,4 @@
+// /api/pinata/upload.ts - VERSION TOTALE FLEXIBLE
 import type { NextApiRequest, NextApiResponse } from "next";
 import axios from "axios";
 import FormData from "form-data";
@@ -25,11 +26,6 @@ export default async function handler(
       scope: UploadScope;
     };
 
-   /*console.log("📥 API reçue:", {
-      scope,
-      fileSize: fileBase64.length / 1000 / 1000 + "Mo base64"
-    });
-*/
     if (!scope || !["badges", "oeuvres"].includes(scope)) {
       throw new Error("Scope invalide");
     }
@@ -56,50 +52,75 @@ export default async function handler(
           Authorization: `Bearer ${pinataJwt}`,
           ...formData.getHeaders(),
         },
-        timeout: 60000 // 60s
+        timeout: 60000
       }
     );
     console.timeEnd("pinata_image");
 
     const imageCid = imageRes.data.IpfsHash;
-   //console.log("✅ Image CID:", imageCid);
 
-    // 🔥 2. METADATA PROPRE (fix crash)
-    const cleanMetadata = {
-      name: metadata.name || "Untitled",
-      description: metadata.description || "",
-      image: `ipfs://${imageCid}`,
-      // ✅ UNIQUEMENT champs Pinata-safe
-      ...(metadata.level && { level: metadata.level }),
-      ...(metadata.artist && { artist: metadata.artist }),
-      ...(Array.isArray(metadata.tags) && metadata.tags.length && { tags: metadata.tags }),
-      ...(metadata.maxEditions && { maxEditions: metadata.maxEditions }),
-      ...(metadata.collectionType && { collectionType: metadata.collectionType }),
-      attributes: Array.isArray(metadata.attributes)
-        ? metadata.attributes.filter((attr: { trait_type?: string; value?: string | number | boolean }) =>
-            attr.trait_type && attr.value !== undefined
-          )
-        : []
+    // 🔥 2. METADATA FLEXIBLE PAR SCOPE
+    let cleanMetadata: any;
 
-    };
+    if (scope === "badges") {
+      // ✅ BADGES : BASE + TOUT CE QUI VIENT DE PREPAREEVOLUTION
+      cleanMetadata = {
+        name: metadata.name || "Badge Rescoe",
+        description: `Badge ${metadata.role || "Membre"}. ${metadata.bio || "Aucune bio."}`,
+        image: `ipfs://${imageCid}`,
+        bio: metadata.bio || "",
+        role: metadata.role || "Membre",
+        level: metadata.level,
+        tags: ["Adhesion", metadata.role || "Membre"],
+        family: metadata.family,
+        sprite_name: metadata.sprite_name,
+        color_profile: metadata.color_profile,
+        previousImage: metadata.previousImage,
+        evolutionHistory: Array.isArray(metadata.evolutionHistory) ? metadata.evolutionHistory : [],
+        attributes: Array.isArray(metadata.attributes)
+          ? metadata.attributes.filter((attr: any) => attr?.trait_type && attr.value !== undefined)
+          : [],
+        // 🔥 TOUT LE RESTE (lore, full_path, dominant_color, etc.)
+        ...metadata
+      };
 
-   //console.log("📄 Metadata envoyée:", cleanMetadata);
+      // Nettoyage (supprime les undefined/null)
+      Object.keys(cleanMetadata).forEach(key => {
+        if (cleanMetadata[key] === null || cleanMetadata[key] === undefined || cleanMetadata[key] === "") {
+          delete cleanMetadata[key];
+        }
+      });
+
+    } else {
+      // OEUVRES (inchangé)
+      cleanMetadata = {
+        name: metadata.name || "Untitled",
+        description: metadata.description || "",
+        image: `ipfs://${imageCid}`,
+        artist: metadata.artist || "",
+        tags: Array.isArray(metadata.tags) ? metadata.tags : ["Oeuvre"],
+        collectionType: metadata.collectionType || "solo",
+        maxEditions: metadata.maxEditions || 1,
+        attributes: Array.isArray(metadata.attributes)
+          ? metadata.attributes.filter((attr: any) => attr?.trait_type && attr.value !== undefined)
+          : [],
+        ...metadata.custom_data
+      };
+    }
+
+    console.log(`📄 [${scope.toUpperCase()}] Keys finales:`, Object.keys(cleanMetadata));
 
     // 🔥 3. UPLOAD METADATA
     console.time("pinata_metadata");
     const metadataRes = await axios.post(
       "https://api.pinata.cloud/pinning/pinJSONToIPFS",
-      cleanMetadata, // ✅ Nettoyé
+      cleanMetadata,
       {
-        headers: {
-          Authorization: `Bearer ${pinataJwt}`,
-        },
+        headers: { Authorization: `Bearer ${pinataJwt}` },
         timeout: 30000
       }
     );
     console.timeEnd("pinata_metadata");
-
-   //console.log("✅ Metadata CID:", metadataRes.data.IpfsHash);
 
     return res.status(200).json({
       image: `ipfs://${imageCid}`,
@@ -110,15 +131,13 @@ export default async function handler(
 
   } catch (err: any) {
     console.error("🚨 API ERROR:", {
+      scope: req.body.scope,
       message: err.message,
       status: err.response?.status,
-      data: err.response?.data,
-      timeout: err.code === 'ECONNABORTED'
+      data: err.response?.data
     });
-
     return res.status(500).json({
-      error: err.message || "Upload failed",
-      details: err.response?.data
+      error: err.message || "Upload failed"
     });
   }
 }
