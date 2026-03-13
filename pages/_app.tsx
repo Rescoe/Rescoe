@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SessionProvider } from "next-auth/react";
 import type { AppProps } from "next/app";
 import { Analytics } from "@vercel/analytics/next"
+import { SpeedInsights } from "@vercel/speed-insights/next";  // ← Speed Insights
+
 
 import { isMobile } from "react-device-detect";
 import theme from "@styles/theme";
@@ -26,6 +28,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
                   </div>
                 )}
                 <Analytics />
+                <SpeedInsights />
             </AuthProvider>
           </SessionProvider>
         </QueryClientProvider>
