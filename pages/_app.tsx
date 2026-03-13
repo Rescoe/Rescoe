@@ -3,6 +3,8 @@ import { AuthProvider } from "../src/utils/authContext";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SessionProvider } from "next-auth/react";
 import type { AppProps } from "next/app";
+import { Analytics } from "@vercel/analytics/next"
+
 import { isMobile } from "react-device-detect";
 import theme from "@styles/theme";
 
@@ -23,6 +25,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
                     <Component {...pageProps} />
                   </div>
                 )}
+                <Analytics />
             </AuthProvider>
           </SessionProvider>
         </QueryClientProvider>
