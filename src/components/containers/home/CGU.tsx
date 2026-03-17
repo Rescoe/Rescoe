@@ -29,17 +29,12 @@ const CGUPage = () => {
 
           {/* IFRAME PDF RESPONSIVE */}
           <Box p={0} h={{ base: "70vh", md: "80vh", lg: "90vh" }} position="relative">
-            <iframe
-              src="/CGU_Rescoe_17032026.pdf#toolbar=0&navpanes=0&view=FitH"
-              width="100%"
-              height="100%"
-              style={{
-                border: 0,
-                borderRadius: '0 0 24px 24px',
-                boxShadow: 'inset 0 4px 6px -1px rgba(0, 0,0, 0.1)'
-              }}
-              title="CGU ResCoe"
-            />
+          <iframe
+            src={`https://docs.google.com/gview?url=${encodeURIComponent(window.location.origin + '/CGU_Rescoe_17032026.pdf')}&embedded=true`}
+            width="100%"
+            height="800px"
+            style={{ border: 0 }}
+          />
           </Box>
         </Box>
 
@@ -60,7 +55,7 @@ const CGUPage = () => {
               Télécharger PDF (1.2 Mo)
             </Button>
           </Box>
-          
+
       </Box>
     </Box>
   );

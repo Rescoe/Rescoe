@@ -27,7 +27,7 @@ const MotionBox = motion(Box);
 const links = {
   adhesion: "/adhesion",
   faq: "/association/faq",
-  formations: "/association/formations",
+  CGUs: "/cgu",
   instagram: "https://www.instagram.com/r_e_s_c_o_e/",
   bluesky: "https://bsky.app/profile/rescoe.bsky.social",
   github: "https://github.com/Rescoe/Rescoe",
@@ -199,13 +199,13 @@ export default function Footer() {
                 <Text fontSize="sm">FAQ</Text>
               </HStack>
             </NextLink>
-            <NextLink href={links.formations} passHref>
-            {/*
+            <NextLink href={links.CGUs} passHref>
+
               <HStack as={Link} spacing={2} _hover={{ opacity: 0.8 }}>
                 <FaQuestionCircle size={14} />
-                <Text fontSize="sm">Formations</Text>
+                <Text fontSize="sm">CGUs</Text>
               </HStack>
-            */}
+
             </NextLink>
           </VStack>
 

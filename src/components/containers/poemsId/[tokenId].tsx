@@ -594,6 +594,14 @@ const isUserOwner =
           {isEditionForSale && poemData?.remainingEditions !== "0" ? (
             tokenIdNumber !== undefined ? (
               <Box w="100%" maxW="400px" mx="auto" mb={8}>  {/* ✅ Container centré fixe */}
+              <Text
+  fontSize="xs"
+  textAlign="center"
+  color="gray.500"
+  lineHeight="1.2"
+>
+  En achetant cette oeuvre vous acceptez les CGU et renoncer au droit de rétractation immediatement après la siganture de la transaction
+</Text>
                 <Button
                   size={{ base: "lg", md: "xl" }}
                   w="full"  // ✅ Pleine largeur du container
@@ -635,7 +643,7 @@ const isUserOwner =
                   </Button>
                 )}
                 */}
-                
+
                   <Button
                     size="md"
                     onClick={() => tokenIdNumber && handleRemoveFromSale(tokenIdNumber)}

@@ -615,7 +615,14 @@ const handleCopy = () => {
                     </FormControl>
                   )}
 
-
+                  <Text
+                    fontSize="xs"
+                    textAlign="center"
+                    color="gray.500"
+                    lineHeight="1.2"
+                  >
+                    En achetant cette oeuvre vous acceptez les CGU et renoncer au droit de rétractation immediatement après la siganture de la transaction
+                  </Text>
                   {(canPurchase && isForSale) ? (
                           <Button colorScheme="green" mt={4} onClick={handlePurchase}>
                             Acheter ce NFT {nftData.price} ETH
