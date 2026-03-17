@@ -39,26 +39,26 @@ export default function EvolutionHistoryTimeline({
 
 
   const getAllAttributes = useCallback((metadata: FullNFTMetadata | null, step: EvolutionStep | null) => {
-    console.log('🔧 getAllAttributes appelé avec:', {
+    /*console.log('🔧 getAllAttributes appelé avec:', {
       metadata: !!metadata,
       metaAttrs: metadata?.attributes?.length || 0,
       step: !!step,
       stepMetaAttrs: step?.fullMetadata?.attributes?.length || 0
     });
-
+*/
     // 1. Priorité : metadata.attributes (lvl 1+)
     if (metadata?.attributes && metadata.attributes.length > 0) {
-      console.log('✅ Retournant metadata.attributes:', metadata.attributes.length);
+      //console.log('✅ Retournant metadata.attributes:', metadata.attributes.length);
       return metadata.attributes;
     }
 
     // 2. Fallback lvl0 : step.fullMetadata.attributes
     if (step?.fullMetadata?.attributes && step.fullMetadata.attributes.length > 0) {
-      console.log('✅ Retournant step.fullMetadata.attributes:', step.fullMetadata.attributes.length);
+      //console.log('✅ Retournant step.fullMetadata.attributes:', step.fullMetadata.attributes.length);
       return step.fullMetadata.attributes;
     }
 
-    console.log('⚠️ Aucun attribut trouvé');
+    //console.log('⚠️ Aucun attribut trouvé');
     return [];
   }, []);
 
@@ -67,7 +67,7 @@ export default function EvolutionHistoryTimeline({
       setIsLoading(true);
       try {
         const enriched = await enrichHistoryWithRealMetadata(rawHistory);
-        console.log('✅ Enriched:', enriched);
+        //console.log('✅ Enriched:', enriched);
         setHistoryWithMetadata(enriched);
       } catch (e) {
         console.error('❌ Load failed:', e);
@@ -86,7 +86,7 @@ export default function EvolutionHistoryTimeline({
   }, [rawHistory]);
 
   const handleStepClick = useCallback((index: number) => {
-    console.log('🔥 Clique:', index, historyWithMetadata[index]);
+    //console.log('🔥 Clique:', index, historyWithMetadata[index]);
     if (index >= 0 && index < historyWithMetadata.length) {
       setSelectedStepIndex(index);
       setShowAllAttributes(false);
@@ -100,14 +100,15 @@ export default function EvolutionHistoryTimeline({
   const visibleAttributes = allAttributes.slice(0, 8);
   const hasMoreAttributes = allAttributes.length > 8;
 
-  console.log('🔍 RENDU PRINCIPAL lvl:', selectedStep?.lvlPrevious, {
+/*
+  //console.log('🔍 RENDU PRINCIPAL lvl:', selectedStep?.lvlPrevious, {
     metadata: !!selectedMetadata,
     stepFullMeta: !!selectedStep?.fullMetadata,
     metaAttrs: selectedMetadata?.attributes?.length || 0,
     stepAttrs: selectedStep?.fullMetadata?.attributes?.length || 0,
     allAttrs: allAttributes.length
   });
-
+*/
   if (rawHistory.length === 0) return null;
 
   return (

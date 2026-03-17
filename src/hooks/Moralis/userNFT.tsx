@@ -94,8 +94,8 @@ export default function UserNFTFeed({ walletAddress }: { walletAddress: string }
         } catch {}
       }
 
-      console.log("Contracts:", addresses);
-      console.log("TypesMap:", typesMap);
+      //console.log("Contracts:", addresses);
+      //console.log("TypesMap:", typesMap);
       setContracts(addresses);
       setCollectionTypesMap(typesMap);
     } catch (e) {
@@ -119,7 +119,7 @@ export default function UserNFTFeed({ walletAddress }: { walletAddress: string }
     }
 
     try {
-      console.log(`🔍 tokenURI ${nft.token_address}/${nft.token_id}`);
+      //console.log(`🔍 tokenURI ${nft.token_address}/${nft.token_id}`);
       const contract = new ethers.Contract(nft.token_address, ERC721_ABI, providerRef.current!);
       const tokenURI = await contract.tokenURI(nft.token_id);
 
@@ -130,7 +130,7 @@ export default function UserNFTFeed({ walletAddress }: { walletAddress: string }
       if (md.image?.startsWith("ipfs://")) {
         md.image = await resolveIPFS(md.image, true);
       }
-      console.log(`✅ Metadata ${nft.token_id}: artist=${md?.artist}`);
+      //console.log(`✅ Metadata ${nft.token_id}: artist=${md?.artist}`);
       return md;
     } catch (e) {
       console.warn(`Metadata fail ${nft.token_id}:`, e);
@@ -185,7 +185,7 @@ export default function UserNFTFeed({ walletAddress }: { walletAddress: string }
         }
       }
       setLoadedNFTs(prev => prev + totalAdded);
-      console.log(`✅ Chargé ${totalAdded} NFTs (total: ${loadedNFTs + totalAdded}/${MAX_TOTAL})`);
+      //console.log(`✅ Chargé ${totalAdded} NFTs (total: ${loadedNFTs + totalAdded}/${MAX_TOTAL})`);
     } catch (e) {
       console.error("Load error:", e);
     } finally {
@@ -289,7 +289,7 @@ export default function UserNFTFeed({ walletAddress }: { walletAddress: string }
                     borderRadius="2xl"
                     p={5}
                     display="flex"
-                    flexDirection="column"     
+                    flexDirection="column"
                     justifyContent="space-between"
                     alignItems="center"
                     color="white"

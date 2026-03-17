@@ -74,7 +74,7 @@ const colorProfilesByFamily: Record<string, any[]> = {};
     totalIndexed++;
   });
 
-  /*console.log(`✅ ${totalIndexed} sprites indexés:`, {
+  /*//console.log(`✅ ${totalIndexed} sprites indexés:`, {
     lvl1: Object.keys(familiesByLevel[1]).length,
     lvl2: Object.keys(familiesByLevel[2]).length,
     lvl3: Object.keys(familiesByLevel[3]).length

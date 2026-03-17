@@ -100,7 +100,7 @@ const PublicProfile: React.FC<PublicProfileProps> = ({ address }) => {
       // 2️⃣ Récupérer tous les tokenIds
       const tokens: number[] = await contract.methods.getTokensByOwner(userAddr).call();
 
-      console.log(`✅ ${userAddr} possède ${tokens.length} tokens:`, tokens);
+      //console.log(`✅ ${userAddr} possède ${tokens.length} tokens:`, tokens);
 
       // 3️⃣ Fetch metadata pour chaque token (EXACT PATTERN FeaturedMembers)
       const nfts = await Promise.all(
@@ -117,12 +117,13 @@ const PublicProfile: React.FC<PublicProfileProps> = ({ address }) => {
 
             const metadata = await response.json();
 
-            console.log(`📦 Token #${tokenId}:`, {
+/*
+            //console.log(`📦 Token #${tokenId}:`, {
               name: metadata.name,
               image: metadata.image,
               family: metadata.attributes?.[15]?.value || metadata.family_name || "Inconnue"
             });
-
+*/
             return {
               tokenId,
               image: resolveIPFS(metadata.image, true) || "",
@@ -285,7 +286,7 @@ const PublicProfile: React.FC<PublicProfileProps> = ({ address }) => {
         setUserData(userInfo);
         setUserCollections(collectionsWithMetadata);
 
-        console.log("✅ UserData final:", userInfo);
+        //console.log("✅ UserData final:", userInfo);
       } catch (err) {
         console.error('❌ Erreur chargement profil public :', err);
       } finally {

@@ -58,13 +58,13 @@ const TextCard: React.FC<TextCardProps> = ({
   };
 
 
-  console.log({
+  /*console.log({
     availableEditions: nft.availableEditions,
     parsed: parseInt(nft.availableEditions || "0"),
     tokenIdsForSale: nft.tokenIdsForSale,
     showBuyButton
   });
-  
+*/
   return (
     <Box
       textAlign="center"

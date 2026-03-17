@@ -394,20 +394,15 @@ export default function UserEditionsManager({
                           <Text>Edition #{ed.tokenId}</Text>
 
                           <VStack spacing={1}>
+                            {/* ✅ TOUJOURS disponible pour le proprio : Retirer / Brûler */}
                             <Button
                               size="xs"
-                              onClick={() => handleBuyLocal(ed.tokenId)}
+                              onClick={() => handleRemove(ed.tokenId)}
                               isDisabled={!ed.isForSale}
                             >
-                              Acheter
-                            </Button>
-                            <Button size="xs" onClick={() => openListModal(ed.tokenId)}>
-                              Mettre en vente
-                            </Button>
-
-                            <Button size="xs" onClick={() => handleRemove(ed.tokenId)}>
                               Retirer de la vente
                             </Button>
+
                             <Button
                               size="xs"
                               colorScheme="red"
@@ -415,7 +410,20 @@ export default function UserEditionsManager({
                             >
                               Brûler
                             </Button>
+
+                            {/* ✅ SEUL le CRÉATEUR peut : Mettre en vente (pas en vente déjà) */}
+                            {ed.author &&
+                             userAddress?.toLowerCase() === ed.author.toLowerCase() &&
+                             !ed.isForSale && (
+                              <Button size="xs" onClick={() => openListModal(ed.tokenId)}>
+                                Mettre en vente
+                              </Button>
+                            )}
+
+                            {/* ✅ JAMAIS pour le proprio actuel : Acheter */}
+                            {/* Bouton "Acheter" géré dans la page principale seulement */}
                           </VStack>
+
                         </HStack>
                       </Box>
 

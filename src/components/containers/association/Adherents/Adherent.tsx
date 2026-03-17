@@ -38,7 +38,7 @@ import { resolveIPFS } from "@/utils/resolveIPFS";
 
 
 
-import MarketplaceBadges from "./MarketplaceBadges";
+//import MarketplaceBadges from "./MarketplaceBadges";
 
 
 interface InsectURI {
@@ -78,13 +78,14 @@ const Adherent: React.FC = () => {
   const [activeTab, setActiveTab] = useState(0);
   const router = useRouter();
 
+/*
   // ✅ Ouvre onglet marketplace si #marketplace dans URL
   useEffect(() => {
     if (router.asPath.includes('#marketplace')) {
       setActiveTab(1);
     }
   }, [router.asPath]);
-
+*/
 
   const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS!;
   const RPC_URL = process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!;
@@ -273,7 +274,7 @@ const { isAuthenticated, address, role, isAdmin } = useAuth();
 
           <TabList>
             <Tab>📊 Statistiques & Membres</Tab>
-            <Tab>🛒 Badges en vente</Tab>
+          {/*  <Tab>🛒 Badges en vente</Tab> */}
           </TabList>
 
           <TabPanels>
@@ -537,7 +538,8 @@ const { isAuthenticated, address, role, isAdmin } = useAuth();
           </Box>
           </TabPanel>
 
-          {/* ✅ TAB 2 : Marketplace */}
+
+          {/* ✅ TAB 2 : Marketplace
           <TabPanel p={{ base: 4, md: 0 }}>
             <MarketplaceBadges
               contractAddress={contractAddress}
@@ -545,6 +547,9 @@ const { isAuthenticated, address, role, isAdmin } = useAuth();
               isVisible={activeTab === 1}  // ✅ TRUE seulement si Tab 2
             />
           </TabPanel>
+
+          */}
+
         </TabPanels>
     </Tabs>
 </Box>

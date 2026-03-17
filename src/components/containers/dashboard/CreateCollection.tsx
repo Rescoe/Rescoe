@@ -360,7 +360,7 @@ const masterFactoryAuth = await artFactoryContract.methods.masterFactoryAuthoriz
 
     try {
       const cfg: any = await artFactory.methods.getUserCollectionConfig(address, exactName).call();
-      /*console.log("🔍 FULL CFG:", {
+      /*//console.log("🔍 FULL CFG:", {
         exists: cfg[3],
         maxSupply: cfg[0]?.toString() || "0",
         collaboratorsLen: cfg[1]?.length || 0,

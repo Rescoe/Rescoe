@@ -108,6 +108,8 @@ const TokenPage: React.FC = () => {
 
 
   const [isOwner, setIsOwner] = useState(false);
+  const [isCreator, setIsCreator] = useState(false);
+
   const [canPurchase, setCanPurchase] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
 
@@ -299,8 +301,10 @@ const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<N
             collectionId: Number(collectionId),
         };
 
-console.log(nftData);
+//console.log(nftData);
 
+        const creatorCheck = Boolean(authAddress && nftData.artist && authAddress.toLowerCase() === nftData.artist.toLowerCase());
+        setIsCreator(creatorCheck);
 
 
         setCanPurchase(!ownerCheck && nftData.forsale);
@@ -564,37 +568,53 @@ const handleCopy = () => {
                       h="100%"
                     />
                   </Box>
-
-                  {isOwner === true &&
+                  {isOwner && (
                     <FormControl mt={4}>
-                    <Text mt={4}>
-                      Vous possédez cette oeuvre
-                    </Text>
-
-                      <Text mt={10}>
-                      Mettre en vente :
+                      <Text mt={4}>
+                        Vous possédez cette oeuvre
                       </Text>
 
-                      <FormLabel htmlFor="price">Mettre a jour le prix de vente :</FormLabel>
-                      <Input
-                        id="price"
-                        type="text"
-                        value={price}
-                        onChange={(e) => setPrice(e.target.value)}
-                        placeholder="Ex: 0.01"
-                      />
-                      <Button colorScheme="teal" mt={4} onClick={handleListForSale}>Mettre en vente</Button>
+                      {isOwner && isCreator && (
+                        <>
+                          <Text mt={10}>
+                            Mettre en vente :
+                          </Text>
 
-                      <Divider my={6} />
+                          <FormLabel htmlFor="price">
+                            Mettre à jour le prix de vente :
+                          </FormLabel>
+                          <Input
+                            id="price"
+                            type="text"
+                            value={price}
+                            onChange={(e) => setPrice(e.target.value)}
+                            placeholder="Ex: 0.01"
+                          />
+                          <Button
+                            colorScheme="teal"
+                            mt={4}
+                            onClick={handleListForSale}
+                          >
+                            Mettre en vente
+                          </Button>
 
-                      <Text>
-                        Détruire l'oeuvre :
-                      </Text>
-                      <Button colorScheme="red" mt={4} onClick={handleBurn}>Brûler</Button>
+                          <Divider my={6} />
 
+                          <Text>
+                            Détruire l'oeuvre :
+                          </Text>
+                          <Button
+                            colorScheme="red"
+                            mt={4}
+                            onClick={handleBurn}
+                          >
+                            Brûler
+                          </Button>
+                        </>
+                      )}
                     </FormControl>
+                  )}
 
-                  }
 
                   {(canPurchase && isForSale) ? (
                           <Button colorScheme="green" mt={4} onClick={handlePurchase}>

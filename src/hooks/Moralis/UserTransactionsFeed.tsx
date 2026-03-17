@@ -488,7 +488,7 @@ const UserFinanceDashboard: React.FC<Props> = ({
 
             // Chercher sous les deux noms possibles
             const internals = tx.internal_transactions || tx.internaltransactions || [];
-            /*console.log(`Tx ${tx.hash.slice(0,10)} internals (${internals.length}):`, internals.slice(0,3).map(i => ({
+            /*//console.log(`Tx ${tx.hash.slice(0,10)} internals (${internals.length}):`, internals.slice(0,3).map(i => ({
               from: i.from_address?.slice(0,10), to: i.to_address?.slice(0,10),
               value: i.value, token: i.token_address ? 'YES' : 'NO'
             })));

@@ -75,7 +75,7 @@ const PoetryGallery: React.FC<PoetryGalleryProps> = ({ collectionAddress }) => {
           })
         );
 
-        console.log(poemsData);
+        //console.log(poemsData);
 
         setPoems(poemsData);
       } catch (err) {
@@ -96,7 +96,7 @@ const PoetryGallery: React.FC<PoetryGalleryProps> = ({ collectionAddress }) => {
     const tokenIdsForSale: number[] = [];
 
     for (let id = premierIDDeLaSerie; id < premierIDDeLaSerie + nombreHaikusParSerie; id++) {
-      console.log(nombreHaikusParSerie);
+      //console.log(nombreHaikusParSerie);
       const forSale: boolean = await collectionContract.isNFTForSale(id);
       if (forSale) {
         tokenIdsForSale.push(id);

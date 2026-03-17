@@ -277,7 +277,7 @@ const [canEvolve, setCanEvolve] = useState(false);
 
 
 
-  console.log(evolutionResult);
+  //console.log(evolutionResult);
 
   const rawMembershipInfo: MembershipInfo | null = evolutionResult.membershipInfo || null;
   const evolvePriceEth = evolutionResult.evolvePriceEth || "0";
@@ -403,7 +403,7 @@ useEffect(() => {
         membershipInfo,
       };
 
-      console.log('NFTData généré:', nftData);
+      //console.log('NFTData généré:', nftData);
       setNftCache(prev => ({ ...prev, [cacheKey]: nftData }));
 
       // Update evolution si metadata partielle
@@ -466,24 +466,24 @@ useEffect(() => {
       }
 
       try {
-        console.log("🔥 SINGLE EVOLVE - Upload");
+        //console.log("🔥 SINGLE EVOLVE - Upload");
 
         // 1. Récupère + stocke le résultat DIRECT
         const result = await prepareEvolution();
-        console.log("📤 Upload result:", result);
+        //console.log("📤 Upload result:", result);
 
         if (!result?.isReady || !result.metadataUri) {
           throw new Error("Upload IPFS échoué: " + JSON.stringify(result));
         }
 
         // 2. SUPPRIME LE POLLING - utilise result.metadataUri direct
-        console.log("🚀 State OK direct:", result.metadataUri);
+        //console.log("🚀 State OK direct:", result.metadataUri);
 
         // 3. Temporise 500ms pour laisser le state se sync (sécurité)
         await new Promise(r => setTimeout(r, 500));
 
         // 4. Transaction
-        console.log("💥 EVOLVE!");
+        //console.log("💥 EVOLVE!");
         await evolve();  // Le hook checkera son propre state interne
 
       } catch (e: any) {
@@ -884,6 +884,7 @@ return (
             Détails
           </Tab>
 
+{/*
           {isOwner && isVendable && (
             <Tab
               px={6}
@@ -897,6 +898,10 @@ return (
             >
             Mise en vente</Tab>
           )}
+
+          */}
+
+
           {isOwner &&
             <Tab
               px={6}
@@ -909,6 +914,8 @@ return (
               _hover={{ bg: useColorModeValue("gray.50", "whiteAlpha.50") }}
             >
             Modifier Profil</Tab>}
+
+            {/*
           {!isOwner && canPurchase && (
 
             <Tab
@@ -923,6 +930,7 @@ return (
             >
             Achat</Tab>
           )}
+*/}
 
           {/* Onglet dynamique discret */}
           {isOwner && (

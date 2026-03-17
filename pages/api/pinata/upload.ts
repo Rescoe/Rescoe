@@ -108,7 +108,7 @@ export default async function handler(
       };
     }
 
-    console.log(`📄 [${scope.toUpperCase()}] Keys finales:`, Object.keys(cleanMetadata));
+    //console.log(`📄 [${scope.toUpperCase()}] Keys finales:`, Object.keys(cleanMetadata));
 
     // 🔥 3. UPLOAD METADATA
     console.time("pinata_metadata");

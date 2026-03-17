@@ -106,7 +106,7 @@ export const useTokenEvolution = ({
         };
 
         setMembershipInfo(info);
-        console.log('🧬 TOKEN INFO OK:', info);
+        //console.log('🧬 TOKEN INFO OK:', info);
 
         // ✅ PRIX EXACT = LOGIQUE CONTRAT
         let priceEth = 0;
@@ -122,8 +122,8 @@ export const useTokenEvolution = ({
 
             priceEth = finalPriceWei / 1e18;
             setEvolvePriceEth(priceEth);
-            console.log(`💰 Prix lvl${info.level}: ${priceEth.toFixed(6)} ETH
-              (base:${(basePrice/1e18).toFixed(6)}, /10:${!info.autoEvolve && info.totalYears >= 1})`);
+
+            //console.log(`💰 Prix lvl${info.level}: ${priceEth.toFixed(6)} ETH (base:${(basePrice/1e18).toFixed(6)}, /10:${!info.autoEvolve && info.totalYears >= 1})`);
           } catch (priceErr) {
             console.error('❌ Prix fail:', priceErr);
             setEvolvePriceEth(0);
@@ -236,9 +236,9 @@ export const useTokenEvolution = ({
         throw new Error("Génération évolution échouée");
       }
 
-      console.log("✅ evolutionDataRaw COMPLET:", evolutionDataRaw);
-      console.log("✅ evolutionDataRaw.lore:", evolutionDataRaw.lore);
-      console.log("✅ evolutionDataRaw.display_name:", evolutionDataRaw.display_name);
+      //console.log("✅ evolutionDataRaw COMPLET:", evolutionDataRaw);
+      //console.log("✅ evolutionDataRaw.lore:", evolutionDataRaw.lore);
+      //console.log("✅ evolutionDataRaw.display_name:", evolutionDataRaw.display_name);
 
       setPreviewImageUrl(evolutionDataRaw.imageUrl);
 
@@ -295,8 +295,8 @@ export const useTokenEvolution = ({
         horodatage: startOfDayUTC,
       });
 
-      console.log(`🚀 ${fullAttributes.length} attributs générés`);
-      console.log("✅ Lore final uploading:", evolutionDataRaw.lore);
+      //console.log(`🚀 ${fullAttributes.length} attributs générés`);
+      //console.log("✅ Lore final uploading:", evolutionDataRaw.lore);
 
       // 📤 UPLOAD IPFS
       const uploadResult = await uploadToIPFS({
@@ -395,7 +395,7 @@ export const useTokenEvolution = ({
         gasPrice: gasPrice.toString(),
       });
 
-      console.log("✅ ÉVOLUTION OK - Gas:", receipt.gasUsed.toString());
+      //console.log("✅ ÉVOLUTION OK - Gas:", receipt.gasUsed.toString());
 
       let newTokenId = null;
 
@@ -412,7 +412,7 @@ export const useTokenEvolution = ({
         newTokenId = (Number(tokenId) + 1).toString();
       }
 
-      console.log("🎉 Nouveau token ID:", newTokenId);
+      //console.log("🎉 Nouveau token ID:", newTokenId);
 
       router.push(`/AdhesionId/${contractAddress}/${newTokenId}`);
 
@@ -454,7 +454,7 @@ export const useTokenEvolution = ({
         gasPrice: gasPrice.toString(),
       });
 
-      console.log("🥚 ÉCLOS OK:", receipt);
+      //console.log("🥚 ÉCLOS OK:", receipt);
 
       let newTokenId = (Number(tokenId) + 1).toString();
 

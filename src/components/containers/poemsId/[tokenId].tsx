@@ -628,9 +628,14 @@ const isUserOwner =
               </Text>
               {tokenIdNumber !== undefined && (
                 <>
+                {/*}
+                {isCreator && (
                   <Button size="md" onClick={onOpen} colorScheme="teal">
                     Mettre en vente
                   </Button>
+                )}
+                */}
+                
                   <Button
                     size="md"
                     onClick={() => tokenIdNumber && handleRemoveFromSale(tokenIdNumber)}

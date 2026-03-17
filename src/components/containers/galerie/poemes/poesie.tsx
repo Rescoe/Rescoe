@@ -200,7 +200,7 @@ const fetchPoetryCollections = async (page: number) => {
     const tokenIdsForSale: number[] = [];
 
     for (let id = premierIDDeLaSerie; id < premierIDDeLaSerie + nombreHaikusParSerie; id++) {
-      console.log(nombreHaikusParSerie);
+      //console.log(nombreHaikusParSerie);
       const forSale: boolean = await collectionContract.isNFTForSale(id);
       if (forSale) {
         tokenIdsForSale.push(id);
@@ -240,11 +240,11 @@ const fetchPoetryCollections = async (page: number) => {
 
           // 📌 On construit un poème avec `tokenIdsForSale` et `availableEditions` en "pending"
           //const tokenIdsForSale = await fetchTokenIdsForSale(collectionContract, Number(firstTokenId), nombreHaikusParSerie);
-          console.log('premierToDernier:', premierToDernier);
-          console.log('premierIDDeLaSerie:', premierIDDeLaSerie, typeof premierIDDeLaSerie);
-          console.log('nombreHaikusParSerie:', nombreHaikusParSerie, typeof nombreHaikusParSerie);
+          //console.log('premierToDernier:', premierToDernier);
+          //console.log('premierIDDeLaSerie:', premierIDDeLaSerie, typeof premierIDDeLaSerie);
+          //console.log('nombreHaikusParSerie:', nombreHaikusParSerie, typeof nombreHaikusParSerie);
           const tokenIdsForSale = await fetchTokenIdsForSale(collectionContract, premierIDDeLaSerie, nombreHaikusParSerie);
-          console.log('tokenIdsForSale RESULT:', tokenIdsForSale);
+          //console.log('tokenIdsForSale RESULT:', tokenIdsForSale);
 
           const poem: Poem = {
             tokenId: Number(firstTokenId).toString(),

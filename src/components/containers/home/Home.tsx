@@ -178,7 +178,7 @@ const getRandomItems = <T,>(array: T[], count: number): T[] => {
 
 /*
 useEffect(() => {
-  console.log('🚀 useRescoeData DATA:', {
+  //console.log('🚀 useRescoeData DATA:', {
     isLoading,
     allNfts: allNfts.length,
     allHaikus: allHaikus.length,

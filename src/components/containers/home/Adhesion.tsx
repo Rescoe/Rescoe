@@ -285,11 +285,11 @@ const handleAdhere = async () => {
       ...colorAttributes
     ];
 
-    console.log(`🚀 ${insectAttributes} attributs générés !`);
-    console.log("INSECT DATA =", data);
-    console.log(`🚀 ${fullAttributes.length} attributs OpenSea générés !`);
+    //console.log(`🚀 ${insectAttributes} attributs générés !`);
+    //console.log("INSECT DATA =", data);
+    //console.log(`🚀 ${fullAttributes.length} attributs OpenSea générés !`);
 
-    console.log("UPLOAD IMAGE =", data.imageUrl)
+    //console.log("UPLOAD IMAGE =", data.imageUrl)
 
 
     // 📤 UPLOAD IPFS
@@ -328,7 +328,7 @@ const contract = new web3.eth.Contract(ABI as any, contractAddress);
         maxPriorityFeePerGas: null as any,
       });
 
-    console.log('✅ Adhésion réussie ! Tx:', tx.transactionHash);
+    //console.log('✅ Adhésion réussie ! Tx:', tx.transactionHash);
 
     // 🎉 SUCCÈS
     setShowBananas(true);
@@ -823,6 +823,7 @@ mb={4}
               <Text fontSize="lg" mb={4}>
                 Vous avez épuisé vos {maxMint} adhésions possibles cette année.
               </Text>
+              {/*
               <Text fontSize="md" mb={6}>
                 💡 Solution : Achetez un badge d’adhésion mis en vente par un autre membre sur le marché secondaire.
               </Text>
@@ -835,6 +836,7 @@ mb={4}
               >
                 🛒 Explorer le marché
               </Button>
+*/}
 
             </Box>
           )}

@@ -397,7 +397,7 @@ const CollectionsByType: React.FC<{ creator: string }> = ({ creator }) => {
         const resolvedUri = resolveIPFS(uri, true); // true = proxy prioritaire
         if (!resolvedUri) return null;
 
-        console.log(`📡 Fetching ${resolvedUri}`); // DEBUG
+        //console.log(`📡 Fetching ${resolvedUri}`); // DEBUG
 
         const response = await fetch(resolvedUri);
         if (!response.ok) {

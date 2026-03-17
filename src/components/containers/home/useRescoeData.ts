@@ -159,7 +159,7 @@ export const useRescoeData = (): UseRescoeDataReturn => {
     const cached = loadCacheArray<Haiku>(cacheKey);
     if (cached?.length) {
       setHaikusByCollection(p => ({ ...p, [collectionId]: cached }));
-      console.log(`[POEMS ${collectionId}] Cache: ${cached.length}`);
+      //console.log(`[POEMS ${collectionId}] Cache: ${cached.length}`);
       return;
     }
 
@@ -167,7 +167,7 @@ export const useRescoeData = (): UseRescoeDataReturn => {
       const contract = new Contract(address, haikuContractABI, provider);
       const count = Number(await contract.getLastUniqueHaikusMinted());
       if (!count) {
-        console.log(`[POEMS ${collectionId}] No haikus`);
+        //console.log(`[POEMS ${collectionId}] No haikus`);
         return;
       }
 
@@ -195,7 +195,7 @@ export const useRescoeData = (): UseRescoeDataReturn => {
         })
       )).filter(Boolean) as Haiku[];
 
-      console.log(`[POEMS ${collectionId}] Found ${poems.length}`);
+      //console.log(`[POEMS ${collectionId}] Found ${poems.length}`);
       setHaikusByCollection(p => ({ ...p, [collectionId]: poems }));
       saveCache(cacheKey, poems);
     } catch (e) {
@@ -209,14 +209,14 @@ export const useRescoeData = (): UseRescoeDataReturn => {
     const cacheKey = `nfts_${collectionId}`;
 
     if (!address || address === "0x0000000000000000000000000000000000000000") {
-      console.log(`[NFTS ${collectionId}] Invalid address: ${address}`);
+      //console.log(`[NFTS ${collectionId}] Invalid address: ${address}`);
       return;
     }
 
     const cached = loadCacheArray<Nft>(cacheKey);
     if (cached?.length) {
       setNftsByCollection(p => ({ ...p, [collectionId]: cached }));
-      console.log(`[NFTS ${collectionId}] Cache: ${cached.length}`);
+      //console.log(`[NFTS ${collectionId}] Cache: ${cached.length}`);
       return;
     }
 
@@ -276,7 +276,7 @@ export const useRescoeData = (): UseRescoeDataReturn => {
         })
       )).filter(Boolean) as Nft[];
 
-      console.log(`[NFTS ${collectionId}] Found ${nfts.length}`);
+      //console.log(`[NFTS ${collectionId}] Found ${nfts.length}`);
       setNftsByCollection(p => ({ ...p, [collectionId]: nfts }));
       saveCache(cacheKey, nfts);
     } catch (e) {
