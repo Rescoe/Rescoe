@@ -203,6 +203,14 @@ const NFTCard: React.FC<NFTCardProps> = ({ nft, buyNFT }) => {
               >
                 Acheter
               </Button>
+              <Text
+  fontSize="xs"
+  textAlign="center"
+  color="gray.500"
+  lineHeight="1.2"
+>
+  ✓ Mint immédiat - En achetant cette oeuvre vous Acceptez les CGU et renoncer au droit de rétractation immediatement après la siganture de la transaction
+</Text>
             </>
           ) : (
             <Box w="full" textAlign="center" p={4} borderRadius="xl">

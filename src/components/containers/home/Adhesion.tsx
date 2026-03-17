@@ -27,6 +27,13 @@ import {
   Checkbox,
   Alert, AlertIcon, AlertTitle,
   Link,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  Textarea,
 } from "@chakra-ui/react";
 import { Canvas } from "@react-three/fiber";
 import { FaAward, FaWallet, FaClock, FaUserShield, FaStar } from "react-icons/fa";
@@ -80,6 +87,9 @@ const RoleBasedNFTPage = () => {
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
   const [insectData, setInsectData] = useState<any>(null);
+
+  const [isCguModalOpen, setIsCguModalOpen] = useState(false);
+const [cguAccepted, setCguAccepted] = useState(false);
 
   const {
   isOpen: isSimOpen,
@@ -512,6 +522,16 @@ const contract = new web3.eth.Contract(ABI as any, contractAddress);
     }, 5000);
   };
 
+  const handleConfirmAdhesion = async () => {
+  if (!cguAccepted) {
+    alert("⚠️ Vous devez accepter les CGU");
+    return;
+  }
+  setIsCguModalOpen(false);  // Ferme modale
+  await handleAdhere();  // Lance mint
+};
+
+
 /*
   const switchToSepolia = async () => {
     if (web3 && (web3.currentProvider as any)) {
@@ -616,12 +636,20 @@ const contract = new web3.eth.Contract(ABI as any, contractAddress);
                     visuel animé.
                   </Text>
                 </ListItem>
+
               </List>
             </Box>
 
-            <Text textAlign="center" mb={4}>
+            <Text textAlign="center" color="brand.gold" mb={4}>
               Connectez-vous pour pouvoir adhérer.
             </Text>
+
+                <Text fontSize="s" color="brand.cream" mb={4}>
+                <strong>Assurez vous d'avoir lu les conditions générales d'utilisation</strong>{' '}
+                <Link href="./CGU" color="brand.gold" isExternal>
+                  Voir les CGU complètes
+                </Link>
+              </Text>
           </VStack>
 
           <Divider mb="10" />
@@ -789,24 +817,25 @@ mb={4}
               */}
 
               <VStack spacing={3}>
-                <Button
-                  w="full"
-                  colorScheme="teal"
-                  size="lg"
-                  onClick={handleAdhere}
-                  isLoading={isProcessing || isUploading}
-                  loadingText={
-                    isUploading
-                      ? "📤 Upload IPFS en cours..."
-                      : "🔨 Finalisation mint..."
-                  }
-                  isDisabled={!selectedRole || !name || !bio || mintRestant <= 0}
-                >
-                  {mintRestant > 1
-                    ? `🎉 Adhérer (${mintRestant} restantes)`
-                    : "🎉 Adhérer (dernière !)"
-                  }
-                </Button>
+              <Button
+                w="full"
+                colorScheme="teal"
+                size="lg"
+                onClick={() => setIsCguModalOpen(true)}  // ✅ OUVRE MODALE
+                isLoading={isProcessing || isUploading}
+                loadingText={
+                  isUploading
+                    ? "📤 Upload IPFS en cours..."
+                    : "🔨 Finalisation mint..."
+                }
+                isDisabled={!selectedRole || !name || !bio || mintRestant <= 0}
+              >
+                {mintRestant > 1
+                  ? `🎉 Adhérer (${mintRestant} restantes)`
+                  : "🎉 Adhérer (dernière !)"
+                }
+              </Button>
+
               </VStack>
 
 
@@ -861,6 +890,82 @@ mb={4}
           </Canvas>
         </Box>
       )}
+
+
+      <Modal isOpen={isCguModalOpen} onClose={() => setIsCguModalOpen(false)} isCentered size="lg">
+        <ModalOverlay />
+        <ModalContent maxH="90vh" overflowY="auto">
+          <ModalHeader>📜 Conditions d'adhésion ResCoe</ModalHeader>
+          <ModalBody p={6}>
+            <Alert status="warning" mb={6}>
+              <AlertIcon />
+              En adhérant à l'association ResCoe, vous reconnaissez avoir lu et accepté intégralement :
+            </Alert>
+
+            <VStack align="start" spacing={4} fontSize="sm">
+              <Box>
+                <strong>✅ Les Conditions Générales d'Utilisation (CGU)</strong>
+                <Text>Statut associatif loi 1901, anti-spéculation, blockchain Base uniquement.</Text>
+              </Box>
+              <Box>
+                <strong>✅ Politique anti-spéculation</strong>
+                <Text>Pas de trading, pas d'investissement, soutien artistique exclusif.</Text>
+              </Box>
+              <Box>
+                <strong>✅ Licence des NFT</strong>
+                <Text>Usage personnel uniquement, pas de droits d'auteur transférés.</Text>
+              </Box>
+              <Box>
+                <strong>✅ Risques blockchain</strong>
+                <Text>Transactions irréversibles, pas de support clés privées perdues.</Text>
+              </Box>
+              <Box>
+                <strong>✅ RGPD & paiements Stripe</strong>
+                <Text>Données sécurisées, KYC si <strong>&gt;1000€</strong>, déclarations TRACFIN si nécessaire.</Text>
+              </Box>
+            </VStack>
+
+            <Divider my={6} />
+
+            <Text fontSize="s" mb={4}>
+              <strong>Texte intégral :</strong>{' '}
+              <Link href="./CGU" color="brand.gold" isExternal>
+                Voir les CGU complètes
+              </Link>
+            </Text>
+
+            <Checkbox
+              isChecked={cguAccepted}
+              onChange={(e) => setCguAccepted(e.target.checked)}
+              mb={4}
+            >
+              <strong>J'accepte les CGU et adhère à ResCoe</strong>
+            </Checkbox>
+          </ModalBody>
+
+          <ModalFooter>
+            <Button
+              variant="ghost"
+              mr={3}
+              onClick={() => {
+                setIsCguModalOpen(false);
+                setCguAccepted(false);
+              }}
+            >
+              Annuler
+            </Button>
+            <Button
+              colorScheme="teal"
+              onClick={handleConfirmAdhesion}
+              isDisabled={!cguAccepted}
+            >
+              ✅ Accepter et adhérer
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+
     </Box>
   );
 };

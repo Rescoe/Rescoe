@@ -173,8 +173,7 @@ export default function Footer() {
           lineHeight={1.6}
           fontStyle="italic"
         >
-          Infrastructure ouverte pour créer, publier et diffuser des œuvres numériques
-          entre pratique artistique, recherche et pédagogie.
+          RESCOE croit en un art numérique libéré des logiques financières, un espace où la création prime sur la spéculation, où le lien entre l'artiste et le public se construit dans la durée et non dans l'urgence du profit. Nous refusons que la blockchain devienne un casino déguisé en galerie. Nous affirmons que chaque NFT est d'abord une œuvre, ensuite un certificat, jamais un placement.
         </Text>
 
         {/* NAVIGATION & COMMUNITY - Parfaitement centrée */}
