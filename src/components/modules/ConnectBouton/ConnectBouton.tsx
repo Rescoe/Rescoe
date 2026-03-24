@@ -16,8 +16,14 @@ import {
   Badge,
   Flex,
   useBreakpointValue,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalCloseButton,
+  Spinner,
 } from "@chakra-ui/react";
-import { LinkIcon, CopyIcon } from "@chakra-ui/icons";
+import { LinkIcon, CopyIcon, ArrowUpIcon  } from "@chakra-ui/icons";
 import { motion } from "framer-motion";
 import { signIn, signOut } from "next-auth/react";
 import { useAuthRequestChallengeEvm } from "@moralisweb3/next";
@@ -26,6 +32,12 @@ import { useAuth } from "../../../utils/authContext";
 import Web3 from "web3";
 import detectEthereumProvider from "@metamask/detect-provider";
 import { formatUnits } from "@ethersproject/units";
+
+import {
+  stripeOnrampPromise,
+  CryptoElements,
+  OnrampElement
+} from "../StripeCryptoElements";
 
 const MotionMenuButton = motion(MenuButton);
 
@@ -83,6 +95,33 @@ const ConnectBouton: React.FC = () => {
     const interval = setInterval(fetchBalance, 10000);
     return () => clearInterval(interval);
   }, [web3, address]);
+
+  const [onrampOpen, setOnrampOpen] = useState(false);
+ const [clientSecret, setClientSecret] = useState("");
+
+ const createOnrampSession = async () => {
+   if (!address) return toast({ title: "Connecte-toi d'abord !", status: "warning" });
+
+   try {
+     const res = await fetch("/api/create-onramp-session", {
+       method: "POST",
+       headers: { "Content-Type": "application/json" },
+       body: JSON.stringify({
+         walletAddress: address, // ✅ WALLET CONNECTÉ (Web3Auth/MetaMask)
+       }),
+     });
+
+     const data = await res.json();
+     if (data.error) throw new Error(data.error);
+
+     // Embedded modal OU hosted redirect
+     setClientSecret(data.clientSecret);
+     setOnrampOpen(true);
+   } catch (e: any) {
+     toast({ title: "Erreur rampe", description: e.message, status: "error" });
+   }
+ };
+
 
   const handleAuth = async (account: string) => {
     setIsConnecting(true);
@@ -225,6 +264,7 @@ const ConnectBouton: React.FC = () => {
   // ========== CONNECTED - NOUVEAU BOUTON PETIT + COMPACT ✅ ==========
   const { onCopy, hasCopied } = useClipboard(address || "");
   return (
+     <>
     <Menu placement="bottom-end">
       <Tooltip
         label={
@@ -367,11 +407,27 @@ const ConnectBouton: React.FC = () => {
           </HStack>
         </MenuItem>
 
+        {/* === NOUVEAU : BOUTON ONRAMP SOUS SOLDE, AU-DESSUS DE BASE === */}
+        <MenuItem           onClick={createOnrampSession}
+ py={3} px={4}           border="1px solid transparent"
+  _hover={{ bg: "brand.cream/5", borderColor: "brand.gold"}}>
+          <HStack>
+            <Box w={2.5} h={2.5} bg="brand.cream" borderRadius="full" boxShadow="0 0 10px brand.cream" />
+            <VStack align="start" spacing={0} flex={1}>
+              <Text color="brand.cream" fontWeight={600}>Acheter des ETH</Text>
+              <Text fontSize="xs" color="brand.cream">
+                Rampe Stripe • Base (ETH)
+              </Text>
+            </VStack>
+            <ArrowUpIcon color="brand.gold" boxSize={4} transform="rotate(45deg)" />
+          </HStack>
+        </MenuItem>
+
         {/* CHAIN */}
         <MenuItem py={3} px={4} _hover={{ bg: "brand.cream/5" }}>
           <HStack>
             <Box w={2} h={2} bg="brand.cream" borderRadius="full" />
-            <Text color="brand.cream">Base ({selectedChainId})</Text>
+            <Text color="brand.cream">Réseau : Base ({selectedChainId})</Text>
           </HStack>
         </MenuItem>
 
@@ -394,6 +450,63 @@ const ConnectBouton: React.FC = () => {
         </Box>
       </MenuList>
     </Menu>
+
+    {/* ✅ MODAL COMPLET - Build safe */}
+<Modal isOpen={onrampOpen} onClose={() => setOnrampOpen(false)} size="full" isCentered>
+  <ModalOverlay backdropFilter="blur(20px)" bg="blackAlpha.800" />
+  <ModalContent
+    bg="brand.navy"
+    borderRadius="3xl"
+    maxW="none"
+    mx={4}
+    mt={{ base: 16, md: 24 }}
+    border="2px solid" borderColor="brand.gold/20"
+  >
+    <ModalHeader pb={4}>
+      <HStack spacing={4}>
+        <Box w={10} h={10} bg="brand.gold" borderRadius="full" boxShadow="0 0 30px rgba(255,237,166,0.6)" />
+        <VStack align="start" spacing={1}>
+          <Text color="brand.cream" fontSize={{ base: "xl", md: "2xl" }} fontWeight={700}>
+            Acheter ETH Base
+          </Text>
+          <HStack>
+            <Badge colorScheme="green" fontSize="xs">0.01 Ξ</Badge>
+            <Text fontSize="sm" color="brand.cream" opacity={0.8}>
+              {getEllipsisTxt(address!)}
+            </Text>
+          </HStack>
+        </VStack>
+      </HStack>
+    </ModalHeader>
+    <ModalCloseButton color="brand.cream" size="lg" />
+
+    {clientSecret ? (
+      <Box p={{ base: 4, md: 8 }} h={{ base: "70vh", md: "650px" }}>
+        {/* ✅ WRAPPER */}
+        <CryptoElements stripeOnramp={stripeOnrampPromise}>
+        <OnrampElement
+          clientSecret={clientSecret}
+          appearance={{ theme: "dark" }}
+          onChange={(e) => {
+            if (["complete", "fulfillment_complete"].includes(e.payload.session.status)) {
+              toast({ title: "🎉 ETH reçu !", status: "success" });
+              setTimeout(() => setOnrampOpen(false), 1500);
+            }
+          }}
+        />
+        </CryptoElements>
+      </Box>
+    ) : (
+      <Box p={12} textAlign="center">
+        <Spinner size="xl" color="brand.gold" />
+        <Text mt={6} color="brand.cream" fontSize="lg">
+          Rampe ETH Base
+        </Text>
+      </Box>
+    )}
+  </ModalContent>
+</Modal>
+</>
   );
 };
 
