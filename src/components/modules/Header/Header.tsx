@@ -221,41 +221,66 @@ const Header = () => {
     return RESIDENT_ADDRESSES.includes(userAddress.toLowerCase());
   };
 
-  // ✅ ÉTAPE 1 : Auth basique (100ms delay)
-    useEffect(() => {
-      if (isAuthenticated && address) {
-        setLoadStep('role');
-        const timer = setTimeout(() => setLoadStep('resident'), 100);
-        return () => clearTimeout(timer);
-      }
+  // ✅ ÉTAPE 1 : Auth → Role (sérialisé)
+  useEffect(() => {
+    console.log('[LOAD] isAuthenticated:', isAuthenticated, 'address:', address);
+
+    if (!isAuthenticated || !address) {
+      console.log('[LOAD] → auth');
       setLoadStep('auth');
-    }, [isAuthenticated, address]);
+      return;
+    }
 
-    // ✅ ÉTAPE 2 : Rôles (200ms après auth)
-    useEffect(() => {
-      if (loadStep === 'role' && !roleLoading && role !== null) {
-        const timer = setTimeout(() => setLoadStep('resident'), 200);
-        return () => clearTimeout(timer);
-      }
-    }, [loadStep, roleLoading, role]);
+    console.log('[LOAD] → role');
+    setLoadStep('role');
+  }, [isAuthenticated, address]);
 
-    useEffect(() => {
-      if (loadStep === 'resident' && address) {
-        const residentStatus = checkIsResident(address);
-        setIsResident(residentStatus);
+  // ✅ ÉTAPE 2 : Role fini → Resident
+  useEffect(() => {
+    if (loadStep !== 'role') return;
 
-        // ✅ UNE SEULE ASSIGNATION FINALE
-        (window as any).RESCOE_AUTH = {
-          isAuthenticated, address, role, isAdmin, isArtist, isPoet,
-          isTrainee, isContributor, isMember, web3, provider,
-          connectWallet, connectWithEmail, logout, roleLoading, isLoading,
-          isResident: residentStatus,
-        };
-        setLoadStep('ready');
-      }
-    }, [loadStep, address, isAuthenticated, role, isAdmin, isArtist, isPoet,
-        isTrainee, isContributor, isMember, web3, provider, roleLoading, isLoading]);
+    console.log('[LOAD] roleLoading:', roleLoading, 'role:', role);
 
+    if (roleLoading) return; // Attends role
+
+    if (role !== null) {
+      console.log('[LOAD] role OK → resident');
+      setLoadStep('resident');
+    } else {
+      console.log('[LOAD] role null → retry');
+    }
+  }, [loadStep, roleLoading, role]);
+
+  // ✅ ÉTAPE 3 : Resident → Ready + Global
+  useEffect(() => {
+    if (loadStep !== 'resident') return;
+
+    console.log('[LOAD] address:', address, '→ check resident');
+
+    if (!address) {
+      setLoadStep('role'); // Retry
+      return;
+    }
+
+    const residentStatus = checkIsResident(address);
+    console.log('[LOAD] isResident:', residentStatus);
+    setIsResident(residentStatus);
+
+    // ✅ GLOBAL AUTH ONCE
+    (window as any).RESCOE_AUTH = {
+      isAuthenticated,
+      address,
+      role: role || 'user',
+      isAdmin, isArtist, isPoet, isTrainee, isContributor, isMember,
+      web3, provider,
+      connectWallet, connectWithEmail, logout,
+      roleLoading, isLoading,
+      isResident: residentStatus,
+    };
+
+    console.log('[LOAD] → READY ! Global set');
+    setLoadStep('ready');
+  }, [loadStep, address, role, isAuthenticated, isAdmin, isArtist, isPoet, isTrainee, isContributor, isMember, web3, provider, roleLoading, isLoading]);
 
   // ✅ boxShadowHover DÉPLACÉ ICI (FIX ERREUR)
   const boxShadowHover = useColorModeValue(
