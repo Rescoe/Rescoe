@@ -61,7 +61,16 @@ const ConnectBouton: React.FC = () => {
 
   const [isConnecting, setIsConnecting] = useState(false);
   const [balance, setBalance] = useState("0");
+
+  const [ethBalance, setEthBalance] = useState("0"); // UNIQUEMENT ETH (baseBalance déjà là)
+
+  // Remplace ETH_RPC (ligne 35)
+  const ETH_RPC = "https://ethereum.publicnode.com"; // Ou Alchemy gratuit
+
+
   const selectedChainId = 8453;
+  const [web3Eth, setWeb3Eth] = useState<Web3 | null>(null); // ✅ AJOUTE ÇA
+
   const [web3, setWeb3] = useState<Web3 | null>(null);
 
   const isDesktop = useBreakpointValue({ base: false, md: true });
@@ -78,12 +87,40 @@ const ConnectBouton: React.FC = () => {
     initWeb3();
   }, []);
 
+
+  useEffect(() => {
+    const initEthRpc = async () => {
+      if (typeof window === "undefined") return;
+      try {
+        const web3e = new Web3(new Web3.providers.HttpProvider(ETH_RPC));
+        setWeb3Eth(web3e); // ✅ MAINTENANT DÉFINI
+        } catch (rpcError: any) {
+         console.log("ETH RPC temp error:", rpcError.message);
+       }
+    };
+    initEthRpc();
+  }, []);
+
+
   useEffect(() => {
     if (!web3 || !address) return;
 
     const fetchBalance = async () => {
       try {
-        const bal = await web3.eth.getBalance(address);
+
+
+        // Dans fetchBalance (ligne 85), wrap avec retry
+        if (web3Eth && address) {
+          try {
+            const balEth = await web3Eth.eth.getBalance(address);
+            setEthBalance(formatUnits(balEth, 18).slice(0, 6));
+          } catch (rpcError: any) {
+            console.log("ETH RPC temp error:", rpcError.message);
+            // Ignore, retry au prochain interval
+          }
+        }
+
+        const bal = await web3.eth.getBalance(address); // Base via MetaMask
         const formatted = formatUnits(bal, 18);
         setBalance(formatted.slice(0, 8));
       } catch (e) {
@@ -95,6 +132,8 @@ const ConnectBouton: React.FC = () => {
     const interval = setInterval(fetchBalance, 10000);
     return () => clearInterval(interval);
   }, [web3, address]);
+
+
 
   const [onrampOpen, setOnrampOpen] = useState(false);
  const [clientSecret, setClientSecret] = useState("");
@@ -401,8 +440,41 @@ const ConnectBouton: React.FC = () => {
             <VStack align="start" spacing={0}>
               <Text color="brand.cream">Solde</Text>
               <Text fontSize="sm" color="brand.gold">
-                {balance} ETH
+                Base : {balance} ETH
               </Text>
+
+              <Text fontSize="sm" color="brand.gold">Ethereum: {ethBalance} ETH</Text>
+
+              {parseFloat(ethBalance) > 0.001 && ( // ✅ > 0.001 pour swap utile
+                <Button
+                  size="xs"
+                  w="full"
+                  mt={1}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.dispatchEvent(new CustomEvent('openSwapModal'));
+                  }}
+                  bg="brand.gold" // ✅ Couleur directe
+                  color="black"
+                  fontSize="xs"
+                  fontWeight={600}
+                  borderRadius="md"
+                  boxShadow="0 4px 12px rgba(238,212,132,0.4)"
+                  _hover={{
+                    bg: "brand.cream",
+                    boxShadow: "0 6px 20px rgba(238,212,132,0.6)",
+                    transform: "translateY(-1px)",
+                  }}
+                  _active={{
+                    transform: "translateY(0px)",
+                    boxShadow: "0 2px 8px rgba(238,212,132,0.3)",
+                  }}
+                  transition="all 0.2s"
+                >
+                  ↔️ {parseFloat(ethBalance).toFixed(3)} ETH → Base
+                </Button>
+              )}
+
             </VStack>
           </HStack>
         </MenuItem>

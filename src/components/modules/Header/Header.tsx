@@ -193,6 +193,10 @@ const Header = () => {
   const MotionButton = motion(Button)
   const MotionBadge = motion(Badge);
 
+  const [loadStep, setLoadStep] = useState<'auth' | 'role' | 'resident' | 'ready'>('auth');
+  const [isResident, setIsResident] = useState(false);
+  const [evolutionCount, setEvolutionCount] = useState(0);
+
   const {
     isAuthenticated,
     isAdmin,
@@ -212,57 +216,52 @@ const Header = () => {
     isLoading,
   } = useAuth();
 
-  // ✅ ÉTAT CENTRALISÉ : est-ce que l'utilisateur actuel est résident ?
-  const [isResident, setIsResident] = useState(false);
-  const [evolutionCount, setEvolutionCount] = useState(0);
+  const checkIsResident = (userAddress: string | null): boolean => {
+    if (!userAddress) return false;
+    return RESIDENT_ADDRESSES.includes(userAddress.toLowerCase());
+  };
+
+  // ✅ ÉTAPE 1 : Auth basique (100ms delay)
+    useEffect(() => {
+      if (isAuthenticated && address) {
+        setLoadStep('role');
+        const timer = setTimeout(() => setLoadStep('resident'), 100);
+        return () => clearTimeout(timer);
+      }
+      setLoadStep('auth');
+    }, [isAuthenticated, address]);
+
+    // ✅ ÉTAPE 2 : Rôles (200ms après auth)
+    useEffect(() => {
+      if (loadStep === 'role' && !roleLoading && role !== null) {
+        const timer = setTimeout(() => setLoadStep('resident'), 200);
+        return () => clearTimeout(timer);
+      }
+    }, [loadStep, roleLoading, role]);
+
+    useEffect(() => {
+      if (loadStep === 'resident' && address) {
+        const residentStatus = checkIsResident(address);
+        setIsResident(residentStatus);
+
+        // ✅ UNE SEULE ASSIGNATION FINALE
+        (window as any).RESCOE_AUTH = {
+          isAuthenticated, address, role, isAdmin, isArtist, isPoet,
+          isTrainee, isContributor, isMember, web3, provider,
+          connectWallet, connectWithEmail, logout, roleLoading, isLoading,
+          isResident: residentStatus,
+        };
+        setLoadStep('ready');
+      }
+    }, [loadStep, address, isAuthenticated, role, isAdmin, isArtist, isPoet,
+        isTrainee, isContributor, isMember, web3, provider, roleLoading, isLoading]);
+
 
   // ✅ boxShadowHover DÉPLACÉ ICI (FIX ERREUR)
   const boxShadowHover = useColorModeValue(
     "0 0 15px rgba(180, 166, 213, 0.25)", // light
     "0 0 15px rgba(238, 212, 132, 0.25)"  // dark
   );
-
-  // ✅ FONCTION UTILITAIRE pour vérifier si une adresse est résidente
-  const checkIsResident = (userAddress: string | null): boolean => {
-    if (!userAddress) return false;
-    return RESIDENT_ADDRESSES.includes(userAddress as string);
-  };
-
-  // ✅ VERIFICATION AUTOMATIQUE à chaque changement d'adresse
-  // ✅ REMPLACEZ TOUT le useEffect (lignes ~200-260) par ÇA :
-useEffect(() => {
-  const residentStatus = checkIsResident(address);
-  setIsResident(residentStatus);
-
-  // ✅ UN SEUL OBJET avec TOUTES les valeurs ACTUELLES
-  const authData = {
-    isAuthenticated,
-    address,
-    role,
-    isAdmin,
-    isArtist,
-    isPoet,
-    isTrainee,
-    isContributor,
-    isMember,
-    web3,
-    provider,
-    connectWallet,
-    connectWithEmail,
-    logout,
-    roleLoading,
-    isLoading,
-    isResident: residentStatus,  // ✅ isResident inclus !
-  } as any;
-
-  // ✅ ASSIGNATION DIRECTE (pas d'update ligne par ligne)
-  (window as any).RESCOE_AUTH = authData;
-
-}, [
-  address, isAuthenticated, role, isAdmin, isArtist, isPoet,
-  isTrainee, isContributor, isMember, web3, provider,
-  roleLoading, isLoading, connectWallet, connectWithEmail, logout
-]);
 
 
   const [isInsectVisible, setIsInsectVisible] = useState(true);
@@ -325,6 +324,32 @@ useEffect(() => {
   useEffect(() => {
     localStorage.setItem('insectVisibility', JSON.stringify(isInsectVisible));
   }, [isInsectVisible]);
+
+
+  // ✅ UI DE CHARGEMENT PROGRESSIF
+if (loadStep !== 'ready' && isAuthenticated) {
+      return (
+      <Box py={8} textAlign="center">
+      <Box
+        as={motion.div} // ✅ Motion wrapper
+        w="40px" h="40px"
+        border="3px solid"
+        borderColor="brand.cream"
+        borderTopColor="brand.gold"
+        borderRadius="full"
+        animate={{ rotate: 360 }}
+
+        mx="auto"
+        mb={4}
+      />
+        <Box fontSize="sm" color="brand.cream">
+          {loadStep === 'auth' && 'Connexion...'}
+          {loadStep === 'role' && 'Chargement rôles...'}
+          {loadStep === 'resident' && 'Vérification résident...'}
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Box
