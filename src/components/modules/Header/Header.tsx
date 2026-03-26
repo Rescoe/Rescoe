@@ -1,4 +1,4 @@
-import { Box, Badge, Spinner, Progress, Text, Tooltip, Container, Button, Menu, MenuButton, MenuList, MenuItem, Drawer, DrawerBody, DrawerCloseButton, DrawerContent, DrawerHeader, DrawerOverlay, useDisclosure, HStack, VStack, Flex, useColorModeValue, useTheme } from '@chakra-ui/react';
+import { Box, Badge, Tooltip, Container, Button, Menu, MenuButton, MenuList, MenuItem, Drawer, DrawerBody, DrawerCloseButton, DrawerContent, DrawerHeader, DrawerOverlay, useDisclosure, HStack, VStack, Flex, useColorModeValue, useTheme } from '@chakra-ui/react';
 import { FaBug, FaEye, FaEyeSlash, FaBars } from 'react-icons/fa';
 
 import { ChevronDownIcon } from '@chakra-ui/icons';
@@ -23,20 +23,6 @@ const MotionMenuButton = motion(MenuButton);
 
 import { brandHover, hoverStyles } from "@styles/theme"; //Style
 
-
-import ABI from '../../../components/ABI/ABIAdhesion.json';  // Ajustez chemin
-import { Web3 } from 'web3';
-
-
-// Supprimez : import type { MemberInfo } from '@/utils/authContext';
-
-// Ajoutez avant fetchRoleLocal :
-interface MemberInfo {
-  role: number;
-  exists: boolean;
-  timestamp: number;
-  isforSale: boolean;
-}
 // ✅ NOUVELLE LISTE CENTRALE DES ADRESSES RÉSIDENTS
 const RESIDENT_ADDRESSES = [
   "0x552C63E3B89ADf749A5C1bB66fE574dF9203FfB4".toLowerCase(),
@@ -112,14 +98,6 @@ const ROLE_MENUS: Record<RoleKey, RoleMenuConfig> = {
     ],
   },
 
-};
-
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS!;
-const roleMapping: Record<number, string> = {
-  0: 'artist',
-  1: 'poet',
-  2: 'contributor',
-  3: 'trainee'
 };
 
 // ✅ COMPOSANT RoleMenu RÉUTILISABLE (AVEC TOOLTIP RÉSIDENCE)
@@ -215,10 +193,6 @@ const Header = () => {
   const MotionButton = motion(Button)
   const MotionBadge = motion(Badge);
 
-  const [loadStep, setLoadStep] = useState<'auth' | 'role' | 'resident' | 'ready'>('auth');
-  const [isResident, setIsResident] = useState(false);
-  const [evolutionCount, setEvolutionCount] = useState(0);
-
   const {
     isAuthenticated,
     isAdmin,
@@ -238,109 +212,57 @@ const Header = () => {
     isLoading,
   } = useAuth();
 
-  const checkIsResident = (userAddress: string | null): boolean => {
-    if (!userAddress) return false;
-    return RESIDENT_ADDRESSES.includes(userAddress.toLowerCase());
-  };
-
-  const fetchRoleLocal = async (web3Instance: any, userAddress: string) => {
-    console.log('[fetchRoleLocal START] Retry rôle pour:', userAddress);
-    try {
-      const contract = new web3Instance.eth.Contract(ABI as any, CONTRACT_ADDRESS);
-      const owner = await contract.methods.owner().call() as string;
-
-      if (owner?.toLowerCase() === userAddress.toLowerCase()) {
-        console.log('[fetchRoleLocal] → admin');
-        // AuthContext gère déjà via useEffect global ou bouton retry
-        return 'admin';
-      }
-
-      const memberInfo: MemberInfo = await contract.methods.members(userAddress).call();
-      if (!memberInfo?.exists) {
-        console.log('[fetchRoleLocal] → non-member');
-        return 'non-member';
-      }
-
-      const roleIndex = parseInt(String(memberInfo.role), 10);
-      const foundRole = roleMapping[roleIndex] || 'non-member';
-      console.log('[fetchRoleLocal] →', foundRole);
-      return foundRole;
-    } catch (error) {
-      console.error('[fetchRoleLocal] Error:', error);
-      return 'non-member';
-    }
-  };
-
-  // ✅ ÉTAPE 1 : Auth → Role (sérialisé) + fetch local si besoin
-  useEffect(() => {
-    console.log('[LOAD] isAuthenticated:', isAuthenticated, 'address:', address);
-
-    if (!isAuthenticated || !address) {
-      console.log('[LOAD] → auth');
-      setLoadStep('auth');
-      return;
-    }
-
-    console.log('[LOAD] → role');
-    setLoadStep('role');
-
-    // ✅ FETCH LOCAL si role null ET web3 dispo (fix wallet)
-    if (!role && !roleLoading && web3) {
-      console.log('[LOAD] role null → fetch local');
-      fetchRoleLocal(web3, address);
-    }
-  }, [isAuthenticated, address, role, roleLoading, web3]);
-
-  // ✅ ÉTAPE 2 : Role fini → Resident (FIX : avance TOUJOURS)
-  useEffect(() => {
-    if (loadStep !== 'role') return;
-
-    console.log('[LOAD] roleLoading:', roleLoading, 'role:', role);
-
-    if (roleLoading) return; // Attends role
-
-    console.log('[LOAD] role OK', role || 'non-member', '→ resident');
-    setLoadStep('resident');  // ✅ AVANCE TOUJOURS (null = non-member valide)
-  }, [loadStep, roleLoading]);  // ✅ Pas 'role' en deps (évite boucle)
-
-  // ✅ ÉTAPE 3 : Resident → Ready + Global (FIX : deps minimales)
-  useEffect(() => {
-    if (loadStep !== 'resident') return;
-
-    console.log('[LOAD] address:', address, '→ check resident');
-
-    if (!address) {
-      setLoadStep('role'); // Retry
-      return;
-    }
-
-    const residentStatus = checkIsResident(address);
-    console.log('[LOAD] isResident:', residentStatus);
-    setIsResident(residentStatus);
-
-    // ✅ GLOBAL AUTH ONCE (role null → non-member)
-    (window as any).RESCOE_AUTH = {
-      isAuthenticated,
-      address,
-      role: role || 'non-member',  // ✅ Fix null
-      isAdmin, isArtist, isPoet, isTrainee, isContributor, isMember,
-      web3, provider,
-      connectWallet, connectWithEmail, logout,
-      roleLoading: false,  // ✅ Force off
-      isLoading,
-      isResident: residentStatus,
-    };
-
-    console.log('[LOAD] → READY ! Global set');
-    setLoadStep('ready');
-  }, [loadStep, address]);  // ✅ Deps minimales
-
+  // ✅ ÉTAT CENTRALISÉ : est-ce que l'utilisateur actuel est résident ?
+  const [isResident, setIsResident] = useState(false);
+  const [evolutionCount, setEvolutionCount] = useState(0);
 
   // ✅ boxShadowHover DÉPLACÉ ICI (FIX ERREUR)
   const boxShadowHover = useColorModeValue(
     "0 0 15px rgba(180, 166, 213, 0.25)", // light
     "0 0 15px rgba(238, 212, 132, 0.25)"  // dark
   );
+
+  // ✅ FONCTION UTILITAIRE pour vérifier si une adresse est résidente
+  const checkIsResident = (userAddress: string | null): boolean => {
+    if (!userAddress) return false;
+    return RESIDENT_ADDRESSES.includes(userAddress as string);
+  };
+
+  // ✅ VERIFICATION AUTOMATIQUE à chaque changement d'adresse
+  // ✅ REMPLACEZ TOUT le useEffect (lignes ~200-260) par ÇA :
+useEffect(() => {
+  const residentStatus = checkIsResident(address);
+  setIsResident(residentStatus);
+
+  // ✅ UN SEUL OBJET avec TOUTES les valeurs ACTUELLES
+  const authData = {
+    isAuthenticated,
+    address,
+    role,
+    isAdmin,
+    isArtist,
+    isPoet,
+    isTrainee,
+    isContributor,
+    isMember,
+    web3,
+    provider,
+    connectWallet,
+    connectWithEmail,
+    logout,
+    roleLoading,
+    isLoading,
+    isResident: residentStatus,  // ✅ isResident inclus !
+  } as any;
+
+  // ✅ ASSIGNATION DIRECTE (pas d'update ligne par ligne)
+  (window as any).RESCOE_AUTH = authData;
+
+}, [
+  address, isAuthenticated, role, isAdmin, isArtist, isPoet,
+  isTrainee, isContributor, isMember, web3, provider,
+  roleLoading, isLoading, connectWallet, connectWithEmail, logout
+]);
 
 
   const [isInsectVisible, setIsInsectVisible] = useState(true);
@@ -403,42 +325,6 @@ const Header = () => {
   useEffect(() => {
     localStorage.setItem('insectVisibility', JSON.stringify(isInsectVisible));
   }, [isInsectVisible]);
-
-
-  // ✅ UI DE CHARGEMENT PROGRESSIF
-  if (loadStep !== 'ready' && isAuthenticated) {
-    return (
-      <Box py={12} textAlign="center" minH="120px">
-        {/* Spinner principal */}
-        <Spinner
-          size="lg"
-          color="brand.gold"
-          thickness="4px"
-          speed="0.8s"
-          emptyColor="brand.cream/20"
-          mx="auto"
-          mb={6}
-        />
-
-        {/* Step indicator */}
-        <VStack spacing={2}>
-          <Text fontSize="sm" fontWeight={500} color="brand.cream">
-            {loadStep === 'auth' && '🔐 Connexion...'}
-            {loadStep === 'role' && '⚙️ Chargement rôles...'}
-            {loadStep === 'resident' && '🎨 Vérification résident...'}
-          </Text>
-          <Progress
-            w="200px"
-            value={loadStep === 'auth' ? 33 : loadStep === 'role' ? 66 : 99}
-            size="sm"
-            colorScheme="brand.gold"
-            borderRadius="full"
-            bg="brand.cream/10"
-          />
-        </VStack>
-      </Box>
-    );
-  }
 
   return (
     <Box
