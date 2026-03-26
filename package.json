@@ -17,6 +17,7 @@
     "p5": "^1.4.0"
   },
   "dependencies": {
+    "@1inch/embedded-widget": "^0.0.2",
     "@chakra-ui/icons": "^2.0.8",
     "@chakra-ui/react": "^2.10.3",
     "@emotion/react": "^11.13.3",
