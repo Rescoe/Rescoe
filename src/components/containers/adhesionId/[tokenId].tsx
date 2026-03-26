@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'; // ✅ ERREUR 1: useCallback ajouté
 import { JsonRpcProvider, Contract as EthersContract, formatUnits, BigNumberish } from 'ethers';
+import { getProvider } from '@/utils/provider';
+
 import Web3 from 'web3';
 
 import {
@@ -216,9 +218,8 @@ const [canEvolve, setCanEvolve] = useState(false);
 
     const loadRenewPrice = async () => {
       try {
-        const provider = new JsonRpcProvider(
-          process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!
-        );
+        const rpcProvider = getProvider();
+
         const contract = new EthersContract(contractAdhesion, ABI, provider);
         const priceWei = await contract.mintPrice();
         setRenewPriceEth(formatUnits(priceWei, "ether"));
@@ -323,7 +324,7 @@ useEffect(() => {
     if (nftCache[cacheKey]) return nftCache[cacheKey];
 
     try {
-      const rpcProvider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!);
+      const rpcProvider = getProvider();
       const contract = new EthersContract(contractAdhesionAddress, ABI, rpcProvider);
       const contractManagement = new EthersContract(contractAdhesionManagement, ABI_Management, rpcProvider);
 
@@ -430,7 +431,7 @@ useEffect(() => {
         if (!membershipInfo) return;
 
         try {
-          const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!);
+          const rpcProvider = getProvider();
           const contract = new EthersContract(contractAdhesion, ABI, provider);
 
           const durationsRaw = await Promise.all([

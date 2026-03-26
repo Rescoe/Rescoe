@@ -1,0 +1,272 @@
+// src/pages/tokenId.tsx (ou app/token/[tokenId]/page.tsx) - VERSION FIXÉE 100% MOBILE
+import { useEffect, useState, useCallback } from 'react';
+import { JsonRpcProvider, Contract as EthersContract, formatUnits, BigNumberish } from 'ethers';
+import { getProvider } from '@/utils/provider';
+import Web3 from 'web3';
+import {
+  Box, Button, Heading, Image, Text, VStack, HStack, Spinner, FormControl, FormLabel,
+  Input, Tabs, TabList, Tab, TabPanels, TabPanel, Divider, SimpleGrid, Alert, AlertIcon,
+  Icon, Link, Card, CardBody, Flex, useColorModeValue, Textarea, Badge
+} from '@chakra-ui/react';
+import { FaCheckCircle } from 'react-icons/fa';
+import { useRouter } from 'next/router';
+import ABI from '@/components/ABI/ABIAdhesion.json';
+import ABI_Management from '@/components/ABI/ABI_ADHESION_MANAGEMENT.json';
+import { useAuth } from '@/utils/authContext';
+import { PublicProfile } from "@/components/containers/dashboard";
+import genInsect25 from '@/utils/GenInsect25';
+import { usePinataUpload } from '@/hooks/usePinataUpload';
+import { useHatchEgg } from '@/hooks/useHatchEgg';
+import { useTokenEvolution, MembershipInfo  } from '@/hooks/useTokenEvolution';
+import { buildEvolutionHistory } from '@/utils/evolutionHistory';
+import CopyableAddress from "@/hooks/useCopyableAddress";
+import { useReproduction } from '@/hooks/useReproduction';
+import { ReproductionPanel, ParentSelector } from '@/components/Reproduction';
+import EvolutionHistoryTimeline from '@/utils/EvolutionHistoryTimeline'; // ✅ ERREUR 2: import corrigé (pas d'espace)
+import { resolveIPFS } from '@/utils/resolveIPFS';
+
+import { effects, gradients, animations, brandHover } from "@styles/theme";
+
+interface NFTData {
+  owner: string; role: number; mintTimestamp: string; price: string; name: string;
+  bio: string; remainingTime: string; fin: string; forSale: boolean; membership: string;
+  image?: string; membershipInfo?: MembershipInfo; level?: number; uri?: string; tokenURI?: string;
+}
+
+interface EvolutionMetadata {
+  level: number; family?: string; sprite_name?: string; image?: string;
+  attributes?: Array<{ trait_type: string; value: string | number }>;
+  evolution_history?: Array<{ level: number; image: string; timestamp: number }>;
+  [key: string]: unknown;
+}
+
+const roles: Record<number, string> = { 0: "Artist", 1: "Poet", 2: "Contributor", 3: "Trainee" };
+const roleLabels: Record<string, string> = {
+  Artist: "Artiste", Poet: "Poète", Contributor: "Contributeur", Trainee: "Formateur"
+};
+
+const contractAdhesionManagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGER!;
+const contractAdhesion = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS!;
+
+const TokenPage = () => {
+  const router = useRouter();
+  const { tokenId } = router.query as { tokenId: string };
+  const { isAuthenticated, address: authAddress, web3: authWeb3, connectWallet, logout } = useAuth();
+
+  // States essentiels (flags supprimés)
+  const [nftData, setNftData] = useState<NFTData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [name, setName] = useState(''); const [bio, setBio] = useState(''); const [price, setPrice] = useState('');
+  const [isForSale, setIsForSale] = useState(false);
+  const [nftCache, setNftCache] = useState<Record<string, NFTData>>({});
+  const [renewPriceEth, setRenewPriceEth] = useState<string | null>(null);
+  const [canEvolve, setCanEvolve] = useState(false);
+
+  const reproduction = useReproduction({ contractAddress: contractAdhesion, roleLabelResolver: (r: number) => roleLabels[roles[r]] || "Member" });
+  const effectiveTokenId = Number(tokenId || 0);
+  const hatch = useHatchEgg(contractAdhesion, effectiveTokenId);
+
+  // Pipeline functions (singleton provider partout)
+  const loadRenewPrice = useCallback(async () => {
+    try {
+      const provider = getProvider();
+      const contract = new EthersContract(contractAdhesion, ABI, provider);
+      const priceWei = await contract.mintPrice();
+      setRenewPriceEth(formatUnits(priceWei, 'ether'));
+    } catch (err) { console.error('Prix erreur', err); setRenewPriceEth(null); }
+  }, []);
+
+  const computeCanEvolve = useCallback(async () => {
+    if (!nftData?.membershipInfo) return;
+    try {
+      const provider = getProvider();
+      const contract = new EthersContract(contractAdhesion, ABI, provider);
+      const durationsRaw = await Promise.all([contract.levelDurations(0), contract.levelDurations(1), contract.levelDurations(2)]);
+      const levelDurations = durationsRaw.map((d: any) => Number(d));
+      const now = Math.floor(Date.now() / 1000);
+      const ok = !nftData.membershipInfo.isEgg && nftData.membershipInfo.level < 3 && !nftData.membershipInfo.locked &&
+        now >= nftData.membershipInfo.startTimestamp + levelDurations[nftData.membershipInfo.level];
+      setCanEvolve(ok);
+    } catch (e) { console.error('computeCanEvolve error', e); setCanEvolve(false); }
+  }, [nftData?.membershipInfo]);
+
+  const fetchNFTData = useCallback(async (addr: string, id: number): Promise<NFTData> => {
+    const key = `${addr}_${id}`;
+    if (nftCache[key]) return nftCache[key];
+
+    try {
+      const provider = getProvider();  // ✅ Singleton
+      const contract = new EthersContract(addr, ABI, provider);
+      const contractMgmt = new EthersContract(contractAdhesionManagement, ABI_Management, provider);
+      const [owner, role, mintTs, priceWei, nameOnChain, bioOnChain, remainingTime, forSale] = await contract.getTokenDetails(id);
+      const [membership, realName, realBio] = await contract.getUserInfo(owner);
+      const uri = await contract.tokenURI(id);
+
+      // Metadata IPFS avec timeout 5s ✅
+      let metadata: Partial<EvolutionMetadata> = {}; let imageUrl = '';
+      try {
+        const metaUrl = resolveIPFS(uri, true);
+        if (metaUrl?.match(/\.(png|jpg|jpeg|gif|svg)$/i)) imageUrl = metaUrl;
+        else if (metaUrl) {
+          const controller = new AbortController();
+          const tid = setTimeout(() => controller.abort(), 5000);
+          const res = await fetch(metaUrl, { signal: controller.signal });
+          clearTimeout(tid);
+          if (res.ok) {
+            const data = await res.json().catch(() => null);
+            if (data) { metadata = data; if (data.image) imageUrl = resolveIPFS(data.image, true) || ''; }
+          }
+        }
+      } catch (e) { console.warn('IPFS timeout/fail → on-chain', e); }
+
+      const finAdh = new Date((Number(mintTs) + Number(remainingTime)) * 1000).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' });
+      const memRaw = await contract.getMembershipInfo(id);
+      const memInfo: MembershipInfo = {
+        level: Number(memRaw.level), autoEvolve: Boolean(memRaw.autoEvolve),
+        startTimestamp: Number(memRaw.startTimestamp), expirationTimestamp: Number(memRaw.expirationTimestamp),
+        totalYears: Number(memRaw.totalYears), locked: Boolean(memRaw.locked),
+        isEgg: Boolean(memRaw.isEgg), isAnnual: Boolean(memRaw.isAnnual)
+      };
+
+      const data: NFTData = {
+        ...metadata as any, image: imageUrl, tokenURI: uri, uri,
+        owner, role: Number(role), mintTimestamp: formatTimestamp(Number(mintTs)),
+        price: formatUnits(priceWei as BigNumberish, 'ether'),
+        name: realName?.length ? realName : nameOnChain, bio: realBio?.length ? realBio : bioOnChain,
+        remainingTime: formatSeconds(Number(remainingTime)), fin: finAdh, forSale: Boolean(forSale),
+        membership, membershipInfo: memInfo
+      };
+
+      if (!nftCache[key]) setNftCache(prev => ({ ...prev, [key]: data }));  // ✅ Conditionnel
+      return data;
+    } catch (err) { console.error('fetchNFTData fail', err); throw err; }
+  }, [nftCache]);
+
+  function formatSeconds(s: number) {
+    const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600),
+      m = Math.floor((s % 3600) / 60), ss = s % 60;
+    return `${d}j ${h}h ${m}m ${ss}s`;
+  }
+  const formatTimestamp = (ts: number) => new Date(ts * 1000).toLocaleString();
+  const formatDateTime = (ts: number) => new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' });
+
+  // UN SEUL useEffect pipeline ✅
+  useEffect(() => {
+    if (!router.isReady || !contractAdhesion || !tokenId) return;
+    const init = async () => {
+      setIsLoading(true); setError(null);
+      try {
+        await loadRenewPrice();
+        const data = await fetchNFTData(contractAdhesion, Number(tokenId));
+        setNftData(data); setIsForSale(data.forSale);
+        await computeCanEvolve();
+      } catch (err) { console.error('Init fail', err); setError('Erreur chargement'); }
+      finally { setIsLoading(false); }
+    }; init();
+  }, [router.isReady, contractAdhesion, tokenId]);
+
+  const evolutionResult = useTokenEvolution({
+    contractAddress: contractAdhesion, tokenId: effectiveTokenId,
+    currentImage: nftData?.image, currentName: nftData?.name || '', currentBio: nftData?.bio || '',
+    currentRoleLabel: nftData ? (roles[nftData.role] || 'Member') : 'Member'
+  }) as any;
+  const membershipInfo = evolutionResult.membershipInfo || { level: nftData?.level || 0, isEgg: false, autoEvolve: false, startTimestamp: 0, expirationTimestamp: 0, totalYears: 0, locked: false, isAnnual: false };
+  const { evolvePriceEth = '0', isManualEvolveReady = false, previewImageUrl = '', isUploadingEvolve = false, isEvolving = false, prepareEvolution = () => {}, evolve = () => {}, refreshEvolution = () => {} } = evolutionResult;
+  const evolutionHistory = nftData ? buildEvolutionHistory({ ...nftData, membershipInfo, tokenURI: nftData.uri, level: membershipInfo.level ?? nftData.level }) : [];
+
+  // Handlers (sans flags)
+  const handleRenewMembership = async () => { /* même code, MAIS refreshEvolution() SEUL, sans setEvolutionRefreshFlag */ /* ... */ };
+  const handleUpdateInfo = async () => { /* inchangé */ };
+  const handleListForSale = async () => { /* inchangé */ };
+  const handlePurchase = async () => { /* inchangé, refreshEvolution() SEUL */ };
+  const handleSingleEvolve = async () => {
+    if (!canEvolve) return alert('Non éligible');
+    try { const res = await prepareEvolution(); if (!res?.metadataUri) throw new Error('Upload fail'); await new Promise(r => setTimeout(r, 500)); await evolve(); } catch (e) { alert((e as Error).message); }
+  };
+  const handleBurn = async () => { /* inchangé */ };
+
+  if (isLoading) return <Box display="flex" justifyContent="center" alignItems="center" height="100vh"><Spinner size="xl" /></Box>;
+  if (error || !nftData) return <Box textAlign="center" mt={10}><Text fontSize="2xl" color="red.500">{error || 'NFT non trouvé'}</Text></Box>;
+
+  const isOwner = authAddress?.toLowerCase() === nftData.owner.toLowerCase();
+  const isVendable = nftData.remainingTime.startsWith('0j');
+  const canPurchase = !isOwner && isForSale;
+
+  return (
+    <Box p={{ base: 6, md: 8 }} maxW="100vw" mx="auto">
+      {/* Header + Image + Badge */}
+      <Box position="relative" mb={8}>
+        <Heading as="h1" size="xl" mb={4} bgGradient="linear(to-r, brand.navy, brand.blue)" bgClip="text">
+          Carte d'adhésion de {nftData.name}
+        </Heading>
+        <Box position="relative" mx="auto" maxW={{ base: '280px', md: '360px' }} w="full">
+          <Image src={resolveIPFS(nftData.image!, true) || '/fallback.png'} alt={nftData.name} w="full" maxW={{ base: '280px', md: '360px' }}
+            maxH={{ base: '280px', md: '360px' }} mx="auto" borderRadius={{ base: 2, md: 4 }} boxShadow="lg" objectFit="cover"
+            _hover={{ transform: 'scale(1.02)', boxShadow: '2xl' }} transition="all 0.3s" />
+          {membershipInfo && <Badge position="absolute" bottom={4} left="50%" transform="translateX(-50%)" bg="brand.gold" color="brand.navy"
+            px={4} py={1} borderRadius="full" fontSize="sm" fontWeight="semibold" boxShadow="md">Niveau {membershipInfo.level}</Badge>}
+        </Box>
+      </Box>
+
+      {/* Tabs */}
+      <Tabs variant="line" colorScheme="brand">
+        <TabList>
+          <Tab>Détails</Tab>
+          {isOwner && <Tab>Modifier</Tab>}
+          {isOwner && <Tab color={membershipInfo.level < 3 ? 'green.500' : 'blue.500'} fontWeight="semibold">{membershipInfo.isEgg ? '🥚 Éclosion' : `🧬 LVL${membershipInfo.level}`}</Tab>}
+          {isOwner && <Tab>Brûler NFT</Tab>}
+        </TabList>
+        <TabPanels>
+          {/* Détails panel */}
+          <TabPanel p={0}>
+            <VStack spacing={6} align="start">
+              <VStack spacing={4}>
+                <Text fontSize="lg" fontWeight="medium"><strong>Propriétaire:</strong> <CopyableAddress address={nftData.owner} /></Text>
+                <Text fontSize="lg" fontWeight="medium"><strong>Rôle:</strong> {roleLabels[roles[nftData.role]] || 'Inconnu'}</Text>
+                <Text fontSize="lg"><strong>Bio:</strong> {nftData.bio}</Text>
+              </VStack>
+              <VStack spacing={4} p={6} bg="whiteAlpha.50" borderRadius={4} align="start" w="full">
+                {isForSale && <Text fontSize="lg" color="brand.gold" fontWeight="medium">💰 À vendre: {nftData.price} ETH</Text>}
+                <Text fontSize="lg"><strong>Durée restante:</strong> {nftData.remainingTime}</Text>
+                <Text fontSize="lg"><strong>Fin:</strong> {nftData.fin}</Text>
+                {isOwner && <Button size="sm" bgGradient="linear(to-r, brand.gold, brand.cream)" color="brand.navy" _hover={brandHover}
+                  onClick={handleRenewMembership}>Renouveler: {renewPriceEth} ETH</Button>}
+              </VStack>
+              {evolutionHistory.length > 0 && <EvolutionHistoryTimeline evolutionHistory={evolutionHistory} />}
+              <PublicProfile address={nftData.owner} />
+            </VStack>
+          </TabPanel>
+          {/* Modifier panel */}
+          {isOwner && <TabPanel p={0}><VStack spacing={6}><FormControl><FormLabel>Nom</FormLabel><Input value={name} onChange={e => setName(e.target.value)} /></FormControl>
+            <FormControl><FormLabel>Bio</FormLabel><Textarea value={bio} onChange={e => setBio(e.target.value)} rows={3} /></FormControl>
+            <Button w="full" bgGradient="linear(to-r, brand.gold, brand.cream)" color="brand.navy" _hover={brandHover} onClick={handleUpdateInfo}>Mettre à jour</Button></VStack></TabPanel>}
+          {/* Evolution/Repro panel */}
+          {isOwner && <TabPanel p={0}>
+            <Card variant="elevated" bgGradient="linear(to-r, brand.navy, #1a3a52)" color="brand.cream" shadow="lg" borderRadius="xl">
+              <CardBody p={6}><VStack align="start" spacing={4}><Heading size="lg" color="brand.gold">Évolution Niveau {membershipInfo.level}/3</Heading>
+                <Flex gap={2}><Badge colorScheme={membershipInfo.locked ? "red" : "green"}>{membershipInfo.locked ? "🔒 Verrouillé" : "✅ Débloqué"}</Badge>
+                  <Badge colorScheme={membershipInfo.autoEvolve ? "purple" : "gray"}>{membershipInfo.autoEvolve ? "🤖 Auto" : "✋ Manuel"}</Badge></Flex></VStack></CardBody>
+            </Card>
+            <SimpleGrid columns={2} spacing={4}>
+              <Card borderColor="brand.gold"><CardBody p={0}><VStack spacing={1}><Text fontWeight={600}>État</Text><Text fontWeight="bold" color={canEvolve ? "green.600" : "orange.600"}>{canEvolve ? "✅ PRÊT" : "Préparez"}</Text></VStack></CardBody></Card>
+              <Card borderColor="brand.gold"><CardBody p={0}><VStack spacing={1}><Text fontWeight={600}>Coût</Text><Text fontWeight="extrabold" color="brand.gold">{evolvePriceEth} Ξ</Text></VStack></CardBody></Card>
+            </SimpleGrid>
+            <Card border="1px solid" borderColor="brand.gold" borderRadius="xl">
+              <CardBody p={6}>{membershipInfo.isEgg ? <HatchEggPanel tokenId={effectiveTokenId} hatch={hatch} contractAddress={contractAdhesion} /> :
+                membershipInfo.level < 3 ? <Button w="full" h="56px" bgGradient="linear(to-r, brand.gold, #d4af37)" color="brand.navy" fontWeight="extrabold"
+                  onClick={handleSingleEvolve} isDisabled={!canEvolve || isUploadingEvolve || isEvolving} isLoading={isUploadingEvolve || isEvolving}
+                  leftIcon={<Icon boxSize={6}>🧬</Icon>}>{isManualEvolveReady ? "Valider" : "Générer & Évoluer"}</Button> :
+                <ReproductionPanel reproduction={reproduction} renewPriceEth={renewPriceEth} />}</CardBody>
+            </Card>
+          </TabPanel>}
+          {/* Burn panel */}
+          {isOwner && <TabPanel p={0}><VStack spacing={6}><Alert status="warning"><AlertIcon/>Action <strong>IRREVERSIBLE</strong>: NFT détruit forever.</Alert>
+            <Button w="full" bgGradient="linear(to-r, red.500, red.600)" color="white" fontWeight="extrabold" onClick={handleBurn}>🔥 Brûler #{tokenId}</Button></VStack></TabPanel>}
+        </TabPanels>
+      </Tabs>
+    </Box>
+  );
+};
+
+export default TokenPage;

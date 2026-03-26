@@ -1,4 +1,4 @@
-import { Box, Badge, Tooltip, Container, Button, Menu, MenuButton, MenuList, MenuItem, Drawer, DrawerBody, DrawerCloseButton, DrawerContent, DrawerHeader, DrawerOverlay, useDisclosure, HStack, VStack, Flex, useColorModeValue, useTheme } from '@chakra-ui/react';
+import { Box, Badge, Spinner, Progress, Text, Tooltip, Container, Button, Menu, MenuButton, MenuList, MenuItem, Drawer, DrawerBody, DrawerCloseButton, DrawerContent, DrawerHeader, DrawerOverlay, useDisclosure, HStack, VStack, Flex, useColorModeValue, useTheme } from '@chakra-ui/react';
 import { FaBug, FaEye, FaEyeSlash, FaBars } from 'react-icons/fa';
 
 import { ChevronDownIcon } from '@chakra-ui/icons';
@@ -352,26 +352,36 @@ const Header = () => {
 
 
   // ✅ UI DE CHARGEMENT PROGRESSIF
-if (loadStep !== 'ready' && isAuthenticated) {
-      return (
-      <Box py={8} textAlign="center">
-      <Box
-        as={motion.div} // ✅ Motion wrapper
-        w="40px" h="40px"
-        border="3px solid"
-        borderColor="brand.cream"
-        borderTopColor="brand.gold"
-        borderRadius="full"
-        animate={{ rotate: 360 }}
+  if (loadStep !== 'ready' && isAuthenticated) {
+    return (
+      <Box py={12} textAlign="center" minH="120px">
+        {/* Spinner principal */}
+        <Spinner
+          size="lg"
+          color="brand.gold"
+          thickness="4px"
+          speed="0.8s"
+          emptyColor="brand.cream/20"
+          mx="auto"
+          mb={6}
+        />
 
-        mx="auto"
-        mb={4}
-      />
-        <Box fontSize="sm" color="brand.cream">
-          {loadStep === 'auth' && 'Connexion...'}
-          {loadStep === 'role' && 'Chargement rôles...'}
-          {loadStep === 'resident' && 'Vérification résident...'}
-        </Box>
+        {/* Step indicator */}
+        <VStack spacing={2}>
+          <Text fontSize="sm" fontWeight={500} color="brand.cream">
+            {loadStep === 'auth' && '🔐 Connexion...'}
+            {loadStep === 'role' && '⚙️ Chargement rôles...'}
+            {loadStep === 'resident' && '🎨 Vérification résident...'}
+          </Text>
+          <Progress
+            w="200px"
+            value={loadStep === 'auth' ? 33 : loadStep === 'role' ? 66 : 99}
+            size="sm"
+            colorScheme="brand.gold"
+            borderRadius="full"
+            bg="brand.cream/10"
+          />
+        </VStack>
       </Box>
     );
   }

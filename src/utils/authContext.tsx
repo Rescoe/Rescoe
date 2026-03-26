@@ -261,7 +261,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // ✅ SUPPRIMÉ : useEffect checkSession interval (cause doubles fetchRole)
 
-  const isMember = !!role;
+const isMember = role !== null && role !== "non-member";
 
   return (
     <AuthContext.Provider

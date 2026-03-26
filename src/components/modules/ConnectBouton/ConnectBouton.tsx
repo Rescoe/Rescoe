@@ -277,7 +277,6 @@ const ConnectBouton: React.FC = () => {
             }}
             onClick={async () => {
               await connectWallet();
-              if (address) await handleAuth(address);
             }}
           >
             🦊 MetaMask / Wallet
