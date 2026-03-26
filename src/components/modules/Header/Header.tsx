@@ -23,6 +23,20 @@ const MotionMenuButton = motion(MenuButton);
 
 import { brandHover, hoverStyles } from "@styles/theme"; //Style
 
+
+import ABI from '../../../components/ABI/ABIAdhesion.json';  // Ajustez chemin
+import { Web3 } from 'web3';
+
+
+// Supprimez : import type { MemberInfo } from '@/utils/authContext';
+
+// Ajoutez avant fetchRoleLocal :
+interface MemberInfo {
+  role: number;
+  exists: boolean;
+  timestamp: number;
+  isforSale: boolean;
+}
 // ✅ NOUVELLE LISTE CENTRALE DES ADRESSES RÉSIDENTS
 const RESIDENT_ADDRESSES = [
   "0x552C63E3B89ADf749A5C1bB66fE574dF9203FfB4".toLowerCase(),
@@ -98,6 +112,14 @@ const ROLE_MENUS: Record<RoleKey, RoleMenuConfig> = {
     ],
   },
 
+};
+
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS!;
+const roleMapping: Record<number, string> = {
+  0: 'artist',
+  1: 'poet',
+  2: 'contributor',
+  3: 'trainee'
 };
 
 // ✅ COMPOSANT RoleMenu RÉUTILISABLE (AVEC TOOLTIP RÉSIDENCE)
@@ -221,7 +243,35 @@ const Header = () => {
     return RESIDENT_ADDRESSES.includes(userAddress.toLowerCase());
   };
 
-  // ✅ ÉTAPE 1 : Auth → Role (sérialisé)
+  const fetchRoleLocal = async (web3Instance: any, userAddress: string) => {
+    console.log('[fetchRoleLocal START] Retry rôle pour:', userAddress);
+    try {
+      const contract = new web3Instance.eth.Contract(ABI as any, CONTRACT_ADDRESS);
+      const owner = await contract.methods.owner().call() as string;
+
+      if (owner?.toLowerCase() === userAddress.toLowerCase()) {
+        console.log('[fetchRoleLocal] → admin');
+        // AuthContext gère déjà via useEffect global ou bouton retry
+        return 'admin';
+      }
+
+      const memberInfo: MemberInfo = await contract.methods.members(userAddress).call();
+      if (!memberInfo?.exists) {
+        console.log('[fetchRoleLocal] → non-member');
+        return 'non-member';
+      }
+
+      const roleIndex = parseInt(String(memberInfo.role), 10);
+      const foundRole = roleMapping[roleIndex] || 'non-member';
+      console.log('[fetchRoleLocal] →', foundRole);
+      return foundRole;
+    } catch (error) {
+      console.error('[fetchRoleLocal] Error:', error);
+      return 'non-member';
+    }
+  };
+
+  // ✅ ÉTAPE 1 : Auth → Role (sérialisé) + fetch local si besoin
   useEffect(() => {
     console.log('[LOAD] isAuthenticated:', isAuthenticated, 'address:', address);
 
@@ -233,9 +283,15 @@ const Header = () => {
 
     console.log('[LOAD] → role');
     setLoadStep('role');
-  }, [isAuthenticated, address]);
 
-  // ✅ ÉTAPE 2 : Role fini → Resident
+    // ✅ FETCH LOCAL si role null ET web3 dispo (fix wallet)
+    if (!role && !roleLoading && web3) {
+      console.log('[LOAD] role null → fetch local');
+      fetchRoleLocal(web3, address);
+    }
+  }, [isAuthenticated, address, role, roleLoading, web3]);
+
+  // ✅ ÉTAPE 2 : Role fini → Resident (FIX : avance TOUJOURS)
   useEffect(() => {
     if (loadStep !== 'role') return;
 
@@ -243,15 +299,11 @@ const Header = () => {
 
     if (roleLoading) return; // Attends role
 
-    if (role !== null) {
-      console.log('[LOAD] role OK → resident');
-      setLoadStep('resident');
-    } else {
-      console.log('[LOAD] role null → retry');
-    }
-  }, [loadStep, roleLoading, role]);
+    console.log('[LOAD] role OK', role || 'non-member', '→ resident');
+    setLoadStep('resident');  // ✅ AVANCE TOUJOURS (null = non-member valide)
+  }, [loadStep, roleLoading]);  // ✅ Pas 'role' en deps (évite boucle)
 
-  // ✅ ÉTAPE 3 : Resident → Ready + Global
+  // ✅ ÉTAPE 3 : Resident → Ready + Global (FIX : deps minimales)
   useEffect(() => {
     if (loadStep !== 'resident') return;
 
@@ -266,21 +318,23 @@ const Header = () => {
     console.log('[LOAD] isResident:', residentStatus);
     setIsResident(residentStatus);
 
-    // ✅ GLOBAL AUTH ONCE
+    // ✅ GLOBAL AUTH ONCE (role null → non-member)
     (window as any).RESCOE_AUTH = {
       isAuthenticated,
       address,
-      role: role || 'user',
+      role: role || 'non-member',  // ✅ Fix null
       isAdmin, isArtist, isPoet, isTrainee, isContributor, isMember,
       web3, provider,
       connectWallet, connectWithEmail, logout,
-      roleLoading, isLoading,
+      roleLoading: false,  // ✅ Force off
+      isLoading,
       isResident: residentStatus,
     };
 
     console.log('[LOAD] → READY ! Global set');
     setLoadStep('ready');
-  }, [loadStep, address, role, isAuthenticated, isAdmin, isArtist, isPoet, isTrainee, isContributor, isMember, web3, provider, roleLoading, isLoading]);
+  }, [loadStep, address]);  // ✅ Deps minimales
+
 
   // ✅ boxShadowHover DÉPLACÉ ICI (FIX ERREUR)
   const boxShadowHover = useColorModeValue(
