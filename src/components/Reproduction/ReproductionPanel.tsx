@@ -113,8 +113,9 @@ export const ReproductionPanel: React.FC<ReproductionPanelProps> = ({
             <Box p={6} bg="rgba(17,25,40,0.6)" borderRadius="2xl" border="2px solid" borderColor="brand.gold">
               <HStack justify="space-between" mb={4}>
                 <Text fontWeight="bold">
-                  🥚 Aperçu : {reproduction.parentA.name} × {reproduction.parentB.name}
+                Vous allez reproduire  {reproduction.parentA.name} × {reproduction.parentB.name}
                 </Text>
+                {/*
                 <Button
                   size="xs"
                   leftIcon={<RepeatIcon />}
@@ -124,7 +125,9 @@ export const ReproductionPanel: React.FC<ReproductionPanelProps> = ({
                 >
                   Nouvel œuf
                 </Button>
+                */}
               </HStack>
+              {/*
               <Image
                 src={`/OEUFS/OEUF${eggPreviewNum}.gif`}
                 fallbackSrc="/OEUFS/OEUF1.gif"
@@ -134,6 +137,7 @@ export const ReproductionPanel: React.FC<ReproductionPanelProps> = ({
                 loading="lazy"
                 transition="opacity 0.2s"
               />
+              */}
             </Box>
           )}
 

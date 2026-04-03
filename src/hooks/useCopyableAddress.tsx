@@ -1,10 +1,10 @@
 import { Text, useToast } from "@chakra-ui/react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { JsonRpcProvider, Contract } from "ethers";
 
 type Props = {
   address?: string;
-  size?: string; // xs, sm, md, lg
+  size?: string;
   color?: string;
 };
 
@@ -15,48 +15,81 @@ const CopyableAddress: React.FC<Props> = ({
 }) => {
   const toast = useToast();
   const [display, setDisplay] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(true);
+
+  const resolveAddress = useCallback(async (addr: string) => {
+    if (!addr) return;
+
+    setIsLoading(true);
+    try {
+      const provider = new JsonRpcProvider(
+        process.env.NEXT_PUBLIC_RPC_URL || "https://mainnet.base.org"
+      );
+
+      let code: string;
+      try {
+        code = await Promise.race<string>([
+          provider.getCode(addr),
+          new Promise<string>((_, reject) =>
+            setTimeout(() => reject(new Error("Timeout")), 3000)
+          ),
+        ]);
+      } catch (codeErr) {
+        console.warn("getCode failed (normal pour EOA):", codeErr);
+        code = "0x";
+      }
+
+      if (code !== "0x") {
+        try {
+          const contract = new Contract(
+            addr,
+            ["function name() view returns (string)"],
+            provider
+          );
+
+          const name = await Promise.race<string>([
+            contract.name(),
+            new Promise<string>((_, reject) =>
+              setTimeout(() => reject(new Error("name timeout")), 2000)
+            ),
+          ]);
+
+          if (name && name !== "") {
+            setDisplay(name);
+            return;
+          }
+        } catch (nameErr) {
+          console.warn("contract.name() failed:", nameErr);
+        }
+      }
+
+      setDisplay(`${addr.slice(0, 6)}...${addr.slice(-4)}`);
+    } catch (error) {
+      console.error("Résolution adresse failed:", error);
+      setDisplay(`${addr.slice(0, 6)}...${addr.slice(-4)}`);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    if (!address) return;
+    if (address) {
+      resolveAddress(address);
+    } else {
+      setDisplay("");
+      setIsLoading(false);
+    }
+  }, [address, resolveAddress]);
 
-    const provider = new JsonRpcProvider(
-      process.env.NEXT_PUBLIC_URL_SERVER_MORALIS
-    );
-
-    const resolveAddress = async () => {
-      try {
-        // Résoudre le nom ENS si présent
-
-        // Vérifiez si l'adresse est un contrat
-        const code = await provider.getCode(address);
-        if (code === "0x") {
-          // Ce n'est pas un contrat, donc on affiche l'adresse abrégée
-          setDisplay(`${address.slice(0, 6)}...${address.slice(-4)}`);
-        } else {
-          // C'est un contrat, donc récupérer le nom
-          const contract = new Contract(address, ["function name() view returns (string)"], provider);
-          const tokenName = await contract.name();
-          setDisplay(tokenName);
-        }
-      } catch (error) {
-        // En cas d'erreur de résolution
-        console.error("Erreur de résolution d'adresse : ", error);
-        setDisplay(`${address.slice(0, 6)}...${address.slice(-4)}`);
-      }
-    };
-
-    resolveAddress();
-  }, [address]);
-
-  if (!address) return null; // Ne rien afficher si l'adresse n'est pas fournie
+  if (!address) return null;
 
   const handleClick = () => {
     navigator.clipboard.writeText(address);
     toast({
       title: "Adresse copiée !",
-      description: address,
+      description: `${display} → ${address.slice(0, 6)}...${address.slice(-4)}`,
       status: "success",
-      duration: 1500,
+      duration: 2000,
       isClosable: true,
     });
   };
@@ -65,11 +98,13 @@ const CopyableAddress: React.FC<Props> = ({
     <Text
       as="span"
       cursor="pointer"
-      color="white"
+      color={color}
       fontSize={size}
+      title={address}
       onClick={handleClick}
+      opacity={isLoading ? 0.6 : 1}
     >
-      {display}
+      {isLoading ? "..." : display}
     </Text>
   );
 };

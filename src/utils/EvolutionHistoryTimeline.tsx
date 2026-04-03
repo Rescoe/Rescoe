@@ -177,7 +177,7 @@ export default function EvolutionHistoryTimeline({
                         />
                         <VStack align="flex-start" spacing={1}>
                           <Text fontSize="xs" textTransform="uppercase" color="brand.cream">
-                            Niveau {idx + 1}
+                            Niveau {idx}
                           </Text>
                           <Text fontSize="sm" fontWeight="semibold">
                             {step.lvlPrevious !== undefined ? `Niv. ${step.lvlPrevious}` : "🥚 Œuf"}
@@ -220,7 +220,7 @@ export default function EvolutionHistoryTimeline({
                                w="100%" h="120px" objectFit="cover" />
                         <Box p={3}>
                           <Text fontSize="xs" textTransform="uppercase" color="brand.cream">
-                            Niveau {idx + 1}
+                            Niveau {idx}
                           </Text>
                           <Text fontSize="sm" fontWeight="semibold" noOfLines={1}>
                             {step.fullMetadata?.name || (step.lvlPrevious === 0 ? '🥚 Œuf' : 'Unknown')}

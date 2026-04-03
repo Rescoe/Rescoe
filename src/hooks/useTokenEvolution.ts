@@ -110,7 +110,7 @@ export const useTokenEvolution = ({
 
         // ✅ PRIX EXACT = LOGIQUE CONTRAT
         let priceEth = 0;
-        if (!info.isEgg) {
+        if (!info.isEgg && info.level < 3) {
           try {
             const basePriceWei = await contract.methods.baseEvolvePrice(info.level).call();
             const basePrice = Number(basePriceWei);

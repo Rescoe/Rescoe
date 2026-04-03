@@ -1,12 +1,12 @@
 // hooks/useReproduction.ts
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Web3 from "web3";
 import { JsonRpcProvider, Contract as EthersContract } from "ethers";
 import ABI from "@/components/ABI/ABIAdhesion.json";
 import { useAuth } from "@/utils/authContext";
-
 import { usePinataUpload } from "@/hooks/usePinataUpload";
 import { resolveIPFS } from "@/utils/resolveIPFS";
+import { ethers } from 'ethers';  // Pour formatEther
 
 
 export type UseReproductionReturn = {
@@ -24,6 +24,7 @@ export type UseReproductionReturn = {
   hasScanned: boolean;
   userPoints: number;
 };
+
 
 const analyzeColorsDummy = (pixels: number[][]): string[] => {
   const clusters = [
@@ -67,6 +68,7 @@ export interface MembershipInfo {
   isEgg?: boolean;
 }
 
+
 export interface TokenWithMeta {
   tokenId: number;
   owner: string;
@@ -76,6 +78,8 @@ export interface TokenWithMeta {
   image: string | undefined;
   name: string;
   roleLabel: string;
+  bio?: string;
+  _cachedAt?: number;
 }
 
 interface UseReproductionParams {
@@ -84,13 +88,18 @@ interface UseReproductionParams {
   maxEggIndex?: number;
 }
 
+
 export const useReproduction = ({
   contractAddress,
-  roleLabelResolver,
+  roleLabelResolver = (role: number) => `Role #${role}`, // ✅ DEFAULT INTERNE STABLE
   maxEggIndex = 9,
-}: UseReproductionParams) => {
-  const { address: account } = useAuth();
+  refreshKey = 'default'
+}: UseReproductionParams & { refreshKey?: string }) => {
+  const { address: account, web3} = useAuth();
 
+  const { uploadToIPFS, isUploading } = usePinataUpload();
+
+  // 🔥 STATES
   const [eligibleTokens, setEligibleTokens] = useState<TokenWithMeta[]>([]);
   const [isLoadingEligible, setIsLoadingEligible] = useState(false);
   const [parentA, setParentA] = useState<TokenWithMeta | null>(null);
@@ -99,150 +108,214 @@ export const useReproduction = ({
   const [lastTxHash, setLastTxHash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [userPoints, setUserPoints] = useState<number>(0);
+  const [hasScannedExplicitly, setHasScannedExplicitly] = useState(false); // ✅ NOUVEAU
 
-  // 🔥 AJOUT : Stocker les URIs de l'œuf
-  const [eggImageUri, setEggImageUri] = useState<string | null>(null);
-  const [eggMetadataUri, setEggMetadataUri] = useState<string | null>(null);
+  // 🔥 REFS STABLES + PERSISTANT CACHE
+  const cacheRef = useRef<Record<number, TokenWithMeta>>({});
+  const providerRef = useRef<JsonRpcProvider | null>(null);
+  const web3Ref = useRef<Web3 | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const lastScanRef = useRef<number>(0);
+  const pointsLastFetchRef = useRef<number>(0);
 
-  const { uploadToIPFS, isUploading } = usePinataUpload();
-
-  const [shouldLoad, setShouldLoad] = useState(false);
-  const [scanStart, setScanStart] = useState(0);
-  const BATCH_SIZE = 50;
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+  const POINTS_DEBOUNCE = 30 * 1000; // 30s
   const MAX_PARENTS = 10;
 
-  const cacheRef = useRef<Record<number, TokenWithMeta>>({});
+  // 🔥 1. PROVIDERS (UNE SEULE FOIS)
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_URL_SERVER_MORALIS) {
+      providerRef.current = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!);
+    }
+    if ((window as any).ethereum) {
+      web3Ref.current = new Web3((window as any).ethereum);
+    }
+  }, []);
 
-  // Helpers contrats
-  const fetchContractRead = useCallback(() => {
-    const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!);
-    return new EthersContract(contractAddress, ABI, provider);
+  // 🔥 2. ROLE LABEL RESOLVER STABLE INTERNE (supprime la dépendance externe)
+  const getRoleLabel = useCallback((role: number): string => {
+    const roles = {
+      0: 'Artiste', 1: 'Poète', 2: 'Contributeur', 3: 'Formateur'
+    } as Record<number, string>;
+    return roleLabelResolver?.(role) ?? roles[role] ?? `Role #${role}`;
+  }, [roleLabelResolver]);
+
+  // 🔥 3. CONTRACT HELPERS STABLES
+  const getReadContract = useCallback(() => {
+    if (!providerRef.current) return null;
+    return new EthersContract(contractAddress, ABI, providerRef.current);
   }, [contractAddress]);
 
-  const fetchContractWrite = useCallback(() => {
+  const getWriteContract = useCallback(() => {
     const web3 = (window as any).ethereum ? new Web3((window as any).ethereum) : null;
     return web3 ? new web3.eth.Contract(ABI as any, contractAddress) : null;
   }, [contractAddress]);
 
+  // 🔥 4. FETCH METADATA STABLE (dépendances internes uniquement)
   const fetchTokenMetadata = useCallback(async (
-    tokenId: number,
-    contract: EthersContract
+    tokenId: number
   ): Promise<TokenWithMeta | null> => {
-    if (cacheRef.current[tokenId]) {
-      return cacheRef.current[tokenId];
+    // ✅ CACHE PERSISTANT + TEMPORAL
+    const cached = cacheRef.current[tokenId];
+    if (cached && (Date.now() - (cached._cachedAt || 0)) < CACHE_DURATION) {
+      return cached;
     }
 
     try {
-      const [owner, role, mintTimestamp, price, nameOnChain, bio, remainingTime, forSale, levelFromDetails, autoEvolveFromDetails, expTimestamp] = await contract.getTokenDetails(tokenId);
+      const provider = providerRef.current;
+      if (!provider) return null;
 
-      const membershipRaw = await contract.getMembershipInfo(tokenId);
+      const contract = new EthersContract(contractAddress, ABI, provider);
 
-      const membershipInfo: MembershipInfo = {
-        level: Number(membershipRaw.level || levelFromDetails || 0),
-        autoEvolve: Boolean(membershipRaw.autoEvolve || autoEvolveFromDetails),
-        startTimestamp: Number(membershipRaw.startTimestamp),
-        expirationTimestamp: Number(membershipRaw.expirationTimestamp || expTimestamp),
-        totalYears: Number(membershipRaw.totalYears),
-        locked: Boolean(membershipRaw.locked),
-        isEgg: Boolean(membershipRaw.isEgg ?? false),
-      };
+      // RPC calls
+      const [tokenDetailsRaw, membershipRaw, uri] = await Promise.all([
+        contract.getTokenDetails(BigInt(tokenId)),
+        contract.getMembershipInfo(BigInt(tokenId)),
+        contract.tokenURI(BigInt(tokenId))
+      ]);
 
-      const uri = await contract.tokenURI(tokenId);
+      const tokenDetails = Array.isArray(tokenDetailsRaw) ? tokenDetailsRaw : [];
+      const [owner, role] = tokenDetails;
 
+      // Metadata fetch
       const resolvedUri = resolveIPFS(uri, true);
       if (!resolvedUri) return null;
 
       const res = await fetch(resolvedUri);
       if (!res.ok) {
-        console.warn(`❌ Metadata failed ${tokenId}: ${res.status}`);
+        console.warn(`❌ Metadata failed #${tokenId}: ${res.status}`);
         return null;
       }
 
       const metadata: EvolutionMetadata = await res.json();
 
-      const roleLabel = roleLabelResolver?.(Number(role)) ?? `Role #${Number(role)}`;
+      const membershipInfo: MembershipInfo = {
+        level: Number(membershipRaw.level || 0),
+        autoEvolve: Boolean(membershipRaw.autoEvolve),
+        startTimestamp: Number(membershipRaw.startTimestamp),
+        expirationTimestamp: Number(membershipRaw.expirationTimestamp),
+        totalYears: Number(membershipRaw.totalYears),
+        locked: Boolean(membershipRaw.locked),
+        isEgg: Boolean(membershipRaw.isEgg ?? false),
+      };
 
       const token: TokenWithMeta = {
         tokenId,
         owner: owner.toString(),
         membershipInfo,
         metadata,
-        tokenURI: uri,
-        image: metadata.image,
-        name: metadata.name || nameOnChain,
-        roleLabel,
+        tokenURI: resolvedUri,
+        image: metadata.image ? resolveIPFS(metadata.image, true) : undefined,
+        name: typeof metadata.name === "string" && metadata.name.trim() ? metadata.name : "Unknown",
+        roleLabel: getRoleLabel(Number(role)),
       };
 
-      cacheRef.current[tokenId] = token;
-      return token;
+      // ✅ MARQUER AVEC TIMESTAMP CACHE
+      cacheRef.current[tokenId] = { ...token, _cachedAt: Date.now() };
+      return cacheRef.current[tokenId];
     } catch (e: any) {
       console.error(`❌ #${tokenId}:`, e);
       return null;
     }
-  }, [roleLabelResolver]);
+  }, [contractAddress, getRoleLabel]); // ✅ DÉPENDANCES STABLES
 
-  const loadEligibleTokens = useCallback(async () => {
-    if (!contractAddress || !account) return;
+  // 🔥 5. SCAN ÉLIGIBLES (séparé + explicite)
+  const scanEligibleTokens = useCallback(async () => {
+    if (!contractAddress || !account || !providerRef.current) {
+      setError('Compte ou contrat non disponible');
+      return;
+    }
+
+    // ✅ ABORT PREVIOUS
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = new AbortController();
 
     setIsLoadingEligible(true);
     setError(null);
+    lastScanRef.current = Date.now();
 
     try {
-      const contract = fetchContractRead();
+      const contract = new EthersContract(contractAddress, ABI, providerRef.current);
       const userTokensRaw = await contract.getTokensByOwner(account);
       const userTokens: number[] = userTokensRaw.map((id: any) => Number(id));
 
-      let eligibleCount = 0;
       const eligibleTokensList: TokenWithMeta[] = [];
+      let eligibleCount = 0;
 
-      for (const tokenId of userTokens) {
-        const token = await fetchTokenMetadata(tokenId, contract);
-        if (!token) continue;
+      // ✅ PARALLÈLE MAIS LIMITÉ (évite rate limits)
+      const tokenPromises = userTokens.slice(0, 50).map(async (tokenId) => {
+        const token = await fetchTokenMetadata(tokenId);
+        if (!token) return null;
 
-        const info = token.membershipInfo;
-        const isEligible = info.level === 3 && info.totalYears >= 1 && !info.isEgg;
+        const isEligible = token.membershipInfo.level === 3 &&
+                          token.membershipInfo.totalYears >= 1 &&
+                          !token.membershipInfo.isEgg;
 
-        if (isEligible) {
-          eligibleTokensList.push(token);
+        return isEligible ? token : null;
+      });
+
+      const results = await Promise.allSettled(tokenPromises);
+
+      for (const result of results) {
+        if (result.status === 'fulfilled' && result.value) {
+          eligibleTokensList.push(result.value);
           eligibleCount++;
-
           if (eligibleCount >= MAX_PARENTS) break;
         }
       }
 
-      setEligibleTokens(eligibleTokensList);
-
+      setEligibleTokens(eligibleTokensList.slice(0, MAX_PARENTS));
+      setHasScannedExplicitly(true);
     } catch (e: any) {
-      console.error('💥 ERREUR:', e);
-      setError(e.message);
+      if (e.name !== 'AbortError') {
+        console.error('💥 SCAN ERROR:', e);
+        setError(e.message || 'Erreur scan');
+      }
     } finally {
       setIsLoadingEligible(false);
-      setShouldLoad(false);
     }
-  }, [contractAddress, account, fetchTokenMetadata, fetchContractRead]);
+  }, [contractAddress, account, fetchTokenMetadata]);
 
+  // 🔥 6. POINTS DÉBOUNCÉS (corrigé)
+  useEffect(() => {
+    const now = Date.now();
+    if (now - pointsLastFetchRef.current < POINTS_DEBOUNCE) return;
 
-  const startScanning = useCallback(() => {
+    const fetchPoints = async () => {
+      try {
+        const contract = getReadContract();
+        if (!contract) return;
+
+        const points = await contract.rewardPoints(account || '');
+        setUserPoints(Number(points));
+        pointsLastFetchRef.current = Date.now();
+      } catch (e) {
+        console.error("Points fetch error:", e);
+      }
+    };
+
+    if (account && contractAddress) {
+      fetchPoints();
+    }
+  }, [account, contractAddress, getReadContract]);
+
+  // 🔥 7. RESET SUR REFRESHKEY (léger)
+  useEffect(() => {
     setEligibleTokens([]);
     setParentA(null);
     setParentB(null);
-    setShouldLoad(true);
-  }, []);
+    setError(null);
+    setHasScannedExplicitly(false);
+    cacheRef.current = {};
+  }, [refreshKey]);
 
+  // 🔥 8. START SCANNING (simple reset + trigger)
+  const startScanning = useCallback(() => {
+    cacheRef.current = {}; // Reset cache seulement
+    scanEligibleTokens();
+  }, [scanEligibleTokens]);
 
-  useEffect(() => {
-    if (contractAddress && account && eligibleTokens.length === 0) {
-      startScanning();
-    }
-  }, [contractAddress, account, eligibleTokens.length, startScanning]);
-
-
-  useEffect(() => {
-    if (shouldLoad) {
-      loadEligibleTokens();
-    }
-  }, [shouldLoad, loadEligibleTokens]);
-
+  // 🔥 9. REPRODUCE (stable)
   const analyzeEggGif = useCallback(async (eggLocalPath: string): Promise<Record<string, string | number>> => {
     const dummy = {
       Couleur1: "rgb(255,255,255)", Couleur2: "rgb(224,224,224)",
@@ -254,7 +327,6 @@ export const useReproduction = ({
 
     try {
       const response = await fetch(eggLocalPath);
-
       if (!response.ok) {
         console.warn(`🎨 GIF 404 → DUMMY`);
         return dummy;
@@ -303,7 +375,6 @@ export const useReproduction = ({
         };
 
         img.src = URL.createObjectURL(blob);
-
         setTimeout(() => resolve(dummy), 5000);
       });
     } catch (e) {
@@ -312,6 +383,7 @@ export const useReproduction = ({
     }
   }, []);
 
+  // 🔥 Ajoute cette fonction COMPLÈTE (copiée de l'ancienne)
   const buildEggMetadata = useCallback((
     parentA: TokenWithMeta,
     parentB: TokenWithMeta,
@@ -337,17 +409,14 @@ export const useReproduction = ({
       { trait_type: "Antennes", value: "Absentes" },
       { trait_type: "Filtre", value: "Aucun" },
       { trait_type: "Legendaire", value: "Non" },
-
       { trait_type: "Famille", value: "Hybride" },
       { trait_type: "DisplayName", value: "Œuf F1" },
-
-      { trait_type: "Lore", value: `Œuf issu de ${parentA.roleLabel} × ${parentB.roleLabel}` },
+      { trait_type: "Lore", value: `Œuf issu de ${parentA.name} × ${parentB.name}, qui étaient respectivement ${parentA.roleLabel} × ${parentB.roleLabel}` },
       { trait_type: "TotalFamille", value: Math.floor(
         (Number(parentA.metadata?.attributes?.find(a => a.trait_type === "TotalFamille")?.value || 32) +
         Number(parentB.metadata?.attributes?.find(a => a.trait_type === "TotalFamille")?.value || 32)) / 2
       ) },
       { trait_type: "Sprite", value: `OEUF${eggIndex}.gif` },
-
       { trait_type: "Couleur1", value: eggColors.Couleur1 as string },
       { trait_type: "Couleur2", value: eggColors.Couleur2 as string },
       { trait_type: "Couleur3", value: eggColors.Couleur3 as string },
@@ -365,74 +434,63 @@ export const useReproduction = ({
       { trait_type: "TailleBytes", value: eggColors.TailleBytes as string }
     ];
 
-    const metadata = {
-      name: `Œuf RESCOE de ${parentA.name} × ${parentB.name}`,
-      bio: `Œuf F1 généré par reproduction`,
-      description: `Vous êtes Œuf RESCOE (niveau 0)`,
+    const chosenParent = Math.random() < 0.5 ? parentA : parentB;
+
+    return {
+      name: `Œuf RESCOE de ${chosenParent.name}`,
+      bio: chosenParent.bio,
+      description: `Vous êtes Œuf RESCOE (niveau 0) — ${chosenParent.bio}\n\nGénéré par la reproduction de ${parentA.name} × ${parentB.name}`,
       image: eggImageIpfs,
       level: 0,
       role: Math.random() < 0.5 ? parentA.roleLabel : parentB.roleLabel,
       rarityTier: "Egg",
       rarityScore: 1,
       tags: [
-        "Adhesion",
-        "Egg",
-        "F1",
+        "Adhesion", "Egg", "Oeuf",
         ...(parentA.metadata?.tags || []).slice(0,2),
         ...(parentB.metadata?.tags || []).slice(2)
       ].slice(0, 8),
-
       attributes: eggTraits,
-      evolutionHistory: [],
+      // ✅ AJOUT : Historique complet avec tokenURI des parents
+      evolutionHistory: [
+        {
+          stage: "Birth",
+          timestamp: now,
+          parents: [
+            {
+              tokenId: parentA.tokenId,
+              name: parentA.name,
+              role: parentA.roleLabel,
+              tokenURI: parentA.tokenURI,  // ← CRITIQUE : URI persistant
+              level: parentA.membershipInfo.level
+            },
+            {
+              tokenId: parentB.tokenId,
+              name: parentB.name,
+              role: parentB.roleLabel,
+              tokenURI: parentB.tokenURI,  // ← CRITIQUE : URI persistant
+              level: parentB.membershipInfo.level
+            }
+          ]
+        }
+      ],
 
+      // Garde aussi breeding pour compatibilité
       breeding: {
         timestamp: now,
         parents: [
-          {
-            id: parentA.tokenId,
-            name: parentA.name,
-            role: parentA.roleLabel,
-            uri: parentA.tokenURI,
-            level: parentA.membershipInfo.level
-          },
-          {
-            id: parentB.tokenId,
-            name: parentB.name,
-            role: parentB.roleLabel,
-            uri: parentB.tokenURI,
-            level: parentB.membershipInfo.level
-          }
+          { id: parentA.tokenId, name: parentA.name, role: parentA.roleLabel, uri: parentA.tokenURI, level: parentA.membershipInfo.level },
+          { id: parentB.tokenId, name: parentB.name, role: parentB.roleLabel, uri: parentB.tokenURI, level: parentB.membershipInfo.level }
         ]
       }
     };
-
-    return metadata;
   }, []);
-
-
-  const fetchUserPoints = useCallback(async () => {
-    if (!account || !contractAddress) return;
-
-    try {
-      const contract = fetchContractRead();
-      const points = await contract.rewardPoints(account);
-      setUserPoints(Number(points));
-    } catch (e) {
-      console.error("Points fetch error:", e);
-    }
-  }, [account, contractAddress, fetchContractRead]);
-
-  useEffect(() => {
-    fetchUserPoints();
-  }, [fetchUserPoints]);
-
 
   const reproduce = useCallback(async () => {
     if (!parentA || !parentB || parentA.tokenId === parentB.tokenId) {
       setError("Choisissez 2 parents différents");
       return;
     }
-
     if (userPoints < 100) {
       setError(`Points insuffisants: ${userPoints}/100`);
       return;
@@ -443,24 +501,20 @@ export const useReproduction = ({
     setLastTxHash(null);
 
     try {
-      const contractWrite = fetchContractWrite();
+      const contractWrite = getWriteContract();
       if (!contractWrite) throw new Error("Wallet non connecté");
 
-      // 1️⃣ Œuf image
       const eggIndex = Math.floor(Math.random() * maxEggIndex) + 1;
       const eggLocalPath = `/OEUFS/OEUF${eggIndex}.gif`;
+
+      const eggColors = await analyzeEggGif(eggLocalPath);
+      const eggMetadata = buildEggMetadata(parentA, parentB, "", eggColors, eggIndex);
+
+      // Upload IPFS (inchangé)
       const response = await fetch(eggLocalPath);
-      if (!response.ok) throw new Error(`Œuf ${eggIndex} 404`);
       const blob = await response.blob();
       const eggFile = new File([blob], `OEUF_${eggIndex}_${Date.now()}.gif`, { type: "image/gif" });
 
-      // 2️⃣ Analyse couleurs
-      const eggColors = await analyzeEggGif(eggLocalPath);
-
-      // 3️⃣ Metadata
-      const eggMetadata = buildEggMetadata(parentA, parentB, "", eggColors, eggIndex);
-
-      // 4️⃣ 🔥 UPLOAD CORRIGÉ - Récupérer LES DEUX URIs
       const objUrl = URL.createObjectURL(eggFile);
       const uploadResult = await uploadToIPFS({
         scope: "badges",
@@ -470,150 +524,201 @@ export const useReproduction = ({
         attributes: eggMetadata.attributes,
         family: "Hybride",
         sprite_name: `OEUF${eggIndex}.gif`,
-        tags: Array.isArray(eggMetadata.tags)
-          ? eggMetadata.tags.join(', ')
-          : eggMetadata.tags || 'hybride,egg,reproduction'
+        tags: Array.isArray(eggMetadata.tags) ? eggMetadata.tags.join(', ') : eggMetadata.tags || 'hybride,egg,reproduction'
       });
       URL.revokeObjectURL(objUrl);
-
-      // 🔥 STOCKER LES DEUX URIs
-      setEggImageUri(uploadResult.imageUri);
-      setEggMetadataUri(uploadResult.metadataUri);
 
       const eggMetadataIpfsUrl = uploadResult.metadataUri;
+      console.log(eggMetadataIpfsUrl);
       if (!eggMetadataIpfsUrl) throw new Error("Upload échoué");
 
-      // 5️⃣ 🔥 Transaction - Envoyer LE METADATA URI
-      const readContract = fetchContractRead();
-      const mintPrice = await readContract.mintPrice();
+      // Transaction
+      const readContract = getReadContract();
+      const mintPrice = await readContract!.mintPrice();
       const halfPriceWei = (BigInt(mintPrice.toString()) / BigInt(2)).toString();
+      console.log("mintPrice", mintPrice);
+      console.log("halfPriceWei", halfPriceWei);
 
-      const gas = await contractWrite.methods
-        .reproduce(parentA.tokenId, parentB.tokenId, eggMetadataIpfsUrl)
-        .estimateGas({ from: account!, value: halfPriceWei });
+/*
+      // Ajoute ces lectures
+      const reproduceCost = await readContract!.REPRODUCE_POINTS_COST();
+      const currentYear = Math.floor(Date.now() / 1000 / (365 * 24 * 3600));
+      const mintsThisYear = await readContract!.mintsPerYear(account!, currentYear);
+      const maxLevel = await readContract!.MAX_LEVEL();
+      const ownerA = await readContract!.ownerOf(parentA.tokenId);
+      const ownerB = await readContract!.ownerOf(parentB.tokenId);
+      const pointsOnChain = await readContract!.rewardPoints(account!);
 
-      const tx = await contractWrite.methods
-        .reproduce(parentA.tokenId, parentB.tokenId, eggMetadataIpfsUrl)
-        .send({
-          from: account!,
-          value: halfPriceWei,
-          gas: Math.floor(Number(gas) * 1.2).toString(),
-        });
-
-      setLastTxHash(tx.transactionHash);
-      setParentA(null);
-      setParentB(null);
-
-    } catch (e: any) {
-      console.error("💥 REPRO ERROR:", e);
-      setError(e.message);
-    } finally {
-      setIsReproducing(false);
-    }
-  }, [parentA, parentB, account, maxEggIndex, buildEggMetadata, fetchContractRead, fetchContractWrite, analyzeEggGif, userPoints, uploadToIPFS]);
-
-
-  //A tester si jamais sucs dans reproduce :  (correctif ChatGPT)
-  /*
-  const reproduce = useCallback(async () => {
-    if (!parentA || !parentB || parentA.tokenId === parentB.tokenId) {
-      setError("Choisissez 2 parents différents");
-      return;
-    }
-
-    if (userPoints < 100) {
-      setError(`Points insuffisants: ${userPoints}/100`);
-      return;
-    }
-
-    setIsReproducing(true);
-    setError(null);
-    setLastTxHash(null);
-
-    try {
-      const contractWrite = fetchContractWrite();
-      if (!contractWrite) throw new Error("Wallet non connecté");
-
-      // -----------------------------
-      // 1️⃣ Préparation de l'œuf
-      // -----------------------------
-      const eggIndex = Math.floor(Math.random() * maxEggIndex) + 1;
-      const eggLocalPath = `/OEUFS/OEUF${eggIndex}.gif`;
-      const response = await fetch(eggLocalPath);
-      if (!response.ok) throw new Error(`Œuf ${eggIndex} introuvable`);
-      const blob = await response.blob();
-      const eggFile = new File(
-        [blob],
-        `OEUF_${eggIndex}_${Date.now()}.gif`,
-        { type: "image/gif" }
-      );
-
-      const eggColors = await analyzeEggGif(eggLocalPath);
-      const eggMetadata = buildEggMetadata(parentA, parentB, "", eggColors, eggIndex);
-
-      // -----------------------------
-      // 2️⃣ Upload sur IPFS
-      // -----------------------------
-      const objUrl = URL.createObjectURL(eggFile);
-      const { metadataUri: eggMetadataIpfsUrl } = await uploadToIPFS({
-        scope: "reproduction",
-        imageUrl: objUrl,
-        name: eggMetadata.name,
-        bio: eggMetadata.bio || "",
-        attributes: eggMetadata.attributes,
-        family: "Hybride",
-        sprite_name: `OEUF${eggIndex}.gif`,
-        tags: eggMetadata.tags || [],
-        breeding: eggMetadata.breeding
+      console.log({
+        reproduceCost: Number(reproduceCost),
+        mintsThisYear: Number(mintsThisYear),
+        maxLevel: Number(maxLevel),
+        ownerA: ownerA,
+        ownerB: ownerB,
+        pointsOnChain: Number(pointsOnChain),
+        account,
       });
-      URL.revokeObjectURL(objUrl);
 
-      if (!eggMetadataIpfsUrl) throw new Error("Upload échoué");
 
-      // -----------------------------
-      // 3️⃣ Transaction blockchain
-      // -----------------------------
-      const readContract = fetchContractRead();
-      const mintPrice = await readContract.mintPrice();
-      const halfPriceWei = (BigInt(mintPrice.toString()) / BigInt(2)).toString();
+
+          //const priceInWei = web3.utils.toWei(requiredPriceEth.toString(), "ether");
+          //const gasPrice = await web3.eth.getGasPrice();
+
+          const gasEstimate = await contractWrite.methods.reproduce(BigInt(parentA.tokenId), BigInt(parentB.tokenId), eggMetadataIpfsUrl)
+          .estimateGas({
+            from: account,
+            value: halfPriceWei,
+          });
+
 
       const gas = await contractWrite.methods
-        .reproduce(parentA.tokenId, parentB.tokenId, eggMetadataIpfsUrl)
+        .reproduce(BigInt(parentA.tokenId), BigInt(parentB.tokenId), eggMetadataIpfsUrl)
         .estimateGas({ from: account!, value: halfPriceWei });
+*/
+
+      console.log("REPRO PARAMS", {
+        account,
+        parentA: parentA.tokenId,
+        parentB: parentB.tokenId,
+        eggMetadataIpfsUrl,
+        halfPriceWei,
+      });
+
+      const iface = new EthersContract(contractAddress, ABI, providerRef.current!).interface;
+      const txData = iface.encodeFunctionData("reproduce", [
+        BigInt(parentA.tokenId),
+        BigInt(parentB.tokenId),
+        eggMetadataIpfsUrl
+      ]);
+
+      let gasEstimate: bigint;
+      try {
+        gasEstimate = await providerRef.current!.estimateGas({
+          from: account!,
+          to: contractAddress,
+          value: BigInt(halfPriceWei),
+          data: txData,
+        });
+        console.log("✅ provider estimateGas", gasEstimate.toString());
+      } catch (gasErr: any) {
+        console.error("❌ provider estimateGas ERROR", gasErr);
+        throw new Error(
+          gasErr?.reason ||
+          gasErr?.message ||
+          gasErr?.info?.error?.message ||
+          gasErr?.data?.message ||
+          "estimateGas provider échoué"
+        );
+      }
+
+      if (!web3) throw new Error("Web3 non disponible");
+
+      const gasPrice = await web3.eth.getGasPrice();
+      const safeGas = ((gasEstimate * 120n) / 100n).toString();
+
+      console.log("gasPrice", gasPrice);
+      console.log("safeGas", safeGas);
 
       const tx = await contractWrite.methods
-        .reproduce(parentA.tokenId, parentB.tokenId, eggMetadataIpfsUrl)
+        .reproduce(BigInt(parentA.tokenId), BigInt(parentB.tokenId), eggMetadataIpfsUrl)
         .send({
           from: account!,
           value: halfPriceWei,
-          gas: Math.floor(Number(gas) * 1.2).toString(),
+          gas: safeGas,
+          gasPrice: gasPrice.toString()
         });
 
-      setLastTxHash(tx.transactionHash);
-      setParentA(null);
-      setParentB(null);
 
-    } catch (e: any) {
-      console.error("💥 REPRO ERROR:", e);
-      setError(e.message || "Erreur inconnue");
-    } finally {
-      setIsReproducing(false);
-    }
-  }, [
-    parentA,
-    parentB,
-    account,
-    maxEggIndex,
-    buildEggMetadata,
-    fetchContractRead,
-    fetchContractWrite,
-    analyzeEggGif,
-    userPoints,
-    uploadToIPFS
-  ]);
+/*
+//fonctionne sur chrome :
+const readContract = getReadContract();
+const mintPrice = await readContract!.mintPrice();
+const halfPriceWei = (BigInt(mintPrice.toString()) / BigInt(2)).toString();
+console.log("mintPrice", mintPrice);
+console.log("halfPriceWei", halfPriceWei);
 
+const method = contractWrite.methods.reproduce(
+BigInt(parentA.tokenId),
+BigInt(parentB.tokenId),
+eggMetadataIpfsUrl
+);
+
+console.log("REPRO PARAMS", {
+account,
+parentA: parentA.tokenId,
+parentB: parentB.tokenId,
+eggMetadataIpfsUrl,
+halfPriceWei,
+});
+
+try {
+const callResult = await method.call({
+from: account!,
+value: halfPriceWei,
+});
+console.log("✅ reproduce.call OK", callResult);
+} catch (callErr: any) {
+console.error("❌ reproduce.call ERROR", callErr);
+throw new Error(
+callErr?.reason ||
+callErr?.message ||
+callErr?.data?.message ||
+callErr?.data?.originalError?.message ||
+"Simulation reproduce.call échouée"
+);
+}
+
+let gasEstimate: bigint;
+try {
+gasEstimate = await method.estimateGas({
+from: account!,
+value: halfPriceWei,
+});
+console.log("✅ gasEstimate", gasEstimate.toString());
+} catch (gasErr: any) {
+console.error("❌ estimateGas ERROR", gasErr);
+console.error("❌ estimateGas data", gasErr?.data);
+throw new Error(
+gasErr?.reason ||
+gasErr?.message ||
+gasErr?.data?.message ||
+gasErr?.data?.originalError?.message ||
+"estimateGas échoué"
+);
+}
+
+const gasPrice = await web3.eth.getGasPrice();
+console.log("gasPrice", gasPrice);
+
+const tx = await contractWrite.methods
+  .reproduce(BigInt(parentA.tokenId), BigInt(parentB.tokenId), eggMetadataIpfsUrl)
+  .send({
+    from: account!,
+    value: halfPriceWei,
+    gas: Math.floor(Number(gasEstimate) * 1).toString(),
+    gasPrice: gasPrice.toString()
+  });
   */
 
+
+
+  //    setLastTxHash(tx.transactionHash);
+      setParentA(null);
+      setParentB(null);
+      startScanning(); // Refresh
+    } catch (e: any) {
+      console.error("💥 REPRO ERROR:", e);
+      setError(e.message || "Erreur reproduction");
+    } finally {
+      setIsReproducing(false);
+    }
+  }, [parentA, parentB, account, maxEggIndex, userPoints, getReadContract, getWriteContract,
+      uploadToIPFS, analyzeEggGif, buildEggMetadata, startScanning]);
+
+  // ✅ LOGIQUE hasScanned CORRIGÉE
+  const hasScanned = useMemo(() => {
+    return hasScannedExplicitly || eligibleTokens.length > 0;
+  }, [hasScannedExplicitly, eligibleTokens.length]);
 
   return {
     eligibleTokens,
@@ -625,8 +730,7 @@ export const useReproduction = ({
     lastTxHash,
     error,
     startScanning,
-    hasScanned: eligibleTokens.length > 0 || !shouldLoad,
+    hasScanned,
     userPoints,
-
   } as UseReproductionReturn;
 };

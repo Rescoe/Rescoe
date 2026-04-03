@@ -1,17 +1,43 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { Box, Text, Badge, Flex, useBreakpointValue, useToast, Tooltip, Button,Modal, ModalOverlay, ModalContent, ModalHeader, ModalCloseButton } from "@chakra-ui/react";
+import {
+  Box,
+  Text,
+  Badge,
+  Flex,
+  useToast,
+  Tooltip,
+  Button,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalCloseButton,
+  ModalBody,
+  Spinner,
+  Alert,
+  AlertIcon,
+} from "@chakra-ui/react";
 import { useAuth } from "../../../utils/authContext";
-import Web3 from "web3";
-import { formatUnits } from "@ethersproject/units";
 import { getEllipsisTxt } from "../../../utils/format";
 import { setup1inchWidget } from "@1inch/embedded-widget";
-
-import detectEthereumProvider from "@metamask/detect-provider"; // ✅ AJOUTE ÇA
+import detectEthereumProvider from "@metamask/detect-provider";
+import { JsonRpcProvider, formatEther } from "ethers";
 
 interface SoldeWalletProps {
   showAddress?: boolean;
   compact?: boolean;
 }
+
+const ETH_RPCS = [
+  "https://ethereum-rpc.publicnode.com",
+  "https://rpc.ankr.com/eth",
+  "https://eth.llamarpc.com",
+];
+
+const BASE_RPCS = [
+  "https://mainnet.base.org",
+  "https://base-rpc.publicnode.com",
+];
 
 const SoldeWallet: React.FC<SoldeWalletProps> = ({
   showAddress = true,
@@ -20,173 +46,246 @@ const SoldeWallet: React.FC<SoldeWalletProps> = ({
   const { address, isAuthenticated } = useAuth();
   const toast = useToast();
 
-  const [baseBalance, setBaseBalance] = useState("0.00");
-  const [ethBalance, setEthBalance] = useState("0.00"); // ✅ NOUVEAU : ETH Ethereum
-  const [web3Base, setWeb3Base] = useState<Web3 | null>(null); // Base RPC
-  const [web3Eth, setWeb3Eth] = useState<Web3 | null>(null); // Ethereum RPC
+  const [baseBalance, setBaseBalance] = useState("0.0000");
+  const [ethBalance, setEthBalance] = useState("0.0000");
   const [isLoading, setIsLoading] = useState(true);
   const [showSwap, setShowSwap] = useState(false);
+  const [widgetError, setWidgetError] = useState<string | null>(null);
+  const [widgetLoaded, setWidgetLoaded] = useState(false);
+
   const iframeRef = useRef<HTMLDivElement>(null);
+  const previousBaseRef = useRef<string>("0.0000");
+  const previousEthRef = useRef<string>("0.0000");
+  const fetchingRef = useRef(false);
+  const toastErrorShownRef = useRef(false);
+  const widgetCleanupRef = useRef<null | (() => void)>(null);
 
-  const previousBaseRef = useRef<string>("0.00");
-  const previousEthRef = useRef<string>("0.00");
+  const getBalanceWithFallback = useCallback(async (rpcUrls: string[], wallet: string) => {
+    let lastError: unknown = null;
 
-  const BASE_RPC = "https://mainnet.base.org"; // ou Alchemy
-  const ETH_RPC = "https://eth.llamarpc.com"; // ou Infura
-  const isDesktop = useBreakpointValue({ base: false, md: true });
-
-  // ✅ INIT Web3 multi-chain
-  useEffect(() => {
-    const initWeb3 = async () => {
+    for (const rpc of rpcUrls) {
       try {
-        const provider = await detectEthereumProvider();
-        if (provider) {
-          // Base chainId 8453
-          const web3b = new Web3(new Web3.providers.HttpProvider(BASE_RPC));
-          const web3e = new Web3(new Web3.providers.HttpProvider(ETH_RPC));
-          setWeb3Base(web3b);
-          setWeb3Eth(web3e);
-        }
-      } catch (error) {
-        console.error("Erreur init Web3:", error);
+        const provider = new JsonRpcProvider(rpc);
+        const balance = await provider.getBalance(wallet);
+        return formatEther(balance);
+      } catch (err) {
+        lastError = err;
+        console.warn(`RPC failed: ${rpc}`, err);
       }
-    };
-    initWeb3();
+    }
+
+    throw lastError ?? new Error("Tous les RPC ont échoué");
   }, []);
 
-  useEffect(() => {
-    const handleOpenSwap = () => setShowSwap(true);
-    window.addEventListener('openSwapModal', handleOpenSwap);
-    return () => window.removeEventListener('openSwapModal', handleOpenSwap);
-  }, []);
-
-  // ✅ FETCH BALANCES MULTI-CHAIN
   const fetchBalances = useCallback(async () => {
-    if (!web3Base || !web3Eth || !address) {
-      setBaseBalance("0.00");
-      setEthBalance("0.00");
+    if (!address) {
+      setBaseBalance("0.0000");
+      setEthBalance("0.0000");
       setIsLoading(false);
       return;
     }
+
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
 
     try {
       setIsLoading(true);
 
-      // Base ETH
-      const balBase = await web3Base.eth.getBalance(address);
-      const newBase = parseFloat(formatUnits(balBase, 18)).toFixed(4);
+      const [baseRaw, ethRaw] = await Promise.all([
+        getBalanceWithFallback(BASE_RPCS, address),
+        getBalanceWithFallback(ETH_RPCS, address),
+      ]);
+
+      const newBase = parseFloat(baseRaw).toFixed(4);
+      const newEth = parseFloat(ethRaw).toFixed(4);
+
       if (newBase !== previousBaseRef.current) {
-        setBaseBalance(newBase);
         previousBaseRef.current = newBase;
+        setBaseBalance(newBase);
       }
 
-      // Ethereum ETH
-      const balEth = await web3Eth.eth.getBalance(address);
-      const newEth = parseFloat(formatUnits(balEth, 18)).toFixed(4);
       if (newEth !== previousEthRef.current) {
-        setEthBalance(newEth);
         previousEthRef.current = newEth;
+        setEthBalance(newEth);
       }
+
+      toastErrorShownRef.current = false;
     } catch (error) {
       console.error("Erreur balances:", error);
+
+      if (!toastErrorShownRef.current) {
+        toast({
+          title: "Erreur balance",
+          description: "Impossible de récupérer les soldes pour le moment",
+          status: "error",
+          duration: 3000,
+        });
+        toastErrorShownRef.current = true;
+      }
     } finally {
       setIsLoading(false);
+      fetchingRef.current = false;
     }
-  }, [web3Base, web3Eth, address]);
+  }, [address, getBalanceWithFallback, toast]);
 
   useEffect(() => {
-    if (isAuthenticated && web3Base && web3Eth && address) {
-      fetchBalances();
-      const interval = setInterval(fetchBalances, 30000);
-      return () => clearInterval(interval);
-    }
-  }, [fetchBalances, isAuthenticated, web3Base, web3Eth, address]);
-
-  // useEffect widget (remplace ligne 108)
-  useEffect(() => {
-    if (!showSwap || !iframeRef.current) return;
-    if (typeof window === "undefined") return;
-
-    const provider = (window as any).ethereum;
-    if (!provider || typeof provider.request !== "function") {
-      console.warn("No valid Ethereum provider");
+    if (!isAuthenticated || !address) {
+      setIsLoading(false);
       return;
     }
 
-    const init = async () => {
-      try {
-        // ✅ switch Base
-        await provider.request({
-          method: "wallet_switchEthereumChain",
-          params: [{ chainId: "0x2105" }],
-        });
+    fetchBalances();
+    const interval = setInterval(fetchBalances, 30000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, address, fetchBalances]);
 
-        // reset widget
+  useEffect(() => {
+    if (!showSwap || !iframeRef.current || typeof window === "undefined") return;
+
+    let cancelled = false;
+
+    const initWidget = async () => {
+      try {
+        setWidgetError(null);
+        setWidgetLoaded(false);
+
+        if (widgetCleanupRef.current) {
+          widgetCleanupRef.current();
+          widgetCleanupRef.current = null;
+        }
+
         iframeRef.current!.innerHTML = "";
 
-        setup1inchWidget({
-          hostElement: iframeRef.current!,
+        const provider = (await detectEthereumProvider()) as any;
+        if (!provider || typeof provider.request !== "function") {
+          throw new Error("MetaMask non détecté");
+        }
+
+        try {
+          await provider.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: "0x1" }],
+          });
+        } catch (switchError: any) {
+          console.warn("Switch Ethereum warning:", switchError);
+        }
+
+        if (cancelled || !iframeRef.current) return;
+
+        const amount = Math.max(parseFloat(ethBalance || "0"), 0.001).toFixed(3);
+
+        const widget = setup1inchWidget({
+          hostElement: iframeRef.current,
           provider,
-
-          chainId: 8453,
-
+          chainId: 1,
           sourceTokenSymbol: "ETH",
-          destinationTokenSymbol: "WETH",
-
-          sourceTokenAmount: baseBalance || "0.001",
-
+          destinationTokenSymbol: "USDC",
+          sourceTokenAmount: amount,
           theme: "dark",
+          ...(process.env.NODE_ENV === 'production' ? { disableWalletModal: true } : {}),
         });
 
-      } catch (e) {
-        console.error("1inch widget error:", e);
+        if (widget && typeof (widget as any).onIframeLoad === "function") {
+          (widget as any).onIframeLoad(() => {
+            if (!cancelled) setWidgetLoaded(true);
+          });
+        } else {
+          setTimeout(() => {
+            if (!cancelled) setWidgetLoaded(true);
+          }, 1500);
+        }
+
+        widgetCleanupRef.current = () => {
+          try {
+            if (widget && typeof (widget as any).destroy === "function") {
+              (widget as any).destroy();
+            }
+          } catch (e) {
+            console.warn("Widget cleanup warning:", e);
+          }
+
+          if (iframeRef.current) {
+            iframeRef.current.innerHTML = "";
+          }
+        };
+      } catch (error: any) {
+        console.error("1inch widget error:", error);
+        if (!cancelled) {
+          setWidgetError(error?.message || "Erreur lors du chargement du widget");
+          setWidgetLoaded(false);
+        }
       }
     };
 
-    init();
+    initWidget();
 
-  }, [showSwap, baseBalance]);
+    return () => {
+      cancelled = true;
+      if (widgetCleanupRef.current) {
+        widgetCleanupRef.current();
+        widgetCleanupRef.current = null;
+      }
+    };
+  }, [showSwap, ethBalance]);
 
   if (!isAuthenticated || !address) {
-    return <Badge bg="brand.navy" color="brand.cream"> -- Ξ </Badge>;
+    return (
+      <Badge bg="brand.navy" color="brand.cream">
+        -- Ξ
+      </Badge>
+    );
   }
 
   if (isLoading) {
-    return <Badge bg="brand.navy" color="brand.cream"> ... </Badge>;
+    return (
+      <Badge bg="brand.navy" color="brand.cream">
+        ...
+      </Badge>
+    );
   }
 
   return (
     <>
       <Tooltip
+        hasArrow
+        placement="bottom"
+        bg="brand.navy"
+        color="brand.cream"
         label={
-          <Flex direction="column" gap={1} p={2}>
-            <Text fontSize="xs" fontWeight="500" color="brand.cream">
-              Base: {baseBalance} ETH
+          <Flex direction="column" gap={2} p={2}>
+            <Text fontSize="xs" fontWeight="bold">
+              Soldes
             </Text>
-            <Text fontSize="xs" fontWeight="500" color="brand.cream">
-              Eth: {ethBalance} ETH
-            </Text>
-            {parseFloat(ethBalance) > 0 && (
+            <Text fontSize="xs">Ethereum: {ethBalance} ETH</Text>
+            <Text fontSize="xs">Base: {baseBalance} ETH</Text>
+
+            {parseFloat(ethBalance) > 0.0009 && (
               <Button
                 size="xs"
                 mt={1}
-                onClick={() => setShowSwap(true)}
-                colorScheme="brand"
+                colorScheme="purple"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowSwap(true);
+                }}
               >
-                Swap → Base
+                Swap / Bridge
               </Button>
             )}
           </Flex>
         }
-        hasArrow
-        placement="bottom"
       >
         <Flex align="center" gap={1}>
           {showAddress && (
-            <Text fontSize={compact ? "2xs" : "xs"} fontFamily="mono" color="gray.400">
+            <Text
+              fontSize={compact ? "2xs" : "xs"}
+              fontFamily="mono"
+              color="gray.400"
+            >
               {getEllipsisTxt(address, 6)}
             </Text>
           )}
+
           <Badge
             bg="brand.cream"
             color="black"
@@ -201,38 +300,93 @@ const SoldeWallet: React.FC<SoldeWalletProps> = ({
         </Flex>
       </Tooltip>
 
-      {/* ✅ SWAP MODAL/WIDGET */}
-      {/* ✅ SWAP MODAL PLEINE PAGE */}
-      {showSwap && (
-        <Modal isOpen={showSwap} onClose={() => setShowSwap(false)} size="6xl" isCentered>
-          <ModalOverlay backdropFilter="blur(20px)" bg="blackAlpha.700" />
-          <ModalContent
-            bg="brand.navy"
-            borderRadius="3xl"
-            border="2px solid"
-            borderColor="brand.purple/30"
-            maxW="90vw"
-            maxH="90vh"
-          >
-            <ModalHeader pb={4}>
-              <Flex justify="space-between" align="center">
+      <Modal isOpen={showSwap} onClose={() => setShowSwap(false)} size="6xl" isCentered>
+        <ModalOverlay backdropFilter="blur(20px)" bg="blackAlpha.700" />
+        <ModalContent
+          bg="brand.navy"
+          borderRadius="3xl"
+          border="2px solid"
+          borderColor="purple.400"
+          maxW="92vw"
+          maxH="90vh"
+        >
+          <ModalHeader pb={4}>
+            <Flex justify="space-between" align="center" gap={4}>
+              <Box>
                 <Text color="brand.cream" fontSize="2xl" fontWeight={700}>
-                  Swap ETH → Base ETH
+                  Swap ETH → Base
                 </Text>
-                <Text fontSize="sm" color="brand.cream" opacity={0.8}>
-                  {ethBalance} ETH disponibles
+                <Text fontSize="sm" color="gray.400">
+                  Le widget 1inch s’ouvre sur Ethereum mainnet pour le swap. [web:75][web:79]
+                </Text>
+              </Box>
+
+              <Flex direction="column" align="flex-end">
+                <Text fontSize="sm" color="brand.cream">
+                  Ethereum: {ethBalance} ETH
+                </Text>
+                <Text fontSize="sm" color="brand.cream">
+                  Base: {baseBalance} ETH
                 </Text>
               </Flex>
-            </ModalHeader>
-            <ModalCloseButton color="brand.cream" size="lg" />
+            </Flex>
+          </ModalHeader>
 
-            <Box p={6} h="500px" w="full">
-              <div ref={iframeRef} style={{ width: "100%", height: "100%" }} />
-            </Box>
-          </ModalContent>
-        </Modal>
-      )}
+          <ModalCloseButton color="brand.cream" size="lg" />
 
+          <ModalBody p={6}>
+            {widgetError ? (
+              <Alert status="warning" borderRadius="lg">
+                <AlertIcon />
+                <Box flex="1">
+                  <Text fontWeight="bold">{widgetError}</Text>
+                  <Text fontSize="sm">
+                    Le chargement du widget a échoué. Réessaie dans quelques secondes.
+                  </Text>
+                </Box>
+                <Button size="sm" ml={4} onClick={() => setShowSwap(false)}>
+                  Fermer
+                </Button>
+              </Alert>
+            ) : (
+              <Box
+                position="relative"
+                h={{ base: "420px", md: "560px" }}
+                w="full"
+                borderRadius="2xl"
+                overflow="hidden"
+                border="1px solid"
+                borderColor="whiteAlpha.300"
+                bg="blackAlpha.300"
+              >
+                {!widgetLoaded && (
+                  <Flex
+                    position="absolute"
+                    inset={0}
+                    align="center"
+                    justify="center"
+                    direction="column"
+                    gap={3}
+                    bg="rgba(7,12,20,0.75)"
+                    zIndex={2}
+                  >
+                    <Spinner size="xl" color="brand.gold" />
+                    <Text color="brand.cream">Chargement du widget 1inch…</Text>
+                  </Flex>
+                )}
+
+                <div
+                  ref={iframeRef}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                  }}
+                />
+              </Box>
+            )}
+          </ModalBody>
+        </ModalContent>
+      </Modal>
     </>
   );
 };

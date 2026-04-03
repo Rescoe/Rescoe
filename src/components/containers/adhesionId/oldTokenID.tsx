@@ -148,7 +148,25 @@ const TokenPage = () => {
   const [renewPriceEth, setRenewPriceEth] = useState<string | null>(null);
 
   const [evolutionRefreshFlag, setEvolutionRefreshFlag] = useState<number>(0);
-  const [reproRefreshFlag, setReproRefreshFlag] = useState<number>(0);
+
+  const reproRefreshFlag = useState<number>(0)[0];
+  const setReproRefreshFlag = useState<number>(0)[1];
+  const showReproduction = useState(false)[0];
+  const setShowReproduction = useState(true)[1];
+
+  // 🔥 FIX 1: TOUJOURS rendre le hook (lazy via refreshFlag)
+  const reproduction = useReproduction({
+    contractAddress: contractAdhesion,
+    roleLabelResolver: (role: number) => roleLabels[roles[role]] || "Member",
+    // 🔥 Clé refresh → reset interne sans re-mount
+    refreshKey: `${contractAdhesion}-${reproRefreshFlag}`
+  });
+
+  // 🔥 FIX 2: Bouton qui trigger refresh SANS condition hook
+  const handleLoadReproduction = useCallback(() => {
+    setShowReproduction(true);
+    setReproRefreshFlag(prev => prev + 1);  // Reset hook + charge
+  }, []);
 
   const [isBurning, setIsBurning] = useState(false);
   const [burnGasEstimate, setBurnGasEstimate] = useState<string | null>(null);
@@ -186,12 +204,6 @@ const [canEvolve, setCanEvolve] = useState(false);
   }, [auth.isAuthenticated]);
 
 
-  const reproduction = useReproduction({
-    contractAddress: contractAdhesion,
-    roleLabelResolver: (role: number) => roleLabels[roles[role]] || "Member",
-  });
-
-
   const effectiveTokenId = tokenId ? Number(tokenId) : 0;
   const hatch = useHatchEgg(contractAdhesion, effectiveTokenId);
 
@@ -218,12 +230,13 @@ const [canEvolve, setCanEvolve] = useState(false);
 
     const loadRenewPrice = async () => {
       try {
-        const rpcProvider = getProvider();
+        const provider = new JsonRpcProvider(
+  process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!
+);
 
         const contract = new EthersContract(contractAdhesion, ABI, provider);
-        const priceWei = await contract.mintPrice;
-        console.log(priceWei);
-        setRenewPriceEth(0);
+        const priceWei = await contract.mintPrice();
+        setRenewPriceEth(formatUnits(priceWei, "ether"));
       } catch (err) {
         console.error("Erreur chargement prix renouvellement", err);
         setRenewPriceEth(null);
@@ -325,34 +338,25 @@ useEffect(() => {
     if (nftCache[cacheKey]) return nftCache[cacheKey];
 
     try {
-      const rpcProvider = getProvider();
-      const contract = new EthersContract(contractAdhesionAddress, ABI, rpcProvider);
-      const contractManagement = new EthersContract(contractAdhesionManagement, ABI_Management, rpcProvider);
+      const provider = new JsonRpcProvider(
+  process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!
+);
+      const contract = new EthersContract(contractAdhesionAddress, ABI, provider);
+      const contractManagement = new EthersContract(contractAdhesionManagement, ABI_Management, provider);
 
       const [
-        tokenDetails,
-        membershipRaw,
-        uri,
-        owner
-      ] = await Promise.all([
-        contract.getTokenDetails(tokenIdNumber),
-        contract.getMembershipInfo(tokenIdNumber),
-        contract.tokenURI(tokenIdNumber),
-        contract.ownerOf(tokenIdNumber)
-      ]);
-
-      const [
-        tokenOwner,
+        owner,
         role,
         mintTimestamp,
         priceWei,
         nameOnChain,
         bioOnChain,
         remainingTime,
-        forSale
-      ] = tokenDetails;
+        forSale,
+      ] = await contract.getTokenDetails(tokenIdNumber);
 
       const [membership, realName, realBio] = await contract.getUserInfo(owner);
+      const uri = await contract.tokenURI(tokenIdNumber);
 
       // ✅ RÉCUPÉRATION ROBUSTE MÉTADONNÉES (gère image directe + JSON fail)
       let metadata: Partial<EvolutionMetadata> = {};
@@ -440,15 +444,13 @@ useEffect(() => {
   //vérification de la possibilité d'evolution
     useEffect(() => {
       const computeCanEvolve = async () => {
-        if (!membershipInfo || membershipInfo.level >= 3) {
-          setCanEvolve(false);
-          console.log("🚫 Skip évolution: lvl", membershipInfo?.level || "inconnu");
-          return;  // 🔥 AJOUTE ÇA
-        }
+        if (!membershipInfo) return;
 
         try {
-          const rpcProvider = getProvider();
-          const contract = new EthersContract(contractAdhesion, ABI, rpcProvider);
+          const provider = new JsonRpcProvider(
+  process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!
+);
+          const contract = new EthersContract(contractAdhesion, ABI, provider);
 
           const durationsRaw = await Promise.all([
             contract.levelDurations(0),
@@ -1231,30 +1233,20 @@ return (
                   </CardBody>
                 </Card>
 
-                <Card
-                  variant="outline"
-                  p={{ base: 3, md: 4 }}
-                  borderColor="brand.gold"
-                >
-                  <CardBody p={0}>
-                    <VStack align="start" spacing={1}>
-                      <Text
-                        fontWeight="600"
-                        color="brand.navy"
-                        fontSize={{ base: "xs", md: "sm" }}
-                      >
-                        Coût
-                      </Text>
-                      <Text
-                        fontSize={{ base: "lg", md: "xl" }}
-                        fontWeight="extrabold"
-                        color="brand.gold"
-                      >
-                        {evolvePriceEth.toFixed(4)} Ξ
-                      </Text>
-                    </VStack>
-                  </CardBody>
-                </Card>
+                {membershipInfo?.level < 3 && (
+                  <Card variant="outline" p={{ base: 3, md: 4 }} borderColor="brand.gold">
+                    <CardBody p={0}>
+                      <VStack align="start" spacing={1}>
+                        <Text fontWeight="600" color="brand.navy" fontSize={{ base: "xs", md: "sm" }}>
+                          Coût
+                        </Text>
+                        <Text fontSize={{ base: "lg", md: "xl" }} fontWeight="extrabold" color="brand.gold">
+                          {Number(evolvePriceEth || 0).toFixed(4)} Ξ
+                        </Text>
+                      </VStack>
+                    </CardBody>
+                  </Card>
+                )}
               </SimpleGrid>
 
               {/* CONTENU PRINCIPAL */}
@@ -1309,12 +1301,24 @@ return (
 
                       </VStack>
                     </VStack>
-                  ) : (
-                    <ReproductionPanel
-                      reproduction={reproduction as any}
-                      renewPriceEth={renewPriceEth}
-                    />
-                  )}
+                  ): (
+                      showReproduction ? (
+                        <ReproductionPanel
+                          reproduction={reproduction as any}
+                          renewPriceEth={renewPriceEth}
+                        />
+                      ) : (
+                        <Center p={8}>
+                        <Button
+                          onClick={handleLoadReproduction}
+                          colorScheme="brand"
+                          size="lg"
+                        >
+                          🔄 Charger les données de reproduction
+                        </Button>
+                        </Center>
+                      )
+                    )}
                 </CardBody>
               </Card>
             </VStack>
