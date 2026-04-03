@@ -28,6 +28,7 @@ export interface UploadOptions {
   color_profile?: unknown;
   previousImage?: string | null;
   evolutionHistory?: any[];
+  breeding?: any;  // 🔥 AJOUTE ÇA
   custom_data?: Record<string, any>;
 }
 
@@ -88,7 +89,7 @@ export const usePinataUpload = (): UsePinataUploadReturn => {
         scope, imageUrl, imageFile, name, description, bio,
         role, level, attributes = [], tags, maxEditions,
         collectionType, artist, family, sprite_name, color_profile,
-        previousImage, evolutionHistory = [], custom_data = {}
+        previousImage, evolutionHistory = [], breeding = {}, custom_data = {}
       } = options;
 
       // 1. Image → base64
@@ -111,6 +112,8 @@ export const usePinataUpload = (): UsePinataUploadReturn => {
         ...(color_profile ? { color_profile: color_profile as any } : {}),
         ...(previousImage !== undefined && { previousImage }),
         ...(evolutionHistory.length > 0 && { evolutionHistory }),
+        ...(breeding !== undefined && { breeding }),  // 🔥 AJOUTE ÇA
+
       };
 
       let metadata: any = { ...baseMetadata };

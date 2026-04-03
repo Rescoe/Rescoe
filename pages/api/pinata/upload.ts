@@ -80,7 +80,7 @@ export default async function handler(
         attributes: Array.isArray(metadata.attributes)
           ? metadata.attributes.filter((attr: any) => attr?.trait_type && attr.value !== undefined)
           : [],
-        // 🔥 TOUT LE RESTE (lore, full_path, dominant_color, etc.)
+        breeding: metadata.breeding && typeof metadata.breeding === "object" ? metadata.breeding : {},
         ...metadata
       };
 

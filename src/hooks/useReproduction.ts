@@ -393,6 +393,33 @@ export const useReproduction = ({
   ) => {
     const now = Math.floor(Date.now() / 1000);
 
+    const chosenParent = Math.random() < 0.5 ? parentA : parentB;
+    const otherParent = chosenParent.tokenId === parentA.tokenId ? parentB : parentA;
+
+    const rgbToHex = (rgb: string): string => {
+      if (rgb.startsWith("#")) return rgb.toUpperCase();
+      const match = rgb.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+      if (!match) return "#FFFFFF";
+      const [r, g, b] = match.slice(1).map(Number);
+      return `#${[r, g, b].map(x => x.toString(16).padStart(2, "0").toUpperCase()).join("")}`;
+    };
+
+    const getTotalFam = (parent: TokenWithMeta): number => {
+      const attr = parent.metadata?.attributes?.find(
+        (a: any) => a.trait_type === "TotalFamille" || a.trait_type === "Totalfamille"
+      );
+      return Number(attr?.value ?? 0);
+    };
+
+    const totalFamille = Math.floor((getTotalFam(parentA) + getTotalFam(parentB)) / 2);
+
+    const chosenBio =
+      typeof chosenParent.metadata?.bio === "string" && chosenParent.metadata.bio.trim()
+        ? chosenParent.metadata.bio.trim()
+        : typeof (chosenParent as any).bio === "string" && (chosenParent as any).bio.trim()
+        ? (chosenParent as any).bio.trim()
+        : "Œuf F1 généré par reproduction";
+
     const eggTraits = [
       { trait_type: "Stade", value: "Œuf" },
       { trait_type: "Type", value: "Œuf RESCOE" },
@@ -411,76 +438,80 @@ export const useReproduction = ({
       { trait_type: "Legendaire", value: "Non" },
       { trait_type: "Famille", value: "Hybride" },
       { trait_type: "DisplayName", value: "Œuf F1" },
-      { trait_type: "Lore", value: `Œuf issu de ${parentA.name} × ${parentB.name}, qui étaient respectivement ${parentA.roleLabel} × ${parentB.roleLabel}` },
-      { trait_type: "TotalFamille", value: Math.floor(
-        (Number(parentA.metadata?.attributes?.find(a => a.trait_type === "TotalFamille")?.value || 32) +
-        Number(parentB.metadata?.attributes?.find(a => a.trait_type === "TotalFamille")?.value || 32)) / 2
-      ) },
+      {
+        trait_type: "Lore",
+        value: `Œuf issu de ${parentA.name} × ${parentB.name}, qui étaient respectivement ${parentA.roleLabel} × ${parentB.roleLabel}`
+      },
+      { trait_type: "TotalFamille", value: totalFamille },
       { trait_type: "Sprite", value: `OEUF${eggIndex}.gif` },
-      { trait_type: "Couleur1", value: eggColors.Couleur1 as string },
-      { trait_type: "Couleur2", value: eggColors.Couleur2 as string },
-      { trait_type: "Couleur3", value: eggColors.Couleur3 as string },
-      { trait_type: "Couleur4", value: eggColors.Couleur4 as string },
-      { trait_type: "Couleur5", value: eggColors.Couleur5 as string },
+      { trait_type: "Couleur1", value: rgbToHex(eggColors.Couleur1 as string) },
+      { trait_type: "Couleur2", value: rgbToHex(eggColors.Couleur2 as string) },
+      { trait_type: "Couleur3", value: rgbToHex(eggColors.Couleur3 as string) },
+      { trait_type: "Couleur4", value: rgbToHex(eggColors.Couleur4 as string) },
+      { trait_type: "Couleur5", value: rgbToHex(eggColors.Couleur5 as string) },
       { trait_type: "Teinte", value: eggColors.Teinte as string },
       { trait_type: "Saturation", value: eggColors.Saturation as string },
       { trait_type: "Luminosité", value: eggColors.Luminosité as string },
       { trait_type: "Colorful", value: eggColors.Colorful as string },
-      { trait_type: "Contraste", value: eggColors.Contraste },
-      { trait_type: "Nettete", value: eggColors.Nettete },
-      { trait_type: "Entropie", value: eggColors.Entropie },
-      { trait_type: "Frames", value: eggColors.Frames },
+      { trait_type: "Contraste", value: Number(eggColors.Contraste) },
+      { trait_type: "Nettete", value: Number(eggColors.Nettete) },
+      { trait_type: "Entropie", value: Number(eggColors.Entropie) },
+      { trait_type: "Frames", value: Number(eggColors.Frames) },
       { trait_type: "Pixels", value: eggColors.Pixels as string },
       { trait_type: "TailleBytes", value: eggColors.TailleBytes as string }
     ];
 
-    const chosenParent = Math.random() < 0.5 ? parentA : parentB;
-
     return {
       name: `Œuf RESCOE de ${chosenParent.name}`,
-      bio: chosenParent.bio,
-      description: `Vous êtes Œuf RESCOE (niveau 0) — ${chosenParent.bio}\n\nGénéré par la reproduction de ${parentA.name} × ${parentB.name}`,
+      bio: chosenBio,
+      description: "Badge Membre. Aucune bio fournie.",
       image: eggImageIpfs,
       level: 0,
-      role: Math.random() < 0.5 ? parentA.roleLabel : parentB.roleLabel,
+      role: chosenParent.roleLabel,
       rarityTier: "Egg",
       rarityScore: 1,
       tags: [
-        "Adhesion", "Egg", "Oeuf",
-        ...(parentA.metadata?.tags || []).slice(0,2),
-        ...(parentB.metadata?.tags || []).slice(2)
+        "Adhesion",
+        "Egg",
+        "F1",
+        ...(parentA.metadata?.tags || []).slice(0, 2),
+        ...(parentB.metadata?.tags || []).slice(0, 2)
       ].slice(0, 8),
+      family: "Hybride",
+      sprite_name: `OEUF${eggIndex}.gif`,
       attributes: eggTraits,
-      // ✅ AJOUT : Historique complet avec tokenURI des parents
-      evolutionHistory: [
-        {
-          stage: "Birth",
-          timestamp: now,
-          parents: [
-            {
-              tokenId: parentA.tokenId,
-              name: parentA.name,
-              role: parentA.roleLabel,
-              tokenURI: parentA.tokenURI,  // ← CRITIQUE : URI persistant
-              level: parentA.membershipInfo.level
-            },
-            {
-              tokenId: parentB.tokenId,
-              name: parentB.name,
-              role: parentB.roleLabel,
-              tokenURI: parentB.tokenURI,  // ← CRITIQUE : URI persistant
-              level: parentB.membershipInfo.level
-            }
-          ]
-        }
-      ],
-
-      // Garde aussi breeding pour compatibilité
+      evolutionHistory: [],
       breeding: {
         timestamp: now,
+        chosenParent: {
+          id: chosenParent.tokenId,
+          name: chosenParent.name,
+          role: chosenParent.roleLabel,
+          uri: chosenParent.tokenURI,
+          level: chosenParent.membershipInfo.level
+        },
+        otherParent: {
+          id: otherParent.tokenId,
+          name: otherParent.name,
+          role: otherParent.roleLabel,
+          uri: otherParent.tokenURI,
+          level: otherParent.membershipInfo.level
+        },
         parents: [
-          { id: parentA.tokenId, name: parentA.name, role: parentA.roleLabel, uri: parentA.tokenURI, level: parentA.membershipInfo.level },
-          { id: parentB.tokenId, name: parentB.name, role: parentB.roleLabel, uri: parentB.tokenURI, level: parentB.membershipInfo.level }
+          {
+            id: parentA.tokenId,
+            name: parentA.name,
+            role: parentA.roleLabel,
+            uri: parentA.tokenURI,
+            level: parentA.membershipInfo.level
+          },
+          {
+            id: parentB.tokenId,
+            name: parentB.name,
+            role: parentB.roleLabel,
+            uri: parentB.tokenURI,
+            level: parentB.membershipInfo.level
+          }
         ]
       }
     };
@@ -509,7 +540,7 @@ export const useReproduction = ({
 
       const eggColors = await analyzeEggGif(eggLocalPath);
       const eggMetadata = buildEggMetadata(parentA, parentB, "", eggColors, eggIndex);
-
+      console.log(eggMetadata);
       // Upload IPFS (inchangé)
       const response = await fetch(eggLocalPath);
       const blob = await response.blob();
@@ -521,11 +552,16 @@ export const useReproduction = ({
         imageUrl: objUrl,
         name: eggMetadata.name,
         bio: eggMetadata.bio || "",
+        role: eggMetadata.role,                    // 🔥 AJOUTÉ
+        level: eggMetadata.level,                  // 🔥 AJOUTÉ
         attributes: eggMetadata.attributes,
-        family: "Hybride",
-        sprite_name: `OEUF${eggIndex}.gif`,
+        family: eggMetadata.family,                // 🔥 eggMetadata.family au lieu de "Hybride"
+        sprite_name: eggMetadata.sprite_name,
+        evolutionHistory: eggMetadata.evolutionHistory,  // 🔥 AJOUTÉ
+        breeding: eggMetadata.breeding,            // 🔥 AJOUTÉ
         tags: Array.isArray(eggMetadata.tags) ? eggMetadata.tags.join(', ') : eggMetadata.tags || 'hybride,egg,reproduction'
       });
+
       URL.revokeObjectURL(objUrl);
 
       const eggMetadataIpfsUrl = uploadResult.metadataUri;
@@ -576,6 +612,11 @@ export const useReproduction = ({
         .estimateGas({ from: account!, value: halfPriceWei });
 */
 
+
+
+
+
+/*
       console.log("REPRO PARAMS", {
         account,
         parentA: parentA.tokenId,
@@ -583,7 +624,7 @@ export const useReproduction = ({
         eggMetadataIpfsUrl,
         halfPriceWei,
       });
-
+*/
       const iface = new EthersContract(contractAddress, ABI, providerRef.current!).interface;
       const txData = iface.encodeFunctionData("reproduce", [
         BigInt(parentA.tokenId),
@@ -599,7 +640,7 @@ export const useReproduction = ({
           value: BigInt(halfPriceWei),
           data: txData,
         });
-        console.log("✅ provider estimateGas", gasEstimate.toString());
+        //console.log("✅ provider estimateGas", gasEstimate.toString());
       } catch (gasErr: any) {
         console.error("❌ provider estimateGas ERROR", gasErr);
         throw new Error(
@@ -615,10 +656,10 @@ export const useReproduction = ({
 
       const gasPrice = await web3.eth.getGasPrice();
       const safeGas = ((gasEstimate * 120n) / 100n).toString();
-
+/*
       console.log("gasPrice", gasPrice);
       console.log("safeGas", safeGas);
-
+*/
       const tx = await contractWrite.methods
         .reproduce(BigInt(parentA.tokenId), BigInt(parentB.tokenId), eggMetadataIpfsUrl)
         .send({
@@ -627,6 +668,9 @@ export const useReproduction = ({
           gas: safeGas,
           gasPrice: gasPrice.toString()
         });
+
+
+
 
 
 /*

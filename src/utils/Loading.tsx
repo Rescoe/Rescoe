@@ -382,7 +382,7 @@ const RescoeNetworkLoader: React.FC<RescoeNetworkLoaderProps> = ({
             </VStack>
             <VStack spacing={0}>
               <Text fontSize="l" fontWeight={900} color={useColorModeValue('brand.navy', 'brand.gold')}>
-                On-chain
+                Décentralisé
               </Text>
               <Text fontSize="2xs" textTransform="uppercase" letterSpacing="wider"
                 color={textSecondary} opacity={0.7}>
