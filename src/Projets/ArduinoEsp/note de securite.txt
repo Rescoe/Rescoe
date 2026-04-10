@@ -1,0 +1,44 @@
+TODO sécurité — sync Discord non sécurisée à corriger plus tard
+
+Problème
+Le endpoint Discord sync utilise un secret envoyé depuis le JavaScript client via notifyRescoeDiscord(...). Dans le code actuel, RESCOESYNCSECRET est embarqué dans la page HTML/JS servie par l’ESP, donc il est visible côté navigateur et ne doit pas être considéré comme un vrai secret.
+
+Où
+Dans le front embarqué de l’ESP :
+
+constante RESCOESYNCSECRET
+
+fonction notifyRescoeDiscord(payload)
+
+appel fetch(RESCOESYNCURL, ...) qui envoie secret: RESCOESYNCSECRET
+
+Risque
+Toute personne qui ouvre l’app web de l’ESP ou inspecte le code peut récupérer cette valeur et appeler l’endpoint https://rescoe.xyz/api/sync-to-discord comme le client légitime. Donc protection faible, risque de spam / appels forgés / usage non autorisé.
+
+Pourquoi c’est temporairement toléré
+Actuellement c’est gardé pour aller vite en dev et valider le flux OLED → galerie → Discord. Ce n’est pas bloquant fonctionnellement, mais ce n’est pas une sécurité correcte.
+
+À faire plus tard
+retirer le secret du code client/ESP
+
+ne plus faire confiance à un secret embarqué dans le navigateur
+
+déplacer la logique protégée côté serveur uniquement, par exemple :
+
+client/ESP → backend perso
+
+backend perso → endpoint Discord avec vrai secret serveur
+
+Option de correction
+Remplacer l’auth actuelle par une vraie protection serveur :
+
+secret stocké uniquement côté backend,
+
+ou signature HMAC générée côté serveur,
+
+ou endpoint intermédiaire privé,
+
+éventuellement rate limit / allowlist IP / validation d’origine en complément
+
+Priorité
+Priorité après correction des bugs JS actuels (profile already declared / script cassé), car le problème sécurité n’empêche pas l’app de fonctionner, alors que l’erreur de syntaxe bloque l’UI.

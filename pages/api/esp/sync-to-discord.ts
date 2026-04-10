@@ -189,9 +189,20 @@ async function postDiscordMessage(
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ ok: false, error: 'Method not allowed' });
-  }
+  export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+    // === CORS - AJOUTER CES 5 LIGNES ===
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+    // === FIN CORS ===
+
+    if (req.method !== 'POST') {
+      return res.status(405).json({ ok: false, error: 'Method not allowed' });
+    }
 
   try {
     const payload: PublishPayload = req.body;
