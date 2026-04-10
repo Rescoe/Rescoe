@@ -1,8 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { PNG } from 'pngjs';
-
-export const runtime = 'nodejs';
-export const maxDuration = 15;
 
 type PublishPayload = {
   secret?: string;
@@ -22,30 +19,30 @@ type PublishPayload = {
 
 const DISCORD_API = 'https://discord.com/api/v10';
 
-function env(name: string) {
+function env(name: string): string {
   const v = process.env[name];
   if (!v) throw new Error(`Missing env: ${name}`);
   return v;
 }
 
-function pickChannel(payload: PublishPayload) {
+function pickChannel(payload: PublishPayload): string {
   const artworkChannel = env('NEXT_PUBLIC_CHANNEL_EXPOS_ID');
   const poetryChannel = env('NEXT_PUBLIC_CHANNEL_EXPOS_ID');
   return payload.type === 'poetry' ? poetryChannel : artworkChannel;
 }
 
-function sanitize(s?: string, fallback = '') {
+function sanitize(s?: string, fallback = ''): string {
   return (s || fallback).toString().trim();
 }
 
-function truncate(s: string, n: number) {
+function truncate(s: string, n: number): string {
   return s.length > n ? `${s.slice(0, n - 1)}…` : s;
 }
 
-function buildUid(payload: PublishPayload) {
+function buildUid(payload: PublishPayload): string {
   if (payload.uid?.trim()) return payload.uid.trim();
   const stamp = sanitize(payload.timestamp, new Date().toISOString())
-    .replace(/[/:\s]+/g, '-')
+    .replace(/[/:\\s]+/g, '-')
     .replace(/-+/g, '-');
   const artist = sanitize(payload.artist, 'anonyme').toLowerCase().replace(/[^a-z0-9]+/g, '-');
   const name = sanitize(payload.name, 'sans-titre').toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -64,7 +61,7 @@ function getPrimaryBuffer(payload: PublishPayload): number[] | null {
   return null;
 }
 
-function oledBufferToPng(buffer: number[]) {
+function oledBufferToPng(buffer: number[]): Buffer {
   const png = new PNG({ width: 128, height: 64 });
   for (let page = 0; page < 8; page++) {
     for (let x = 0; x < 128; x++) {
@@ -83,7 +80,7 @@ function oledBufferToPng(buffer: number[]) {
   return PNG.sync.write(png);
 }
 
-function buildDiscordContent(payload: PublishPayload, uid: string) {
+function buildDiscordContent(payload: PublishPayload, uid: string): string {
   const type = sanitize(payload.type, 'still');
   const mode = sanitize(payload.mode, 'still');
   const name = sanitize(payload.name, 'Sans titre');
@@ -91,6 +88,7 @@ function buildDiscordContent(payload: PublishPayload, uid: string) {
   const timestamp = sanitize(payload.timestamp, new Date().toLocaleString('fr-FR'));
   const eth = sanitize(payload.ethAddress);
   const forSale = payload.forSale ? 'oui' : 'non';
+
   const lines = [
     payload.type === 'poetry' ? '✍️ Nouvelle poésie OLED' : '🖼️ Nouvelle œuvre OLED',
     `Nom: ${name}`,
@@ -102,25 +100,59 @@ function buildDiscordContent(payload: PublishPayload, uid: string) {
     `Adresse ETH: ${eth || '—'}`,
     `UID: ${uid}`,
   ];
+
   if (payload.text) {
     lines.push('', 'Texte:');
     lines.push(truncate(payload.text, 1200));
   }
+
   return lines.join('\n');
 }
 
-async function fetchChannelMessages(channelId: string, token: string) {
+async function fetchChannelMessages(channelId: string, token: string): Promise<any[]> {
   const res = await fetch(`${DISCORD_API}/channels/${channelId}/messages?limit=50`, {
     headers: { Authorization: `Bot ${token}` },
-    cache: 'no-store',
   });
+
   if (!res.ok) throw new Error(`Discord read failed: ${res.status}`);
   return res.json();
 }
 
-async function postDiscordMessage(channelId: string, token: string, content: string, png?: Buffer) {
+function buildMultipartBody(content: string, png: Buffer, boundary: string): Buffer {
+  const payloadJsonPart =
+    `--${boundary}\r\n` +
+    `Content-Disposition: form-data; name="payload_json"\r\n` +
+    `Content-Type: application/json\r\n\r\n` +
+    JSON.stringify({ content }) +
+    `\r\n`;
+
+  const fileHeaderPart =
+    `--${boundary}\r\n` +
+    `Content-Disposition: form-data; name="files[0]"; filename="oled-preview.png"\r\n` +
+    `Content-Type: image/png\r\n` +
+    `Content-Transfer-Encoding: base64\r\n\r\n`;
+
+  const fileBase64 = png.toString('base64');
+  const fileFooterPart = `\r\n--${boundary}--\r\n`;
+
+  return Buffer.concat([
+    Buffer.from(payloadJsonPart, 'utf8'),
+    Buffer.from(fileHeaderPart, 'utf8'),
+    Buffer.from(fileBase64, 'utf8'),
+    Buffer.from(fileFooterPart, 'utf8'),
+  ]);
+}
+
+async function postDiscordMessage(
+  channelId: string,
+  token: string,
+  content: string,
+  png?: Buffer
+): Promise<any> {
+  const url = `${DISCORD_API}/channels/${channelId}/messages`;
+
   if (!png) {
-    const res = await fetch(`${DISCORD_API}/channels/${channelId}/messages`, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: {
         Authorization: `Bot ${token}`,
@@ -128,28 +160,44 @@ async function postDiscordMessage(channelId: string, token: string, content: str
       },
       body: JSON.stringify({ content }),
     });
+
     if (!res.ok) throw new Error(`Discord post failed: ${res.status}`);
     return res.json();
   }
 
-  const form = new FormData();
-  form.set('payload_json', JSON.stringify({ content }));
-  form.set('files[0]', new Blob([png], { type: 'image/png' }), 'oled-preview.png');
+  const boundary = `----rescoe-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-  const res = await fetch(`${DISCORD_API}/channels/${channelId}/messages`, {
+  const bodyBuffer = buildMultipartBody(content, png, boundary);
+  const body = new Uint8Array(bodyBuffer);
+
+  const res = await fetch(url, {
     method: 'POST',
-    headers: { Authorization: `Bot ${token}` },
-    body: form,
+    headers: {
+      Authorization: `Bot ${token}`,
+      'Content-Type': `multipart/form-data; boundary=${boundary}`,
+      'Content-Length': String(body.byteLength),
+    },
+    body,
   });
-  if (!res.ok) throw new Error(`Discord upload failed: ${res.status}`);
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`Discord upload failed: ${res.status} ${txt}`);
+  }
+
   return res.json();
 }
 
-export async function POST(req: NextRequest) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ ok: false, error: 'Method not allowed' });
+  }
+
   try {
-    const payload = (await req.json()) as PublishPayload;
+    const payload: PublishPayload = req.body;
+
     if (payload.secret !== env('OLED_SYNC_SECRET')) {
-      return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
+      return res.status(401).json({ ok: false, error: 'unauthorized' });
     }
 
     const token = env('DISCORD_TOKEN');
@@ -158,24 +206,24 @@ export async function POST(req: NextRequest) {
     const content = buildDiscordContent(payload, uid);
 
     const existing = await fetchChannelMessages(channelId, token);
-    const alreadyPosted = Array.isArray(existing) && existing.some((m: any) => typeof m?.content === 'string' && m.content.includes(`UID: ${uid}`));
+    const alreadyPosted =
+      Array.isArray(existing) &&
+      existing.some((m: any) => typeof m?.content === 'string' && m.content.includes(`UID: ${uid}`));
+
     if (alreadyPosted) {
-      return NextResponse.json({ ok: true, skipped: true, reason: 'duplicate', uid });
+      return res.status(200).json({ ok: true, skipped: true, reason: 'duplicate', uid });
     }
 
     const primaryBuffer = getPrimaryBuffer(payload);
     const png = primaryBuffer ? oledBufferToPng(primaryBuffer) : undefined;
     const message = await postDiscordMessage(channelId, token, content, png);
 
-    return NextResponse.json({ ok: true, uid, channelId, messageId: message.id });
+    return res.status(200).json({ ok: true, uid, channelId, messageId: message.id });
   } catch (error: any) {
-    return NextResponse.json(
-      { ok: false, error: error?.message || 'internal_error' },
-      { status: 500 }
-    );
+    console.error('sync-to-discord error:', error);
+    return res.status(500).json({
+      ok: false,
+      error: error?.message || 'internal_error',
+    });
   }
-}
-
-export async function GET() {
-  return NextResponse.json({ ok: true, mode: 'direct-post-enabled' });
 }
