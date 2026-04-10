@@ -161,23 +161,28 @@ async function postDiscordMessage(
       body: JSON.stringify({ content }),
     });
 
-    if (!res.ok) throw new Error(`Discord post failed: ${res.status}`);
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      throw new Error(`Discord post failed: ${res.status} ${txt}`);
+    }
+
     return res.json();
   }
 
-  const boundary = `----rescoe-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-  const bodyBuffer = buildMultipartBody(content, png, boundary);
-  const body = new Uint8Array(bodyBuffer);
+  const form = new FormData();
+  form.append('payload_json', JSON.stringify({ content }));
+  form.append(
+    'files[0]',
+    new Blob([png], { type: 'image/png' }),
+    'oled-preview.png'
+  );
 
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       Authorization: `Bot ${token}`,
-      'Content-Type': `multipart/form-data; boundary=${boundary}`,
-      'Content-Length': String(body.byteLength),
     },
-    body,
+    body: form,
   });
 
   if (!res.ok) {
@@ -205,8 +210,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(405).json({ ok: false, error: 'Method not allowed' });
     }
 
+    console.log('sync-to-discord hit');
+    console.log('method:', req.method);
+    console.log('body keys:', Object.keys(req.body || {}));
+    console.log('type:', req.body?.type, 'mode:', req.body?.mode);
+    console.log('oledBuffer length:', Array.isArray(req.body?.oledBuffer) ? req.body.oledBuffer.length : 0);
+    console.log('frames length:', Array.isArray(req.body?.frames) ? req.body.frames.length : 0);
+    
   try {
     const payload: PublishPayload = req.body;
+
+    if (!payload || typeof payload !== 'object') {
+      return res.status(400).json({ ok: false, error: 'invalid_body' });
+    }
 
     if (payload.secret !== env('OLED_SYNC_SECRET')) {
       return res.status(401).json({ ok: false, error: 'unauthorized' });
@@ -227,6 +243,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const primaryBuffer = getPrimaryBuffer(payload);
+
+    if (!getPrimaryBuffer(payload)) {
+  console.warn('No primary OLED buffer found in payload');
+}
+
     const png = primaryBuffer ? oledBufferToPng(primaryBuffer) : undefined;
     const message = await postDiscordMessage(channelId, token, content, png);
 
