@@ -189,7 +189,6 @@ async function postDiscordMessage(
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     // === CORS - AJOUTER CES 5 LIGNES ===
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
