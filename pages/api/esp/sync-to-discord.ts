@@ -173,7 +173,7 @@ async function postDiscordMessage(
   form.append('payload_json', JSON.stringify({ content }));
   form.append(
     'files[0]',
-    new Blob([png], { type: 'image/png' }),
+    new Blob([Buffer.from(png)], { type: 'image/png' }),  // ✅ OK
     'oled-preview.png'
   );
 
@@ -216,7 +216,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('type:', req.body?.type, 'mode:', req.body?.mode);
     console.log('oledBuffer length:', Array.isArray(req.body?.oledBuffer) ? req.body.oledBuffer.length : 0);
     console.log('frames length:', Array.isArray(req.body?.frames) ? req.body.frames.length : 0);
-    
+
   try {
     const payload: PublishPayload = req.body;
 
