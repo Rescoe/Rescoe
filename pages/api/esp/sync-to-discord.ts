@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 
 const ESP_BASE_URL = process.env.ESP_BASE_URL!;
-const DISCORD_TOKEN = process.env.NEXT_PUBLIC_CHANNEL_EXPOS_ID!;
+const DISCORD_TOKEN = process.env.DISCORD_TOKEN!;
 const DISCORD_CHANNEL_ART_ID = process.env.NEXT_PUBLIC_CHANNEL_EXPOS_ID!;
 const DISCORD_CHANNEL_POETRY_ID = process.env.NEXT_PUBLIC_CHANNEL_EXPOS_ID!;
 const DISCORD_FETCH_LIMIT = 100;
