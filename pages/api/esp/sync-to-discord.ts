@@ -143,14 +143,17 @@ function buildMultipartBody(content: string, png: Buffer, boundary: string): Buf
   ]);
 }
 
+
 async function postDiscordMessage(
   channelId: string,
   token: string,
   content: string,
   png?: Buffer
 ): Promise<any> {
+
   const url = `${DISCORD_API}/channels/${channelId}/messages`;
 
+  // CAS TEXTE SIMPLE
   if (!png) {
     const res = await fetch(url, {
       method: 'POST',
@@ -169,20 +172,32 @@ async function postDiscordMessage(
     return res.json();
   }
 
-  const form = new FormData();
-  form.append('payload_json', JSON.stringify({ content }));
-  form.append(
-    'files[0]',
-    new Blob([Buffer.from(png)], { type: 'image/png' }),  // ✅ OK
-    'oled-preview.png'
-  );
+  // MULTIPART MANUEL (FIABLE)
+  const boundary = `----rescoe-${Date.now()}`;
+
+  const body = Buffer.concat([
+    Buffer.from(
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="payload_json"\r\n\r\n` +
+      JSON.stringify({ content }) +
+      `\r\n`
+    ),
+    Buffer.from(
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="files[0]"; filename="oled.png"\r\n` +
+      `Content-Type: image/png\r\n\r\n`
+    ),
+    png,
+    Buffer.from(`\r\n--${boundary}--`)
+  ]);
 
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       Authorization: `Bot ${token}`,
+      'Content-Type': `multipart/form-data; boundary=${boundary}`,
     },
-    body: form,
+    body,
   });
 
   if (!res.ok) {
@@ -233,10 +248,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const uid = buildUid(payload);
     const content = buildDiscordContent(payload, uid);
 
-    const existing = await fetchChannelMessages(channelId, token);
-    const alreadyPosted =
-      Array.isArray(existing) &&
-      existing.some((m: any) => typeof m?.content === 'string' && m.content.includes(`UID: ${uid}`));
+      let alreadyPosted = false;
+
+      try {
+        const existing = await fetchChannelMessages(channelId, token);
+        alreadyPosted =
+          Array.isArray(existing) &&
+          existing.some((m: any) =>
+            typeof m?.content === 'string' && m.content.includes(`UID: ${uid}`)
+          );
+      } catch (e) {
+        console.warn('fetchChannelMessages failed, skipping duplicate check');
+      }
 
     if (alreadyPosted) {
       return res.status(200).json({ ok: true, skipped: true, reason: 'duplicate', uid });
