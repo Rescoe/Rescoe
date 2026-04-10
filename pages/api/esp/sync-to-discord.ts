@@ -17,6 +17,7 @@ type PublishPayload = {
   delays?: number[];
 };
 
+const ESP_BASE_URL = process.env.ESP_OLED_URL!;
 const DISCORD_API = 'https://discord.com/api/v10';
 
 function env(name: string): string {
@@ -143,6 +144,18 @@ function buildMultipartBody(content: string, png: Buffer, boundary: string): Buf
   ]);
 }
 
+async function fetchEspSlot(slot: number) {
+  const res = await fetch(`${ESP_BASE_URL}/gallery-item?slot=${slot}`, {
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`ESP slot fetch failed ${res.status}: ${txt}`);
+  }
+
+  return res.json();
+}
 
 async function postDiscordMessage(
   channelId: string,
@@ -150,136 +163,209 @@ async function postDiscordMessage(
   content: string,
   png?: Buffer
 ): Promise<any> {
-
   const url = `${DISCORD_API}/channels/${channelId}/messages`;
 
-  // CAS TEXTE SIMPLE
-  if (!png) {
+  try {
+    // TEXT ONLY
+    if (!png) {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bot ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content }),
+      });
+
+      const txt = await res.text();
+
+      if (!res.ok) {
+        return { ok: false, status: res.status, body: txt };
+      }
+
+      return { ok: true, ...(JSON.parse(txt || '{}')) };
+    }
+
+    // MULTIPART SAFE
+    const boundary = `----rescoe-${Date.now()}`;
+
+    const body = Buffer.concat([
+      Buffer.from(
+        `--${boundary}\r\n` +
+        `Content-Disposition: form-data; name="payload_json"\r\n\r\n` +
+        JSON.stringify({ content }) +
+        `\r\n`
+      ),
+      Buffer.from(
+        `--${boundary}\r\n` +
+        `Content-Disposition: form-data; name="files[0]"; filename="oled.png"\r\n` +
+        `Content-Type: image/png\r\n\r\n`
+      ),
+      png,
+      Buffer.from(`\r\n--${boundary}--\r\n`)
+    ]);
+
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         Authorization: `Bot ${token}`,
-        'Content-Type': 'application/json',
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
       },
-      body: JSON.stringify({ content }),
+      body,
     });
 
+    const txt = await res.text();
+
     if (!res.ok) {
-      const txt = await res.text().catch(() => '');
-      throw new Error(`Discord post failed: ${res.status} ${txt}`);
+      return { ok: false, status: res.status, body: txt };
     }
 
-    return res.json();
+    return { ok: true, ...(JSON.parse(txt || '{}')) };
+
+  } catch (err: any) {
+    return {
+      ok: false,
+      status: 0,
+      error: err?.message || 'discord_exception',
+    };
   }
-
-  // MULTIPART MANUEL (FIABLE)
-  const boundary = `----rescoe-${Date.now()}`;
-
-  const body = Buffer.concat([
-    Buffer.from(
-      `--${boundary}\r\n` +
-      `Content-Disposition: form-data; name="payload_json"\r\n\r\n` +
-      JSON.stringify({ content }) +
-      `\r\n`
-    ),
-    Buffer.from(
-      `--${boundary}\r\n` +
-      `Content-Disposition: form-data; name="files[0]"; filename="oled.png"\r\n` +
-      `Content-Type: image/png\r\n\r\n`
-    ),
-    png,
-    Buffer.from(`\r\n--${boundary}--`)
-  ]);
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bot ${token}`,
-      'Content-Type': `multipart/form-data; boundary=${boundary}`,
-    },
-    body,
-  });
-
-  if (!res.ok) {
-    const txt = await res.text().catch(() => '');
-    throw new Error(`Discord upload failed: ${res.status} ${txt}`);
-  }
-
-  return res.json();
 }
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-    // === CORS - AJOUTER CES 5 LIGNES ===
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.setHeader('Access-Control-Max-Age', '86400');
 
-    if (req.method === 'OPTIONS') {
-      return res.status(204).end();
+  // CORS SAFE
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+
+  console.log('--- SYNC HIT ---');
+  if (req.method === 'GET') {
+    try {
+      const rawSlot = req.query.slot;
+
+      console.log('[API GET] slot raw:', rawSlot);
+
+      if (!rawSlot) {
+        return res.status(400).json({
+          ok: false,
+          error: 'missing_slot',
+        });
+      }
+
+      const slot = Number(rawSlot);
+
+      if (!Number.isFinite(slot) || slot < 0) {
+        return res.status(400).json({
+          ok: false,
+          error: 'invalid_slot',
+          raw: rawSlot,
+        });
+      }
+
+      const url = `${ESP_BASE_URL}/gallery-item?slot=${slot}`;
+
+      console.log('[API GET] fetching ESP:', url);
+
+      const resEsp = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+
+      const text = await resEsp.text();
+
+      console.log('[API GET] ESP status:', resEsp.status);
+      console.log('[API GET] ESP raw response:', text.slice(0, 300));
+
+      if (!resEsp.ok) {
+        return res.status(502).json({
+          ok: false,
+          error: 'esp_error',
+          status: resEsp.status,
+          body: text,
+        });
+      }
+
+      let item;
+
+      try {
+        item = JSON.parse(text);
+      } catch (e) {
+        return res.status(502).json({
+          ok: false,
+          error: 'invalid_json_from_esp',
+          raw: text,
+        });
+      }
+
+      return res.status(200).json({
+        ok: true,
+        slot,
+        item,
+      });
+
+    } catch (err: any) {
+      console.error('[API GET FATAL]', err);
+
+      return res.status(500).json({
+        ok: false,
+        error: err?.message || 'esp_proxy_failed',
+      });
     }
-
-    // === FIN CORS ===
-
-    if (req.method !== 'POST') {
-      return res.status(405).json({ ok: false, error: 'Method not allowed' });
-    }
-
-    console.log('sync-to-discord hit');
-    console.log('method:', req.method);
-    console.log('body keys:', Object.keys(req.body || {}));
-    console.log('type:', req.body?.type, 'mode:', req.body?.mode);
-    console.log('oledBuffer length:', Array.isArray(req.body?.oledBuffer) ? req.body.oledBuffer.length : 0);
-    console.log('frames length:', Array.isArray(req.body?.frames) ? req.body.frames.length : 0);
-
+  }
+  
   try {
-    const payload: PublishPayload = req.body;
+    const payload = (req.body || {}) as PublishPayload;
 
-    if (!payload || typeof payload !== 'object') {
-      return res.status(400).json({ ok: false, error: 'invalid_body' });
+    console.log('payload type:', typeof payload);
+    console.log('keys:', Object.keys(payload || {}));
+
+    // NEVER CRASH ON ENV
+    const token = process.env.DISCORD_TOKEN || '';
+    const channelId = process.env.NEXT_PUBLIC_CHANNEL_EXPOS_ID || '';
+
+    if (!token || !channelId) {
+      return res.status(500).json({
+        ok: false,
+        error: 'missing_env',
+        token: !!token,
+        channel: !!channelId,
+      });
     }
 
-    if (payload.secret !== env('OLED_SYNC_SECRET')) {
-      return res.status(401).json({ ok: false, error: 'unauthorized' });
-    }
-
-    const token = env('DISCORD_TOKEN');
-    const channelId = pickChannel(payload);
     const uid = buildUid(payload);
     const content = buildDiscordContent(payload, uid);
 
-      let alreadyPosted = false;
-
-      try {
-        const existing = await fetchChannelMessages(channelId, token);
-        alreadyPosted =
-          Array.isArray(existing) &&
-          existing.some((m: any) =>
-            typeof m?.content === 'string' && m.content.includes(`UID: ${uid}`)
-          );
-      } catch (e) {
-        console.warn('fetchChannelMessages failed, skipping duplicate check');
-      }
-
-    if (alreadyPosted) {
-      return res.status(200).json({ ok: true, skipped: true, reason: 'duplicate', uid });
-    }
-
     const primaryBuffer = getPrimaryBuffer(payload);
 
-    if (!getPrimaryBuffer(payload)) {
-  console.warn('No primary OLED buffer found in payload');
-}
+    if (!primaryBuffer) {
+      console.warn('[WARN] no buffer');
+    }
 
     const png = primaryBuffer ? oledBufferToPng(primaryBuffer) : undefined;
-    const message = await postDiscordMessage(channelId, token, content, png);
 
-    return res.status(200).json({ ok: true, uid, channelId, messageId: message.id });
-  } catch (error: any) {
-    console.error('sync-to-discord error:', error);
-    return res.status(500).json({
+    const discord = await postDiscordMessage(channelId, token, content, png);
+
+    console.log('discord result:', discord);
+
+    return res.status(200).json({
+      ok: true,
+      uid,
+      discord,
+    });
+
+  } catch (err: any) {
+
+    console.error('FATAL HANDLER ERROR:', err);
+
+    return res.status(200).json({
       ok: false,
-      error: error?.message || 'internal_error',
+      error: err?.message || 'unknown_error',
+      stack: err?.stack || null,
     });
   }
 }
