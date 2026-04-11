@@ -1,11 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { PNG } from 'pngjs';
 
+// ─────────────────────────────────────────────────────────────────
+//  TYPES
+// ─────────────────────────────────────────────────────────────────
 type PublishPayload = {
   secret?: string;
   uid?: string;
-  type?: 'still' | 'gif' | 'poetry' | string;
-  mode?: 'still' | 'anim' | 'scroll' | string;
+  type?: string;
+  mode?: string;
   name?: string;
   artist?: string;
   timestamp?: string;
@@ -13,623 +16,424 @@ type PublishPayload = {
   ethAddress?: string;
   text?: string;
   oledBuffer?: number[];
+  oledBufferCompact?: string | string[];
   frames?: Array<number[] | { buffer: number[]; delay?: number }>;
   framesCompact?: Array<{ buf: string; delay?: number }>;
   delays?: number[];
 };
 
-const ESP_BASE_URL = process.env.ESP_OLED_URL!;
+type OledFrame = { buffer: number[]; delay: number };
+
 const DISCORD_API = 'https://discord.com/api/v10';
 
-function env(name: string): string {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing env: ${name}`);
-  return v;
-}
-
-function pickChannel(payload: PublishPayload): string {
-  const artworkChannel = env('NEXT_PUBLIC_CHANNEL_EXPOS_ID');
-  const poetryChannel = env('NEXT_PUBLIC_CHANNEL_EXPOS_ID');
-  return payload.type === 'poetry' ? poetryChannel : artworkChannel;
-}
-
+// ─────────────────────────────────────────────────────────────────
+//  HELPERS
+// ─────────────────────────────────────────────────────────────────
 function sanitize(s?: string, fallback = ''): string {
   return (s || fallback).toString().trim();
 }
-
 function truncate(s: string, n: number): string {
   return s.length > n ? `${s.slice(0, n - 1)}…` : s;
 }
+function buildUid(payload: PublishPayload): string {
+  if (payload.uid?.trim()) return payload.uid.trim();
+  const stamp = sanitize(payload.timestamp, new Date().toISOString())
+    .replace(/[/:\s]+/g, '-').replace(/-+/g, '-');
+  const artist = sanitize(payload.artist, 'anonyme').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const name   = sanitize(payload.name,   'sans-titre').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const type   = sanitize(payload.type,   'still').toLowerCase();
+  const mode   = sanitize(payload.mode,   'still').toLowerCase();
+  return `${stamp}-${type}-${mode}-${artist}-${name}`.replace(/-+/g, '-');
+}
 
-function extractAllFrames(payload: PublishPayload): Array<{ buffer: number[]; delay: number }> {
-  const out: Array<{ buffer: number[]; delay: number }> = [];
+// ─────────────────────────────────────────────────────────────────
+//  FRAME EXTRACTION
+//  Priority: framesCompact (ESP compact hex) > frames > oledBuffer
+// ─────────────────────────────────────────────────────────────────
+function hexStrToBuffer(hex: string): number[] | null {
+  if (typeof hex !== 'string' || hex.length !== 2048) return null;
+  const buf: number[] = new Array(1024);
+  for (let i = 0; i < 1024; i++) {
+    const byte = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+    if (isNaN(byte)) return null;
+    buf[i] = byte;
+  }
+  return buf;
+}
 
-  if (Array.isArray(payload.frames)) {
-    for (let i = 0; i < payload.frames.length; i++) {
-      const f = payload.frames[i] as any;
+function extractAllFrames(payload: PublishPayload): OledFrame[] {
+  const out: OledFrame[] = [];
 
-      if (Array.isArray(f) && f.length === 1024) {
-        out.push({ buffer: f, delay: payload.delays?.[i] ?? 100 });
-      } else if (f?.buffer?.length === 1024) {
-        out.push({ buffer: f.buffer, delay: f.delay ?? payload.delays?.[i] ?? 100 });
-      }
+  // ── framesCompact: [{buf: "2048hexchars", delay: N}] ── ESP format
+  if (Array.isArray(payload.framesCompact) && payload.framesCompact.length > 0) {
+    for (const f of payload.framesCompact) {
+      if (!f || typeof f.buf !== 'string') continue;
+      const buffer = hexStrToBuffer(f.buf);
+      if (buffer) out.push({ buffer, delay: f.delay ?? 100 });
+    }
+    if (out.length > 0) {
+      console.log(`[frames] extracted ${out.length} frames from framesCompact`);
+      return out;
     }
   }
 
-  if (Array.isArray((payload as any).framesCompact)) {
-    const fc = (payload as any).framesCompact;
-    for (const f of fc) {
-      if (typeof f.buf === 'string' && f.buf.length === 2048) {
-        const buffer: number[] = [];
-        for (let i = 0; i < 2048; i += 2) {
-          buffer.push(parseInt(f.buf.slice(i, i + 2), 16));
-        }
-        if (buffer.length === 1024) {
-          out.push({ buffer, delay: f.delay ?? 100 });
-        }
-      }
+  // ── oledBufferCompact: "2048hexchars" or ["00","ff",...] ── single frame
+  if (payload.oledBufferCompact) {
+    let buf: number[] | null = null;
+    if (typeof payload.oledBufferCompact === 'string') {
+      buf = hexStrToBuffer(payload.oledBufferCompact);
+    } else if (Array.isArray(payload.oledBufferCompact) && payload.oledBufferCompact.length === 1024) {
+      buf = (payload.oledBufferCompact as string[]).map(h => parseInt(h, 16));
     }
+    if (buf) {
+      out.push({ buffer: buf, delay: 1000 });
+      console.log('[frames] extracted 1 frame from oledBufferCompact');
+      return out;
+    }
+  }
+
+  // ── frames: [{buffer:[...1024], delay}] or [[...1024]] ── JS direct
+  if (Array.isArray(payload.frames) && payload.frames.length > 0) {
+    for (let i = 0; i < payload.frames.length; i++) {
+      const f = payload.frames[i] as any;
+      let buf: number[] | null = null;
+      if (Array.isArray(f) && f.length === 1024) buf = f;
+      else if (Array.isArray(f?.buffer) && f.buffer.length === 1024) buf = f.buffer;
+      if (buf) out.push({ buffer: buf, delay: f?.delay ?? payload.delays?.[i] ?? 100 });
+    }
+    if (out.length > 0) {
+      console.log(`[frames] extracted ${out.length} frames from frames[]`);
+      return out;
+    }
+  }
+
+  // ── oledBuffer: [0..255, ...×1024] ── single frame
+  if (Array.isArray(payload.oledBuffer) && payload.oledBuffer.length === 1024) {
+    out.push({ buffer: payload.oledBuffer, delay: 1000 });
+    console.log('[frames] extracted 1 frame from oledBuffer');
   }
 
   return out;
 }
 
-
-function encodeGif(frames: Array<{ buffer: number[]; delay: number }>): Buffer {
-  const W = 128;
-  const H = 64;
-  const out: number[] = [];
-
-  const push = (...bytes: number[]) => out.push(...bytes.map(b => b & 0xff));
-  const writeU16 = (v: number) => push(v & 0xff, (v >> 8) & 0xff);
-  const writeStr = (s: string) => {
-    for (let i = 0; i < s.length; i++) push(s.charCodeAt(i));
-  };
-
-  function pixelsFromBuffer(buffer: number[]): number[] {
-    const pixels = new Array(W * H);
-    for (let page = 0; page < 8; page++) {
-      for (let x = 0; x < W; x++) {
-        const b = buffer[page * W + x] || 0;
-        for (let bit = 0; bit < 8; bit++) {
-          const y = page * 8 + bit;
-          pixels[y * W + x] = (b >> bit) & 1;
-        }
-      }
-    }
-    return pixels;
-  }
-
-  function lzwEncodeGif(pixels: number[], minCodeSize: number): number[] {
-    const clearCode = 1 << minCodeSize;
-    const endCode = clearCode + 1;
-
-    let codeSize = minCodeSize + 1;
-    let nextCode = endCode + 1;
-
-    const dict = new Map<string, number>();
-    for (let i = 0; i < clearCode; i++) {
-      dict.set(String(i), i);
-    }
-
-    const bytes: number[] = [];
-    let bitBuffer = 0;
-    let bitCount = 0;
-
-    const writeCode = (code: number) => {
-      bitBuffer |= code << bitCount;
-      bitCount += codeSize;
-
-      while (bitCount >= 8) {
-        bytes.push(bitBuffer & 0xff);
-        bitBuffer >>= 8;
-        bitCount -= 8;
-      }
-    };
-
-    const resetDictionary = () => {
-      dict.clear();
-      for (let i = 0; i < clearCode; i++) {
-        dict.set(String(i), i);
-      }
-      codeSize = minCodeSize + 1;
-      nextCode = endCode + 1;
-    };
-
-    writeCode(clearCode);
-
-    let current = String(pixels[0] ?? 0);
-
-    for (let i = 1; i < pixels.length; i++) {
-      const next = String(pixels[i]);
-      const combined = current + ',' + next;
-
-      if (dict.has(combined)) {
-        current = combined;
-      } else {
-        writeCode(dict.get(current)!);
-
-        if (nextCode < 4096) {
-          dict.set(combined, nextCode++);
-          if (nextCode === (1 << codeSize) && codeSize < 12) {
-            codeSize++;
-          }
-        } else {
-          writeCode(clearCode);
-          resetDictionary();
-        }
-
-        current = next;
-      }
-    }
-
-    writeCode(dict.get(current)!);
-    writeCode(endCode);
-
-    if (bitCount > 0) {
-      bytes.push(bitBuffer & 0xff);
-    }
-
-    return bytes;
-  }
-
-  function writeSubBlocks(data: number[]) {
-    for (let i = 0; i < data.length; i += 255) {
-      const chunk = data.slice(i, i + 255);
-      push(chunk.length);
-      push(...chunk);
-    }
-    push(0x00);
-  }
-
-  // Header
-  writeStr('GIF89a');
-
-  // Logical Screen Descriptor
-  writeU16(W);
-  writeU16(H);
-  push(0x80); // GCT present, 2 colors => size field 0
-  push(0x00); // background color index
-  push(0x00); // pixel aspect ratio
-
-  // Global Color Table: 2 entries
-  push(0x00, 0x00, 0x00); // black
-  push(0xff, 0xff, 0xff); // white
-
-  // Netscape loop extension
-  push(0x21, 0xff, 0x0b);
-  writeStr('NETSCAPE2.0');
-  push(0x03, 0x01, 0x00, 0x00, 0x00); // infinite loop
-
-  for (const frame of frames) {
-    const delayCs = Math.max(2, Math.round((frame.delay ?? 100) / 10));
-
-    // Graphic Control Extension
-    push(0x21, 0xf9, 0x04);
-    push(0x00); // no transparency / no disposal override
-    writeU16(delayCs);
-    push(0x00); // transparent color index
-    push(0x00); // block terminator
-
-    // Image Descriptor
-    push(0x2c);
-    writeU16(0); // left
-    writeU16(0); // top
-    writeU16(W);
-    writeU16(H);
-    push(0x00); // no local color table
-
-    const minCodeSize = 2;
-    push(minCodeSize);
-
-    const pixels = pixelsFromBuffer(frame.buffer);
-    const lzwData = lzwEncodeGif(pixels, minCodeSize);
-    writeSubBlocks(lzwData);
-  }
-
-  // Trailer
-  push(0x3b);
-
-  return Buffer.from(out);
-}
-
-
-function buildUid(payload: PublishPayload): string {
-  if (payload.uid?.trim()) return payload.uid.trim();
-  const stamp = sanitize(payload.timestamp, new Date().toISOString())
-    .replace(/[/:\\s]+/g, '-')
-    .replace(/-+/g, '-');
-  const artist = sanitize(payload.artist, 'anonyme').toLowerCase().replace(/[^a-z0-9]+/g, '-');
-  const name = sanitize(payload.name, 'sans-titre').toLowerCase().replace(/[^a-z0-9]+/g, '-');
-  const type = sanitize(payload.type, 'still').toLowerCase();
-  const mode = sanitize(payload.mode, 'still').toLowerCase();
-  return `${stamp}-${type}-${mode}-${artist}-${name}`.replace(/-+/g, '-');
-}
-
-function getPrimaryBuffer(payload: PublishPayload): number[] | null {
-  // Premier buffer direct (cas classique)
-  if (Array.isArray(payload.oledBuffer) && payload.oledBuffer.length === 1024) {
-    return payload.oledBuffer;
-  }
-
-  // Frames existantes
-  if (Array.isArray(payload.frames) && payload.frames.length) {
-    const first = payload.frames[0] as any;
-    if (Array.isArray(first) && first.length === 1024) return first;
-    if (first && Array.isArray(first.buffer) && first.buffer.length === 1024) return first.buffer;
-  }
-
-  // NOUVEAU : extractFrames pour framesCompact (hex strings compactes)
-  if (!Array.isArray(payload.frames) && Array.isArray((payload as any).framesCompact)) {
-    const fc = (payload as any).framesCompact as Array<{ buf: string; delay: number }>;
-    for (const f of fc) {
-      if (typeof f.buf === 'string' && f.buf.length === 2048) {  // 1024 bytes = 2048 hex chars
-        const buffer: number[] = [];
-        for (let i = 0; i < 2048; i += 2) {
-          buffer.push(parseInt(f.buf.slice(i, i + 2), 16));
-        }
-        // Retourne le premier frame valide (128x64 = 1024 bytes)
-        if (buffer.length === 1024) {
-          return buffer;
-        }
-      }
-    }
-  }
-
-  return null;
-}
-
-
-function oledBufferToPng(buffer: number[]): Buffer {
-  const png = new PNG({ width: 128, height: 64 });
+// ─────────────────────────────────────────────────────────────────
+//  PNG ENCODER  (pngjs, 4× scale, blue-on-black)
+// ─────────────────────────────────────────────────────────────────
+function oledToPng(buffer: number[]): Buffer {
+  const SCALE = 4;
+  const W = 128 * SCALE; // 512
+  const H = 64  * SCALE; // 256
+  const png = new PNG({ width: W, height: H });
   for (let page = 0; page < 8; page++) {
     for (let x = 0; x < 128; x++) {
       const b = buffer[page * 128 + x] || 0;
       for (let bit = 0; bit < 8; bit++) {
-        const y = page * 8 + bit;
-        const idx = (y * 128 + x) << 2;
         const on = ((b >> bit) & 1) === 1;
-        png.data[idx] = on ? 68 : 0;
-        png.data[idx + 1] = on ? 170 : 0;
-        png.data[idx + 2] = on ? 255 : 0;
-        png.data[idx + 3] = 255;
+        for (let dy = 0; dy < SCALE; dy++) {
+          for (let dx = 0; dx < SCALE; dx++) {
+            const idx = (((page * 8 + bit) * SCALE + dy) * W + (x * SCALE + dx)) << 2;
+            png.data[idx]     = on ? 0x44 : 0x00;
+            png.data[idx + 1] = on ? 0xaa : 0x00;
+            png.data[idx + 2] = on ? 0xff : 0x00;
+            png.data[idx + 3] = 255;
+          }
+        }
       }
     }
   }
   return PNG.sync.write(png);
 }
 
-function buildDiscordContent(payload: PublishPayload, uid: string): string {
-  const type = sanitize(payload.type, 'still');
-  const mode = sanitize(payload.mode, 'still');
-  const name = sanitize(payload.name, 'Sans titre');
-  const artist = sanitize(payload.artist, 'Anonyme');
-  const timestamp = sanitize(payload.timestamp, new Date().toLocaleString('fr-FR'));
-  const eth = sanitize(payload.ethAddress);
-  const forSale = payload.forSale ? 'oui' : 'non';
+// ─────────────────────────────────────────────────────────────────
+//  GIF ENCODER  — pure TypeScript, zero external deps
+//  Palette: 0=black, 1=OLED blue #44aaff
+//  Output: 2× scale (256×128 px)
+// ─────────────────────────────────────────────────────────────────
+function encodeAnimatedGif(frames: OledFrame[]): Buffer {
+  const SCALE = 2;
+  const W = 128 * SCALE; // 256
+  const H = 64  * SCALE; // 128
 
-  const lines = [
-    payload.type === 'poetry' ? '✍️ Nouvelle poésie OLED' : '🖼️ Nouvelle œuvre OLED',
-    `Nom: ${name}`,
-    `Artiste: ${artist}`,
-    `Date: ${timestamp}`,
-    `Type: ${type}`,
-    `Mode: ${mode}`,
-    `À vendre: ${forSale}`,
-    `Adresse ETH: ${eth || '—'}`,
-    `UID: ${uid}`,
-  ];
+  const out: number[] = [];
+  const u8  = (v: number) => out.push(v & 0xff);
+  const u16 = (v: number) => { out.push(v & 0xff); out.push((v >> 8) & 0xff); };
+  const str = (s: string) => { for (let i = 0; i < s.length; i++) u8(s.charCodeAt(i)); };
 
-  if (payload.text) {
-    lines.push('', 'Texte:');
-    lines.push(truncate(payload.text, 1200));
+  // Header
+  str('GIF89a');
+  u16(W); u16(H);
+  u8(0b10000000); // GCT present, 2 colors
+  u8(0); u8(0);
+  // Global Color Table
+  out.push(0x00, 0x00, 0x00); // 0 = black
+  out.push(0x44, 0xaa, 0xff); // 1 = OLED blue
+
+  // Netscape loop (infinite)
+  u8(0x21); u8(0xff); u8(0x0b);
+  str('NETSCAPE2.0');
+  u8(3); u8(1); u16(0); u8(0);
+
+  // LZW encoder
+  function lzwEncode(indices: number[]): number[] {
+    const MIN = 2, CLEAR = 4, END = 5;
+    const res: number[] = [];
+    let bits = 0, cur = 0, codeSize = 3;
+    const dict = new Map<string, number>();
+    let next = END + 1;
+
+    const reset = () => { dict.clear(); next = END + 1; codeSize = 3; };
+    const emit  = (code: number) => {
+      cur |= code << bits; bits += codeSize;
+      while (bits >= 8) { res.push(cur & 0xff); cur >>= 8; bits -= 8; }
+    };
+
+    reset(); emit(CLEAR);
+    let buf = '';
+
+    for (let i = 0; i <= indices.length; i++) {
+      const c   = i < indices.length ? String.fromCharCode(indices[i]) : null;
+      const nxt = c !== null ? buf + c : null;
+      if (c !== null && dict.has(nxt!)) {
+        buf = nxt!;
+      } else {
+        emit(buf.length === 1 ? buf.charCodeAt(0) : dict.get(buf)!);
+        if (c !== null) {
+          if (next < 4096) {
+            dict.set(nxt!, next++);
+            if (next > (1 << codeSize) && codeSize < 12) codeSize++;
+          } else { emit(CLEAR); reset(); }
+          buf = c;
+        }
+      }
+    }
+    emit(END);
+    if (bits > 0) res.push(cur & 0xff);
+    return res;
   }
 
+  const writeBlocks = (data: number[]) => {
+    for (let i = 0; i < data.length; i += 255) {
+      const chunk = data.slice(i, i + 255);
+      u8(chunk.length);
+      for (const b of chunk) u8(b);
+    }
+    u8(0);
+  };
+
+  for (const frame of frames) {
+    const delay = Math.max(2, Math.round(frame.delay / 10));
+
+    // Graphic Control Extension
+    u8(0x21); u8(0xf9); u8(0x04);
+    u8(0b00000100); // disposal=keep, no transparency
+    u16(delay);
+    u8(0); u8(0);
+
+    // Image Descriptor
+    u8(0x2c);
+    u16(0); u16(0); u16(W); u16(H);
+    u8(0);
+
+    // Pixel indices (2× scaled)
+    const indices = new Array<number>(W * H);
+    for (let page = 0; page < 8; page++) {
+      for (let x = 0; x < 128; x++) {
+        const b = frame.buffer[page * 128 + x] || 0;
+        for (let bit = 0; bit < 8; bit++) {
+          const on   = (b >> bit) & 1;
+          const srcY = page * 8 + bit;
+          for (let dy = 0; dy < SCALE; dy++)
+            for (let dx = 0; dx < SCALE; dx++)
+              indices[(srcY * SCALE + dy) * W + (x * SCALE + dx)] = on;
+        }
+      }
+    }
+
+    u8(2);
+    writeBlocks(lzwEncode(indices));
+  }
+
+  u8(0x3b);
+  return Buffer.from(out);
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  DISCORD CONTENT
+// ─────────────────────────────────────────────────────────────────
+function buildContent(payload: PublishPayload, uid: string): string {
+  const type    = sanitize(payload.type,   'still');
+  const mode    = sanitize(payload.mode,   'still');
+  const name    = sanitize(payload.name,   'Sans titre');
+  const artist  = sanitize(payload.artist, 'Anonyme');
+  const ts      = sanitize(payload.timestamp, new Date().toLocaleString('fr-FR'));
+  const eth     = sanitize(payload.ethAddress);
+  const forSale = payload.forSale ? 'oui' : 'non';
+
+  const isPoetry  = type === 'poetry';
+  const isAnim    = mode === 'anim' || mode === 'scroll';
+  const isProfile = type === 'profile';
+
+  const emoji = isProfile ? '👤' : isPoetry ? '✍️' : isAnim ? '🎬' : '🖼️';
+  const label = isProfile ? 'Mise à jour profil'
+    : isPoetry && isAnim ? 'Poésie scroll OLED'
+    : isPoetry           ? 'Nouvelle poésie OLED'
+    : isAnim             ? 'Nouvelle animation OLED'
+    :                      'Nouvelle œuvre OLED';
+
+  const lines = [
+    `${emoji} **${label}**`,
+    `**Nom:** ${name}`,
+    `**Artiste:** ${artist}`,
+    `**Date:** ${ts}`,
+  ];
+  if (!isProfile) {
+    lines.push(`**Type:** ${type} | **Mode:** ${mode}`);
+    lines.push(`**À vendre:** ${forSale}`);
+    if (eth) lines.push(`**ETH:** ${eth}`);
+  }
+  lines.push(`**UID:** \`${uid}\``);
+  if (payload.text) lines.push('', '**Texte:**', truncate(payload.text, 1200));
   return lines.join('\n');
 }
 
-async function fetchChannelMessages(channelId: string, token: string): Promise<any[]> {
-  const res = await fetch(`${DISCORD_API}/channels/${channelId}/messages?limit=50`, {
-    headers: { Authorization: `Bot ${token}` },
-  });
-
-  if (!res.ok) throw new Error(`Discord read failed: ${res.status}`);
-  return res.json();
-}
-
-function buildMultipartBody(content: string, png: Buffer, boundary: string): Buffer {
-  const payloadJsonPart =
-    `--${boundary}\r\n` +
-    `Content-Disposition: form-data; name="payload_json"\r\n` +
-    `Content-Type: application/json\r\n\r\n` +
-    JSON.stringify({ content }) +
-    `\r\n`;
-
-  const fileHeaderPart =
-    `--${boundary}\r\n` +
-    `Content-Disposition: form-data; name="files[0]"; filename="oled-preview.png"\r\n` +
-    `Content-Type: image/png\r\n` +
-    `Content-Transfer-Encoding: base64\r\n\r\n`;
-
-  const fileBase64 = png.toString('base64');
-  const fileFooterPart = `\r\n--${boundary}--\r\n`;
-
-  return Buffer.concat([
-    Buffer.from(payloadJsonPart, 'utf8'),
-    Buffer.from(fileHeaderPart, 'utf8'),
-    Buffer.from(fileBase64, 'utf8'),
-    Buffer.from(fileFooterPart, 'utf8'),
-  ]);
-}
-
-async function fetchEspSlot(slot: number) {
-  const res = await fetch(`${ESP_BASE_URL}/gallery-item?slot=${slot}`, {
-    cache: 'no-store',
-  });
-
-  if (!res.ok) {
-    const txt = await res.text().catch(() => '');
-    throw new Error(`ESP slot fetch failed ${res.status}: ${txt}`);
-  }
-
-  return res.json();
-}
-async function postDiscordMessage(
+// ─────────────────────────────────────────────────────────────────
+//  DISCORD POST
+// ─────────────────────────────────────────────────────────────────
+async function postToDiscord(
   channelId: string,
   token: string,
   content: string,
-  png?: Buffer,
-  gif?: Buffer
-): Promise<any> {
-
+  file?: { data: Buffer; name: string; mime: string }
+): Promise<{ ok: boolean; status: number; body: string }> {
   const url = `${DISCORD_API}/channels/${channelId}/messages`;
 
-  try {
-
-    // TEXT ONLY
-    if (!png && !gif) {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bot ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ content }),
-      });
-
-      const txt = await res.text();
-      return res.ok
-        ? { ok: true, ...(JSON.parse(txt || '{}')) }
-        : { ok: false, status: res.status, body: txt };
-    }
-
-    // MULTIPART
-    const boundary = `----rescoe-${Date.now()}`;
-    const parts: Buffer[] = [];
-
-    // payload_json
-    parts.push(
-      Buffer.from(
-        `--${boundary}\r\n` +
-        `Content-Disposition: form-data; name="payload_json"\r\n\r\n` +
-        JSON.stringify({ content }) +
-        `\r\n`
-      )
-    );
-
-    let fileIndex = 0;
-
-    if (png) {
-      parts.push(
-        Buffer.from(
-          `--${boundary}\r\n` +
-          `Content-Disposition: form-data; name="files[${fileIndex}]"; filename="oled.png"\r\n` +
-          `Content-Type: image/png\r\n\r\n`
-        )
-      );
-      parts.push(png, Buffer.from('\r\n'));
-      fileIndex++;
-    }
-
-    if (gif) {
-      parts.push(
-        Buffer.from(
-          `--${boundary}\r\n` +
-          `Content-Disposition: form-data; name="files[${fileIndex}]"; filename="oled.gif"\r\n` +
-          `Content-Type: image/gif\r\n\r\n`
-        )
-      );
-      parts.push(gif, Buffer.from('\r\n'));
-      fileIndex++;
-    }
-
-    parts.push(Buffer.from(`--${boundary}--\r\n`));
-
-    const body = Buffer.concat(parts);
-
-    const res = await fetch(url, {
+  if (!file) {
+    const r = await fetch(url, {
       method: 'POST',
-      headers: {
-        Authorization: `Bot ${token}`,
-        'Content-Type': `multipart/form-data; boundary=${boundary}`,
-      },
-      body,
+      headers: { Authorization: `Bot ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
     });
-
-    const txt = await res.text();
-
-    return res.ok
-      ? { ok: true, ...(JSON.parse(txt || '{}')) }
-      : { ok: false, status: res.status, body: txt };
-
-  } catch (err: any) {
-    return {
-      ok: false,
-      status: 0,
-      error: err?.message || 'discord_exception',
-    };
+    return { ok: r.ok, status: r.status, body: await r.text() };
   }
+
+  const boundary = `rescoe${Date.now()}`;
+  const body = Buffer.concat([
+    Buffer.from(
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="payload_json"\r\n` +
+      `Content-Type: application/json\r\n\r\n` +
+      JSON.stringify({ content }) + `\r\n`,
+      'utf8'
+    ),
+    Buffer.from(
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="files[0]"; filename="${file.name}"\r\n` +
+      `Content-Type: ${file.mime}\r\n\r\n`,
+      'utf8'
+    ),
+    file.data,
+    Buffer.from(`\r\n--${boundary}--\r\n`, 'utf8'),
+  ]);
+
+  console.log(`[Discord] POST ${file.name}: ${file.data.length} bytes`);
+
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bot ${token}`,
+      'Content-Type': `multipart/form-data; boundary=${boundary}`,
+    },
+    body,
+  });
+
+  const txt = await r.text();
+  console.log(`[Discord] response: ${r.status} — ${txt.slice(0, 300)}`);
+
+  if (r.status === 403) {
+    console.error('[Discord] 403 — missing ATTACH_FILES permission on this channel');
+    const r2 = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bot ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: content + '\n\n⚠️ *[image non jointe — accorde **Joindre des fichiers** au bot]*',
+      }),
+    });
+    return { ok: r2.ok, status: r2.status, body: await r2.text() };
+  }
+
+  return { ok: r.ok, status: r.status, body: txt };
 }
 
-
-
-
+// ─────────────────────────────────────────────────────────────────
+//  MAIN HANDLER
+// ─────────────────────────────────────────────────────────────────
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-
-  // CORS SAFE
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', '*');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(204).end();
 
   console.log('--- SYNC HIT ---');
-  if (req.method === 'GET') {
-    try {
-      const rawSlot = req.query.slot;
-
-      console.log('[API GET] slot raw:', rawSlot);
-
-      if (!rawSlot) {
-        return res.status(400).json({
-          ok: false,
-          error: 'missing_slot',
-        });
-      }
-
-      const slot = Number(rawSlot);
-
-      if (!Number.isFinite(slot) || slot < 0) {
-        return res.status(400).json({
-          ok: false,
-          error: 'invalid_slot',
-          raw: rawSlot,
-        });
-      }
-
-      const url = `${ESP_BASE_URL}/gallery-item?slot=${slot}`;
-
-      console.log('[API GET] fetching ESP:', url);
-
-      const resEsp = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
-
-      const text = await resEsp.text();
-
-      console.log('[API GET] ESP status:', resEsp.status);
-      console.log('[API GET] ESP raw response:', text.slice(0, 300));
-
-      if (!resEsp.ok) {
-        return res.status(502).json({
-          ok: false,
-          error: 'esp_error',
-          status: resEsp.status,
-          body: text,
-        });
-      }
-
-      let item;
-
-      try {
-        item = JSON.parse(text);
-      } catch (e) {
-        return res.status(502).json({
-          ok: false,
-          error: 'invalid_json_from_esp',
-          raw: text,
-        });
-      }
-
-      return res.status(200).json({
-        ok: true,
-        slot,
-        item,
-      });
-
-    } catch (err: any) {
-      console.error('[API GET FATAL]', err);
-
-      return res.status(500).json({
-        ok: false,
-        error: err?.message || 'esp_proxy_failed',
-      });
-    }
-  }
 
   try {
     const payload = (req.body || {}) as PublishPayload;
+    const type = sanitize(payload.type, 'still');
+    const mode = sanitize(payload.mode, 'still');
 
-    console.log('🔍 RAW_BODY_SIZE:', Buffer.from(JSON.stringify(req.body || {})).byteLength);
-    console.log('🔍 HAS_OLEDBUFFER:', !!payload.oledBuffer);
-    console.log('🔍 PAYLOAD_KEYS:', Object.keys(payload || {}));
-    console.log('🔍 FIRST_10_ITEM_KEYS:', (payload as any).item ? Object.keys((payload as any).item || {}).slice(0, 10) : 'NO ITEM');
-    console.log('🔍 BUFFER_LEN:', payload.oledBuffer?.length || 'NO BUFFER');
+    console.log(`type=${type} mode=${mode}`);
+    console.log(`oledBuffer=${payload.oledBuffer?.length ?? 'none'}`);
+    console.log(`oledBufferCompact=${typeof payload.oledBufferCompact === 'string' ? payload.oledBufferCompact.length + ' chars' : Array.isArray(payload.oledBufferCompact) ? payload.oledBufferCompact.length + ' entries' : 'none'}`);
+    console.log(`framesCompact=${Array.isArray(payload.framesCompact) ? payload.framesCompact.length + ' frames' : 'none'}`);
+    console.log(`frames=${Array.isArray(payload.frames) ? payload.frames.length + ' frames' : 'none'}`);
 
-    console.log('payload type:', typeof payload);
-    console.log('keys:', Object.keys(payload || {}));
-
-    // NEVER CRASH ON ENV
-    const token = process.env.DISCORD_TOKEN || '';
+    const token     = process.env.DISCORD_TOKEN || '';
     const channelId = process.env.NEXT_PUBLIC_CHANNEL_EXPOS_ID || '';
-
     if (!token || !channelId) {
-      return res.status(500).json({
-        ok: false,
-        error: 'missing_env',
-        token: !!token,
-        channel: !!channelId,
-      });
+      return res.status(500).json({ ok: false, error: 'missing_env' });
     }
 
-    const uid = buildUid(payload);
-    const content = buildDiscordContent(payload, uid);
+    const uid     = buildUid(payload);
+    const content = buildContent(payload, uid);
+    const frames  = extractAllFrames(payload);
 
-    const primaryBuffer = getPrimaryBuffer(payload);
-    const frames = extractAllFrames(payload);
+    console.log(`frames extracted: ${frames.length}`);
 
-    const isAnimation =
-      sanitize(payload.mode).toLowerCase() === 'anim' ||
-      sanitize(payload.type).toLowerCase() === 'gif' ||
-      frames.length > 1;
-    if (!primaryBuffer) {
-      console.warn('[WARN] no buffer');
+    // ── Decide what to attach ──────────────────────────────────
+    let file: { data: Buffer; name: string; mime: string } | undefined;
+
+    const isAnimation    = (type === 'gif' || mode === 'anim') && type !== 'poetry';
+    const isPoetryScroll = type === 'poetry' && mode === 'scroll';
+
+    if (isPoetryScroll) {
+      // Poetry scroll → text only
+      console.log('poetry scroll → text only');
+
+    } else if (isAnimation && frames.length > 1) {
+      // Animated artwork → GIF
+      console.log(`encoding GIF: ${frames.length} frames`);
+      const gif = encodeAnimatedGif(frames);
+      console.log(`GIF size: ${gif.length} bytes`);
+      file = { data: gif, name: 'animation.gif', mime: 'image/gif' };
+
+    } else if (frames.length >= 1) {
+      // Still image → PNG
+      const png = oledToPng(frames[0].buffer);
+      console.log(`PNG size: ${png.length} bytes`);
+      file = { data: png, name: 'oled.png', mime: 'image/png' };
+
+    } else {
+      console.warn('no frames extracted → text only');
     }
 
-    const png = primaryBuffer ? oledBufferToPng(primaryBuffer) : undefined;
-    const gif = isAnimation && frames.length > 1 ? encodeGif(frames) : undefined;
-
-    const discord = await postDiscordMessage(channelId, token, content, png, gif);
-    console.log('discord result:', discord);
-
-    return res.status(200).json({
-      ok: true,
-      uid,
-      discord,
-    });
+    const discord = await postToDiscord(channelId, token, content, file);
+    return res.status(200).json({ ok: discord.ok, uid, discord });
 
   } catch (err: any) {
-
-    console.error('FATAL HANDLER ERROR:', err);
-
-    return res.status(200).json({
-      ok: false,
-      error: err?.message || 'unknown_error',
-      stack: err?.stack || null,
-    });
+    console.error('FATAL:', err);
+    return res.status(200).json({ ok: false, error: err?.message ?? 'unknown' });
   }
 }
 
-
 export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '2mb',
-    },
-  },
+  api: { bodyParser: { sizeLimit: '4mb' } },
 };
