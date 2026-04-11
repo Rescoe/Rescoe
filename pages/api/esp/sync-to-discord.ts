@@ -40,6 +40,137 @@ function truncate(s: string, n: number): string {
   return s.length > n ? `${s.slice(0, n - 1)}…` : s;
 }
 
+function extractAllFrames(payload: PublishPayload): Array<{ buffer: number[]; delay: number }> {
+  const out: Array<{ buffer: number[]; delay: number }> = [];
+
+  if (Array.isArray(payload.frames)) {
+    for (let i = 0; i < payload.frames.length; i++) {
+      const f = payload.frames[i] as any;
+
+      if (Array.isArray(f) && f.length === 1024) {
+        out.push({ buffer: f, delay: payload.delays?.[i] ?? 100 });
+      } else if (f?.buffer?.length === 1024) {
+        out.push({ buffer: f.buffer, delay: f.delay ?? payload.delays?.[i] ?? 100 });
+      }
+    }
+  }
+
+  if (Array.isArray((payload as any).framesCompact)) {
+    const fc = (payload as any).framesCompact;
+    for (const f of fc) {
+      if (typeof f.buf === 'string' && f.buf.length === 2048) {
+        const buffer: number[] = [];
+        for (let i = 0; i < 2048; i += 2) {
+          buffer.push(parseInt(f.buf.slice(i, i + 2), 16));
+        }
+        if (buffer.length === 1024) {
+          out.push({ buffer, delay: f.delay ?? 100 });
+        }
+      }
+    }
+  }
+
+  return out;
+}
+
+function encodeGif(frames: Array<{ buffer: number[]; delay: number }>): Buffer {
+  const width = 128;
+  const height = 64;
+
+  const out: number[] = [];
+  const push = (...b: number[]) => out.push(...b);
+
+  const writeShort = (v: number) => {
+    push(v & 0xff, (v >> 8) & 0xff);
+  };
+
+  // Header
+  push(0x47,0x49,0x46,0x38,0x39,0x61); // GIF89a
+
+  // Logical Screen Descriptor
+  writeShort(width);
+  writeShort(height);
+  push(0x80 | 0x01); // global color table flag + size
+  push(0); // bg
+  push(0); // aspect
+
+  // Palette (black / white)
+  push(0,0,0, 255,255,255);
+
+  // Loop
+  push(0x21,0xFF,11,...Buffer.from('NETSCAPE2.0'));
+  push(3,1,0,0,0);
+
+  for (const frame of frames) {
+    const delay = Math.max(2, Math.floor(frame.delay / 10));
+
+    // GCE
+    push(0x21,0xF9,4,0, delay & 0xff, (delay>>8)&0xff, 0,0);
+
+    // Image descriptor
+    push(0x2C);
+    writeShort(0); writeShort(0);
+    writeShort(width); writeShort(height);
+    push(0);
+
+    // LZW
+    const minCodeSize = 2;
+    push(minCodeSize);
+
+    const clear = 1 << minCodeSize;
+    const end = clear + 1;
+
+    let codeSize = minCodeSize + 1;
+
+    const pixels: number[] = [];
+
+    for (let page = 0; page < 8; page++) {
+      for (let x = 0; x < 128; x++) {
+        const b = frame.buffer[page * 128 + x];
+        for (let bit = 0; bit < 8; bit++) {
+          pixels.push((b >> bit) & 1);
+        }
+      }
+    }
+
+    const stream: number[] = [];
+
+    const writeCode = (code: number) => {
+      for (let i = 0; i < codeSize; i++) {
+        stream.push((code >> i) & 1);
+      }
+    };
+
+    writeCode(clear);
+
+    for (const p of pixels) writeCode(p);
+
+    writeCode(end);
+
+    // pack bits → bytes
+    const bytes: number[] = [];
+    for (let i = 0; i < stream.length; i += 8) {
+      let byte = 0;
+      for (let b = 0; b < 8; b++) {
+        if (stream[i + b]) byte |= (1 << b);
+      }
+      bytes.push(byte);
+    }
+
+    // sub-blocks
+    for (let i = 0; i < bytes.length; i += 255) {
+      const chunk = bytes.slice(i, i + 255);
+      push(chunk.length, ...chunk);
+    }
+
+    push(0);
+  }
+
+  push(0x3B);
+
+  return Buffer.from(out);
+}
+
 function buildUid(payload: PublishPayload): string {
   if (payload.uid?.trim()) return payload.uid.trim();
   const stamp = sanitize(payload.timestamp, new Date().toISOString())
@@ -180,18 +311,20 @@ async function fetchEspSlot(slot: number) {
 
   return res.json();
 }
-
 async function postDiscordMessage(
   channelId: string,
   token: string,
   content: string,
-  png?: Buffer
+  png?: Buffer,
+  gif?: Buffer
 ): Promise<any> {
+
   const url = `${DISCORD_API}/channels/${channelId}/messages`;
 
   try {
+
     // TEXT ONLY
-    if (!png) {
+    if (!png && !gif) {
       const res = await fetch(url, {
         method: 'POST',
         headers: {
@@ -202,32 +335,54 @@ async function postDiscordMessage(
       });
 
       const txt = await res.text();
-
-      if (!res.ok) {
-        return { ok: false, status: res.status, body: txt };
-      }
-
-      return { ok: true, ...(JSON.parse(txt || '{}')) };
+      return res.ok
+        ? { ok: true, ...(JSON.parse(txt || '{}')) }
+        : { ok: false, status: res.status, body: txt };
     }
 
-    // MULTIPART SAFE
+    // MULTIPART
     const boundary = `----rescoe-${Date.now()}`;
+    const parts: Buffer[] = [];
 
-    const body = Buffer.concat([
+    // payload_json
+    parts.push(
       Buffer.from(
         `--${boundary}\r\n` +
         `Content-Disposition: form-data; name="payload_json"\r\n\r\n` +
         JSON.stringify({ content }) +
         `\r\n`
-      ),
-      Buffer.from(
-        `--${boundary}\r\n` +
-        `Content-Disposition: form-data; name="files[0]"; filename="oled.png"\r\n` +
-        `Content-Type: image/png\r\n\r\n`
-      ),
-      png,
-      Buffer.from(`\r\n--${boundary}--\r\n`)
-    ]);
+      )
+    );
+
+    let fileIndex = 0;
+
+    if (png) {
+      parts.push(
+        Buffer.from(
+          `--${boundary}\r\n` +
+          `Content-Disposition: form-data; name="files[${fileIndex}]"; filename="oled.png"\r\n` +
+          `Content-Type: image/png\r\n\r\n`
+        )
+      );
+      parts.push(png, Buffer.from('\r\n'));
+      fileIndex++;
+    }
+
+    if (gif) {
+      parts.push(
+        Buffer.from(
+          `--${boundary}\r\n` +
+          `Content-Disposition: form-data; name="files[${fileIndex}]"; filename="oled.gif"\r\n` +
+          `Content-Type: image/gif\r\n\r\n`
+        )
+      );
+      parts.push(gif, Buffer.from('\r\n'));
+      fileIndex++;
+    }
+
+    parts.push(Buffer.from(`--${boundary}--\r\n`));
+
+    const body = Buffer.concat(parts);
 
     const res = await fetch(url, {
       method: 'POST',
@@ -240,11 +395,9 @@ async function postDiscordMessage(
 
     const txt = await res.text();
 
-    if (!res.ok) {
-      return { ok: false, status: res.status, body: txt };
-    }
-
-    return { ok: true, ...(JSON.parse(txt || '{}')) };
+    return res.ok
+      ? { ok: true, ...(JSON.parse(txt || '{}')) }
+      : { ok: false, status: res.status, body: txt };
 
   } catch (err: any) {
     return {
@@ -254,6 +407,10 @@ async function postDiscordMessage(
     };
   }
 }
+
+
+
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   // CORS SAFE
@@ -371,15 +528,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const content = buildDiscordContent(payload, uid);
 
     const primaryBuffer = getPrimaryBuffer(payload);
+    const frames = extractAllFrames(payload);
 
+    const isAnimation =
+      sanitize(payload.mode).toLowerCase() === 'anim' ||
+      sanitize(payload.type).toLowerCase() === 'gif' ||
+      frames.length > 1;
     if (!primaryBuffer) {
       console.warn('[WARN] no buffer');
     }
 
     const png = primaryBuffer ? oledBufferToPng(primaryBuffer) : undefined;
+    const gif = isAnimation && frames.length > 1 ? encodeGif(frames) : undefined;
 
-    const discord = await postDiscordMessage(channelId, token, content, png);
-
+    const discord = await postDiscordMessage(channelId, token, content, png, gif);
     console.log('discord result:', discord);
 
     return res.status(200).json({
