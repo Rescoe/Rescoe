@@ -53,14 +53,38 @@ function buildUid(payload: PublishPayload): string {
 }
 
 function getPrimaryBuffer(payload: PublishPayload): number[] | null {
-  if (Array.isArray(payload.oledBuffer) && payload.oledBuffer.length === 1024) return payload.oledBuffer;
+  // Premier buffer direct (cas classique)
+  if (Array.isArray(payload.oledBuffer) && payload.oledBuffer.length === 1024) {
+    return payload.oledBuffer;
+  }
+
+  // Frames existantes
   if (Array.isArray(payload.frames) && payload.frames.length) {
     const first = payload.frames[0] as any;
     if (Array.isArray(first) && first.length === 1024) return first;
     if (first && Array.isArray(first.buffer) && first.buffer.length === 1024) return first.buffer;
   }
+
+  // NOUVEAU : extractFrames pour framesCompact (hex strings compactes)
+  if (!Array.isArray(payload.frames) && Array.isArray((payload as any).framesCompact)) {
+    const fc = (payload as any).framesCompact as Array<{ buf: string; delay: number }>;
+    for (const f of fc) {
+      if (typeof f.buf === 'string' && f.buf.length === 2048) {  // 1024 bytes = 2048 hex chars
+        const buffer: number[] = [];
+        for (let i = 0; i < 2048; i += 2) {
+          buffer.push(parseInt(f.buf.slice(i, i + 2), 16));
+        }
+        // Retourne le premier frame valide (128x64 = 1024 bytes)
+        if (buffer.length === 1024) {
+          return buffer;
+        }
+      }
+    }
+  }
+
   return null;
 }
+
 
 function oledBufferToPng(buffer: number[]): Buffer {
   const png = new PNG({ width: 128, height: 64 });
