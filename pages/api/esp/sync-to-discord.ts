@@ -73,91 +73,87 @@ function extractAllFrames(payload: PublishPayload): Array<{ buffer: number[]; de
   return out;
 }
 
+
 function encodeGif(frames: Array<{ buffer: number[]; delay: number }>): Buffer {
-  const width = 128;
-  const height = 64;
 
+  const W = 128, H = 64;
   const out: number[] = [];
+
   const push = (...b: number[]) => out.push(...b);
+  const writeShort = (v: number) => push(v & 255, (v >> 8) & 255);
 
-  const writeShort = (v: number) => {
-    push(v & 0xff, (v >> 8) & 0xff);
-  };
+  // HEADER
+  push(0x47,0x49,0x46,0x38,0x39,0x61);
+  writeShort(W);
+  writeShort(H);
 
-  // Header
-  push(0x47,0x49,0x46,0x38,0x39,0x61); // GIF89a
+  push(0x80 | 0x01); // GCT 2 colors
+  push(0,0);
 
-  // Logical Screen Descriptor
-  writeShort(width);
-  writeShort(height);
-  push(0x80 | 0x01); // global color table flag + size
-  push(0); // bg
-  push(0); // aspect
-
-  // Palette (black / white)
+  // palette (black / white)
   push(0,0,0, 255,255,255);
 
-  // Loop
-  push(0x21,0xFF,11,...Buffer.from('NETSCAPE2.0'));
-  push(3,1,0,0,0);
+  // loop
+  push(0x21,0xFF,11,...Buffer.from('NETSCAPE2.0'),3,1,0,0,0);
 
   for (const frame of frames) {
+
     const delay = Math.max(2, Math.floor(frame.delay / 10));
 
     // GCE
-    push(0x21,0xF9,4,0, delay & 0xff, (delay>>8)&0xff, 0,0);
+    push(0x21,0xF9,4,0, delay & 255, (delay>>8)&255, 0,0);
 
     // Image descriptor
     push(0x2C);
     writeShort(0); writeShort(0);
-    writeShort(width); writeShort(height);
+    writeShort(W); writeShort(H);
     push(0);
 
-    // LZW
     const minCodeSize = 2;
     push(minCodeSize);
 
-    const clear = 1 << minCodeSize;
-    const end = clear + 1;
+    const CLEAR = 1 << minCodeSize;
+    const END = CLEAR + 1;
 
     let codeSize = minCodeSize + 1;
 
     const pixels: number[] = [];
 
     for (let page = 0; page < 8; page++) {
-      for (let x = 0; x < 128; x++) {
-        const b = frame.buffer[page * 128 + x];
+      for (let x = 0; x < W; x++) {
+        const b = frame.buffer[page * W + x];
         for (let bit = 0; bit < 8; bit++) {
           pixels.push((b >> bit) & 1);
         }
       }
     }
 
-    const stream: number[] = [];
+    const codes: number[] = [];
 
-    const writeCode = (code: number) => {
+    // LZW ultra minimal (pas de dictionnaire dynamique → valide)
+    codes.push(CLEAR);
+    for (const p of pixels) codes.push(p);
+    codes.push(END);
+
+    // bit packing
+    const bits: number[] = [];
+
+    for (const c of codes) {
       for (let i = 0; i < codeSize; i++) {
-        stream.push((code >> i) & 1);
+        bits.push((c >> i) & 1);
       }
-    };
+    }
 
-    writeCode(clear);
-
-    for (const p of pixels) writeCode(p);
-
-    writeCode(end);
-
-    // pack bits → bytes
     const bytes: number[] = [];
-    for (let i = 0; i < stream.length; i += 8) {
+
+    for (let i = 0; i < bits.length; i += 8) {
       let byte = 0;
       for (let b = 0; b < 8; b++) {
-        if (stream[i + b]) byte |= (1 << b);
+        if (bits[i + b]) byte |= (1 << b);
       }
       bytes.push(byte);
     }
 
-    // sub-blocks
     for (let i = 0; i < bytes.length; i += 255) {
       const chunk = bytes.slice(i, i + 255);
       push(chunk.length, ...chunk);
@@ -170,6 +166,8 @@ function encodeGif(frames: Array<{ buffer: number[]; delay: number }>): Buffer {
 
   return Buffer.from(out);
 }
+
+
 
 function buildUid(payload: PublishPayload): string {
   if (payload.uid?.trim()) return payload.uid.trim();
