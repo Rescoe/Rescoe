@@ -14,6 +14,7 @@ type PublishPayload = {
   text?: string;
   oledBuffer?: number[];
   frames?: Array<number[] | { buffer: number[]; delay?: number }>;
+  framesCompact?: Array<{ buf: string; delay?: number }>;
   delays?: number[];
 };
 
@@ -75,98 +76,162 @@ function extractAllFrames(payload: PublishPayload): Array<{ buffer: number[]; de
 
 
 function encodeGif(frames: Array<{ buffer: number[]; delay: number }>): Buffer {
-
-  const W = 128, H = 64;
+  const W = 128;
+  const H = 64;
   const out: number[] = [];
 
-  const push = (...b: number[]) => out.push(...b);
-  const writeShort = (v: number) => push(v & 255, (v >> 8) & 255);
+  const push = (...bytes: number[]) => out.push(...bytes.map(b => b & 0xff));
+  const writeU16 = (v: number) => push(v & 0xff, (v >> 8) & 0xff);
+  const writeStr = (s: string) => {
+    for (let i = 0; i < s.length; i++) push(s.charCodeAt(i));
+  };
 
-  // HEADER
-  push(0x47,0x49,0x46,0x38,0x39,0x61);
-  writeShort(W);
-  writeShort(H);
+  function pixelsFromBuffer(buffer: number[]): number[] {
+    const pixels = new Array(W * H);
+    for (let page = 0; page < 8; page++) {
+      for (let x = 0; x < W; x++) {
+        const b = buffer[page * W + x] || 0;
+        for (let bit = 0; bit < 8; bit++) {
+          const y = page * 8 + bit;
+          pixels[y * W + x] = (b >> bit) & 1;
+        }
+      }
+    }
+    return pixels;
+  }
 
-  push(0x80 | 0x01); // GCT 2 colors
-  push(0,0);
+  function lzwEncodeGif(pixels: number[], minCodeSize: number): number[] {
+    const clearCode = 1 << minCodeSize;
+    const endCode = clearCode + 1;
 
-  // palette (black / white)
-  push(0,0,0, 255,255,255);
+    let codeSize = minCodeSize + 1;
+    let nextCode = endCode + 1;
 
-  // loop
-  push(0x21,0xFF,11,...Buffer.from('NETSCAPE2.0'),3,1,0,0,0);
+    const dict = new Map<string, number>();
+    for (let i = 0; i < clearCode; i++) {
+      dict.set(String(i), i);
+    }
+
+    const bytes: number[] = [];
+    let bitBuffer = 0;
+    let bitCount = 0;
+
+    const writeCode = (code: number) => {
+      bitBuffer |= code << bitCount;
+      bitCount += codeSize;
+
+      while (bitCount >= 8) {
+        bytes.push(bitBuffer & 0xff);
+        bitBuffer >>= 8;
+        bitCount -= 8;
+      }
+    };
+
+    const resetDictionary = () => {
+      dict.clear();
+      for (let i = 0; i < clearCode; i++) {
+        dict.set(String(i), i);
+      }
+      codeSize = minCodeSize + 1;
+      nextCode = endCode + 1;
+    };
+
+    writeCode(clearCode);
+
+    let current = String(pixels[0] ?? 0);
+
+    for (let i = 1; i < pixels.length; i++) {
+      const next = String(pixels[i]);
+      const combined = current + ',' + next;
+
+      if (dict.has(combined)) {
+        current = combined;
+      } else {
+        writeCode(dict.get(current)!);
+
+        if (nextCode < 4096) {
+          dict.set(combined, nextCode++);
+          if (nextCode === (1 << codeSize) && codeSize < 12) {
+            codeSize++;
+          }
+        } else {
+          writeCode(clearCode);
+          resetDictionary();
+        }
+
+        current = next;
+      }
+    }
+
+    writeCode(dict.get(current)!);
+    writeCode(endCode);
+
+    if (bitCount > 0) {
+      bytes.push(bitBuffer & 0xff);
+    }
+
+    return bytes;
+  }
+
+  function writeSubBlocks(data: number[]) {
+    for (let i = 0; i < data.length; i += 255) {
+      const chunk = data.slice(i, i + 255);
+      push(chunk.length);
+      push(...chunk);
+    }
+    push(0x00);
+  }
+
+  // Header
+  writeStr('GIF89a');
+
+  // Logical Screen Descriptor
+  writeU16(W);
+  writeU16(H);
+  push(0x80); // GCT present, 2 colors => size field 0
+  push(0x00); // background color index
+  push(0x00); // pixel aspect ratio
+
+  // Global Color Table: 2 entries
+  push(0x00, 0x00, 0x00); // black
+  push(0xff, 0xff, 0xff); // white
+
+  // Netscape loop extension
+  push(0x21, 0xff, 0x0b);
+  writeStr('NETSCAPE2.0');
+  push(0x03, 0x01, 0x00, 0x00, 0x00); // infinite loop
 
   for (const frame of frames) {
+    const delayCs = Math.max(2, Math.round((frame.delay ?? 100) / 10));
 
-    const delay = Math.max(2, Math.floor(frame.delay / 10));
+    // Graphic Control Extension
+    push(0x21, 0xf9, 0x04);
+    push(0x00); // no transparency / no disposal override
+    writeU16(delayCs);
+    push(0x00); // transparent color index
+    push(0x00); // block terminator
 
-    // GCE
-    push(0x21,0xF9,4,0, delay & 255, (delay>>8)&255, 0,0);
-
-    // Image descriptor
-    push(0x2C);
-    writeShort(0); writeShort(0);
-    writeShort(W); writeShort(H);
-    push(0);
+    // Image Descriptor
+    push(0x2c);
+    writeU16(0); // left
+    writeU16(0); // top
+    writeU16(W);
+    writeU16(H);
+    push(0x00); // no local color table
 
     const minCodeSize = 2;
     push(minCodeSize);
 
-    const CLEAR = 1 << minCodeSize;
-    const END = CLEAR + 1;
-
-    let codeSize = minCodeSize + 1;
-
-    const pixels: number[] = [];
-
-    for (let page = 0; page < 8; page++) {
-      for (let x = 0; x < W; x++) {
-        const b = frame.buffer[page * W + x];
-        for (let bit = 0; bit < 8; bit++) {
-          pixels.push((b >> bit) & 1);
-        }
-      }
-    }
-
-    const codes: number[] = [];
-
-    // LZW ultra minimal (pas de dictionnaire dynamique → valide)
-    codes.push(CLEAR);
-    for (const p of pixels) codes.push(p);
-    codes.push(END);
-
-    // bit packing
-    const bits: number[] = [];
-
-    for (const c of codes) {
-      for (let i = 0; i < codeSize; i++) {
-        bits.push((c >> i) & 1);
-      }
-    }
-
-    const bytes: number[] = [];
-
-    for (let i = 0; i < bits.length; i += 8) {
-      let byte = 0;
-      for (let b = 0; b < 8; b++) {
-        if (bits[i + b]) byte |= (1 << b);
-      }
-      bytes.push(byte);
-    }
-
-    for (let i = 0; i < bytes.length; i += 255) {
-      const chunk = bytes.slice(i, i + 255);
-      push(chunk.length, ...chunk);
-    }
-
-    push(0);
+    const pixels = pixelsFromBuffer(frame.buffer);
+    const lzwData = lzwEncodeGif(pixels, minCodeSize);
+    writeSubBlocks(lzwData);
   }
 
-  push(0x3B);
+  // Trailer
+  push(0x3b);
 
   return Buffer.from(out);
 }
-
 
 
 function buildUid(payload: PublishPayload): string {
