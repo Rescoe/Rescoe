@@ -317,9 +317,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
   }
-  
+
   try {
     const payload = (req.body || {}) as PublishPayload;
+
+    console.log('🔍 RAW_BODY_SIZE:', Buffer.from(JSON.stringify(req.body || {})).byteLength);
+    console.log('🔍 HAS_OLEDBUFFER:', !!payload.oledBuffer);
+    console.log('🔍 PAYLOAD_KEYS:', Object.keys(payload || {}));
+    console.log('🔍 FIRST_10_ITEM_KEYS:', (payload as any).item ? Object.keys((payload as any).item || {}).slice(0, 10) : 'NO ITEM');
+    console.log('🔍 BUFFER_LEN:', payload.oledBuffer?.length || 'NO BUFFER');
 
     console.log('payload type:', typeof payload);
     console.log('keys:', Object.keys(payload || {}));
