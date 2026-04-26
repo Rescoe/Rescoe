@@ -40,7 +40,7 @@ Epd epd;
 #define BUFFER_SIZE (WIDTH_BYTES * EPD_H)
 
 #define EINK_BUF_FULL ((EPD_W * EPD_H) / 8)
-static const int EINKHEADERH = 24;
+static const int EINKHEADERH = 16;
 
 //Paint e-ink
 #define COLORED     0
@@ -76,9 +76,10 @@ String pendingEinkEthAddress;
 bool pendingEinkForSale = false;
 static bool renderCacheValid = false; // variable globale, avant loop()
 bool einkLandscape = false;  // défaut portrait
+bool oledPortrait = false;
 
 
-WiFiServer server(5058);
+WiFiServer server(80);
 
 
 const char* RESCOE_SYNC_URL = "https://www.rescoe.xyz/api/esp/sync-to-discord";
@@ -88,6 +89,108 @@ const char* RESCOE_SYNC_SECRET = "IlajouteausslesfonctionsJSinjecterdanslecodEDp
 #define ANIM_MAX_FRAMES 50
 
 uint8_t lastRendered[1024] = {0};
+
+
+// Police bitmap 5x7 (ASCII 32-126) — remplace display.getPixel()
+// Chaque caractère = 5 octets, 1 bit par pixel, LSB = ligne haute
+static const uint8_t FONT5x7[][5] PROGMEM = {
+  {0x00,0x00,0x00,0x00,0x00}, // 32 space
+  {0x00,0x00,0x5F,0x00,0x00}, // 33 !
+  {0x00,0x07,0x00,0x07,0x00}, // 34 "
+  {0x14,0x7F,0x14,0x7F,0x14}, // 35 #
+  {0x24,0x2A,0x7F,0x2A,0x12}, // 36 $
+  {0x23,0x13,0x08,0x64,0x62}, // 37 %
+  {0x36,0x49,0x55,0x22,0x50}, // 38 &
+  {0x00,0x05,0x03,0x00,0x00}, // 39 '
+  {0x00,0x1C,0x22,0x41,0x00}, // 40 (
+  {0x00,0x41,0x22,0x1C,0x00}, // 41 )
+  {0x14,0x08,0x3E,0x08,0x14}, // 42 *
+  {0x08,0x08,0x3E,0x08,0x08}, // 43 +
+  {0x00,0x50,0x30,0x00,0x00}, // 44 ,
+  {0x08,0x08,0x08,0x08,0x08}, // 45 -
+  {0x00,0x60,0x60,0x00,0x00}, // 46 .
+  {0x20,0x10,0x08,0x04,0x02}, // 47 /
+  {0x3E,0x51,0x49,0x45,0x3E}, // 48 0
+  {0x00,0x42,0x7F,0x40,0x00}, // 49 1
+  {0x42,0x61,0x51,0x49,0x46}, // 50 2
+  {0x21,0x41,0x45,0x4B,0x31}, // 51 3
+  {0x18,0x14,0x12,0x7F,0x10}, // 52 4
+  {0x27,0x45,0x45,0x45,0x39}, // 53 5
+  {0x3C,0x4A,0x49,0x49,0x30}, // 54 6
+  {0x01,0x71,0x09,0x05,0x03}, // 55 7
+  {0x36,0x49,0x49,0x49,0x36}, // 56 8
+  {0x06,0x49,0x49,0x29,0x1E}, // 57 9
+  {0x00,0x36,0x36,0x00,0x00}, // 58 :
+  {0x00,0x56,0x36,0x00,0x00}, // 59 ;
+  {0x08,0x14,0x22,0x41,0x00}, // 60
+  {0x14,0x14,0x14,0x14,0x14}, // 61 =
+  {0x00,0x41,0x22,0x14,0x08}, // 62 >
+  {0x02,0x01,0x51,0x09,0x06}, // 63 ?
+  {0x32,0x49,0x79,0x41,0x3E}, // 64 @
+  {0x7E,0x11,0x11,0x11,0x7E}, // 65 A
+  {0x7F,0x49,0x49,0x49,0x36}, // 66 B
+  {0x3E,0x41,0x41,0x41,0x22}, // 67 C
+  {0x7F,0x41,0x41,0x22,0x1C}, // 68 D
+  {0x7F,0x49,0x49,0x49,0x41}, // 69 E
+  {0x7F,0x09,0x09,0x09,0x01}, // 70 F
+  {0x3E,0x41,0x49,0x49,0x7A}, // 71 G
+  {0x7F,0x08,0x08,0x08,0x7F}, // 72 H
+  {0x00,0x41,0x7F,0x41,0x00}, // 73 I
+  {0x20,0x40,0x41,0x3F,0x01}, // 74 J
+  {0x7F,0x08,0x14,0x22,0x41}, // 75 K
+  {0x7F,0x40,0x40,0x40,0x40}, // 76 L
+  {0x7F,0x02,0x04,0x02,0x7F}, // 77 M
+  {0x7F,0x04,0x08,0x10,0x7F}, // 78 N
+  {0x3E,0x41,0x41,0x41,0x3E}, // 79 O
+  {0x7F,0x09,0x09,0x09,0x06}, // 80 P
+  {0x3E,0x41,0x51,0x21,0x5E}, // 81 Q
+  {0x7F,0x09,0x19,0x29,0x46}, // 82 R
+  {0x46,0x49,0x49,0x49,0x31}, // 83 S
+  {0x01,0x01,0x7F,0x01,0x01}, // 84 T
+  {0x3F,0x40,0x40,0x40,0x3F}, // 85 U
+  {0x1F,0x20,0x40,0x20,0x1F}, // 86 V
+  {0x3F,0x40,0x38,0x40,0x3F}, // 87 W
+  {0x63,0x14,0x08,0x14,0x63}, // 88 X
+  {0x07,0x08,0x70,0x08,0x07}, // 89 Y
+  {0x61,0x51,0x49,0x45,0x43}, // 90 Z
+  {0x00,0x7F,0x41,0x41,0x00}, // 91 [
+  {0x02,0x04,0x08,0x10,0x20}, // 92 backslash
+  {0x00,0x41,0x41,0x7F,0x00}, // 93 ]
+  {0x04,0x02,0x01,0x02,0x04}, // 94 ^
+  {0x40,0x40,0x40,0x40,0x40}, // 95 _
+  {0x00,0x01,0x02,0x04,0x00}, // 96 `
+  {0x20,0x54,0x54,0x54,0x78}, // 97 a
+  {0x7F,0x48,0x44,0x44,0x38}, // 98 b
+  {0x38,0x44,0x44,0x44,0x20}, // 99 c
+  {0x38,0x44,0x44,0x48,0x7F}, // 100 d
+  {0x38,0x54,0x54,0x54,0x18}, // 101 e
+  {0x08,0x7E,0x09,0x01,0x02}, // 102 f
+  {0x0C,0x52,0x52,0x52,0x3E}, // 103 g
+  {0x7F,0x08,0x04,0x04,0x78}, // 104 h
+  {0x00,0x44,0x7D,0x40,0x00}, // 105 i
+  {0x20,0x40,0x44,0x3D,0x00}, // 106 j
+  {0x7F,0x10,0x28,0x44,0x00}, // 107 k
+  {0x00,0x41,0x7F,0x40,0x00}, // 108 l
+  {0x7C,0x04,0x18,0x04,0x78}, // 109 m
+  {0x7C,0x08,0x04,0x04,0x78}, // 110 n
+  {0x38,0x44,0x44,0x44,0x38}, // 111 o
+  {0x7C,0x14,0x14,0x14,0x08}, // 112 p
+  {0x08,0x14,0x14,0x18,0x7C}, // 113 q
+  {0x7C,0x08,0x04,0x04,0x08}, // 114 r
+  {0x48,0x54,0x54,0x54,0x20}, // 115 s
+  {0x04,0x3F,0x44,0x40,0x20}, // 116 t
+  {0x3C,0x40,0x40,0x40,0x7C}, // 117 u
+  {0x1C,0x20,0x40,0x20,0x1C}, // 118 v
+  {0x3C,0x40,0x30,0x40,0x3C}, // 119 w
+  {0x44,0x28,0x10,0x28,0x44}, // 120 x
+  {0x0C,0x50,0x50,0x50,0x3C}, // 121 y
+  {0x44,0x64,0x54,0x4C,0x44}, // 122 z
+  {0x00,0x08,0x36,0x41,0x00}, // 123 {
+  {0x00,0x00,0x7F,0x00,0x00}, // 124 |
+  {0x00,0x41,0x36,0x08,0x00}, // 125 }
+  {0x10,0x08,0x08,0x10,0x08}, // 126 ~
+};
+
 
 struct GalleryIndex {
   uint16_t magic;
@@ -116,645 +219,1405 @@ uint8_t   animCurFrame   = 0;
 bool      animRunning    = false;
 unsigned long animLastT  = 0;
 
-
-
 const char PROGMEM html_page[] = R"rawliteral(
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Collaborative Oled Galerie</title>
+<title>Rescoled</title>
+
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="logo" href="/logo.png">
 
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;500;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&family=Inter:wght@400;500;600&display=swap');
 
-  :root {
-    --bg:      #0d0d0f;
-    --surface: #17171a;
-    --surf2:   #1e1e22;
-    --border:  #2a2a30;
-    --accent:  #00e5b0;
-    --red:     #ff4757;
-    --orange:  #ffa502;
-    --text:    #e8e8ed;
-    --text2:   #7a7a8a;
-    --mono:    'JetBrains Mono', monospace;
-    --sans:    'Space Grotesk', sans-serif;
-  }
+:root {
+  /* Palette principale */
+  --bg:       #080809;
+  --surface:  #101013;
+  --surf2:    #18181c;
+  --surf3:    #1f1f24;
+  --border:   rgba(255,255,255,.07);
+  --border2:  rgba(255,255,255,.12);
 
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  /* Accents */
+  --accent:   #00e5b0;
+  --accent2:  #00b88a;
+  --accent-dim: rgba(0,229,176,.08);
+  --accent-glow: rgba(0,229,176,.15);
 
-  body {
-    background: var(--bg); color: var(--text); font-family: var(--sans);
-    min-height: 100vh; display: flex; flex-direction: column;
-    align-items: center; padding: 14px; gap: 10px;
-  }
+  --red:      #ff3b4e;
+  --red-dim:  rgba(255,59,78,.1);
+  --orange:   #ff8c00;
+  --orange-dim: rgba(255,140,0,.1);
+  --blue:     #3d8eff;
+  --blue-dim: rgba(61,142,255,.1);
 
-  header {
-    width: 100%; max-width: 560px; display: flex;
-    align-items: center; justify-content: space-between;
-    padding: 10px 14px; background: var(--surface);
-    border: 1px solid var(--border); border-radius: 10px;
-  }
-  header h1 { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--accent); letter-spacing: .06em; text-transform: uppercase; }
-  #userBadge { font-family: var(--mono); font-size: 11px; color: var(--text2); display: flex; align-items: center; gap: 6px; }
-  #userBadge strong { color: var(--orange); }
+  /* Texte */
+  --text:     #e2e2e8;
+  --text2:    #6b6b7a;
+  --text3:    #3d3d48;
 
-  #status {
-    width: 100%; max-width: 560px; font-family: var(--mono); font-size: 11px;
-    color: var(--text2); padding: 6px 12px; background: var(--surface);
-    border: 1px solid var(--border); border-radius: 8px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
+  /* Typo */
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Inter', system-ui, sans-serif;
 
-  #canvasWrap {
-    position: relative; display: inline-block;
-    border: 2px solid var(--border); border-radius: 6px; overflow: hidden;
-    box-shadow: 0 0 28px rgba(0,229,176,.06); background: #fff;
-  }
-  #canvas, #layerCanvas {
-    display: block; width: min(90vw, 512px); height: auto;
-    image-rendering: pixelated; cursor: crosshair;
-  }
-  #layerCanvas { position: absolute; top:0; left:0; pointer-events: none; }
+  /* Rayons */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
 
-.tabs{
-  width:100%;
-  max-width:560px;
-  display:flex;
-  gap:4px;
-  padding:5px;
-  background:var(--surface);
-  border:1px solid var(--border);
-  border-radius:10px;
-  overflow-x:auto;
-  overflow-y:hidden;
-  flex-wrap:nowrap;
-  -webkit-overflow-scrolling:touch;
-  scrollbar-width:none;
-}
-.tabs::-webkit-scrollbar{display:none;}
-
-.tab-btn{
-  flex:0 0 auto;
-  min-width:max-content;
-  padding:8px 10px;
-  background:none;
-  border:none;
-  border-radius:7px;
-  color:var(--text2);
-  font-family:var(--mono);
-  font-size:11px;
-  font-weight:600;
-  cursor:pointer;
-  transition:all .2s;
-  white-space:nowrap;
+  /* Transitions */
+  --ease: cubic-bezier(.16,1,.3,1);
 }
 
-
-  .tab-btn:hover { color: var(--text); background: var(--surf2); }
-  .tab-btn.active { background: var(--accent); color: #000; }
-
-  .panel {
-    display: none; width: 100%; max-width: 560px; background: var(--surface);
-    border: 1px solid var(--border); border-radius: 10px;
-    padding: 14px; gap: 10px; flex-direction: column;
-  }
-  .panel.active { display: flex; }
-  .panel-title {
-    font-family: var(--mono); font-size: 11px; font-weight: 700;
-    color: var(--accent); text-transform: uppercase; letter-spacing: .08em;
-    padding-bottom: 8px; border-bottom: 1px solid var(--border);
-  }
-
-  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-
-  button.btn {
-    padding: 7px 11px; background: var(--surf2); border: 1px solid var(--border);
-    border-radius: 7px; color: var(--text); font-family: var(--mono);
-    font-size: 11px; font-weight: 600; cursor: pointer; transition: all .15s; white-space: nowrap;
-  }
-  button.btn:hover  { border-color: var(--accent); color: var(--accent); }
-  button.btn.active { background: var(--accent); border-color: var(--accent); color: #000; }
-  button.btn.danger { border-color: var(--red); color: var(--red); }
-  button.btn.danger:hover { background: var(--red); color: #fff; }
-  button.btn.send   { border-color: var(--accent); color: var(--accent); }
-  button.btn.send:hover { background: var(--accent); color: #000; }
-
-  .sr { display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:11px; color:var(--text2); }
-  .sr label { min-width:44px; }
-  .sr input[type=range] { width:90px; accent-color:var(--accent); cursor:pointer; }
-  .sv { color:var(--accent); font-weight:600; min-width:38px; }
-
-  .tog { display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:11px; color:var(--text2); cursor:pointer; user-select:none; }
-  .tog input { display:none; }
-  .tok { width:36px; height:18px; background:var(--surf2); border:1px solid var(--border); border-radius:9px; position:relative; transition:background .2s; }
-  .tok::after { content:''; position:absolute; width:12px; height:12px; background:var(--text2); border-radius:50%; top:2px; left:2px; transition:all .2s; }
-  .tog input:checked + .tok { background:var(--accent); border-color:var(--accent); }
-  .tog input:checked + .tok::after { left:20px; background:#000; }
-
-  #framesStrip { display:flex; gap:6px; overflow-x:auto; padding:4px 0; min-height:42px; }
-  #framesStrip canvas { border-radius:5px; cursor:pointer; flex-shrink:0; transition:transform .15s; }
-  #framesStrip canvas:hover { transform:scale(1.05); }
-  #frameInfo { font-family:var(--mono); font-size:11px; color:var(--orange); padding:5px 10px; background:var(--surf2); border:1px solid var(--border); border-radius:6px; white-space:nowrap; }
-
-  textarea { width:100%; height:110px; background:var(--surf2); color:var(--text); border:1px solid var(--border); border-radius:7px; font-family:var(--mono); font-size:11px; padding:9px; resize:vertical; }
-
-  .file-btn { padding:7px 11px; background:var(--surf2); border:1px solid var(--red); border-radius:7px; color:var(--red); font-family:var(--mono); font-size:11px; font-weight:600; cursor:pointer; transition:all .15s; display:inline-block; white-space:nowrap; }
-  .file-btn:hover { background:var(--red); color:#fff; }
-
-  .overlay { position:fixed; inset:0; background:rgba(0,0,0,.88); display:none; justify-content:center; align-items:center; z-index:200; padding:16px; }
-  .overlay.active { display:flex; }
-  .mbox { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; width:100%; max-width:380px; display:flex; flex-direction:column; gap:14px; }
-  .mtitle { font-family:var(--mono); font-size:13px; font-weight:700; color:var(--accent); text-transform:uppercase; }
-  .mbox p { font-family:var(--mono); font-size:11px; color:var(--text2); line-height:1.6; }
-  .mbox input[type=text] { width:100%; padding:10px 12px; background:var(--surf2); border:1px solid var(--border); border-radius:7px; color:var(--text); font-family:var(--mono); font-size:14px; outline:none; transition:border-color .2s; }
-  .mbox input[type=text]:focus { border-color:var(--accent); }
-
-  #cropPreview { image-rendering:pixelated; border:1px solid var(--border); border-radius:4px; background:#fff; width:100%; max-width:256px; height:auto; display:block; margin:0 auto; }
-
-  select { padding:6px 9px; background:var(--surf2); border:1px solid var(--border); border-radius:7px; color:var(--text); font-family:var(--mono); font-size:11px; cursor:pointer; }
-
-.gallery-grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-  gap:10px;
-}
-.gcard{
-  background:var(--surf2);
-  border:1px solid var(--border);
-  border-radius:8px;
-  padding:8px;
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-}
-.gmeta{
-  display:flex;
-  flex-direction:column;
-  gap:2px;
-  font-family:var(--mono);
-  font-size:10px;
-  color:var(--text2);
-}
-.gmeta strong{
-  color:var(--text);
-  font-size:11px;
-}
-.gempty{
-  font-family:var(--mono);
-  font-size:11px;
-  color:var(--text2);
-  padding:8px;
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-.dither-preview-card {
-  background: var(--surf2); border: 1px solid var(--border); border-radius: 7px;
-  padding: 6px; cursor: pointer; display: flex; flex-direction: column; gap: 4px;
-  font-family: var(--mono); font-size: 10px; color: var(--text2); text-align: center;
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.5;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px;
+  gap: 8px;
+  max-width: 580px;
+  margin: 0 auto;
+}
+
+/* ═══════════════════════════════
+   HEADER
+═══════════════════════════════ */
+header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  gap: 10px;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.app-logo {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  object-fit: contain;
+  border-radius: var(--r-sm);
+}
+
+.app-header h1 {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: .1em;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+
+.app-header h4 {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 400;
+  color: var(--text2);
+  white-space: nowrap;
+  margin-top: 1px;
+  letter-spacing: .04em;
+}
+
+#userBadge {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+#userBadge span {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text2);
+  white-space: nowrap;
+  letter-spacing: .03em;
+}
+
+#userBadge strong { color: var(--accent); font-weight: 500; }
+#userDisplay { color: var(--orange) !important; }
+
+/* ═══════════════════════════════
+   STATUS BAR
+═══════════════════════════════ */
+#status {
+  width: 100%;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text2);
+  padding: 6px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: .02em;
+  position: relative;
+}
+
+#status::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 2px;
+  background: var(--accent);
+  border-radius: 2px 0 0 2px;
+  opacity: .6;
+}
+
+/* ═══════════════════════════════
+   CANVAS ZONE
+═══════════════════════════════ */
+#drawArea {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#canvasWrap {
+  position: relative;
+  width: 100%;
+  border: 1px solid var(--border2);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: #000;
+  outline: 3px solid var(--accent-glow);
+  outline-offset: -1px;
+}
+
+#canvas, #layerCanvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+  cursor: crosshair;
+}
+
+#layerCanvas {
+  position: absolute;
+  top: 0; left: 0;
+  pointer-events: none;
+}
+
+#canvasWrap:fullscreen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  border: none;
+  width: 100vw;
+  height: 100vh;
+  outline: none;
+}
+#canvasWrap:fullscreen canvas {
+  width: 90vw !important;
+  height: auto !important;
+  max-height: 90vh;
+}
+
+/* ═══════════════════════════════
+   CANVAS ACTIONS
+═══════════════════════════════ */
+.canvas-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+}
+
+.canvas-actions .btn-send-main {
+  margin-left: auto;
+  flex-shrink: 0;
+  background: var(--accent);
+  color: #000;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  border: none;
+  border-radius: var(--r-sm);
+  padding: 8px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  letter-spacing: .04em;
+  transition: opacity .15s var(--ease), transform .1s;
+}
+.canvas-actions .btn-send-main:hover { opacity: .88; }
+.canvas-actions .btn-send-main:active { transform: scale(.97); }
+
+/* ═══════════════════════════════
+   APERÇU ÉCRANS
+═══════════════════════════════ */
+.preview-panel { width: 100%; }
+
+.preview-toggle {
+  cursor: pointer;
+  user-select: none;
+  display: block;
+  width: 100%;
+  padding: 7px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text2);
+  list-style: none;
+  letter-spacing: .04em;
+  transition: border-color .15s, color .15s;
+}
+.preview-toggle:hover { border-color: var(--border2); color: var(--text); }
+.preview-toggle::-webkit-details-marker { display: none; }
+details[open] .preview-toggle {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom-color: transparent;
+  color: var(--accent);
+}
+
+.preview-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--r-md) var(--r-md);
+}
+
+.preview-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surf2);
+}
+
+.preview-title {
+  font-family: var(--mono);
+  font-size: 8px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+}
+
+.preview-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+  padding: 3px;
+  width: 100%;
+}
+.preview-frame-oled { background: #000; }
+.preview-frame-eink { background: #e8e4d8; }
+
+#oledPreview, #einkPreview {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}
+#oledPreview { aspect-ratio: 128/64; }
+
+.preview-meta {
+  font-family: var(--mono);
+  font-size: 8px;
+  color: var(--text2);
+  letter-spacing: .04em;
+}
+
+/* ═══════════════════════════════
+   ORIENTATION
+═══════════════════════════════ */
+.orient-row {
+  width: 100%;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+#orientSensorBadge {
+  display: none;
+  font-size: 10px;
+  color: var(--accent);
+}
+
+/* ═══════════════════════════════
+   TABS
+═══════════════════════════════ */
+.tabs {
+  width: 100%;
+  display: flex;
+  gap: 3px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+
+.tab-btn {
+  flex: 0 0 auto;
+  min-width: max-content;
+  padding: 7px 12px;
+  background: none;
+  border: none;
+  border-radius: var(--r-md);
+  color: var(--text2);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color .15s, background .15s;
+  letter-spacing: .03em;
+}
+.tab-btn:hover { color: var(--text); background: var(--surf2); }
+.tab-btn.active {
+  background: var(--accent);
+  color: #000;
+  font-weight: 700;
+}
+
+/* ═══════════════════════════════
+   PANELS
+═══════════════════════════════ */
+.panel {
+  display: none;
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 14px;
+  gap: 10px;
+  flex-direction: column;
+}
+.panel.active { display: flex; }
+
+.panel-title {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: .14em;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ═══════════════════════════════
+   HINT
+═══════════════════════════════ */
+.hint {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text2);
+  line-height: 1.6;
+  padding: 8px 10px 8px 12px;
+  background: var(--surf2);
+  border-left: 2px solid var(--accent);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  letter-spacing: .02em;
+}
+
+/* ═══════════════════════════════
+   BOUTONS
+═══════════════════════════════ */
+.row { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.row-soft { padding: 2px 0; }
+
+button.btn {
+  padding: 6px 10px;
+  background: var(--surf2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text2);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color .15s, color .15s, background .15s, transform .1s;
+  white-space: nowrap;
+  letter-spacing: .03em;
+}
+button.btn:hover {
+  border-color: var(--border2);
+  color: var(--text);
+  background: var(--surf3);
+}
+button.btn:active { transform: scale(.96); }
+button.btn.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+button.btn.danger {
+  border-color: transparent;
+  color: var(--text2);
+}
+button.btn.danger:hover {
+  border-color: var(--red);
+  color: var(--red);
+  background: var(--red-dim);
+}
+button.btn.send {
+  border-color: rgba(0,229,176,.3);
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+button.btn.send:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #000;
+}
+
+/* ═══════════════════════════════
+   SLIDERS
+═══════════════════════════════ */
+.sr {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text2);
+}
+.sr label { min-width: 40px; letter-spacing: .03em; }
+.sr input[type=range] {
+  flex: 1;
+  min-width: 60px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  height: 3px;
+}
+.sv {
+  color: var(--accent);
+  font-weight: 600;
+  min-width: 38px;
+  text-align: right;
+  font-size: 10px;
+}
+
+/* ═══════════════════════════════
+   TOGGLES
+═══════════════════════════════ */
+.tog {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text2);
+  cursor: pointer;
+  user-select: none;
+  letter-spacing: .03em;
+}
+.tog input { display: none; }
+.tok {
+  width: 34px;
+  height: 18px;
+  background: var(--surf3);
+  border: 1px solid var(--border2);
+  border-radius: 9px;
+  position: relative;
+  transition: background .2s, border-color .2s;
+  flex-shrink: 0;
+}
+.tok::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: var(--text3);
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: left .2s var(--ease), background .2s;
+}
+.tog input:checked + .tok {
+  background: rgba(0,229,176,.2);
+  border-color: var(--accent);
+}
+.tog input:checked + .tok::after {
+  left: 18px;
+  background: var(--accent);
+}
+.tog.compact .tok { width: 28px; height: 16px; }
+.tog.compact .tok::after { width: 10px; height: 10px; }
+.tog.compact input:checked + .tok::after { left: 16px; }
+
+/* ═══════════════════════════════
+   FRAMES STRIP
+═══════════════════════════════ */
+#framesStrip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px 0;
+  min-height: 44px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+#framesStrip canvas {
+  border-radius: var(--r-xs);
+  cursor: pointer;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  transition: border-color .15s, outline .15s;
+  outline: 2px solid transparent;
+  outline-offset: 1px;
+}
+#framesStrip canvas:hover {
+  border-color: var(--border2);
+  outline-color: var(--accent-glow);
+}
+
+#frameInfo {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--orange);
+  padding: 4px 10px;
+  background: var(--orange-dim);
+  border: 1px solid rgba(255,140,0,.2);
+  border-radius: var(--r-sm);
+  white-space: nowrap;
+  letter-spacing: .03em;
+}
+
+#frameMultiInfo {
+  display: none;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--orange);
+  padding: 4px 8px;
+  background: var(--orange-dim);
+  border: 1px solid rgba(255,140,0,.2);
+  border-radius: var(--r-sm);
+}
+
+/* ═══════════════════════════════
+   TOOL GROUPS
+═══════════════════════════════ */
+.tool-group { width: 100%; }
+
+.tool-summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 7px 10px;
+  background: var(--surf2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text2);
+  user-select: none;
+  transition: border-color .15s, color .15s;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.tool-summary::-webkit-details-marker { display: none; }
+.tool-summary:hover { border-color: var(--border2); color: var(--text); }
+.tool-group[open] .tool-summary {
+  border-color: rgba(0,229,176,.3);
+  color: var(--accent);
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+}
+
+.tool-group-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+  padding: 8px;
+  background: var(--surf2);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--r-sm) var(--r-sm);
+}
+
+/* ═══════════════════════════════
+   COLOR SWATCH
+═══════════════════════════════ */
+.color-swatch {
+  min-width: 72px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.color-swatch.is-black {
+  background: #0a0a0a;
+  color: rgba(255,255,255,.7);
+  border-color: rgba(255,255,255,.15);
+}
+.color-swatch.is-white {
+  background: #f5f5f5;
+  color: rgba(0,0,0,.7);
+  border-color: rgba(0,0,0,.15);
+}
+
+/* ═══════════════════════════════
+   TEXTAREA
+═══════════════════════════════ */
+textarea {
+  width: 100%;
+  height: 90px;
+  background: var(--surf2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 9px;
+  resize: vertical;
+  outline: none;
+  transition: border-color .15s;
+  line-height: 1.6;
+}
+textarea:focus { border-color: var(--border2); }
+
+/* ═══════════════════════════════
+   FILE BTN
+═══════════════════════════════ */
+.file-btn {
+  padding: 6px 10px;
+  background: var(--surf2);
+  border: 1px solid rgba(255,59,78,.25);
+  border-radius: var(--r-sm);
+  color: var(--red);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-block;
+  white-space: nowrap;
+  transition: background .15s, border-color .15s;
+  letter-spacing: .03em;
+}
+.file-btn:hover {
+  background: var(--red-dim);
+  border-color: var(--red);
+}
+
+/* ═══════════════════════════════
+   SELECT
+═══════════════════════════════ */
+select {
+  padding: 6px 9px;
+  background: var(--surf2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 10px;
+  cursor: pointer;
+  outline: none;
   transition: border-color .15s;
 }
-.dither-preview-card:hover  { border-color: var(--accent); }
-.dither-preview-card.active { border-color: var(--accent); color: var(--accent); }
+select:focus { border-color: var(--border2); }
 
-.profile-field {
-  display: flex; flex-direction: column; gap: 4px;
+/* ═══════════════════════════════
+   DITHER CARDS
+═══════════════════════════════ */
+.dither-preview-card {
+  background: var(--surf2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 6px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text2);
+  text-align: center;
+  transition: border-color .15s, color .15s;
+  letter-spacing: .03em;
 }
+.dither-preview-card:hover { border-color: var(--border2); color: var(--text); }
+.dither-preview-card.active {
+  border-color: rgba(0,229,176,.4);
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+/* ═══════════════════════════════
+   GALERIE
+═══════════════════════════════ */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+}
+
+.gcard {
+  background: var(--surf2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color .15s;
+}
+.gcard:hover { border-color: var(--border2); }
+
+.gmeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text2);
+}
+.gmeta strong {
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 600;
+}
+.gempty {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text2);
+  padding: 8px;
+  text-align: center;
+  letter-spacing: .04em;
+}
+
+/* ═══════════════════════════════
+   PROFIL
+═══════════════════════════════ */
+.profile-field { display: flex; flex-direction: column; gap: 4px; }
 .profile-field label {
-  font-family: var(--mono); font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: .06em;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: .1em;
 }
 .profile-field input[type=text] {
-  width: 100%; padding: 8px 10px; background: var(--surf2);
-  border: 1px solid var(--border); border-radius: 7px;
-  color: var(--text); font-family: var(--mono); font-size: 12px;
-  outline: none; transition: border-color .2s;
+  width: 100%;
+  padding: 9px 10px;
+  background: var(--surf2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  outline: none;
+  transition: border-color .2s;
 }
 .profile-field input[type=text]:focus { border-color: var(--accent); }
+
 .eth-field { display: none; }
 .eth-field.visible { display: flex; }
+
 .profile-badge {
-  font-family: var(--mono); font-size: 10px; color: var(--text2);
-  padding: 6px 10px; background: var(--surf2);
-  border: 1px solid var(--border); border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text2);
+  padding: 6px 10px;
+  background: var(--surf2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
   word-break: break-all;
+  letter-spacing: .02em;
 }
 .profile-badge span { color: var(--accent); }
 
-
+/* ═══════════════════════════════
+   POÉSIE
+═══════════════════════════════ */
 .poetry-preview-wrap {
-  position: relative; background: #000; border-radius: 6px;
-  overflow: hidden; width: 100%;
-  aspect-ratio: 128/64; image-rendering: pixelated;
+  position: relative;
+  background: #000;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  width: 100%;
+  aspect-ratio: 128/64;
+  border: 1px solid var(--border);
 }
 .poetry-preview-wrap canvas {
-  display: block; width: 100%; height: 100%; image-rendering: pixelated;
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
 }
+
 .poetry-char-counter {
-  font-family: var(--mono); font-size: 10px; color: var(--text2);
-  text-align: right; padding: 2px 0;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text2);
+  text-align: right;
+  padding: 2px 0;
+  letter-spacing: .03em;
 }
 .poetry-char-counter.warn  { color: var(--orange); }
 .poetry-char-counter.error { color: var(--red); }
-.poetry-scroll-opts { display: none; }
+
+.poetry-scroll-opts { display: none; flex: 1; }
 .poetry-scroll-opts.visible { display: flex; }
 
-  .preview-panel {
-    margin-top: 8px;
-  }
+/* ═══════════════════════════════
+   OVERLAYS / MODALS
+═══════════════════════════════ */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.75);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: none;
+  justify-content: center;
+  align-items: flex-end;
+  z-index: 200;
+  padding: 0;
+}
+.overlay.active { display: flex; }
 
-  .preview-toggle {
-    cursor: pointer;
-    user-select: none;
-    width: fit-content;
-    margin: 0 auto 8px;
-    padding: 6px 8px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--panel, rgba(255,255,255,0.03));
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--text);
-  }
+.mbox {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  padding: 24px 20px 32px;
+  width: 100%;
+  max-width: 580px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
 
-  .preview-grid {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    align-items: stretch;
-    gap: 12px;
-  }
+.mtitle {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+}
 
-  .preview-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 4px;
-    padding: 6px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--panel, rgba(255,255,255,0.02));
-    min-height: 100%;
-  }
+.mbox p {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text2);
+  line-height: 1.6;
+  letter-spacing: .02em;
+}
 
-  .preview-card-oled {
-    flex: 0 1 220px;
-  }
+.mbox input[type=text] {
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--surf2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 15px;
+  outline: none;
+  transition: border-color .2s;
+}
+.mbox input[type=text]:focus { border-color: var(--accent); }
 
-  .preview-card-eink {
-    flex: 0 1 180px;
-  }
+.btn-send-full {
+  width: 100%;
+  padding: 14px;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--r-md);
+  color: #000;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity .15s, transform .1s;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.btn-send-full:hover { opacity: .88; }
+.btn-send-full:active { transform: scale(.98); }
 
-  .preview-title {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--text2);
-  }
+.btn-cancel-full {
+  width: 100%;
+  padding: 11px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: var(--text2);
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+  letter-spacing: .03em;
+}
+.btn-cancel-full:hover { border-color: var(--red); color: var(--red); }
 
-  .preview-meta {
-    font-family: var(--mono);
-    font-size: 9px;
-    color: var(--text2);
-  }
+#cropPreview {
+  image-rendering: pixelated;
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+  background: #fff;
+  width: 100%;
+  height: auto;
+  display: block;
+}
 
-  .preview-frame {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 2px;
-  }
+/* ═══════════════════════════════
+   FULLSCREEN CONFIG
+═══════════════════════════════ */
+#fsConfig {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--r-md);
+  padding: 12px;
+  z-index: 10000;
+  gap: 6px;
+  max-width: 280px;
+  display: none;
+}
+#fsConfig select {
+  padding: 5px 8px;
+  font-size: 10px;
+}
 
-  .preview-frame-oled {
-    background: #000;
-    min-width: 196px;
-    min-height: 100px;
-  }
+#fsToolbar {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+  gap: 6px;
+  padding: 6px 10px;
+  background: rgba(8,8,9,.92);
+  border: 1px solid var(--border2);
+  border-radius: var(--r-md);
+  z-index: 9999;
+}
+body.fs-mode #fsToolbar { display: flex; }
 
-  .preview-frame-eink {
-    background: #e8e4d8;
-    min-width: 140px;
-    min-height: 140px;
-  }
+/* ═══════════════════════════════
+   SELECT ACTIONS
+═══════════════════════════════ */
+#selectActions { display: none; }
 
-  #oledPreview,
-  #einkPreview {
-    display: block;
-    image-rendering: pixelated;
-    position: static !important;
-    max-width: 100%;
-    height: auto;
-  }
+#selectToolInfo {
+  display: none;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text2);
+  padding: 5px 10px;
+  background: var(--blue-dim);
+  border: 1px solid rgba(61,142,255,.2);
+  border-radius: var(--r-sm);
+  line-height: 1.5;
+  letter-spacing: .02em;
+}
 
-  #oledPreview {
-    width: 192px;
-    height: 96px;
-  }
+/* ═══════════════════════════════
+   SEND MENU
+═══════════════════════════════ */
+.send-menu-wrap {
+  position: relative;
+  margin-left: auto;
+}
 
-  #einkPreview.eink-portrait {
-    width: 66px;
-    height: 132px;
-  }
+.send-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 180px;
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--r-md);
+  padding: 5px;
+  display: none;
+  z-index: 999;
+}
+.send-menu.open {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
 
-  #einkPreview.eink-landscape {
-    width: 132px;
-    height: 66px;
-  }
+.send-menu-item {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text2);
+  border-radius: var(--r-sm);
+  padding: 9px 12px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .12s, color .12s;
+  letter-spacing: .03em;
+}
+.send-menu-item:hover {
+  background: var(--surf3);
+  color: var(--text);
+}
+.send-menu-item:first-child { border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 2px; }
 
-  @media (max-width: 640px) {
-    .preview-grid {
-      gap: 8px;
-    }
-
-    .preview-card-oled {
-      flex-basis: 170px;
-    }
-
-    .preview-card-eink {
-      flex-basis: 150px;
-    }
-
-    .preview-frame-oled {
-      min-width: 148px;
-      min-height: 76px;
-    }
-
-    .preview-frame-eink {
-      min-width: 110px;
-      min-height: 110px;
-    }
-
-    #oledPreview {
-      width: 144px;
-      height: 72px;
-    }
-
-    #einkPreview.eink-portrait {
-      width: 52px;
-      height: 104px;
-    }
-
-    #einkPreview.eink-landscape {
-      width: 104px;
-      height: 52px;
-    }
-  }
 
 </style>
 </head>
 <body>
 
+<!-- ═══ HEADER ═══ -->
 <header>
-  <h1>◼ OLED Paint</h1>
-<!-- PAR : -->
-<div id="userBadge" style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
-  <span style="font-family:var(--mono);font-size:10px;color:var(--text2)">
-    Artiste: <strong id="artistDisplay" style="color:var(--accent)">—</strong>
-  </span>
-  <span style="font-family:var(--mono);font-size:10px;color:var(--text2)">
-    Œuvre: <strong id="userDisplay" style="color:var(--orange)">—</strong>
-  </span>
-</div>
+  <div class="app-header">
+    <img src="/logo.png?v=10" alt="Rescoled" class="app-logo">
+    <div>
+      <h1>Rescoled</h1>
+      <h4>J'irai dessiner chez vous !</h4>
+    </div>
+  </div>
+  <div id="userBadge">
+    <span>Artiste&nbsp;: <strong id="artistDisplay">—</strong></span>
+    <span>Œuvre&nbsp;: <strong id="userDisplay">—</strong></span>
+  </div>
 </header>
 
+<!-- ═══ STATUS ═══ -->
 <div id="status">Prêt</div>
 
-<div id="canvasWrap">
-  <canvas id="canvas"      width="128" height="64"></canvas>
-  <canvas id="layerCanvas" width="128" height="64"></canvas>
+<!-- ═══ CANVAS + ACTIONS ═══ -->
+<div id="drawArea">
+
+  <!-- Fullscreen config (overlay fixé, géré en JS) -->
+  <div id="fsConfig" class="row">
+    <div style="font-family:var(--mono);font-size:10px;color:var(--text2);">Fullscreen tools :</div>
+    <select id="fsTool1" onchange="saveFsConfig()">
+      <option value="brush">🖌 Pinceau</option>
+      <option value="eraser">🧽 Gomme</option>
+      <option value="line">📏 Ligne</option>
+      <option value="rect">⬜ Rect</option>
+    </select>
+    <select id="fsTool2" onchange="saveFsConfig()">
+      <option value="circle">○ Cercle</option>
+      <option value="fill">🪣 Remplir</option>
+      <option value="addFrame">＋ Frame</option>
+      <option value="sendFrame">↑ Send</option>
+    </select>
+    <select id="fsTool3" onchange="saveFsConfig()">
+      <option value="undo">↶ Undo</option>
+      <option value="clearCanvas">🗑 Clear</option>
+    </select>
+    <button class="btn" onclick="showFsConfig(false)">✓</button>
+  </div>
+
+  <!-- Canvas -->
+  <div id="canvasWrap">
+    <canvas id="canvas" width="128" height="64"></canvas>
+    <canvas id="layerCanvas" width="128" height="64"></canvas>
+  </div>
+
+  <!-- Actions rapides sous le canvas + ENVOYER bien visible -->
+<!-- Actions rapides sous le canvas + ENVOYER bien visible -->
+<div class="canvas-actions">
+  <button class="btn" onclick="undo()" title="Annuler">↶</button>
+  <button class="btn" onclick="redo()" title="Rétablir">↷</button>
+  <button class="btn danger" onclick="clearCanvas()" title="Effacer">🗑</button>
+  <button class="btn" onclick="toggleFullscreenCanvas()" title="Plein écran">⛶</button>
+  <button class="btn" onclick="togglePlay()" id="playBtn" title="Lecture">▶</button>
+
+  <div class="send-menu-wrap">
+    <button class="btn-send-main" type="button" id="sendMenuBtn">
+      ↑ Envoyer ▾
+    </button>
+
+    <div class="send-menu" id="sendMenu">
+      <button class="send-menu-item" type="button" onclick="sendFrameFromMenu()">
+        ↑ Envoyer l'image
+      </button>
+      <button class="send-menu-item" type="button" onclick="sendAnimFromMenu()">
+        ↑ Envoyer l'animation
+      </button>
+    </div>
+  </div>
+</div>
 </div>
 
-<!-- Ajouter juste après la fermeture de #canvasWrap : -->
-<!-- Preview OLED -->
-
-
-  <details id="previewPanel" open class="preview-panel">
-  <summary class="preview-toggle">Panel aperçu — afficher / masquer</summary>
-
+<!-- ═══ APERÇU ÉCRANS ═══ -->
+<details id="previewPanel" class="preview-panel">
+  <summary class="preview-toggle">👁 Aperçu écrans</summary>
   <div class="preview-grid">
-    <!-- OLED -->
-    <div class="preview-card preview-card-oled">
-      <div class="preview-title">Rendu OLED</div>
 
+    <!-- OLED -->
+    <div class="preview-card">
+      <div class="preview-title">OLED 0.96"</div>
       <div class="preview-frame preview-frame-oled">
         <canvas id="oledPreview" width="128" height="64"></canvas>
       </div>
-
-      <div class="row preview-actions" style="gap:4px;">
-        <button
-          class="btn"
-          id="oledColorBtn"
-          style="font-size:9px;padding:4px 7px;"
-          onclick="toggleOledPreviewColor()"
-        >
-          🔵 Bleu
-        </button>
-      </div>
+      <button class="btn" id="oledColorBtn" style="font-size:9px;padding:4px 7px;" onclick="toggleOledPreviewColor()">🔵 Mode</button>
     </div>
 
     <!-- E-INK -->
-    <div class="preview-card preview-card-eink">
-      <div class="preview-title">Rendu E-INK</div>
-
+    <div class="preview-card">
+      <div class="preview-title">E-INK 2.7"</div>
       <div class="preview-frame preview-frame-eink">
-        <canvas
-          id="einkPreview"
-          width="176"
-          height="264"
-          class="eink-portrait"
-          title="Aperçu e-ink"
-        ></canvas>
+        <canvas id="einkPreview" width="176" height="264" title="Aperçu e-ink"></canvas>
       </div>
-
       <div class="preview-meta" id="einkOrientLabel">Portrait</div>
     </div>
+
   </div>
 </details>
 
-</div>
-
-<!-- Sélecteur d'orientation (juste sous les previews) -->
-<div style="display:flex;gap:8px;width:100%;max-width:560px;align-items:center;font-family:var(--mono);font-size:11px;color:var(--text2);">
-  <span>Orientation :</span>
-  <button class="btn active" id="orientPortraitBtn" onclick="setOrientation('portrait')">⬜ Portrait</button>
+<!-- ═══ ORIENTATION ═══ -->
+<div class="orient-row">
+  <button class="btn active" id="orientPortraitBtn"  onclick="setOrientation('portrait')">⬜ Portrait</button>
   <button class="btn"        id="orientLandscapeBtn" onclick="setOrientation('landscape')">⬛ Paysage</button>
-  <span id="orientSensorBadge" style="margin-left:8px;font-size:10px;color:var(--accent);display:none">📡 capteur</span>
-
+  <span id="orientSensorBadge">📡</span>
   <button class="btn" id="sensorOrientBtn"
     onclick="sensorOrientationActive ? stopSensorOrientation() : startSensorOrientation()"
-    style="margin-left:auto;font-size:10px;">
-    📡 Capteur
-  </button>
-
-
+    style="margin-left:auto;font-size:10px;">📡</button>
 </div>
 
-
-
-
+<!-- ═══ TABS ═══ -->
 <div class="tabs">
   <button class="tab-btn active" onclick="showTab('frames',this)">🎞 Frames</button>
-  <button class="tab-btn"        onclick="showTab('draw',this)"  >🖌 Dessin</button>
-  <button class="tab-btn"        onclick="showTab('media',this)" >📸 Média</button>
-  <button class="tab-btn" onclick="showTab('gallery',this); loadGallery();">🖼️ Galerie</button>
-  <button class="tab-btn" onclick="showTab('poetry',this)">✍ Poésie</button>
-  <button class="tab-btn" onclick="showTab('profile',this)">👤 Profil</button>
+  <button class="tab-btn"        onclick="showTab('draw',this)">🖌 Dessin</button>
+  <button class="tab-btn"        onclick="showTab('media',this)">📸 Média</button>
+  <button class="tab-btn"        onclick="showTab('gallery',this); loadGallery();">🖼 Galerie</button>
+  <button class="tab-btn"        onclick="showTab('poetry',this)">✍ Poésie</button>
+  <button class="tab-btn"        onclick="showTab('profile',this)">👤 Profil</button>
 </div>
 
-<!-- FRAMES -->
-
+<!-- ═══ PANEL : FRAMES ═══ -->
 <div class="panel active" id="panel-frames">
-  <div class="panel-title">Timeline & Animation</div>
-<div class="row">
-    <button class="btn" onclick="prevFrame()">⏮ Prev</button>
-    <button class="btn" onclick="nextFrame()">⏭ Next</button>
-    <button class="btn" onclick="addFrame()">＋ Ajouter</button>
-    <button class="btn" onclick="dupFrame()">⎘ Dupliquer</button>
-    <button class="btn danger" onclick="delFrame()">✕ Suppr</button>
-  </div>
-  <!-- Gestion multi-frames -->
-  <div class="row" style="margin-top:4px;">
-    <button class="btn" id="frameSelBtn" onclick="toggleFrameSelectionMode()">⬚ Multi-select</button>
-    <button class="btn" onclick="cutSelectedFrames()">✂ Couper</button>
-    <button class="btn" onclick="copySelectedFrames()">⎘ Copier</button>
-    <button class="btn" onclick="pasteFrames()">⬇ Coller</button>
-    <button class="btn" onclick="moveSelectedFramesLeft()">← Reculer</button>
-    <button class="btn" onclick="moveSelectedFramesRight()">→ Avancer</button>
-    <button class="btn danger" onclick="deleteSelectedFrames()">✕ Suppr sél.</button>
-  </div>
+  <div class="panel-title">Timeline &amp; Animation</div>
 
-  <div id="frameMultiInfo" style="display:none;font-family:var(--mono);font-size:10px;color:var(--orange);padding:4px 8px;background:var(--surf2);border:1px solid var(--border);border-radius:6px;"></div>
-  <div class="row">
-    <button class="btn"      onclick="togglePlay()" id="playBtn">▶ Lire</button>
-    <button class="btn send" onclick="sendFrame()">↑ Frame→OLED</button>
-    <button class="btn send" onclick="toggleOledAnim()" id="animBtn">📺 Anim→OLED</button>
-  </div>
-   <div class="row">
-   <select onchange="setStillDisplayTarget(this.value)">
-     <option value="2" selected>OLED + E-INK</option>
-     <option value="0">OLED seul</option>
-     <option value="1">E-INK seul</option>
-   </select>
- </div>
+  <p class="hint">Naviguez entre les frames, lancez l'animation, puis envoyez.</p>
 
-
-<!-- REMPLACER le bloc délai dans panel-frames : -->
-<div class="row">
-  <div class="sr">
-    <label>Délai:</label>
-    <input type="range" min="50" max="2000" step="10" value="200"
-      id="delaySlider" oninput="setDelay(this.value)">
-    <span class="sv" id="delayVal">200ms</span>
-  </div>
-  <label class="tog" style="margin-left:8px;">
-    <input type="checkbox" id="delayAllFrames">
-    <span class="tok"></span>
-    <span style="font-size:10px;">Toutes les frames</span>
-  </label>
-  <div id="frameInfo">Frame 1/1</div>
-</div>
-
+  <div id="framesStrip"></div>
 
   <div class="row">
+    <button class="btn" onclick="prevFrame()">⏮</button>
+    <button class="btn" onclick="togglePlay()" id="playBtn">▶</button>
+    <button class="btn" onclick="nextFrame()">⏭</button>
+    <button class="btn" onclick="addFrame()">＋</button>
+    <button class="btn" onclick="dupFrame()">⎘</button>
+    <button class="btn danger" onclick="delFrame()">✕</button>
+    <button class="btn" onclick="toggleInvert()">◐</button>
+    <div id="frameInfo">Frame 1/1</div>
+  </div>
+
+  <div class="row row-soft">
+    <div class="sr">
+      <label>Délai</label>
+      <input type="range" min="50" max="2000" step="10" value="200" id="delaySlider" oninput="setDelay(this.value)">
+      <span class="sv" id="delayVal">200ms</span>
+    </div>
+    <label class="tog compact">
+      <input type="checkbox" id="delayAllFrames">
+      <span class="tok"></span>Toutes
+    </label>
+  </div>
+
+  <div class="row row-soft">
     <label class="tog">
       <input type="checkbox" id="onionCheck" onchange="toggleOnion()">
-      <span class="tok"></span>
-      Onion Skin (2 frames)
+      <span class="tok"></span>Onion skin
     </label>
-    <div class="sr">
-      <label>Opacité:</label>
+    <div class="sr" style="flex:1">
+      <label>Opacité</label>
       <input type="range" min="10" max="80" value="35" id="onionSlider" oninput="setOnionOpacity(this.value)">
       <span class="sv" id="onionVal">35%</span>
     </div>
   </div>
 
+  <!-- Envoyer animation -->
   <div class="row">
-  <button class="btn" onclick="saveCurrentPng()">Sauver PNG</button>
-  <button class="btn" onclick="saveAnimationGif()">Sauver GIF</button>
+    <button class="btn send" style="flex:1" onclick="toggleOledAnim()" id="animBtn">📺 Envoyer animation (OLED)</button>
+    <select onchange="setStillDisplayTarget(this.value)">
+      <option value="2" selected>OLED + E-INK</option>
+      <option value="0">OLED</option>
+      <option value="1">E-INK</option>
+    </select>
+  </div>
+
+  <!-- Multi-sélection -->
+  <details class="tool-group">
+    <summary class="tool-summary">Multi-sélection</summary>
+    <div class="tool-group-row">
+      <button class="btn" id="frameSelBtn" onclick="toggleFrameSelectionMode()">⬚ Multi-select</button>
+      <button class="btn" onclick="cutSelectedFrames()">✂ Couper</button>
+      <button class="btn" onclick="copySelectedFrames()">⎘ Copier</button>
+      <button class="btn" onclick="pasteFrames()">⬇ Coller</button>
+      <button class="btn" onclick="moveSelectedFramesLeft()">← Reculer</button>
+      <button class="btn" onclick="moveSelectedFramesRight()">Avancer →</button>
+      <button class="btn danger" onclick="deleteSelectedFrames()">✕ Suppr</button>
+    </div>
+  </details>
+  <div id="frameMultiInfo"></div>
+
+  <!-- Export -->
+  <details class="tool-group">
+    <summary class="tool-summary">Export</summary>
+    <div class="tool-group-row">
+      <button class="btn" onclick="saveCurrentPng()">📄 PNG</button>
+      <button class="btn" onclick="saveAnimationGif()">🎞 GIF</button>
+    </div>
+  </details>
 </div>
 
-
-  <div id="framesStrip"></div>
-
-</div>
-
-<!-- DRAW -->
+<!-- ═══ PANEL : DESSIN ═══ -->
 <div class="panel" id="panel-draw">
   <div class="panel-title">Outils de Dessin</div>
+
+  <!-- Outils -->
   <div class="row">
-    <button class="btn active" id="btn_brush"  onclick="setTool('brush')" >🖌 Pinceau</button>
-    <button class="btn"        id="btn_eraser" onclick="setTool('eraser')">⬜ Gomme</button>
-    <button class="btn"        id="btn_line"   onclick="setTool('line')"  >╱ Ligne</button>
-    <button class="btn"        id="btn_rect"   onclick="setTool('rect')"  >▭ Rect</button>
-    <button class="btn"        id="btn_circle" onclick="setTool('circle')">◯ Cercle</button>
-    <button class="btn"        id="btn_poly"   onclick="setTool('poly')"  >△ Poly</button>
-
-    <button class="btn"        id="btn_select" onclick="setTool('select')">⬚ Sélect.</button>
-    <button class="btn"        id="btn_wand"   onclick="setTool('wand')"  >🪄 Baguette</button>
-    <button class="btn"        id="btn_fill"   onclick="setTool('fill')"  >🪣 Remplir</button>
-    <button class="btn"        id="btn_move"   onclick="setTool('move')"  >✥ Déplacer</button>
-    <button class="btn"        id="btn_stamp"  onclick="setTool('stamp')" >🖼 Tampon</button>
-
-  </div>
-  <!-- Info contextuelle outils select/move -->
-  <div id="selectToolInfo" style="display:none;font-family:var(--mono);font-size:10px;color:var(--text2);padding:4px 8px;background:var(--surf2);border:1px solid var(--border);border-radius:6px;line-height:1.5;"></div>
-  <!-- Actions sur la sélection -->
-
-  <div id="selectActions" class="row" style="display:none;">
-    <button class="btn" onclick="cutSelection()">✂ Couper</button>
-    <button class="btn" onclick="confirmMoveSelection()">✓ Valider déplacement</button>
-    <button class="btn" onclick="setTool('stamp')" title="Transformer en tampon réutilisable">🖼 → Tampon</button>
-    <button class="btn danger" onclick="clearSelectionArea()">✕ Effacer</button>
-    <button class="btn" onclick="cancelSelection()">✗ Annuler</button>
+    <button class="btn active" id="btnbrush"  onclick="setTool('brush')">🖌 Pinceau</button>
+    <button class="btn"        id="btneraser" onclick="setTool('eraser')">🧽 Gomme</button>
+    <button class="btn"        id="btnline"   onclick="setTool('line')">📏 Ligne</button>
+    <button class="btn"        id="btnrect"   onclick="setTool('rect')">⬜ Rect</button>
+    <button class="btn"        id="btncircle" onclick="setTool('circle')">○ Cercle</button>
+    <button class="btn"        id="btnpoly"   onclick="setTool('poly')">△ Poly</button>
+    <button class="btn"        id="btnfill"   onclick="setTool('fill')">🪣 Remplir</button>
   </div>
 
-  <div class="row">
-    <div class="sr">
-      <label>Taille:</label>
-      <input type="range" min="1" max="8" value="1" id="sizeSlider" oninput="setSize(this.value)">
-      <span class="sv" id="sizeVal">1px</span>
+  <!-- Couleur + forme pleine -->
+  <div class="row row-soft">
+    <label class="tog compact">
+      <input type="checkbox" id="fillCheck" onchange="setFill(this.checked)">
+      <span class="tok"></span>Forme pleine
+    </label>
+    <button class="btn color-swatch" onclick="toggleColor()" id="colorBtn">NOIR</button>
+  </div>
+
+  <!-- Réglages taille / snap -->
+  <details class="tool-group" open>
+    <summary class="tool-summary">Réglages</summary>
+    <div class="tool-group-row">
+      <div class="sr" style="flex:1">
+        <label>Taille</label>
+        <input type="range" min="1" max="8" value="1" id="sizeSlider" oninput="setSize(this.value)">
+        <span class="sv" id="sizeVal">1px</span>
+      </div>
+      <div class="sr" style="flex:1">
+        <label>Snap</label>
+        <input type="range" min="1" max="16" value="1" id="snapSlider" oninput="setSnap(this.value)">
+        <span class="sv" id="snapVal">1px</span>
+      </div>
     </div>
-    <div class="sr">
-      <label>Snap:</label>
-      <input type="range" min="1" max="16" value="1" id="snapSlider" oninput="setSnap(this.value)">
-      <span class="sv" id="snapVal">1px</span>
+  </details>
+
+  <!-- Grille / Symétrie -->
+  <div class="row row-soft">
+    <label class="tog">
+      <input type="checkbox" id="gridCheck" onchange="setGrid(this.checked)">
+      <span class="tok"></span>Grille
+    </label>
+    <label class="tog">
+      <input type="checkbox" id="symCheck" onchange="setSym(this.checked)">
+      <span class="tok"></span>Symétrie
+    </label>
+  </div>
+
+  <!-- Sélection -->
+  <details class="tool-group">
+    <summary class="tool-summary">Sélection</summary>
+    <div class="tool-group-row">
+      <button class="btn" id="btnselect" onclick="setTool('select')">Sélect.</button>
+      <button class="btn" id="btnwand"   onclick="setTool('wand')">🪄 Baguette</button>
     </div>
+  </details>
+  <div id="selectActions" class="row">
+    <button class="btn" onclick="cutSelection()">Déplacer</button>
+    <button class="btn" onclick="confirmMoveSelection()">Fin déplacement</button>
+    <button class="btn" onclick="setStampFromSelection()">Tampon</button>
+    <button class="btn danger" onclick="clearSelectionArea()">Effacer</button>
   </div>
-  <div class="row">
-    <label class="tog"><input type="checkbox" id="fillCheck" onchange="setFill(this.checked)"><span class="tok"></span>Remplir</label>
-    <label class="tog"><input type="checkbox" id="gridCheck" onchange="setGrid(this.checked)"><span class="tok"></span>Grille</label>
-    <label class="tog"><input type="checkbox" id="symCheck"  onchange="setSym(this.checked)"> <span class="tok"></span>Symétrie</label>
-  </div>
-  <div class="row">
-    <button class="btn" onclick="toggleColor()" id="colorBtn">● NOIR</button>
-    <button class="btn" onclick="undo()">↶ Undo</button>
-    <button class="btn" onclick="redo()">↷ Redo</button>
-    <button class="btn" onclick="flipH()">↔ Flip H</button>
-    <button class="btn" onclick="flipV()">↕ Flip V</button>
-    <button class="btn danger" onclick="clearCanvas()">✕ Vider</button>
-    <button class="btn" onclick="toggleInvert()">⬛ Invert</button>
-  </div>
+  <div id="selectToolInfo"></div>
+
+  <!-- Transformations -->
+  <details class="tool-group">
+    <summary class="tool-summary">Transformations</summary>
+    <div class="tool-group-row">
+      <button class="btn" onclick="flipH()">↔ Flip H</button>
+      <button class="btn" onclick="flipV()">↕ Flip V</button>
+    </div>
+  </details>
+
+  <!-- Export code -->
+  <details class="tool-group">
+    <summary class="tool-summary">Export code</summary>
+    <div class="tool-group-row">
+      <button class="btn" onclick="exportTxt()">📄 TXT Art</button>
+      <button class="btn" onclick="exportArduino()">⚡ Arduino</button>
+      <button class="btn" onclick="exportBuffer()">📦 Buffer</button>
+      <button class="btn" onclick="copyExport()">⎘ Copier</button>
+    </div>
+    <textarea id="exportArea" readonly placeholder="Code exporté ici..." style="border-radius:0 0 7px 7px;border-top:none;"></textarea>
+  </details>
 </div>
 
-<!-- MEDIA -->
+<!-- ═══ PANEL : MÉDIA ═══ -->
 <div class="panel" id="panel-media">
   <div class="panel-title">Import Média</div>
+
   <div class="row">
     <input type="file" id="fileInput" accept="image/*,.gif" style="display:none" onchange="loadFile(event)">
     <label for="fileInput" class="file-btn">🖼 Ouvrir image / GIF</label>
   </div>
-  <div class="row">
-    <div class="sr">
-      <label>Seuil:</label>
-      <input type="range" min="0" max="255" value="128" id="threshSlider" oninput="setThreshold(this.value)">
-      <span class="sv" id="threshVal">128</span>
-    </div>
+
+  <div class="sr">
+    <label>Seuil</label>
+    <input type="range" min="0" max="255" value="128" id="threshSlider" oninput="setThreshold(this.value)">
+    <span class="sv" id="threshVal">128</span>
   </div>
-  <!-- Boutons de mode dithering avec preview intégrée -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;">
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
     <div id="dp_floyd"    class="dither-preview-card active" onclick="setDither('floyd')"    data-mode="floyd">
       <canvas id="preview_floyd"    width="128" height="64" style="width:100%;height:auto;image-rendering:pixelated;background:#fff;border-radius:4px;"></canvas>
       <span>Floyd-Steinberg</span>
@@ -771,87 +1634,59 @@ const char PROGMEM html_page[] = R"rawliteral(
       <canvas id="preview_none"     width="128" height="64" style="width:100%;height:auto;image-rendering:pixelated;background:#fff;border-radius:4px;"></canvas>
       <span>Seuil simple</span>
     </div>
+    <div id="dp_bayer8"   class="dither-preview-card" onclick="setDither('bayer8')"   data-mode="bayer8">
+      <canvas id="preview_bayer8"   width="128" height="64" style="width:100%;height:auto;image-rendering:pixelated;background:#fff;border-radius:4px;"></canvas>
+      <span>Bayer 8×8</span>
+    </div>
+    <div id="dp_stucki"   class="dither-preview-card" onclick="setDither('stucki')"   data-mode="stucki">
+      <canvas id="preview_stucki"   width="128" height="64" style="width:100%;height:auto;image-rendering:pixelated;background:#fff;border-radius:4px;"></canvas>
+      <span>Stucki</span>
+    </div>
+    <div id="dp_halftone" class="dither-preview-card" onclick="setDither('halftone')" data-mode="halftone">
+      <canvas id="preview_halftone" width="128" height="64" style="width:100%;height:auto;image-rendering:pixelated;background:#fff;border-radius:4px;"></canvas>
+      <span>Halftone</span>
+    </div>
+    <div id="dp_gray4"    class="dither-preview-card" onclick="setDither('gray4')"    data-mode="gray4">
+      <canvas id="preview_gray4"    width="128" height="64" style="width:100%;height:auto;image-rendering:pixelated;background:#fff;border-radius:4px;"></canvas>
+      <span>Gris 4 niveaux (E-INK)</span>
+    </div>
   </div>
-  <!-- Preview text art de l'image -->
-  <div id="txtArtPreview" style="display:none;margin-top:6px;">
+
+  <div id="txtArtPreview" style="display:none;">
     <div class="panel-title" style="margin-bottom:4px;">Aperçu Text Art</div>
     <pre id="txtArtPreviewContent" style="font-size:4px;line-height:1;background:var(--surf2);padding:6px;border-radius:6px;overflow:hidden;white-space:pre;"></pre>
   </div>
-  <div class="row" style="margin-top:6px;">
-    <button class="btn" onclick="applySelectedDither()">✓ Appliquer ce mode</button>
+
+  <div class="row">
+    <button class="btn" onclick="applySelectedDither()">✓ Appliquer</button>
     <button class="btn" onclick="toggleTxtArtPreview()">📄 Aperçu Text Art</button>
   </div>
+
   <textarea id="txtArt" placeholder="Coller du TXT Art ici (█ # @)..."></textarea>
-
-<div class="row">
-  <button class="btn" onclick="importTxtArt()">← Importer TXT</button>
-  <button class="btn send" id="sendTxtArtBtn" style="display:none" onclick="sendTxtArtToOled()">↑ Envoyer à l'OLED</button>
-</div>
-
-</div>
-
-
-<!-- EXPORT -->
-<div class="panel" id="panel-export">
-  <div class="panel-title">Export</div>
   <div class="row">
-    <button class="btn" onclick="exportTxt()">📄 TXT Art</button>
-    <button class="btn" onclick="exportArduino()">⚡ Arduino</button>
-    <button class="btn" onclick="exportBuffer()">📦 Buffer</button>
-    <button class="btn" onclick="copyExport()">⎘ Copier</button>
+    <button class="btn" onclick="importTxtArt()">← Importer TXT</button>
+    <button class="btn send" id="sendTxtArtBtn" style="display:none" onclick="sendTxtArtToOled()">↑ Envoyer à l'OLED</button>
   </div>
-  <textarea id="exportArea" readonly placeholder="Code exporté ici..."></textarea>
 </div>
 
-<!-- PROFIL, (export suppr) -->
-<div class="panel" id="panel-profile">
-  <div class="panel-title">Profil Artiste</div>
-
-  <div class="profile-field">
-    <label>Nom artiste</label>
-    <input type="text" id="profileArtistName" maxlength="20" placeholder="Ton nom d'artiste...">
-  </div>
-
-  <div class="row">
-    <label class="tog">
-      <input type="checkbox" id="profileForSale" onchange="toggleEthField()">
-      <span class="tok"></span>
-      Mettre mes œuvres en vente
-    </label>
-  </div>
-
-  <div class="profile-field eth-field" id="ethFieldWrap">
-    <label>Adresse ETH (Base)</label>
-    <input type="text" id="profileEthAddress" maxlength="42" placeholder="0x...">
-  </div>
-
-  <div class="row">
-    <button class="btn send" onclick="saveProfile()">💾 Sauvegarder le profil</button>
-    <button class="btn danger" onclick="resetProfile()">✕ Réinitialiser</button>
-  </div>
-
-  <div id="profileStatus" class="profile-badge" style="display:none"></div>
-</div>
-
+<!-- ═══ PANEL : GALERIE ═══ -->
 <div class="panel" id="panel-gallery">
   <div class="panel-title">Galerie</div>
-  <div class="row" style="margin-bottom:6px;">
-    <button class="btn active" id="galleryTabArtwork"
-      onclick="switchGalleryTab('artwork',this)">🖼 Œuvres</button>
-    <button class="btn" id="galleryTabPoetry"
-      onclick="switchGalleryTab('poetry',this)">✍ Poésies</button>
+  <div class="row">
+    <button class="btn active" id="galleryTabArtwork" onclick="switchGalleryTab('artwork',this)">🖼 Œuvres</button>
+    <button class="btn"        id="galleryTabPoetry"  onclick="switchGalleryTab('poetry',this)">✍ Poésies</button>
   </div>
   <div id="galleryGrid"       class="gallery-grid"></div>
   <div id="galleryGridPoetry" class="gallery-grid" style="display:none"></div>
 </div>
 
+<!-- ═══ PANEL : POÉSIE ═══ -->
 <div class="panel" id="panel-poetry">
   <div class="panel-title">Poésie / Texte libre</div>
 
-  <!-- Taille de texte -->
   <div class="row">
     <div class="sr">
-      <label>Taille:</label>
+      <label>Taille</label>
       <select id="poetrySize" onchange="poetryUpdate()">
         <option value="1">1× — 21 car/ligne</option>
         <option value="2" selected>2× — 10 car/ligne</option>
@@ -861,82 +1696,92 @@ const char PROGMEM html_page[] = R"rawliteral(
     <div id="poetryCharCounter" class="poetry-char-counter">0 / 48 car.</div>
   </div>
 
-  <!-- Zone de saisie -->
-  <textarea id="poetryInput" placeholder="Écris ta poésie ici…"
-     style="height:80px;resize:vertical;"></textarea>
+  <textarea id="poetryInput" placeholder="Écris ta poésie ici…" style="height:80px;resize:vertical;"></textarea>
 
-  <!-- Scroll -->
   <div class="row">
     <label class="tog">
       <input type="checkbox" id="poetryScrollCheck" onchange="poetryToggleScroll()">
-      <span class="tok"></span>
-      Mode scroll
+      <span class="tok"></span>Mode scroll
     </label>
     <div class="sr poetry-scroll-opts" id="poetryScrollOpts">
-      <label>Vitesse:</label>
-      <input type="range" min="20" max="300" step="10" value="80"
-        id="poetryScrollSpeed" oninput="poetryScrollSpeedUpdate(this.value)">
+      <label>Vitesse</label>
+      <input type="range" min="20" max="300" step="10" value="80" id="poetryScrollSpeed" oninput="poetryScrollSpeedUpdate(this.value)">
       <span class="sv" id="poetryScrollSpeedVal">80ms</span>
     </div>
   </div>
 
-  <!-- Preview OLED (fond noir, pixels bleus) -->
   <div class="poetry-preview-wrap">
     <canvas id="poetryCanvas" width="128" height="64"></canvas>
   </div>
 
-  <!-- Avertissement dépassement -->
   <div id="poetryWarning" style="display:none;font-family:var(--mono);font-size:10px;color:var(--orange);padding:4px 0;"></div>
 
-  <!-- Actions -->
   <div class="row">
-    <button class="btn send" onclick="poetrySendToOled()">↑ Envoyer à l'OLED</button>
-    <button class="btn"      onclick="poetrySaveToGallery()">💾 Sauver en galerie</button>
+    <button class="btn send" style="flex:1" onclick="poetrySendToOled()">↑ Envoyer à l'OLED</button>
+    <button class="btn" onclick="poetrySaveToGallery()">💾 Sauver</button>
   </div>
 </div>
 
-<!-- MODAL: USERNAME — popup à chaque envoi vers OLED -->
-<!-- REMPLACER le modal userModal entièrement : -->
+<!-- ═══ PANEL : PROFIL ═══ -->
+<div class="panel" id="panel-profile">
+  <div class="panel-title">Profil Artiste</div>
+
+  <div class="profile-field">
+    <label>Nom artiste</label>
+    <input type="text" id="profileArtistName" maxlength="20" placeholder="Ton nom d'artiste...">
+  </div>
+
+  <label class="tog">
+    <input type="checkbox" id="profileForSale" onchange="toggleEthField()">
+    <span class="tok"></span>Mettre mes œuvres en vente
+  </label>
+
+  <div class="profile-field eth-field" id="ethFieldWrap">
+    <label>Adresse ETH (Base)</label>
+    <input type="text" id="profileEthAddress" maxlength="42" placeholder="0x...">
+  </div>
+
+  <div class="row">
+    <button class="btn send" style="flex:1" onclick="saveProfile()">💾 Sauvegarder</button>
+    <button class="btn danger" onclick="resetProfile()">✕ Réinitialiser</button>
+  </div>
+
+  <div id="profileStatus" class="profile-badge" style="display:none"></div>
+</div>
+
+<!-- ═══ MODAL : ENVOYER ═══ -->
 <div class="overlay" id="userModal">
   <div class="mbox">
-    <div class="mtitle">✏️ Envoyer à l'OLED</div>
-    <div id="modalArtistBadge" style="font-family:var(--mono);font-size:10px;color:var(--text2);padding:4px 0;display:none">
+    <div class="mtitle">↑ Envoyer à l'écran</div>
+    <div id="modalArtistBadge" style="font-family:var(--mono);font-size:10px;color:var(--text2);display:none">
       Artiste : <span id="modalArtistDisplay" style="color:var(--accent)"></span>
     </div>
-    <p>Nom de cette œuvre :</p>
-    <input type="text" id="usernameInput" placeholder="Nom de l'œuvre (max 20 car.)..." maxlength="20">
-    <div class="row" id="forSaleRow" style="display:none">
+    <p>Donne un titre à ce dessin :</p>
+    <input type="text" id="usernameInput" placeholder="Ex : Coucher de soleil… (max 20 car.)" maxlength="20">
+    <div id="forSaleRow" style="display:none">
       <label class="tog">
         <input type="checkbox" id="modalForSale">
-        <span class="tok"></span>
-        Mettre en vente
+        <span class="tok"></span>Mettre en vente
       </label>
     </div>
-    <div class="row">
-      <button class="btn send"   onclick="confirmSend()" style="flex:1">↑ Envoyer</button>
-      <button class="btn danger" onclick="cancelSend()"  style="flex:1">✕ Annuler</button>
-    </div>
+    <button class="btn-send-full" onclick="confirmSend()">↑ Envoyer maintenant</button>
+    <button class="btn-cancel-full" onclick="cancelSend()">Annuler</button>
   </div>
 </div>
 
+<!-- ═══ MODAL : PREMIER LANCEMENT ═══ -->
 <div class="overlay" id="firstRunModal">
   <div class="mbox">
     <div class="mtitle">👋 Bienvenue !</div>
-    <p>Avant de commencer, configure ton profil artiste. Tu pourras le modifier plus tard dans l'onglet Profil.</p>
-
+    <p>Dessine sur ton téléphone et ton dessin apparaît sur les écrans en direct. Commence par te présenter :</p>
     <div class="profile-field">
       <label>Ton nom d'artiste</label>
       <input type="text" id="firstRunName" maxlength="20" placeholder="Ex: Jean-Michel...">
     </div>
-
-    <div class="row">
-      <label class="tog">
-        <input type="checkbox" id="firstRunForSale" onchange="toggleFirstRunEth()">
-        <span class="tok"></span>
-        Je veux mettre mes œuvres en vente
-      </label>
-    </div>
-
+    <label class="tog">
+      <input type="checkbox" id="firstRunForSale" onchange="toggleFirstRunEth()">
+      <span class="tok"></span>Je veux mettre mes œuvres en vente
+    </label>
     <div class="profile-field eth-field" id="firstRunEthWrap">
       <label>Adresse ETH (Base)</label>
       <input type="text" id="firstRunEth" maxlength="42" placeholder="0x...">
@@ -945,28 +1790,54 @@ const char PROGMEM html_page[] = R"rawliteral(
     <div class="row">
       <button class="btn send" onclick="confirmFirstRun()" style="flex:1">Commencer</button>
     </div>
+
   </div>
 </div>
 
-<!-- MODAL: CROP — contain / cover / stretch sans sliders -->
+<!-- ═══ MODAL : CROP ═══ -->
 <div class="overlay" id="cropModal">
   <div class="mbox">
     <div class="mtitle">📐 Recadrage</div>
     <canvas id="cropPreview" width="128" height="64"></canvas>
     <div class="row">
       <button class="btn active" id="cropContain" onclick="setCropFit('contain')">Contain</button>
-      <button class="btn"        id="cropCover"   onclick="setCropFit('cover')"  >Cover</button>
+      <button class="btn"        id="cropCover"   onclick="setCropFit('cover')">Cover</button>
       <button class="btn"        id="cropStretch" onclick="setCropFit('stretch')">Étirer</button>
     </div>
-    <div class="row">
-      <button class="btn send"   onclick="applyCrop()"  style="flex:1">✓ Appliquer</button>
-      <button class="btn danger" onclick="cancelCrop()" style="flex:1">✕ Annuler</button>
-    </div>
+    <button class="btn-send-full"   onclick="applyCrop()">✓ Appliquer</button>
+    <button class="btn-cancel-full" onclick="cancelCrop()">Annuler</button>
   </div>
 </div>
 
+
+
 <script>
+
+// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+//  S
+// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+//  C
+// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+//  R
+// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+//  I
+// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+//  P
+// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+//  T
+// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+
+
 (function () {
+
+
 
 // ═══════════════════════════════════════════════════════════════════
 //  CANVAS
@@ -983,17 +1854,38 @@ ctx.fillRect(0, 0, 128, 64);
 //  DRAWING STATE - Variable Etat - variables d'état
 // ═══════════════════════════════════════════════════════════════════
 let tool = 'brush';
+let orientationFromImport = false;
+
 
 const PIXEL_ON_COLOR = '#000';
 const PIXEL_OFF_COLOR = '#fff';
 let drawColor = PIXEL_ON_COLOR;
 
-window.toggleColor = function(){
-  drawColor = (drawColor === PIXEL_ON_COLOR) ? PIXEL_OFF_COLOR : PIXEL_ON_COLOR;
-  document.getElementById('colorBtn').textContent =
-    (drawColor === PIXEL_ON_COLOR) ? 'NOIR' : 'BLANC';
-  setStatus();
-}
+window.finishSelectionMove = function () {
+  moveMode = false;
+  selectionFloating = false;
+  moveDragStart = null;
+  clearOverlay();
+  drawSelectionOverlay();
+  showSelectActions(true);
+  setTool('select');
+  setStatus('Déplacement terminé');
+};
+
+window.toggleColor = function () {
+  drawColor = drawColor === PIXEL_ON_COLOR ? PIXEL_OFF_COLOR : PIXEL_ON_COLOR;
+  const btn = document.getElementById('colorBtn');
+  const isBlack = drawColor === PIXEL_ON_COLOR;
+  btn.textContent = isBlack ? 'NOIR' : 'BLANC';
+  btn.classList.toggle('is-black', isBlack);
+  btn.classList.toggle('is-white', !isBlack);
+  setStatus(isBlack ? 'Couleur noir' : 'Couleur blanc');
+};
+
+document.getElementById('colorBtn')?.classList.add('is-black');
+
+
+
 
 let size = 1, snapSize = 1;
 let rawSourceImg = null; // ImageData brute de l'image chargée, avant dithering
@@ -1054,19 +1946,210 @@ window.setStillDisplayTarget = v => {
 // ═══════════════════════════════════════════════════════════════════
 //  ORIENTATION — 'portrait' | 'landscape'
 // ═══════════════════════════════════════════════════════════════════
-let currentCanvasOrientation = 'portrait'; // orientation logique choisie
 let sensorOrientationActive  = false;      // true si le capteur pilote l'orientation
 let sensorPollInterval       = null;
 
+
+let currentCanvasOrientation = 'landscape';
+
+function syncOrientationUI() {
+  document.getElementById('orientPortraitBtn').classList.toggle('active', currentCanvasOrientation === 'portrait');
+  document.getElementById('orientLandscapeBtn').classList.toggle('active', currentCanvasOrientation === 'landscape');
+
+  const label = document.getElementById('einkOrientLabel');
+  if (label) label.textContent = currentCanvasOrientation === 'portrait' ? 'Portrait' : 'Paysage';
+}
+
+function applyOrientationToDrawingCanvas() {
+  const wrap = document.getElementById('canvasWrap');
+  const canvasEl = document.getElementById('canvas');
+  const layerEl = document.getElementById('layerCanvas');
+
+  const baseW = 128;
+  const baseH = 64;
+  const scale = Math.min(window.innerWidth * 0.9, 512) / baseW;
+  const cssW = Math.round(baseW * scale);
+  const cssH = Math.round(baseH * scale);
+
+  [canvasEl, layerEl].forEach(el => {
+    el.style.width = cssW + 'px';
+    el.style.height = cssH + 'px';
+    el.style.position = 'absolute';
+    el.style.left = '50%';
+    el.style.top = '50%';
+    el.style.transformOrigin = 'center center';
+  });
+
+  if (currentCanvasOrientation === 'portrait') {
+    wrap.style.width = cssH + 'px';
+    wrap.style.height = cssW + 'px';
+    canvasEl.style.transform = 'translate(-50%, -50%) rotate(-90deg)';
+    layerEl.style.transform  = 'translate(-50%, -50%) rotate(-90deg)';
+  } else {
+    wrap.style.width = cssW + 'px';
+    wrap.style.height = cssH + 'px';
+    canvasEl.style.transform = 'translate(-50%, -50%) rotate(0deg)';
+    layerEl.style.transform  = 'translate(-50%, -50%) rotate(0deg)';
+  }
+
+  wrap.style.position = 'relative';
+  wrap.style.overflow = 'hidden';
+}
+
+function applyOrientationEverywhere() {
+  syncOrientationUI();
+  applyOrientationToDrawingCanvas();
+  if (frames[curFrame]) {
+    updateOledPreview(frames[curFrame].buffer);
+    updateEinkPreview(frames[curFrame].buffer);
+  }
+}
+
 window.setOrientation = function(orient) {
   currentCanvasOrientation = orient;
-  sensorOrientationActive  = false;
+  orientationFromImport = false;
+  sensorOrientationActive = false;
   document.getElementById('orientSensorBadge').style.display = 'none';
-  document.getElementById('orientPortraitBtn').classList.toggle('active',  orient === 'portrait');
-  document.getElementById('orientLandscapeBtn').classList.toggle('active', orient === 'landscape');
-  applyOrientationToUI();
-  if (frames[curFrame]) updateEinkPreview(frames[curFrame].buffer);
+  document.getElementById('sensorOrientBtn').classList.remove('active');
+  applyOrientationEverywhere();
+  setStatus('Orientation : ' + orient);
 };
+
+
+window.toggleFullscreenCanvas = function () {
+  const canvasWrap = document.getElementById('canvasWrap');
+  if (!canvasWrap) return;
+
+  if (!document.fullscreenElement) {
+    canvasWrap.requestFullscreen();
+  } else {
+    document.exitFullscreen();
+  }
+};
+
+
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement) {
+    document.body.classList.remove('fs-mode');
+  }
+});
+
+// ✅ Charge la config au démarrage
+let fsConfig = JSON.parse(localStorage.getItem('fsConfig') || '["brush","eraser","addFrame"]');
+
+// ✅ Toggle config fullscreen
+function showFsConfig(show) {
+  document.getElementById('fsConfig').style.display = show ? 'flex' : 'none';
+  if (!show) saveFsConfig();
+}
+
+// ✅ Sauvegarde config
+function saveFsConfig() {
+  fsConfig = [
+    document.getElementById('fsTool1').value,
+    document.getElementById('fsTool2').value,
+    document.getElementById('fsTool3').value
+  ];
+  localStorage.setItem('fsConfig', JSON.stringify(fsConfig));
+  updateFsToolbar();  // Met à jour les boutons
+}
+
+// ✅ Met à jour la toolbar fullscreen
+function updateFsToolbar() {
+  const toolbar = document.getElementById('fsToolbar');
+  if (!toolbar) return;
+
+  toolbar.innerHTML = `
+    <button class="btn" onclick="runFsAction('${fsConfig[0]}')">${getFsIcon(fsConfig[0])}</button>
+    <button class="btn" onclick="runFsAction('${fsConfig[1]}')">${getFsIcon(fsConfig[1])}</button>
+    <button class="btn" onclick="runFsAction('${fsConfig[2]}')">${getFsIcon(fsConfig[2])}</button>
+    <button class="btn danger" onclick="toggleFullscreenCanvas()">✕</button>
+  `;
+}
+
+window.toggleSendMenu = function(force){
+  const menu = document.getElementById('sendMenu');
+  if(!menu) return;
+
+  if(force === false){
+    menu.classList.remove('open');
+    return;
+  }
+  if(force === true){
+    menu.classList.add('open');
+    return;
+  }
+
+  menu.classList.toggle('open');
+};
+
+window.closeSendMenu = function(){
+  toggleSendMenu(false);
+};
+
+window.sendFrameFromMenu = function(){
+  closeSendMenu();
+  sendFrame();
+};
+
+window.sendAnimFromMenu = function(){
+  closeSendMenu();
+  toggleOledAnim();
+};
+
+document.addEventListener('DOMContentLoaded', function(){
+  const btn = document.getElementById('sendMenuBtn');
+  const wrap = document.querySelector('.send-menu-wrap');
+
+  if(btn){
+    btn.addEventListener('click', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      toggleSendMenu();
+    });
+  }
+
+  document.addEventListener('click', function(e){
+    if(!wrap) return;
+    if(!wrap.contains(e.target)){
+      closeSendMenu();
+    }
+  });
+});
+
+
+window.runFsAction = function (action) {
+  if (action === 'addFrame') return addFrame();
+  if (action === 'undo') return undo();
+  if (action === 'clearCanvas') return clearCanvas();
+  if (action === 'sendFrame') return sendFrame();
+  if (action === 'togglePlay') return togglePlay();
+  if (action === 'toggleOledAnim') return toggleOledAnim();
+  setTool(action);
+};
+
+
+// ✅ Icones pour les boutons
+function getFsIcon(tool) {
+  const icons = {
+    'brush': '🖌', 'eraser': '🧽', 'line': '📏', 'rect': '⬜',
+    'circle': '○', 'fill': '🪣', 'addFrame': '＋', 'sendFrame': '↑',
+    'undo': '↶', 'clearCanvas': '🗑'
+  };
+  return icons[tool] || '⚙️';
+}
+
+// ✅ Initialise au chargement
+updateFsToolbar();
+
+// ✅ Toggle config avec double-tap ESC ou clic long sur ✕
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.fullscreenElement) {
+    showFsConfig(true);
+  }
+});
+
+
 function applyOrientationToUI() {
   const einkPc = document.getElementById('einkPreview');
   const label  = document.getElementById('einkOrientLabel');
@@ -1091,33 +2174,36 @@ function updateEinkPreview(oledBuf) {
   if (!pc) return;
 
   const einkBuf = buildEinkStillBufferFromOledBuf(oledBuf);
-  const pctx = pc.getContext('2d', { willReadFrequently: true });
+  const ectx = pc.getContext('2d', { willReadFrequently: true });
 
   const W = 176;
   const H = 264;
 
+  // La preview affiche toujours le canvas physique 176×264
+  // La rotation est déjà dans le buffer (buildEinkStillBufferFromOledBuf)
   pc.width = W;
   pc.height = H;
 
-  pctx.clearRect(0, 0, W, H);
-  pctx.fillStyle = '#e8e4d8';
-  pctx.fillRect(0, 0, W, H);
-  pctx.fillStyle = '#1a1a1a';
+  ectx.fillStyle = '#e8e4d8';
+  ectx.fillRect(0, 0, W, H);
+  ectx.fillStyle = '#1a1a1a';
 
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       const bitIdx  = x + y * W;
       const byteIdx = Math.floor(bitIdx / 8);
       const bitPos  = 7 - (bitIdx % 8);
-
-      if (einkBuf[byteIdx] & (1 << bitPos)) {
-        pctx.fillRect(x, y, 1, 1);
+      if (!(einkBuf[byteIdx] & (1 << bitPos))) {
+        ectx.fillRect(x, y, 1, 1);
       }
     }
   }
 
-  applyOrientationToUI();
+  // Label orientation
+  const label = document.getElementById('einkOrientLabel');
+  if (label) label.textContent = currentCanvasOrientation === 'portrait' ? 'Portrait' : 'Paysage';
 }
+
 
 
 // ── Polling capteur (/orientation toutes les 800ms) ────────────────
@@ -1187,75 +2273,77 @@ function oledBufToImageData(buf, w = 128, h = 64) {
   return id;
 }
 
-
 function buildEinkStillBufferFromOledBuf(buf) {
   const src = document.createElement('canvas');
-  src.width = 128; src.height = 64;
+  src.width = 128;
+  src.height = 64;
   const sctx = src.getContext('2d', { willReadFrequently: true });
   sctx.putImageData(oledBufToImageData(buf), 0, 0);
 
+  const W = 176;
+  const H = 264;
+  const HEADERH = 16;
+  const FOOTERH = 22;
+  const availH = H - HEADERH - FOOTERH;
+
   const dst = document.createElement('canvas');
-  dst.width = EINK_WIDTH;   // 176
-  dst.height = EINK_HEIGHT; // 264
+  dst.width = W;
+  dst.height = H;
   const dctx = dst.getContext('2d', { willReadFrequently: true });
   dctx.imageSmoothingEnabled = false;
   dctx.fillStyle = '#fff';
-  dctx.fillRect(0, 0, EINK_WIDTH, EINK_HEIGHT);
+  dctx.fillRect(0, 0, W, H);
 
-  if (currentCanvasOrientation === 'landscape') {
-    // Paysage : l'image remplit toute la zone utile en rotation 90°
-    // Zone utile : 264px large × 176px haut (e-ink tourné)
-    // Image OLED 128×64 → scale pour occuper 264×132 (ratio préservé)
-    const scaleX = EINK_HEIGHT / 128;  // 264/128 = 2.0625
-    const scaleY = EINK_WIDTH  / 64;   // 176/64  = 2.75
-    const scale  = Math.min(scaleX, scaleY); // 2.0625 → préserve le ratio
-    const w = Math.round(128 * scale);
-    const h = Math.round(64  * scale);
+  if (currentCanvasOrientation === 'portrait') {
+    // Portrait voulu : rotation 90° anti-horaire
+    const rotW = 64;
+    const rotH = 128;
+    const scale = Math.min(W / rotW, availH / rotH);
+    const drawW = Math.round(rotW * scale);
+    const drawH = Math.round(rotH * scale);
+    const ox = Math.round((W - drawW) / 2);
+    const oy = HEADERH + Math.round((availH - drawH) / 2);
 
     dctx.save();
-    dctx.translate(EINK_WIDTH / 2, EINK_HEIGHT / 2);
-    dctx.rotate(Math.PI / 2);
-    dctx.drawImage(src,
-      -w / 2, -h / 2,
-       w,      h
-    );
+    dctx.translate(ox + drawW / 2, oy + drawH / 2);
+    dctx.rotate(-Math.PI / 2);
+    dctx.drawImage(src, -drawH / 2, -drawW / 2, drawH, drawW);
     dctx.restore();
+} else {
+  // Paysage : corrige le décalage observé de 90° antihoraire à l'envoi
+  const rotW = 64;
+  const rotH = 128;
+  const scale = Math.min(W / rotW, availH / rotH);
+  const drawW = Math.round(rotW * scale);
+  const drawH = Math.round(rotH * scale);
+  const ox = Math.round((W - drawW) / 2);
+  const oy = HEADERH + Math.round((availH - drawH) / 2);
 
-  } else {
-    // Portrait : l'image remplit les 176px de largeur
-    // Zone utile : 176px large, on laisse 24px en haut pour le header
-    const HEADER_H = 24;
-    const availW = EINK_WIDTH;              // 176
-    const availH = EINK_HEIGHT - HEADER_H; // 240
+  dctx.save();
+  dctx.translate(ox + drawW / 2, oy + drawH / 2);
+  dctx.rotate(Math.PI / 2);
+  dctx.drawImage(src, -drawH / 2, -drawW / 2, drawH, drawW);
+  dctx.restore();
+}
 
-    // Ratio de l'OLED = 2:1, on scale au maximum en largeur
-    const scaleX = availW / 128; // 176/128 = 1.375
-    const scaleY = availH / 64;  // 240/64  = 3.75
-    const scale  = Math.min(scaleX, scaleY); // 1.375 → width-limited
+  const id = dctx.getImageData(0, 0, W, H);
+  const out = new Uint8Array(W * H / 8);
+  out.fill(0xFF);
 
-    const w  = Math.round(128 * scale); // 176px → pleine largeur
-    const h  = Math.round(64  * scale); // 88px
-    const ox = Math.floor((availW - w) / 2);  // 0 (centré = déjà plein)
-    const oy = HEADER_H + Math.floor((availH - h) / 2); // centré dans la zone utile
-
-    dctx.drawImage(src, ox, oy, w, h);
-  }
-
-  // Conversion canvas → bitarray 1bpp MSB-first
-  const id  = dctx.getImageData(0, 0, EINK_WIDTH, EINK_HEIGHT);
-  const out = new Uint8Array((EINK_WIDTH * EINK_HEIGHT) / 8);
-  for (let y = 0; y < EINK_HEIGHT; y++) {
-    for (let x = 0; x < EINK_WIDTH; x++) {
-      const i   = (y * EINK_WIDTH + x) * 4;
-      const lum = (id.data[i] + id.data[i+1] + id.data[i+2]) / 3;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      const lum = (id.data[i] + id.data[i + 1] + id.data[i + 2]) / 3;
       if (lum < 128) {
-        const bi = x + y * EINK_WIDTH;
-        out[Math.floor(bi / 8)] |= (0x80 >> (bi % 8));
+        const bi = x + y * W;
+        out[bi >> 3] &= ~(0x80 >> (bi & 7));
       }
     }
   }
+
   return out;
 }
+
 
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1454,6 +2542,7 @@ function checkFirstRun() {
     applyProfileToUI(profile);
   }
 }
+
 
 
 window.saveProfile = async function () {
@@ -1714,13 +2803,13 @@ window.togglePlay = () => {
     isPlaying = false;
     cancelAnimationFrame(playRafId);
     playRafId = null;
-    document.getElementById('playBtn').textContent = '▶ Lire';
+    document.getElementById('playBtn').textContent = '▶';
     setStatus('Lecture stoppée');
   } else {
     saveToFrame(true);
     isPlaying = true;
     playLastT = performance.now();
-    document.getElementById('playBtn').textContent = '⏸ Pause';
+    document.getElementById('playBtn').textContent = '⏸';
     playRafId = requestAnimationFrame(playLoop);
     setStatus('Lecture…');
   }
@@ -1731,26 +2820,68 @@ window.togglePlay = () => {
 //  MINI-PREVIEW OLED
 // ═══════════════════════════════════════════════════════════════════
 let oledPreviewColor = 'blue'; // 'blue' | 'white'
-function updateOledPreview(buf){
+
+function updateOledPreview(buf) {
   const pc = document.getElementById('oledPreview');
   if (!pc) return;
 
-  const pctx = pc.getContext('2d', { willReadFrequently: true });
-  const id = pctx.createImageData(128, 64);
+  const isPortrait = currentCanvasOrientation === 'portrait';
 
-  for(let page = 0; page < 8; page++){
-    for(let x = 0; x < 128; x++){
+  if (isPortrait) {
+    pc.width = 64;
+    pc.height = 128;
+    pc.style.width = 'auto';
+    pc.style.height = '100%';
+    pc.style.maxHeight = '128px';
+    pc.style.aspectRatio = '1 / 2';
+  } else {
+    pc.width = 128;
+    pc.height = 64;
+    pc.style.width = '100%';
+    pc.style.height = 'auto';
+    pc.style.maxHeight = '';
+    pc.style.aspectRatio = '2 / 1';
+  }
+
+  const pctx = pc.getContext('2d', { willReadFrequently: true });
+  const id = pctx.createImageData(pc.width, pc.height);
+  id.data.fill(0);
+
+  for (let page = 0; page < 8; page++) {
+    for (let x = 0; x < 128; x++) {
       const b = buf[page * 128 + x];
 
-      for(let bit = 0; bit < 8; bit++){
-        const y = page * 8 + bit;
-        const i = (y * 128 + x) * 4;
+      for (let bit = 0; bit < 8; bit++) {
+        const sy = page * 8 + bit;
+        const sx = x;
+        let dx, dy;
+
+        if (isPortrait) {
+          dx = sy;
+          dy = 127 - sx;
+        } else {
+          dx = sx;
+          dy = sy;
+        }
+
+        if (page === 0 && x === 0 && bit === 0) {
+          console.log('[OLED preview]', {
+            orientation: currentCanvasOrientation,
+            sx, sy, dx, dy,
+            width: pc.width,
+            height: pc.height
+          });
+        }
+
+        if (dx < 0 || dx >= pc.width || dy < 0 || dy >= pc.height) continue;
+
+        const i = (dy * pc.width + dx) * 4;
         const on = (b >> bit) & 1;
 
         id.data[i + 3] = 255;
 
-        if(on){
-          if(oledPreviewColor === 'blue'){
+        if (on) {
+          if (oledPreviewColor === 'blue') {
             id.data[i] = 0x44;
             id.data[i + 1] = 0xaa;
             id.data[i + 2] = 0xff;
@@ -1768,9 +2899,13 @@ function updateOledPreview(buf){
     }
   }
 
+  console.log('[OLED preview] render done', {
+    orientation: currentCanvasOrientation,
+    canvas: pc.width + 'x' + pc.height
+  });
+
   pctx.putImageData(id, 0, 0);
 }
-
 window.toggleOledPreviewColor = () => {
   oledPreviewColor = oledPreviewColor === 'blue' ? 'white' : 'blue';
   document.getElementById('oledColorBtn').textContent =
@@ -1793,7 +2928,6 @@ window.toggleOledAnim = async () => {
     btn.textContent = '📺 Anim→OLED';
     await fetch('/frames/stop', { method: 'POST' }).catch(() => {});
     setStatus('Animation OLED stoppée');
-    return;
   }
 
   saveToFrame(true);
@@ -1976,7 +3110,6 @@ async function savePoetryScrollToGallery({ name, text, frameList, profile }) {
 
   if (!r.ok) throw new Error('HTTP ' + r.status);
 }
-
 window.confirmSend = async () => {
   const name = document.getElementById('usernameInput').value.trim();
   if (!name) {
@@ -1988,6 +3121,13 @@ window.confirmSend = async () => {
   window._lastName = name;
   document.getElementById('userDisplay').textContent = name;
   document.getElementById('userModal').classList.remove('active');
+
+  // ── Calcul de l'orientation à envoyer à l'OLED ──────────────────
+  // Si l'image vient d'un import média, on envoie toujours 'landscape'
+  // car le buffer est déjà correct et ne nécessite pas de rotation sur l'OLED.
+  // Si c'est un dessin manuel en portrait, on envoie 'portrait' pour
+  // que l'ESP applique la rotation 180°.
+  const orientForOled = orientationFromImport ? 'landscape' : currentCanvasOrientation;
 
   try {
     // ─────────────────────────────
@@ -2004,24 +3144,20 @@ window.confirmSend = async () => {
 
       const ts = encodeURIComponent(
         new Date().toLocaleString('fr-FR', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
+          day: '2-digit', month: '2-digit', year: 'numeric',
+          hour: '2-digit', minute: '2-digit'
         })
       );
 
       const artistName = profile.artistName || 'Anonyme';
 
-      await fetch(`/username?n=${encodeURIComponent(name)}&ts=${ts}&a=${encodeURIComponent(artistName)}`, {
+      await fetch(`/username?n=${encodeURIComponent(name)}&ts=${ts}&a=${encodeURIComponent(artistName)}&orient=${encodeURIComponent(orientForOled)}`, {
         cache: 'no-store'
       });
 
       await new Promise(r => setTimeout(r, 300));
 
       const blob = new Uint8Array(frames.length * 1026);
-
       frames.forEach((f, i) => {
         const d = f.delay & 0xffff;
         blob[i * 1026 + 0] = d & 0xff;
@@ -2042,11 +3178,8 @@ window.confirmSend = async () => {
       });
 
       const timestamp = new Date().toLocaleString('fr-FR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
       });
 
       const firstFrame =
@@ -2055,20 +3188,9 @@ window.confirmSend = async () => {
         null;
 
       await notifyRescoeDiscord({
-        uid: makeClientUid({
-          type: 'poetry',
-          mode: 'scroll',
-          artist: artistName,
-          name,
-          timestamp
-        }),
-        type: 'poetry',
-        mode: 'scroll',
-        name,
-        artist: artistName,
-        timestamp,
-        forSale: false,
-        ethAddress: '',
+        uid: makeClientUid({ type: 'poetry', mode: 'scroll', artist: artistName, name, timestamp }),
+        type: 'poetry', mode: 'scroll', name, artist: artistName, timestamp,
+        forSale: false, ethAddress: '',
         text: sendContext.poetryText || '',
         oledBufferCompact: firstFrame
           ? Array.from(firstFrame.buffer, b => (b & 0xff).toString(16).padStart(2, '0'))
@@ -2076,6 +3198,7 @@ window.confirmSend = async () => {
       });
 
       setStatus('Scroll poésie envoyé sur OLED et classé en poésies');
+      orientationFromImport = false;
       resetSendContext();
       return;
     }
@@ -2094,58 +3217,35 @@ window.confirmSend = async () => {
       const artistName = profile.artistName || 'Anonyme';
 
       const timestamp = new Date().toLocaleString('fr-FR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
       });
 
-      await fetch(`/username?n=${encodeURIComponent(name)}&ts=${encodeURIComponent(timestamp)}&a=${encodeURIComponent(artistName)}`, {
+      await fetch(`/username?n=${encodeURIComponent(name)}&ts=${encodeURIComponent(timestamp)}&a=${encodeURIComponent(artistName)}&orient=${encodeURIComponent(orientForOled)}`, {
         cache: 'no-store'
       });
 
       await new Promise(r => setTimeout(r, 300));
-
       await resetOledForStillImage();
 
-      const r = await fetch('/draw?save=0', {
-        method: 'POST',
-        body: buf
-      });
-
+      const r = await fetch('/draw?save=0', { method: 'POST', body: buf });
       if (!r.ok) throw new Error('HTTP ' + r.status);
 
       await new Promise(r => setTimeout(r, 800));
 
-      await savePoetryStillToGallery({
-        name,
-        text: sendContext.poetryText,
-        buf,
-        profile
-      });
+      await savePoetryStillToGallery({ name, text: sendContext.poetryText, buf, profile });
 
       await notifyRescoeDiscord({
-        uid: makeClientUid({
-          type: 'poetry',
-          mode: 'still',
-          artist: artistName,
-          name,
-          timestamp
-        }),
-        type: 'poetry',
-        mode: 'still',
-        name,
-        artist: artistName,
-        timestamp,
-        forSale: false,
-        ethAddress: '',
+        uid: makeClientUid({ type: 'poetry', mode: 'still', artist: artistName, name, timestamp }),
+        type: 'poetry', mode: 'still', name, artist: artistName, timestamp,
+        forSale: false, ethAddress: '',
         text: sendContext.poetryText || '',
         oledBufferCompact: Array.from(buf, b => (b & 0xff).toString(16).padStart(2, '0'))
       });
 
       pendingBuf = null;
       setStatus('Poésie envoyée sur OLED et classée en poésies');
+      orientationFromImport = false;
       resetSendContext();
       return;
     }
@@ -2162,19 +3262,15 @@ window.confirmSend = async () => {
 
       const ts = encodeURIComponent(
         new Date().toLocaleString('fr-FR', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
+          day: '2-digit', month: '2-digit', year: 'numeric',
+          hour: '2-digit', minute: '2-digit'
         })
       );
 
-      await fetch(`/username?n=${encodeURIComponent(name)}&ts=${ts}`);
+      await fetch(`/username?n=${encodeURIComponent(name)}&ts=${ts}&orient=${encodeURIComponent(orientForOled)}`);
       await new Promise(r => setTimeout(r, 300));
 
       const blob = new Uint8Array(frames.length * 1026);
-
       frames.forEach((f, i) => {
         const d = f.delay & 0xffff;
         blob[i * 1026 + 0] = d & 0xff;
@@ -2188,37 +3284,23 @@ window.confirmSend = async () => {
       const isForSale = !!(profile.forSale && profile.ethAddress && modalForSale?.checked);
 
       const timestamp = new Date().toLocaleString('fr-FR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
       });
 
       await notifyRescoeDiscord({
-        uid: makeClientUid({
-          type: 'gif',
-          mode: 'anim',
-          artist: profile.artistName || 'Anonyme',
-          name,
-          timestamp
-        }),
-        type: 'gif',
-        mode: 'anim',
-        name,
-        artist: profile.artistName || 'Anonyme',
-        timestamp,
+        uid: makeClientUid({ type: 'gif', mode: 'anim', artist: profile.artistName || 'Anonyme', name, timestamp }),
+        type: 'gif', mode: 'anim', name,
+        artist: profile.artistName || 'Anonyme', timestamp,
         forSale: isForSale,
         ethAddress: isForSale ? profile.ethAddress : '',
-        frames: frames.map(fr => ({
-          buffer: Array.from(fr.buffer),
-          delay: fr.delay
-        }))
+        frames: frames.map(fr => ({ buffer: Array.from(fr.buffer), delay: fr.delay }))
       });
 
       if (!r.ok) throw new Error('HTTP ' + r.status);
 
       setStatus(`Animation autonome: ${frames.length} frames ✓ (${name})`);
+      orientationFromImport = false;
       resetSendContext();
       return;
     }
@@ -2234,11 +3316,8 @@ window.confirmSend = async () => {
     const artistName = profile.artistName || name;
 
     const timestamp = new Date().toLocaleString('fr-FR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
     });
 
     const modalForSale = document.getElementById('modalForSale');
@@ -2249,17 +3328,12 @@ window.confirmSend = async () => {
 
     setStatus(
       `Envoi ${name}` +
-        (sendToOled && sendToEink
-          ? ' → OLED + E-INK'
-          : sendToOled
-          ? ' → OLED'
-          : ' → E-INK') +
-        '…'
+      (sendToOled && sendToEink ? ' → OLED + E-INK' : sendToOled ? ' → OLED' : ' → E-INK') + '…'
     );
 
     // OLED
     if (sendToOled) {
-      let usernameUrl = `username?n=${encodeURIComponent(name)}&ts=${encodeURIComponent(timestamp)}&a=${encodeURIComponent(artistName)}`;
+      let usernameUrl = `username?n=${encodeURIComponent(name)}&ts=${encodeURIComponent(timestamp)}&a=${encodeURIComponent(artistName)}&orient=${encodeURIComponent(orientForOled)}`;
 
       if (isForSale && profile.ethAddress) {
         usernameUrl += `&eth=${encodeURIComponent(profile.ethAddress)}`;
@@ -2269,14 +3343,9 @@ window.confirmSend = async () => {
       if (!userRes.ok) throw new Error('username HTTP ' + userRes.status);
 
       await new Promise(r => setTimeout(r, 300));
-
       await resetOledForStillImage();
 
-      const drawRes = await fetch('/draw', {
-        method: 'POST',
-        body: pendingBuf
-      });
-
+      const drawRes = await fetch('/draw', { method: 'POST', body: pendingBuf });
       if (!drawRes.ok) throw new Error('draw HTTP ' + drawRes.status);
     }
 
@@ -2284,16 +3353,13 @@ window.confirmSend = async () => {
     if (sendToEink) {
       const einkBuf = buildEinkStillBufferFromOledBuf(pendingBuf);
 
-// Rotation logique si paysage : le buffer e-ink est déjà orienté par buildEinkStillBufferFromOledBuf
-// Transmettre l'orientation à l'ESP pour qu'il sache comment afficher
-await fetch(`/eink-username?n=${encodeURIComponent(name)}&ts=${encodeURIComponent(timestamp)}&a=${encodeURIComponent(artistName)}&orient=${encodeURIComponent(currentCanvasOrientation)}`, { cache: 'no-store' }).catch(()=>{});
+      await fetch(`/eink-username?n=${encodeURIComponent(name)}&ts=${encodeURIComponent(timestamp)}&a=${encodeURIComponent(artistName)}&orient=${encodeURIComponent(currentCanvasOrientation)}`, { cache: 'no-store' }).catch(() => {});
 
       if (!einkBuf || einkBuf.length !== 264 * 176 / 8) {
         throw new Error('buildEinkBuffer: taille invalide ' + einkBuf?.length);
       }
 
       let einkUserUrl = `/eink-username?n=${encodeURIComponent(name)}&ts=${encodeURIComponent(timestamp)}&a=${encodeURIComponent(artistName)}`;
-
       if (isForSale && profile.ethAddress) {
         einkUserUrl += `&eth=${encodeURIComponent(profile.ethAddress)}`;
       }
@@ -2302,7 +3368,6 @@ await fetch(`/eink-username?n=${encodeURIComponent(name)}&ts=${encodeURIComponen
       if (!einkUserRes.ok) throw new Error('eink-username HTTP ' + einkUserRes.status);
 
       await new Promise(r => setTimeout(r, 200));
-
       setStatus('E-INK : envoi 5808 octets…');
 
       const einkDrawRes = await fetch('/eink-draw', {
@@ -2310,53 +3375,37 @@ await fetch(`/eink-username?n=${encodeURIComponent(name)}&ts=${encodeURIComponen
         headers: { 'Content-Type': 'application/octet-stream' },
         body: einkBuf
       });
-
       if (!einkDrawRes.ok) throw new Error('eink-draw HTTP ' + einkDrawRes.status);
     }
 
     // Discord
     await notifyRescoeDiscord({
-      uid: makeClientUid({
-        type: 'still',
-        mode: 'still',
-        artist: artistName,
-        name,
-        timestamp
-      }),
-      type: 'still',
-      mode: 'still',
-      name,
-      artist: artistName,
-      timestamp,
+      uid: makeClientUid({ type: 'still', mode: 'still', artist: artistName, name, timestamp }),
+      type: 'still', mode: 'still', name, artist: artistName, timestamp,
       forSale: isForSale,
       ethAddress: isForSale ? profile.ethAddress : '',
       oledBufferCompact: Array.from(pendingBuf, b => (b & 0xff).toString(16).padStart(2, '0'))
     });
 
     pendingBuf = null;
+    orientationFromImport = false; // ← reset flag après envoi
 
     setStatus(
-      sendToOled && sendToEink
-        ? `OLED + E-INK ✓ (${name})`
-        : sendToOled
-        ? `OLED ✓ (${name})`
-        : `E-INK ✓ (${name})`
+      sendToOled && sendToEink ? `OLED + E-INK ✓ (${name})` :
+      sendToOled ? `OLED ✓ (${name})` : `E-INK ✓ (${name})`
     );
 
     resetSendContext();
     return;
 
-    // ⚠️ fallback logique DOIT rester dans le try
-    throw new Error('Cible d’affichage inconnue');
-
   } catch (e) {
     console.error('Erreur confirmSend:', e);
     setStatus('Erreur envoi: ' + e.message);
     pendingBuf = null;
+    orientationFromImport = false; // ← reset flag même en cas d'erreur
     resetSendContext();
   }
 };
-
 
 window.cancelSend = () => {
   pendingBuf = null;
@@ -2380,15 +3429,25 @@ async function stopOledAnimationOnly() {
 
 async function resetOledForStillImage() {
   try {
-    await fetch("/frames/stop", { method: "POST" })
-  } catch (e) {}
-  try {
-    await fetch("draw?save=0", {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1500);
+
+    const res = await fetch("/framesstop", {
       method: "POST",
-      body: new Uint8Array(1024)
+      cache: "no-store",
+      signal: controller.signal
     });
-    await new Promise(r => setTimeout(r, 40));
-  } catch (e) {}
+
+    clearTimeout(timeout);
+
+    if (!res.ok) {
+      console.warn(`resetOledForStillImage: /framesstop -> HTTP ${res.status}`);
+    }
+  } catch (e) {
+    console.warn("resetOledForStillImage: unable to stop OLED animation", e);
+  }
+
+  await new Promise(r => setTimeout(r, 60));
 }
 
 
@@ -2459,54 +3518,44 @@ function clearOverlay(previewFn = null) {
 // ═══════════════════════════════════════════════════════════════════
 //  BUFFER ↔ CANVAS
 // ═══════════════════════════════════════════════════════════════════
-function imgDataToBuf(imgData){
-  const d = imgData.data;
-  const buf = new Uint8Array(1024);
 
-  for(let page = 0; page < 8; page++){
-    for(let x = 0; x < 128; x++){
-      let b = 0;
-      for(let bit = 0; bit < 8; bit++){
+
+function bufToCanvas(buf, targetCtx = ctx) {
+  const img = targetCtx.createImageData(128, 64);
+  for (let page = 0; page < 8; page++) {
+    for (let x = 0; x < 128; x++) {
+      const b = buf[page * 128 + x];
+      for (let bit = 0; bit < 8; bit++) {
         const y = page * 8 + bit;
         const i = (y * 128 + x) * 4;
+        const v = (b >> bit) & 1 ? 0 : 255;
+        img.data[i] = img.data[i+1] = img.data[i+2] = v;
+        img.data[i+3] = 255;
+      }
+    }
+  }
+  targetCtx.putImageData(img, 0, 0);
+  if (targetCtx === ctx && gridMode) drawGrid();
+}
 
-        const r = d[i];
-        const g = d[i + 1];
-        const bl = d[i + 2];
-        const lum = (r + g + bl) / 3;
-
-        if(lum < 128) b |= (1 << bit); // pixel sombre = ON
+function imgDataToBuf(imgData) {
+  const d = imgData.data;
+  const buf = new Uint8Array(1024);
+  for (let page = 0; page < 8; page++) {
+    for (let x = 0; x < 128; x++) {
+      let b = 0;
+      for (let bit = 0; bit < 8; bit++) {
+        const y = page * 8 + bit;
+        const i = (y * 128 + x) * 4;
+        const lum = (d[i] + d[i+1] + d[i+2]) / 3;
+        if (lum < 128) b |= (1 << bit);
       }
       buf[page * 128 + x] = b;
     }
   }
   return buf;
 }
-function bufToCanvas(buf, targetCtx = ctx){
-  const img = targetCtx.createImageData(128, 64);
 
-  for(let page = 0; page < 8; page++){
-    for(let x = 0; x < 128; x++){
-      const b = buf[page * 128 + x];
-
-      for(let bit = 0; bit < 8; bit++){
-        const y = page * 8 + bit;
-        const i = (y * 128 + x) * 4;
-
-        const on = (b >> bit) & 1;
-        const v = on ? 0 : 255; // ON = noir sur canvas blanc
-
-        img.data[i] = v;
-        img.data[i + 1] = v;
-        img.data[i + 2] = v;
-        img.data[i + 3] = 255;
-      }
-    }
-  }
-
-  targetCtx.putImageData(img, 0, 0);
-  if(targetCtx === ctx && gridMode) drawGrid();
-}
 
 // ═══════════════════════════════════════════════════════════════════
 //  PIXEL / SHAPE DRAWING
@@ -2576,10 +3625,31 @@ function previewPolyOnLayer(mx,my){
 // ═══════════════════════════════════════════════════════════════════
 //  INPUT
 // ═══════════════════════════════════════════════════════════════════
-function getPos(e){
-  const r=canvas.getBoundingClientRect(), src=e.touches?e.touches[0]:e;
-  return {x:Math.floor((src.clientX-r.left)*128/r.width), y:Math.floor((src.clientY-r.top)*64/r.height)};
+
+function getPos(e) {
+  const r = canvas.getBoundingClientRect();
+  const src = e.touches ? e.touches[0] : e;
+  const relX = src.clientX - r.left;
+  const relY = src.clientY - r.top;
+
+// APRÈS
+if (currentCanvasOrientation === 'portrait') {
+    const x = Math.floor(((r.height - relY) / r.height) * 128);
+    const y = Math.floor((relX / r.width) * 64);
+    return {
+        x: Math.max(0, Math.min(127, x)),
+        y: Math.max(0, Math.min(63, y))
+    };
 }
+
+
+  return {
+    x: Math.max(0, Math.min(127, Math.floor((relX / r.width) * 128))),
+    y: Math.max(0, Math.min(63, Math.floor((relY / r.height) * 64)))
+  };
+}
+
+
 function snap(v){return snapSize<=1?v:Math.round(v/snapSize)*snapSize;}
 
 function startDraw(e){
@@ -2730,28 +3800,30 @@ function moveDraw(e){
   }
 }
 
-function endDraw(e){
-  if(!drawing)return; e.preventDefault(); drawing=false;
-  const r=canvas.getBoundingClientRect(), src=e.changedTouches?e.changedTouches[0]:e;
-  const ex=snap(Math.floor((src.clientX-r.left)*128/r.width));
-  const ey=snap(Math.floor((src.clientY-r.top)*64/r.height));
+function endDraw(e) {
+  if (!drawing) return;
+  e.preventDefault();
+  drawing = false;
 
-  // ── Outil MOVE : finaliser le déplacement ─────────────────
-  if(tool === 'move' && moveMode){
+  // Utiliser getPos() comme startDraw/moveDraw pour la cohérence
+  const src = e.changedTouches ? e.changedTouches[0] : e;
+  const fakeEvent = { clientX: src.clientX, clientY: src.clientY, touches: null };
+  const p = getPos(fakeEvent);
+  const ex = snap(p.x);
+  const ey = snap(p.y);
+
+  if (tool === 'move' && moveMode) {
     commitMoveSelection();
     drawing = false;
     moveDragStart = null;
     return;
   }
 
-  // ── Outil SELECT : finaliser la sélection ─────────────────
-  if(tool === 'select'){
+  if (tool === 'select') {
     drawing = false;
-    if(selRect && selRect.w > 1 && selRect.h > 1){
+    if (selRect && selRect.w > 1 && selRect.h > 1) {
       selectionActive = true;
-      // Sauvegarder la frame courante
       selectionBuf = new Uint8Array(frames[curFrame].buffer);
-      // Capturer l'ImageData de la zone sélectionnée
       selectionData = ctx.getImageData(selRect.x, selRect.y, selRect.w, selRect.h);
       drawSelectionOverlay();
       showSelectActions(true);
@@ -2761,11 +3833,19 @@ function endDraw(e){
     return;
   }
 
-  if(tool==='poly'){polyPoints.push({x:ex,y:ey});previewPolyOnLayer(ex,ey);shapeSnap=null;return;}
-  if(tool!=='brush'&&tool!=='eraser'&&tool!=='select'&&tool!=='move'){
-    if(shapeSnap instanceof ImageData){ctx.putImageData(shapeSnap,0,0);if(gridMode)drawGrid();drawShapeFinal(startX,startY,ex,ey);saveHistory();}
+  if (tool === 'poly') { polyPoints.push({x:ex,y:ey}); previewPolyOnLayer(ex,ey); shapeSnap=null; return; }
+  if (tool !== 'brush' && tool !== 'eraser' && tool !== 'select' && tool !== 'move') {
+    if (shapeSnap instanceof ImageData) {
+      ctx.putImageData(shapeSnap, 0, 0);
+      if (gridMode) drawGrid();
+      drawShapeFinal(startX, startY, ex, ey);
+      saveHistory();
+    }
   }
-  clearOverlay(); saveToFrame(true); renderStrip(); shapeSnap=null;
+  clearOverlay();
+  saveToFrame(true);
+  renderStrip();
+  shapeSnap = null;
   updateOledPreview(frames[curFrame].buffer);
   updateEinkPreview(frames[curFrame].buffer);
   setStatus();
@@ -2887,11 +3967,12 @@ function floodSelect(px, py){
   const masked = new ImageData(bw, bh);
   for(const {x,y} of pixels){
     const si = ((y-minY)*bw + (x-minX))*4;
-    if(targetLum === 255){
-      masked.data[si]=255; masked.data[si+1]=255; masked.data[si+2]=255; masked.data[si+3]=255;
-    } else {
-      masked.data[si]=0; masked.data[si+1]=0; masked.data[si+2]=0; masked.data[si+3]=255;
-    }
+
+// targetLum est la couleur SÉLECTIONNÉE (celle sur laquelle on a cliqué)
+// On la garde opaque, tout le reste (hors zone flood) est déjà à alpha=0
+const v = targetLum === 255 ? 255 : 0;
+masked.data[si] = v; masked.data[si+1] = v; masked.data[si+2] = v; masked.data[si+3] = 255;
+// Note : les pixels HORS sélection ont déjà alpha=0 car ImageData est initialisé à 0
   }
   cancelSelection();
   selRect = {x:minX,y:minY,w:bw,h:bh};
@@ -2961,13 +4042,24 @@ window.cancelSelection = function(){
   if(info && !['select','move','wand','fill'].includes(tool)) info.style.display = 'none';
 };
 
-// Masque les pixels blancs (fond) d'un ImageData → seuls les noirs restent (alpha)
-function maskWhitePixels(imgData){
+// REMPLACER maskWhitePixels par ceci :
+function maskBackgroundPixels(imgData) {
   const d = new Uint8ClampedArray(imgData.data);
-  for(let i = 0; i < d.length; i += 4){
-    const lum = (d[i]*0.299 + d[i+1]*0.587 + d[i+2]*0.114);
-    if(lum > 128){ d[i+3] = 0; } // blanc → transparent
-    else { d[i] = 0; d[i+1] = 0; d[i+2] = 0; d[i+3] = 255; } // noir → opaque
+  // Le "fond" à rendre transparent est l'opposé de drawColor
+  // drawColor === '#000' (NOIR) → fond = blanc (lum >= 128) → transparent
+  // drawColor === '#fff' (BLANC) → fond = noir (lum < 128) → transparent
+  const maskLight = (drawColor === PIXEL_ON_COLOR); // PIXEL_ON_COLOR = '#000'
+  for (let i = 0; i < d.length; i += 4) {
+    const lum = d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114;
+    const isLight = lum >= 128;
+    if (maskLight ? isLight : !isLight) {
+      // C'est le fond → transparent
+      d[i] = 0; d[i+1] = 0; d[i+2] = 0; d[i+3] = 0;
+    } else {
+      // C'est le dessin → opaque, couleur active
+      const v = maskLight ? 0 : 255;
+      d[i] = v; d[i+1] = v; d[i+2] = v; d[i+3] = 255;
+    }
   }
   return new ImageData(d, imgData.width, imgData.height);
 }
@@ -2977,7 +4069,7 @@ window.duplicateSelection = function(){
   if(!selectionActive || !selRect || selRect.w < 1 || selRect.h < 1) return;
   // Capturer l'ImageData brute de la zone, puis masquer le blanc
   const raw = ctx.getImageData(selRect.x, selRect.y, selRect.w, selRect.h);
-  selectionData = maskWhitePixels(raw);
+  selectionData = maskBackgroundPixels(raw);
   selectionBuf  = new Uint8Array(frames[curFrame].buffer);
   moveMode = true;
   moveOffsetX = 4; moveOffsetY = 4;
@@ -2994,15 +4086,18 @@ function drawMovePreview(){
   if(gridMode) drawGrid();
   clearOverlay();
   if(!(selectionData instanceof ImageData) || !selRect) return;
+
   const dx = selRect.x + moveOffsetX;
   const dy = selRect.y + moveOffsetY;
+
   const tmp = document.createElement('canvas');
-  tmp.width = selectionData.width; tmp.height = selectionData.height;
+  tmp.width = selectionData.width;
+  tmp.height = selectionData.height;
   tmp.getContext('2d').putImageData(selectionData, 0, 0);
-  ctx.save();
-  ctx.globalAlpha = 0.85;
-  ctx.drawImage(tmp, dx, dy);
-  ctx.restore();
+
+  // PREVIEW sur le layer overlay, pas sur le canvas principal
+  lctx.drawImage(tmp, dx, dy);
+
   lctx.save();
   lctx.strokeStyle = 'rgba(255,165,0,0.9)';
   lctx.lineWidth = 1;
@@ -3011,7 +4106,6 @@ function drawMovePreview(){
   lctx.setLineDash([]);
   lctx.restore();
 }
-
 
 // Valider le déplacement → écrire sur le canvas
 // Valider le déplacement → efface la source, colle à destination (vrai cut+move)
@@ -3060,21 +4154,27 @@ function commitMoveSelection(){
 }
 
 // Bouton "Valider déplacement" (alias public)
-window.confirmMoveSelection = commitMoveSelection;
+window.confirmMoveSelection = function () {
+  finishSelectionMove();
+};
+
 
 // Outil stamp : copier la sélection dans un tampon réutilisable (sans effacer la source)
 let stampData = null;  // ImageData du tampon courant
 let stampMode = false; // on est en train de poser le tampon
 
-window.setStampFromSelection = function() {
-  if(!selectionActive || !selectionData) {
-    setStatus('Sélectionnez d\'abord une zone');
+window.setStampFromSelection = function () {
+  if (!selectionActive || !selectionData || !selRect) {
+    setStatus('Sélectionnez d’abord une zone');
     return;
   }
   const raw = ctx.getImageData(selRect.x, selRect.y, selRect.w, selRect.h);
-  stampData = maskWhitePixels(raw);
+  stampData = maskBackgroundPixels ? maskBackgroundPixels(raw) : maskWhitePixels(raw);
+  moveMode = false;
+  selectionFloating = false;
+  moveDragStart = null;
   setTool('stamp');
-  setStatus('Tampon prêt — cliquez pour poser');
+  setStatus('Tampon prêt : cliquez pour dupliquer');
 };
 
 // Effacer la zone sélectionnée
@@ -3094,7 +4194,7 @@ window.clearSelectionArea = function(){
 window.cutSelection = function() {
   if(!selectionActive || !selRect || selRect.w < 1 || selRect.h < 1) return;
   const raw = ctx.getImageData(selRect.x, selRect.y, selRect.w, selRect.h);
-  selectionData = maskWhitePixels(raw);
+  selectionData = maskBackgroundPixels(raw);
   selectionBuf  = new Uint8Array(frames[curFrame].buffer);
 
   // Effacer la zone source
@@ -3290,7 +4390,7 @@ window.clearCanvas = async function () {
   saveToFrame(true);
   clearOverlay();
   renderStrip();
-
+/*
   try {
     await fetch("/frames/stop", { method: "POST" }) // stop anim en cours
     await fetch("/draw?save=0", { method: "POST", body: new Uint8Array(1024) }); // clear sans galerie
@@ -3298,6 +4398,7 @@ window.clearCanvas = async function () {
   } catch (e) {
     setStatus("Erreur clear OLED");
   }
+  */
 };
 
 function downloadBlob(blob, filename){
@@ -3512,7 +4613,6 @@ window.flipH = async function () {
     renderStrip();
     saveHistory();
 
-    await sendCurrentFrameToOled(false);
     setStatus("Flip H");
   } catch (e) {
     setStatus(`Erreur flip H: ${e.message}`);
@@ -3547,7 +4647,6 @@ window.flipV = async function () {
     renderStrip();
     saveHistory();
 
-    await sendCurrentFrameToOled(false);
     setStatus("Flip V");
   } catch (e) {
     setStatus(`Erreur flip V: ${e.message}`);
@@ -3610,37 +4709,265 @@ window.toggleTxtArtPreview = () => {
   }
 };
 
+function applyDither(imgData) {
+  const d = imgData.data;
 
-function applyDither(imgData){
-  const d=imgData.data;
-  if(ditherMode==='floyd'){
-    for(let i=0;i<d.length;i+=4){const g=.299*d[i]+.587*d[i+1]+.114*d[i+2];d[i]=d[i+1]=d[i+2]=g;}
-    for(let y=0;y<64;y++)for(let x=0;x<128;x++){
-      const idx=(y*128+x)*4,old=d[idx]/255,nw=old<threshold/255?0:1,err=(old-nw)*255;
-      d[idx]=d[idx+1]=d[idx+2]=nw*255;
-      const sp=(x2,y2,w)=>{if(x2<0||x2>=128||y2<0||y2>=64)return;const i2=(y2*128+x2)*4;for(let c=0;c<3;c++)d[i2+c]=Math.max(0,Math.min(255,d[i2+c]+err*w));};
-      sp(x+1,y,7/16);sp(x-1,y+1,3/16);sp(x,y+1,5/16);sp(x+1,y+1,1/16);
+  // ─────────────────────────────
+  // Helper commun : grayscale
+  // ─────────────────────────────
+  const toGray = () => {
+    for (let i = 0; i < d.length; i += 4) {
+      const g = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+      d[i] = d[i+1] = d[i+2] = g;
     }
-  } else if(ditherMode==='ordered'){
-    const M=[[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
-    for(let i=0;i<d.length;i+=4){
-      const g=.299*d[i]+.587*d[i+1]+.114*d[i+2];d[i]=d[i+1]=d[i+2]=g;
+  };
+
+  // ─────────────────────────────
+  // FLOYD
+  // ─────────────────────────────
+  if (ditherMode === 'floyd') {
+
+    toGray();
+
+    for (let y = 0; y < 64; y++) {
+      for (let x = 0; x < 128; x++) {
+        const idx = (y*128+x)*4;
+        const old = d[idx]/255;
+        const nw  = old < threshold/255 ? 0 : 1;
+        const err = (old - nw) * 255;
+
+        d[idx]=d[idx+1]=d[idx+2]=nw*255;
+
+        const spread = (x2,y2,w)=>{
+          if (x2<0||x2>=128||y2<0||y2>=64) return;
+          const i2=(y2*128+x2)*4;
+          for(let c=0;c<3;c++){
+            d[i2+c]=Math.max(0,Math.min(255,d[i2+c]+err*w));
+          }
+        };
+
+        spread(x+1,y,7/16);
+        spread(x-1,y+1,3/16);
+        spread(x,y+1,5/16);
+        spread(x+1,y+1,1/16);
       }
-    for(let y=0;y<64;y++)for(let x=0;x<128;x++){
-      const idx=(y*128+x)*4,dv=M[y%4][x%4]/16;d[idx]=d[idx+1]=d[idx+2]=(d[idx]+dv*32-16>threshold)?255:0;
-      }
-} else if (ditherMode === 'atkinson') {
-    for (let i = 0; i < d.length; i += 4) { const g = .299*d[i]+.587*d[i+1]+.114*d[i+2]; d[i]=d[i+1]=d[i+2]=g; }
-    for (let y = 0; y < 64; y++) for (let x = 0; x < 128; x++) {
-      const idx = (y*128+x)*4, old = d[idx], nw = old < threshold ? 0 : 255, err = Math.floor((old - nw) / 8);
-      d[idx]=d[idx+1]=d[idx+2]=nw;
-      const sp = (x2, y2) => { if(x2<0||x2>=128||y2<0||y2>=64) return; const i2=(y2*128+x2)*4; for(let c=0;c<3;c++) d[i2+c]=Math.max(0,Math.min(255,d[i2+c]+err)); };
-      sp(x+1,y); sp(x+2,y); sp(x-1,y+1); sp(x,y+1); sp(x+1,y+1); sp(x,y+2);
     }
-  } else {
-    for(let i=0;i<d.length;i+=4){const g=.299*d[i]+.587*d[i+1]+.114*d[i+2];d[i]=d[i+1]=d[i+2]=(g>threshold)?255:0;d[i+3]=255;}
+
+  }
+
+  // ─────────────────────────────
+  // ORDERED (BAYER 4x4)
+  // ─────────────────────────────
+  else if (ditherMode === 'ordered') {
+
+    const M = [
+      [0,8,2,10],
+      [12,4,14,6],
+      [3,11,1,9],
+      [15,7,13,5]
+    ];
+
+    toGray();
+
+    for (let y = 0; y < 64; y++) {
+      for (let x = 0; x < 128; x++) {
+        const idx = (y*128+x)*4;
+        const dv  = M[y%4][x%4] / 16;
+
+        d[idx]=d[idx+1]=d[idx+2] =
+          (d[idx] + dv*32 - 16 > threshold) ? 255 : 0;
+      }
+    }
+
+  }
+
+  // ─────────────────────────────
+  // ATKINSON
+  // ─────────────────────────────
+  else if (ditherMode === 'atkinson') {
+
+    toGray();
+
+    for (let y = 0; y < 64; y++) {
+      for (let x = 0; x < 128; x++) {
+
+        const idx = (y*128+x)*4;
+        const old = d[idx];
+        const nw  = old < threshold ? 0 : 255;
+        const err = Math.floor((old - nw) / 8);
+
+        d[idx]=d[idx+1]=d[idx+2]=nw;
+
+        const spread = (x2,y2)=>{
+          if (x2<0||x2>=128||y2<0||y2>=64) return;
+          const i2=(y2*128+x2)*4;
+          for(let c=0;c<3;c++){
+            d[i2+c]=Math.max(0,Math.min(255,d[i2+c]+err));
+          }
+        };
+
+        spread(x+1,y);
+        spread(x+2,y);
+        spread(x-1,y+1);
+        spread(x,y+1);
+        spread(x+1,y+1);
+        spread(x,y+2);
+      }
+    }
+
+  }
+
+  // ─────────────────────────────
+  // BAYER 8x8
+  // ─────────────────────────────
+  else if (ditherMode === 'bayer8') {
+
+    const M8 = [
+      [0,32,8,40,2,34,10,42],
+      [48,16,56,24,50,18,58,26],
+      [12,44,4,36,14,46,6,38],
+      [60,28,52,20,62,30,54,22],
+      [3,35,11,43,1,33,9,41],
+      [51,19,59,27,49,17,57,25],
+      [15,47,7,39,13,45,5,37],
+      [63,31,55,23,61,29,53,21]
+    ];
+
+    toGray();
+
+    for (let y = 0; y < 64; y++) {
+      for (let x = 0; x < 128; x++) {
+        const idx = (y*128+x)*4;
+        const dv  = M8[y%8][x%8] / 64;
+
+        d[idx]=d[idx+1]=d[idx+2] =
+          (d[idx] + dv*32 - 16 > threshold) ? 255 : 0;
+      }
+    }
+
+  }
+
+  // ─────────────────────────────
+  // STUCKI
+  // ─────────────────────────────
+  else if (ditherMode === 'stucki') {
+
+    toGray();
+
+    for (let y = 0; y < 64; y++) {
+      for (let x = 0; x < 128; x++) {
+
+        const idx = (y*128+x)*4;
+        const old = d[idx];
+        const nw  = old < threshold ? 0 : 255;
+        const err = old - nw;
+
+        d[idx]=d[idx+1]=d[idx+2]=nw;
+
+        const spread = (x2,y2,w)=>{
+          if (x2<0||x2>=128||y2<0||y2>=64) return;
+          const i2=(y2*128+x2)*4;
+          for(let c=0;c<3;c++){
+            d[i2+c]=Math.max(0,Math.min(255,d[i2+c]+err*w/42));
+          }
+        };
+
+        spread(x+1,y,8); spread(x+2,y,4);
+        spread(x-2,y+1,2); spread(x-1,y+1,4);
+        spread(x,y+1,8); spread(x+1,y+1,4); spread(x+2,y+1,2);
+        spread(x-2,y+2,1); spread(x-1,y+2,2);
+        spread(x,y+2,4); spread(x+1,y+2,2); spread(x+2,y+2,1);
+      }
+    }
+
+  }
+
+  // ─────────────────────────────
+  // HALFTONE
+  // ─────────────────────────────
+  else if (ditherMode === 'halftone') {
+
+    toGray();
+
+    const cell = 4;
+
+    for (let y = 0; y < 64; y++) {
+      for (let x = 0; x < 128; x++) {
+
+        const idx = (y*128+x)*4;
+
+        const cx = (x % cell) - cell/2 + 0.5;
+        const cy = (y % cell) - cell/2 + 0.5;
+        const dist = Math.sqrt(cx*cx + cy*cy) / (cell * 0.707);
+
+        const bx = Math.floor(x/cell)*cell;
+        const by = Math.floor(y/cell)*cell;
+
+        let sum = 0, cnt = 0;
+
+        for (let dy=0;dy<cell;dy++){
+          for (let dx=0;dx<cell;dx++){
+            if (bx+dx<128 && by+dy<64) {
+              sum += d[((by+dy)*128+bx+dx)*4];
+              cnt++;
+            }
+          }
+        }
+
+        const avg = cnt ? sum/cnt : 128;
+        const r   = 1 - avg/255;
+
+        d[idx]=d[idx+1]=d[idx+2] =
+          (dist < r * 0.9) ? 0 : 255;
+      }
+    }
+
+  } else if (ditherMode === 'gray4') {
+
+  const M2 = [[0,2],[3,1]];
+
+  for (let i = 0; i < d.length; i += 4) {
+      const g = .299*d[i] + .587*d[i+1] + .114*d[i+2];
+      d[i] = d[i+1] = d[i+2] = g;
+  }
+
+  for (let y = 0; y < 64; y++) {
+    for (let x = 0; x < 128; x++) {
+
+      const idx  = (y*128+x)*4;
+      const gray = d[idx];
+
+      const level = Math.round(gray / 85) * 85;
+      const dv = M2[y%2][x%2] / 4;
+
+      let out;
+      if      (level >= 255) out = 255;
+      else if (level >= 170) out = dv > 0.25 ? 255 : 0;
+      else if (level >= 85)  out = dv > 0.5  ? 255 : 0;
+      else if (level >= 1)   out = dv > 0.75 ? 255 : 0;
+      else                   out = 0;
+
+      d[idx] = d[idx+1] = d[idx+2] = out;
+    }
+  }
+
+} // ✅ ← MANQUAIT ICI
+  // ─────────────────────────────
+  // DEFAULT
+  // ─────────────────────────────
+  else {
+
+    for (let i = 0; i < d.length; i += 4) {
+      const g = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+      const v = (g > threshold) ? 255 : 0;
+
+      d[i]=d[i+1]=d[i+2]=v;
+      d[i+3]=255;
+    }
+
   }
 }
+
 
 // ═══════════════════════════════════════════════════════════════════
 //  CROP MODAL — contain / cover / stretch, no sliders
@@ -3705,8 +5032,8 @@ function applyDitherToSource() {
 
 
 function updateDitherPreviews() {
-  const modes = ['floyd', 'ordered', 'atkinson', 'none'];
-
+// PAR
+const modes = ['floyd', 'ordered', 'atkinson', 'none', 'bayer8', 'stucki', 'halftone', 'gray4'];
   let previewSource = null;
   if (rawGifFrames && rawGifFrames.length && rawGifFrames[0].imageData) {
     previewSource = rawGifFrames[0].imageData;
@@ -3741,6 +5068,78 @@ function updateDitherPreviews() {
   });
 }
 
+function renderFrameTo128x64(frame) {
+  const srcW = frame?.srcW || frame?.imageData?.width || 128;
+  const srcH = frame?.srcH || frame?.imageData?.height || 64;
+
+  const srcCanvas = document.createElement('canvas');
+  srcCanvas.width = srcW;
+  srcCanvas.height = srcH;
+  const sctx = srcCanvas.getContext('2d', { willReadFrequently: true });
+  sctx.putImageData(frame.imageData, 0, 0);
+
+  const dstCanvas = document.createElement('canvas');
+  dstCanvas.width = 128;
+  dstCanvas.height = 64;
+  const dctx = dstCanvas.getContext('2d', { willReadFrequently: true });
+  dctx.imageSmoothingEnabled = false;
+  dctx.fillStyle = '#fff';
+  dctx.fillRect(0, 0, 128, 64);
+
+  const f = fitParams(srcW, srcH);
+  dctx.drawImage(srcCanvas, f.ox, f.oy, f.w, f.h);
+
+  return dctx.getImageData(0, 0, 128, 64);
+}
+
+function updateCropPreview() {
+  const pc = document.getElementById('cropPreview');
+  if (!pc) return;
+
+  const pctx = pc.getContext('2d', { willReadFrequently: true });
+  pctx.imageSmoothingEnabled = false;
+  pctx.fillStyle = '#fff';
+  pctx.fillRect(0, 0, 128, 64);
+
+  if (cropSrcImg) {
+    const f = fitParams(cropSrcImg.width, cropSrcImg.height);
+    pctx.drawImage(cropSrcImg, f.ox, f.oy, f.w, f.h);
+    return;
+  }
+
+  if (cropSrcGifFrames && cropSrcGifFrames.length) {
+    const previewId = renderFrameTo128x64(cropSrcGifFrames[0]);
+    pctx.putImageData(previewId, 0, 0);
+  }
+}
+
+function rebuildGifFromSource() {
+  if (!rawGifFrames || !rawGifFrames.length) {
+    updateDitherPreviews();
+    return;
+  }
+
+  frames = rawGifFrames.slice(0, GIF_MAX_FRAMES).map(fr => {
+    const id = new ImageData(
+      new Uint8ClampedArray(fr.imageData.data),
+      128,
+      64
+    );
+    applyDither(id);
+    return {
+      buffer: imgDataToBuf(id),
+      delay: fr.delay || 100
+    };
+  });
+
+  curFrame = 0;
+  loadFrame();
+  renderStrip();
+  updateFrameUi();
+  updateDitherPreviews();
+  saveHistory();
+}
+
 
 window.applyCrop = () => {
   if (cropSrcImg) {
@@ -3770,6 +5169,10 @@ window.applyCrop = () => {
   document.getElementById('cropModal').classList.remove('active');
   cropSrcImg = null; cropSrcGifFrames = [];
 };
+
+
+
+
 
 window.cancelCrop=()=>{document.getElementById('cropModal').classList.remove('active');cropSrcImg=null;cropSrcGifFrames=[];};
 
@@ -4149,44 +5552,98 @@ async function gifToFrames(file) {
 
   return outFrames;
 }
-
-
 window.loadFile = async function (e) {
   const file = e.target.files[0];
   if (!file) return;
 
-  // Stopper tout ce qui est encore actif avant de charger un nouveau média
   resetCurrentMediaState();
 
-  if (file.name.toLowerCase().endsWith(".gif")) {
-    await loadGif(file);
-    e.target.value = "";
+  const isGif = file.name.toLowerCase().endsWith('.gif');
+
+  if (isGif) {
+    try {
+      const buffer = await file.arrayBuffer();
+      const parsed = parseGif(buffer);
+
+      if (!parsed || !parsed.frames || !parsed.frames.length) {
+        setStatus('GIF vide');
+        e.target.value = '';
+        return;
+      }
+
+      // Orientation automatique selon dimensions du GIF
+      currentCanvasOrientation = parsed.width < parsed.height ? 'portrait' : 'landscape';
+      orientationFromImport = true;
+      applyOrientationEverywhere();
+
+      rawSourceImg = null;
+      cropSrcImg = null;
+      cropSrcGifFrames = [];
+
+      rawGifFrames = parsed.frames.slice(0, GIF_MAX_FRAMES).map(fr => {
+        const srcCanvas = document.createElement('canvas');
+        srcCanvas.width = parsed.width;
+        srcCanvas.height = parsed.height;
+        const sctx = srcCanvas.getContext('2d', { willReadFrequently: true });
+        sctx.imageSmoothingEnabled = false;
+        sctx.putImageData(fr.imageData, 0, 0);
+
+        const dstCanvas = document.createElement('canvas');
+        dstCanvas.width = 128;
+        dstCanvas.height = 64;
+        const dctx = dstCanvas.getContext('2d', { willReadFrequently: true });
+        dctx.imageSmoothingEnabled = false;
+        dctx.fillStyle = '#fff';
+        dctx.fillRect(0, 0, 128, 64);
+
+        const f = fitContain(parsed.width, parsed.height);
+        dctx.drawImage(srcCanvas, f.ox, f.oy, f.w, f.h);
+
+        return {
+          imageData: dctx.getImageData(0, 0, 128, 64),
+          delay: fr.delay || 100
+        };
+      });
+
+      curFrame = 0;
+      rebuildGifFromSource();
+      setStatus('GIF importé : ' + rawGifFrames.length + ' frames (' + currentCanvasOrientation + ')');
+    } catch (err) {
+      console.error(err);
+      setStatus('Erreur chargement GIF');
+    }
+
+    e.target.value = '';
     return;
   }
 
+  // Image fixe
   const img = new Image();
   const url = URL.createObjectURL(file);
 
   img.onload = () => {
+    // Orientation automatique selon dimensions de l'image
+    currentCanvasOrientation = img.width < img.height ? 'portrait' : 'landscape';
+    orientationFromImport = true;
+    applyOrientationEverywhere();
+
     cropSrcImg = img;
     cropSrcGifFrames = [];
-
-    // S'assurer qu'aucun ancien GIF ne reste en source active
     rawGifFrames = [];
     rawSourceImg = null;
 
     openCropModal();
     URL.revokeObjectURL(url);
-    setStatus("Image chargée");
+    setStatus('Image chargée (' + currentCanvasOrientation + ')');
   };
 
   img.onerror = () => {
     URL.revokeObjectURL(url);
-    setStatus("Erreur chargement image");
+    setStatus('Erreur chargement image');
   };
 
   img.src = url;
-  e.target.value = "";
+  e.target.value = '';
 };
 
 
@@ -4773,32 +6230,6 @@ function resetCurrentMediaState() {
   clearOverlay();
 }
 
-function rebuildGifFromSource() {
-  if (!rawGifFrames || !rawGifFrames.length) {
-    updateDitherPreviews();
-    return;
-  }
-
-  frames = rawGifFrames.slice(0, GIF_MAX_FRAMES).map(fr => {
-    const id = new ImageData(
-      new Uint8ClampedArray(fr.imageData.data),
-      128,
-      64
-    );
-    applyDither(id);
-    return {
-      buffer: imgDataToBuf(id),
-      delay: fr.delay || 100
-    };
-  });
-
-  curFrame = 0;
-  loadFrame();
-  renderStrip();
-  updateFrameUi();
-  updateDitherPreviews();
-  saveHistory();
-}
 
 async function loadGif(file) {
   try {
@@ -5810,78 +7241,156 @@ int headerScrollOffset() {
 
 // Dessine la barre header en haut de l'OLED (ligne 0, hauteur 8px).
 // Texte en blanc sur fond noir. Scroll automatique si trop long.
-void drawHeaderBar() {
-  unsigned long phase = (millis() / 10000UL) % 3UL;
-  String line;
-  if      (phase == 0) line = pendingArtistName;
-  else if (phase == 1) line = pendingTimestamp;
-  else                 line = pendingAuthor;
-
-  display.setTextWrap(false);
-  display.fillRect(0, 0, SCREEN_WIDTH, 8, SSD1306_BLACK);
-  display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
-
-  if (!line.length()) return;
-
-  int textPx = line.length() * 6;
-
-  if (textPx <= SCREEN_WIDTH) {
-    // Texte court : affiché statique
-    display.setCursor(0, 0);
-    display.print(line);
-  } else {
-    // Texte long : scroll horizontal avec répétition
-    int off = headerScrollOffset();
-    int x   = -off;
-    while (x < SCREEN_WIDTH) {
-      display.setCursor(x, 0);
-      display.print(line);
-      x += textPx + 24;
+// Dessine un char dans le buffer OLED (page/bit) via la police bitmap
+static void oledDrawChar(int cx, int cy, char c) {
+  if (c < 32 || c > 126) c = '?';
+  int idx = c - 32;
+  for (int col = 0; col < 5; col++) {
+    uint8_t colData = pgm_read_byte(&FONT5x7[idx][col]);
+    for (int row = 0; row < 7; row++) {
+      if (!(colData & (1 << row))) continue;
+      int px = cx + col;
+      int py = cy + row;
+      if (px < 0 || px >= 128 || py < 0 || py >= 64) continue;
+      display.drawPixel(px, py, SSD1306_WHITE);
     }
   }
 }
 
-// Affiche le buffer OLED 1024 octets + redessine le header par-dessus.
-// À appeler pour image fixe ET pour chaque frame d'animation.
+// Dessine une string dans le buffer OLED (ne fait PAS display.display())
+static void oledDrawString(int x, int y, const String& s, int maxW = 128) {
+  int cx = x;
+  for (size_t i = 0; i < s.length(); i++) {
+    if (cx + 5 > x + maxW) break;
+    oledDrawChar(cx, y, s[i]);
+    cx += 6; // 5px char + 1px espace
+  }
+}
+
+
+void drawHeaderBar() {
+  // Effacer la ligne 0 (8 premiers pixels en hauteur)
+  for (int x = 0; x < 128; x++)
+    for (int y = 0; y < 8; y++)
+      display.drawPixel(x, y, SSD1306_BLACK);
+
+  // Construire la ligne complète : artiste | oeuvre | timestamp
+  String line = "";
+  if (pendingArtistName.length()) line += pendingArtistName;
+  if (pendingAuthor.length()) {
+    if (line.length()) line += "  |  ";
+    line += pendingAuthor;
+  }
+  if (pendingTimestamp.length()) {
+    if (line.length()) line += "  |  ";
+    line += pendingTimestamp;
+  }
+  if (!line.length()) return;
+
+  // Ajouter un séparateur de boucle pour le scroll continu
+  line += "    ";
+
+  int textPx = line.length() * 6;
+
+  static int offset = 0;
+  static unsigned long lastStep = 0;
+  unsigned long now = millis();
+
+  if (textPx > 128) {
+    if (now - lastStep > 150) {
+      lastStep = now;
+      offset++;
+      if (offset >= textPx) offset = 0;
+    }
+    // Dessiner avec répétition pour le scroll infini
+    int x = -offset;
+    while (x < 128) {
+      oledDrawString(x, 0, line, 128 + offset);
+      x += textPx;
+    }
+  } else {
+    offset = 0;
+    oledDrawString(0, 0, line, 128);
+  }
+}
+
+
+
+// Rotation 90° CCW du buffer OLED pour mode portrait physique
+// src : buffer 128×64 (paysage logique)
+// L'OLED reste 128×64 physique, on réorganise les pixels
+static void renderBufferRotated(const uint8_t* src) {
+  // Rotation 90° CCW : pixel source (sx, sy) → destination (sy, 127-sx)
+  // Dans l'espace 128×64 : le résultat est compressé mais l'image est tournée
+  // On remplit un buffer temporaire puis on l'affiche
+  display.clearDisplay();
+  for (int sy = 0; sy < 64; sy++) {
+    for (int sx = 0; sx < 128; sx++) {
+      int page = sy / 8, bit = sy % 8;
+      if (!(src[page * 128 + sx] & (1 << bit))) continue;
+      // CCW : dx = 63-sy (scaled to fit), dy = sx/2 (scaled to fit 128→64)
+      // Pour garder le ratio on scale : x source [0..127] → y dest [0..63]
+      //                                  y source [0..63]  → x dest [0..127]
+      // Donc : dx = sy * 2, dy = 63 - sx/2  (scale pour remplir l'écran)
+      int dx = sy * 2;
+      int dy = 63 - sx / 2;
+      if (dx >= 0 && dx < 128 && dy >= 0 && dy < 64)
+        display.drawPixel(dx, dy, SSD1306_WHITE);
+    }
+  }
+}
 void renderBufferWithHeader(const uint8_t* buf) {
   if (!buf) return;
-
   display.clearDisplay();
 
-  for (int page = 0; page < 8; page++) {
-    for (int x = 0; x < SCREEN_WIDTH; x++) {
-      uint8_t b = buf[page * SCREEN_WIDTH + x];
-      for (int bit = 0; bit < 8; bit++) {
-        if (b & (1 << bit)) {
-          display.drawPixel(x, page * 8 + bit, SSD1306_WHITE);
+  if (!oledPortrait) {
+    // ── Mode paysage : rendu direct 128×64 ──────────────────────
+    for (int page = 0; page < 8; page++) {
+      for (int x = 0; x < 128; x++) {
+        uint8_t b = buf[page * 128 + x];
+        for (int bit = 0; bit < 8; bit++) {
+          if (b & (1 << bit))
+            display.drawPixel(x, page * 8 + bit, SSD1306_WHITE);
+        }
+      }
+    }
+    } else {
+    // ── Mode portrait : rotation 180° ────────────────────────────
+    // pixel source (sx, sy) → destination (127 - sx, 63 - sy)
+    for (int page = 0; page < 8; page++) {
+      for (int sx = 0; sx < 128; sx++) {
+        uint8_t b = buf[page * 128 + sx];
+        for (int bit = 0; bit < 8; bit++) {
+          if (!(b & (1 << bit))) continue;
+          int sy = page * 8 + bit;
+          int dx = 127 - sx;
+          int dy = 63  - sy;
+          display.drawPixel(dx, dy, SSD1306_WHITE);
         }
       }
     }
   }
 
-  drawHeaderBar();   // overlay header par-dessus l'image
+  // Header par-dessus si des métadonnées sont disponibles
+  if (pendingAuthor.length() || pendingTimestamp.length() || pendingArtistName.length()) {
+    drawHeaderBar();
+  }
+
   display.display();
 }
 
-// Appelé dans loop() pour rafraîchir le header OLED en mode image fixe.
-// Toutes les 500ms, redessine lastRendered + header (gère le scroll).
-// Ne fait rien si une animation tourne (tickAnim() gère ça).
+
+
 void tickStillHeader() {
   static unsigned long lastRefresh = 0;
-
   if (animRunning) return;
-  if (!pendingAuthor.length() &&
-      !pendingTimestamp.length() &&
-      !pendingArtistName.length()) return;
-
+  if (!pendingAuthor.length() && !pendingTimestamp.length() && !pendingArtistName.length()) return;
   unsigned long now = millis();
-  if (now - lastRefresh > 500) {
+  if (now - lastRefresh > 200) {
     lastRefresh = now;
     renderBufferWithHeader(lastRendered);
   }
 }
-
 
 
 // ============================================================
@@ -5909,66 +7418,94 @@ String buildEinkHeaderLine() {
 // black = true → pixels noirs (COLORED), false → pixels blancs (UNCOLORED)
 static void einkDrawTextLineToBuffer(uint8_t* buf, const String& text, int x, int y, bool black) {
   if (!buf || !text.length()) return;
-
-  // Utiliser l'OLED comme raster temporaire (fiable, fonte connue)
-  display.clearDisplay();
-  display.setTextWrap(false);
-  display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
-  display.setCursor(0, 0);
-  display.print(text);
-  // NE PAS appeler display.display() — on lit juste le buffer interne
-
-  for (int py = 0; py < 8; py++) {
-    for (int px = 0; px < SCREEN_WIDTH; px++) {
-      if (display.getPixel(px, py)) {
-        // Projeter dans le repère e-ink orienté
-        einkSetPixelOriented(buf, x + px, y + py, black ? COLORED : UNCOLORED);
+  uint8_t color = black ? COLORED : UNCOLORED;
+  int cx = x;
+  for (size_t i = 0; i < text.length(); i++) {
+    char c = text[i];
+    if (c < 32 || c > 126) c = ' ';
+    int idx = (uint8_t)c - 32;
+    for (int col = 0; col < 5; col++) {
+      uint8_t colData = pgm_read_byte(&FONT5x7[idx][col]);
+      for (int row = 0; row < 7; row++) {
+        if (!(colData & (1 << row))) continue;
+        einkSetPixelOriented(buf, cx + col, y + row, color);
       }
     }
+    cx += 6;
   }
 }
 
-// Dessine le header bar dans le buffer e-ink orienté.
-// Fond blanc, texte noir, séparation noire en bas du header.
-// Gère portrait et paysage via einkSetPixelOriented.
+static void einkSetPixelRaw(uint8_t* buf, int px, int py, uint8_t color) {
+  if (!buf || px < 0 || px >= EPD_W || py < 0 || py >= EPD_H) return;
+  int byteIdx = py * WIDTH_BYTES + px / 8;
+  int bitPos  = 7 - (px % 8);
+  if (color == COLORED) buf[byteIdx] &= ~(1 << bitPos);
+  else                  buf[byteIdx] |=  (1 << bitPos);
+}
+
+static void einkDrawStringRaw(uint8_t* buf, int x, int y, const String& s, int maxW) {
+  int cx = x;
+  for (size_t i = 0; i < s.length() && cx + 5 < x + maxW; i++) {
+    char c = s[i];
+    if (c < 32 || c > 126) c = '?';
+    int idx = c - 32;
+    for (int col = 0; col < 5; col++) {
+      uint8_t colData = pgm_read_byte(&FONT5x7[idx][col]);
+      for (int row = 0; row < 7; row++) {
+        if (colData & (1 << row))
+          einkSetPixelRaw(buf, cx + col, y + row, COLORED);
+      }
+    }
+    cx += 6;
+  }
+}
+
 void drawEinkHeaderBar(uint8_t* buf) {
   if (!buf) return;
 
-  // Largeur visible selon orientation
-  int visibleW = einkLandscape ? EPD_H : EPD_W;
+  // Le buffer reçu est TOUJOURS 176(W)×264(H) physique MSB-first
+  // Le JS a déjà appliqué la rotation dans buildEinkStillBufferFromOledBuf()
+  // On écrit le cartel en coordonnées physiques brutes
 
-  // --- Fond du header : blanc (UNCOLORED) ---
-  einkFillRectOriented(buf, 0, 0, visibleW, EINKHEADERH, UNCOLORED);
+  const int W = EPD_W;   // 176
+  const int H = EPD_H;   // 264
+  const int HEADER_H = 16;
+  const int FOOTER_H = 22;
 
-  // --- Ligne de séparation noire en bas du header ---
-  for (int xx = 0; xx < visibleW; xx++) {
-    einkSetPixelOriented(buf, xx, EINKHEADERH - 1, COLORED);
+  // ── Bande haute : timestamp ──────────────────────────────────
+  for (int py = 0; py < HEADER_H; py++)
+    for (int px = 0; px < W; px++)
+      einkSetPixelRaw(buf, px, py, UNCOLORED);
+  for (int px = 0; px < W; px++)
+    einkSetPixelRaw(buf, px, HEADER_H - 1, COLORED);
+
+  if (pendingEinkTimestamp.length()) {
+    String ts = pendingEinkTimestamp.substring(0, (W - 4) / 6);
+    einkDrawStringRaw(buf, 2, 4, ts, W - 4);
   }
 
-  // --- Texte du header ---
-  String line = buildEinkHeaderLine();
-  if (!line.length()) return;
+  // ── Bande basse : artiste + œuvre ────────────────────────────
+  int footerY = H - FOOTER_H;
+  for (int py = footerY; py < H; py++)
+    for (int px = 0; px < W; px++)
+      einkSetPixelRaw(buf, px, py, UNCOLORED);
+  for (int px = 0; px < W; px++)
+    einkSetPixelRaw(buf, px, footerY, COLORED);
 
-  // Tronquer si trop long (pas de scroll sur e-ink)
-  int maxChars = visibleW / 6;   // font 6px wide
-  if (maxChars < 1) return;
-  if ((int)line.length() > maxChars) {
-    if (maxChars >= 4) line = line.substring(0, maxChars - 3) + "...";
-    else               line = line.substring(0, maxChars);
+  if (pendingEinkArtistName.length()) {
+    String art = pendingEinkArtistName.substring(0, (W - 4) / 6);
+    einkDrawStringRaw(buf, 2, footerY + 2, art, W - 4);
   }
-
-  // Ligne 1 : artiste | oeuvre (y=2)
-  einkDrawTextLineToBuffer(buf, line, 0, 2, true);
-
-  // Ligne 2 : timestamp seul si il y a de la place (y=12)
-  if (pendingEinkTimestamp.length() && EINKHEADERH >= 22) {
-    String ts = pendingEinkTimestamp;
-    int maxTs = visibleW / 6;
-    if ((int)ts.length() > maxTs) ts = ts.substring(0, maxTs);
-    einkDrawTextLineToBuffer(buf, ts, 0, 12, true);
+  if (pendingEinkAuthor.length()) {
+    String oe = pendingEinkAuthor.substring(0, (W - 4) / 6);
+    einkDrawStringRaw(buf, 2, footerY + 12, oe, W - 4);
   }
 }
+
+// Compose le buffer e-ink final (5808 octets) à partir du buffer OLED 1024 octets.
+// Place l'image dans la zone sous le header, gère l'orientation.
+// dst doit pointer sur EINK_BUF_FULL octets déjà alloués.
+
 
 // Compose le buffer e-ink final (5808 octets) à partir du buffer OLED 1024 octets.
 // Place l'image dans la zone sous le header, gère l'orientation.
@@ -6013,6 +7550,8 @@ void buildEinkStillBufferFromOledBuf(const uint8_t* src1024, uint8_t* dst) {
   // 5. Header par-dessus (fond blanc + texte noir + séparateur)
   drawEinkHeaderBar(dst);
 }
+
+
 
 // Envoie un buffer e-ink déjà composé (EINK_BUF_FULL octets) à l'écran.
 // Gère init → Display → Sleep.
@@ -6062,66 +7601,23 @@ void tickEinkStillHeader(const uint8_t* src1024) {
   }
 }
 
-
-
-
 void recoverOledAfterEink() {
   Serial.println(F("OLED recover after EINK..."));
-
-  // Sur ESP8266, pas de Wire.end() selon le core utilisé.
-  // On relance simplement l'I2C sur les bonnes pins.
-Wire.begin(OLED_SDA, OLED_SCL);
-  delay(20);
-
+  Wire.begin(OLED_SDA, OLED_SCL);
+  delay(30);
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-    Serial.println(F("OLED reinit FAILED"));
     delay(100);
-
-    // 2e tentative simple
     Wire.begin(OLED_SDA, OLED_SCL);
     delay(30);
-
     if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-      Serial.println(F("OLED reinit 2nd attempt FAILED"));
+      Serial.println(F("OLED reinit FAILED"));
       return;
     }
   }
-
   delay(20);
-  display.clearDisplay();
-
-  bool hasContent = false;
-  for (int i = 0; i < 1024; i++) {
-    if (lastRendered[i] != 0) {
-      hasContent = true;
-      break;
-    }
-  }
-
-  if (hasContent) {
-    for (int page = 0; page < 8; page++) {
-      for (int x = 0; x < 128; x++) {
-        uint8_t b = lastRendered[page * 128 + x];
-        for (int bit = 0; bit < 8; bit++) {
-          if (b & (1 << bit)) {
-            display.drawPixel(x, page * 8 + bit, SSD1306_WHITE);
-          }
-        }
-      }
-    }
-
-    // Redessiner le header OLED
-    drawHeaderBar();
-    display.display();
-    Serial.println(F("OLED lastRendered restored"));
-  } else {
-    display.display();
-    Serial.println(F("OLED no lastRendered, clear screen"));
-  }
+  renderBufferWithHeader(lastRendered);
+  Serial.println(F("OLED recovered with header"));
 }
-
-
-
 
 
 bool writeGallerySlotJson(int slot,
@@ -6208,15 +7704,11 @@ bool saveGifToGallery(AnimFrame frames[], int count, const String& author, const
   if (galleryIndex.count < GALLERY_SIZE) galleryIndex.count++;
   saveGalleryIndex();
 
-  pendingAuthor = "";
-  pendingTimestamp = "";
-  pendingArtistName = "";
   pendingEthAddress = "";
   pendingForSale = false;
   pendingUid = "";
   pendingType = "still";
   pendingMode = "still";
-
   return true;
 }
 
@@ -6379,8 +7871,8 @@ void setup() {
   // LIVEBOX (MAISON) - IP FIXE
   // =====================================================
 
-  const char* ssid = "Livebox-4CF0";
-  const char* password = "6jhVfMstXQTAx9TWb9";
+  const char* ssid = "Livebox-D190";
+  const char* password = "Q2gueWg3UaYJo2VN7C";
 
   IPAddress local_IP(192, 168, 1, 16);
   IPAddress gateway(192, 168, 1, 1);
@@ -6461,6 +7953,36 @@ if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
   server.begin();
   Serial.println("Serveur 5058 OK");
 }
+bool serveLittleFSFile(WiFiClient& client, const char* path, const char* contentType) {
+  Serial.printf("[LFS] open %s\n", path);
+  File file = LittleFS.open(path, "r");
+  if (!file) {
+    Serial.println("[LFS] open failed");
+    return false;
+  }
+
+  size_t size = file.size();
+  Serial.printf("[LFS] size=%u\n", (unsigned)size);
+
+  client.println("HTTP/1.1 200 OK");
+  client.print("Content-Type: ");
+  client.println(contentType);
+  client.print("Content-Length: ");
+  client.println(size);                      // ✅ FIX CRITIQUE
+  client.println("Cache-Control: public, max-age=86400");
+  client.println("Connection: close");
+  client.println();
+
+  uint8_t buf[512];
+  while (file.available()) {
+    size_t len = file.read(buf, sizeof(buf));
+    client.write(buf, len);                  // ✅ OK
+  }
+
+  file.close();
+  return true;
+}
+
 
 void sendHTML(WiFiClient& client) {
   Serial.println(F("[HTML] sendHTML() start"));
@@ -6510,7 +8032,9 @@ void renderBuffer(uint8_t* buf) {
   static uint8_t last[1024] = {0};
 
   bool isClear = true;
-  for (int i = 0; i < 1024; i++) if (buf[i]) { isClear = false; break; }
+  for (int i = 0; i < 1024; i++) {
+    if (buf[i]) { isClear = false; break; }
+  }
 
   if (isClear) {
     display.clearDisplay();
@@ -6520,30 +8044,55 @@ void renderBuffer(uint8_t* buf) {
     return;
   }
 
+  auto drawMappedPixel = [&](int sx, int sy, bool on) {
+    int dx = sx;
+    int dy = sy;
+
+    // Paysage: normal
+    // Portrait: même preview que ton JS, puis flip 180° pour corriger l'écran physique
+if (currentOrientation.startsWith("portrait")) {
+      dx = 63;
+      dy = 127 - sx;
+    }
+
+    if (dx < 0 || dx >= 128 || dy < 0 || dy >= 64) return;
+    display.drawPixel(dx, dy, on ? SSD1306_WHITE : SSD1306_BLACK);
+  };
+
   if (!renderCacheValid) {
     display.clearDisplay();
-    for (int page = 0; page < 8; page++)
+    for (int page = 0; page < 8; page++) {
       for (int x = 0; x < 128; x++) {
-        const uint8_t b = buf[page*128+x];
-        for (int bit = 0; bit < 8; bit++)
-          if (b & (1<<bit)) display.drawPixel(x, page*8+bit, SSD1306_WHITE);
-      }
-  } else {
-    for (int page = 0; page < 8; page++)
-      for (int x = 0; x < 128; x++) {
-        uint8_t b = buf[page*128+x], lb = last[page*128+x];
-        if (b == lb) continue;
-        for (int row = 0; row < 8; row++) {
-          bool np = (b>>row)&1, lp = (lb>>row)&1;
-          if (np != lp) display.drawPixel(x, page*8+row, np ? SSD1306_WHITE : SSD1306_BLACK);
+        const uint8_t b = buf[page * 128 + x];
+        for (int bit = 0; bit < 8; bit++) {
+          bool on = b & (1 << bit);
+          drawMappedPixel(x, page * 8 + bit, on);
         }
       }
+    }
+  } else {
+    for (int page = 0; page < 8; page++) {
+      for (int x = 0; x < 128; x++) {
+        uint8_t b  = buf[page * 128 + x];
+        uint8_t lb = last[page * 128 + x];
+        if (b == lb) continue;
+
+        for (int row = 0; row < 8; row++) {
+          bool np = b  & (1 << row);
+          bool lp = lb & (1 << row);
+          if (np != lp) {
+            drawMappedPixel(x, page * 8 + row, np);
+          }
+        }
+      }
+    }
   }
 
   display.display();
   memcpy(last, buf, 1024);
   renderCacheValid = true;
 }
+
 void freeAnimFrames() {
   for (int i = 0; i < animFrameCount; i++) {
     if (animFrames[i].buf) { free(animFrames[i].buf); animFrames[i].buf = nullptr; }
@@ -6553,14 +8102,18 @@ void freeAnimFrames() {
 }
 
 
+
 void tickAnim() {
   if (!animRunning || animFrameCount == 0) return;
   unsigned long now = millis();
   if (now - animLastT < animFrames[animCurFrame].delay) return;
   animLastT = now;
   animCurFrame = (animCurFrame + 1) % animFrameCount;
-renderBufferWithHeader(animFrames[animCurFrame].buf);
+  // Mettre à jour lastRendered pour que tickStillHeader puisse aussi l'utiliser
+  memcpy(lastRendered, animFrames[animCurFrame].buf, 1024);
+  renderBufferWithHeader(animFrames[animCurFrame].buf);
 }
+
 
 
 bool streamGallerySlotJson(WiFiClient& client, int slot) {
@@ -7277,6 +8830,26 @@ void loop() {
     return;
   }
 
+
+if (req.startsWith("GET /logo.png")) { //apple-touch-icon
+  Serial.println("[ROUTE] logo.png");
+  bool ok = serveLittleFSFile(client, "/logo.png", "image/png");
+  Serial.printf("[ROUTE] apple served=%d\n", ok);
+  return;
+}
+
+if (req.indexOf("GET /favicon-32.png") >= 0) {
+  Serial.println("[ROUTE] favicon-32.png");
+  serveLittleFSFile(client, "/favicon-32.png", "image/png");
+  return;
+}
+
+if (req.indexOf("GET /favicon.ico") >= 0) {
+  Serial.println("[ROUTE] favicon.ico");
+  serveLittleFSFile(client, "/favicon-32.png", "image/png"); // fallback
+  return;
+}
+
   // =========================
   // POST /draw
   // =========================
@@ -7297,6 +8870,7 @@ void loop() {
         contentLength = line.substring(strlen("Content-Length:")).toInt();
       }
     }
+freeAnimFrames();
 
     Serial.print(F("[DRAW] Content-Length = "));
     Serial.println(contentLength);
@@ -7321,12 +8895,16 @@ void loop() {
     }
 
 // APRÈS
-freeAnimFrames();
 memcpy(lastRendered, buf, 1024);
-renderBufferWithHeader(lastRendered);
 
 // Sauvegarder en galerie seulement si ?save=0 absent
+// Forcer re-render avec header (saveToGallery ne vide plus les pending)
+
+renderBufferWithHeader(lastRendered);
+
 if (req.indexOf("save=0") < 0) saveToGallery(lastRendered);
+
+
 
     client.println(F("HTTP/1.1 200 OK"));
     client.println(F("Access-Control-Allow-Origin: *"));
@@ -7449,6 +9027,7 @@ if (req.startsWith("GET /gallery-item?slot=")) {
   // GET /username?n=...
   // =========================
 
+
 if (req.startsWith("GET /username?")) {
   while (client.connected()) {
     String line = client.readStringUntil('\n');
@@ -7456,54 +9035,59 @@ if (req.startsWith("GET /username?")) {
     if (!line.length()) break;
   }
 
-pendingAuthor = getQueryParam(req, "n");
-pendingAuthor = pendingAuthor.substring(0, 20);
+  pendingAuthor = getQueryParam(req, "n");
+  pendingAuthor = pendingAuthor.substring(0, 20);
 
-pendingTimestamp = getQueryParam(req, "ts");
-if (!pendingTimestamp.length()) {
-  unsigned long sec = millis() / 1000;
-  char tbuf[20];
-  snprintf(tbuf, sizeof(tbuf), "%lus boot", sec);
-  pendingTimestamp = String(tbuf);
-}
-pendingTimestamp = pendingTimestamp.substring(0, 23);
+  pendingTimestamp = getQueryParam(req, "ts");
+  if (!pendingTimestamp.length()) {
+    unsigned long sec = millis() / 1000;
+    char tbuf[20];
+    snprintf(tbuf, sizeof(tbuf), "%lus boot", sec);
+    pendingTimestamp = String(tbuf);
+  }
+  pendingTimestamp = pendingTimestamp.substring(0, 23);
 
-String artistName = getQueryParam(req, "a");
-artistName = artistName.substring(0, 20);
+  String artistName = getQueryParam(req, "a");
+  artistName = artistName.substring(0, 20);
 
-String ethAddress = getQueryParam(req, "eth");
-ethAddress = ethAddress.substring(0, 42);
+  String ethAddress = getQueryParam(req, "eth");
+  ethAddress = ethAddress.substring(0, 42);
 
-pendingArtistName = artistName.length() ? artistName : pendingAuthor;
-pendingEthAddress = ethAddress;
-pendingForSale = pendingEthAddress.length() > 0;
+  // ── Orientation OLED ──────────────────────────────────────────
+  String orient = getQueryParam(req, "orient");
+  if (orient.length()) {
+    oledPortrait = (orient == "portrait");
+  }
+  // Si absent, on garde l'orientation précédente (cohérence animation)
 
-// pour les envois standards via /username : œuvre fixe par défaut
-pendingType = "still";
-pendingMode = "still";
-pendingUid = makeUid(pendingType, pendingMode, pendingArtistName, pendingAuthor, pendingTimestamp);
+  pendingArtistName = artistName.length() ? artistName : pendingAuthor;
+  pendingEthAddress = ethAddress;
+  pendingForSale = pendingEthAddress.length() > 0;
 
-Serial.println(F("[ROUTE] /username"));
-logGalleryMeta("pending from /username",
-               -1,
-               pendingUid,
-               pendingType,
-               pendingMode,
-               pendingAuthor,
-               pendingArtistName,
-               pendingTimestamp,
-               pendingForSale,
-               pendingEthAddress);
+  pendingType = "still";
+  pendingMode = "still";
+  pendingUid = makeUid(pendingType, pendingMode, pendingArtistName, pendingAuthor, pendingTimestamp);
 
-  Serial.print(F("[USERNAME] artwork="));
-  Serial.println(pendingAuthor);
-  Serial.print(F("[USERNAME] artist="));
-  Serial.println(pendingArtistName);
-  Serial.print(F("[USERNAME] stamp="));
-  Serial.println(pendingTimestamp);
+  Serial.println(F("[ROUTE] /username"));
+  Serial.print(F("[USERNAME] oledPortrait="));
+  Serial.println(oledPortrait ? F("true") : F("false"));
+
+  logGalleryMeta("pending from /username",
+                 -1,
+                 pendingUid,
+                 pendingType,
+                 pendingMode,
+                 pendingAuthor,
+                 pendingArtistName,
+                 pendingTimestamp,
+                 pendingForSale,
+                 pendingEthAddress);
+
+  Serial.print(F("[USERNAME] artwork="));   Serial.println(pendingAuthor);
+  Serial.print(F("[USERNAME] artist="));    Serial.println(pendingArtistName);
+  Serial.print(F("[USERNAME] stamp="));     Serial.println(pendingTimestamp);
   if (ethAddress.length()) {
-    Serial.print(F("[USERNAME] eth="));
-    Serial.println(ethAddress);
+    Serial.print(F("[USERNAME] eth="));     Serial.println(ethAddress);
   }
 
   invalidateRenderCache();
@@ -7517,6 +9101,10 @@ logGalleryMeta("pending from /username",
   drainAndClose(client);
   return;
 }
+
+
+
+
   // =========================
   // GET /invert
   // =========================
@@ -7888,18 +9476,12 @@ if (req.startsWith("GET /eink-username?")) {
 if (req.startsWith("POST /eink-draw")) {
   int contentLength = -1;
 
-  // Lire les headers HTTP
   while (client.connected()) {
     String line = client.readStringUntil('\n');
     line.trim();
     if (!line.length()) break;
-
-    Serial.print(F("[EINK HDR] "));
-    Serial.println(line);
-
-    if (line.startsWith("Content-Length:")) {
+    if (line.startsWith("Content-Length:"))
       contentLength = line.substring(15).toInt();
-    }
   }
 
   Serial.printf("[EINK] /eink-draw Content-Length=%d (attendu %d)\n",
@@ -7910,8 +9492,7 @@ if (req.startsWith("POST /eink-draw")) {
     client.println(F("Access-Control-Allow-Origin: *"));
     client.println(F("Connection: close"));
     client.println();
-    client.printf("ERR: attendu %d octets, reçu %d\n",
-                  EINK_BUF_FULL, contentLength);
+    client.printf("ERR: attendu %d octets, recu %d\n", EINK_BUF_FULL, contentLength);
     drainAndClose(client);
     return;
   }
@@ -7929,11 +9510,9 @@ if (req.startsWith("POST /eink-draw")) {
 
   int total = 0;
   unsigned long deadline = millis() + 10000;
-
   while (total < EINK_BUF_FULL && millis() < deadline) {
-    while (client.available() && total < EINK_BUF_FULL) {
+    while (client.available() && total < EINK_BUF_FULL)
       buf[total++] = client.read();
-    }
     yield();
   }
 
@@ -7950,7 +9529,14 @@ if (req.startsWith("POST /eink-draw")) {
     return;
   }
 
-  // Répondre vite au navigateur avant le refresh e-ink
+  // ── Ajouter le header bar dans le buffer e-ink reçu ──────────
+  // Le buffer JS est déjà au bon format (MSB, 5808 octets)
+  // On surcharge la zone header avec drawEinkHeaderBar()
+  if (pendingEinkAuthor.length() || pendingEinkArtistName.length() || pendingEinkTimestamp.length()) {
+    drawEinkHeaderBar(buf);
+  }
+
+  // Répondre vite au navigateur AVANT le refresh e-ink (lent ~2s)
   client.println(F("HTTP/1.1 200 OK"));
   client.println(F("Access-Control-Allow-Origin: *"));
   client.println(F("Connection: close"));
@@ -7958,17 +9544,14 @@ if (req.startsWith("POST /eink-draw")) {
   client.println(F("OK"));
   drainAndClose(client);
 
-
-// Fin du handler POST eink-draw (après drainAndClose)
-renderEinkBuffer(buf);  // contient déjà epd.Sleep()   // Refresh e-ink après réponse HTTP
-
-free(buf);
-recoverOledAfterEink();  // ← ajouter si absent ou s'assurer qu'il est là
-return;
-
-
-
+  // Refresh e-ink (bloquant ~2s)
+  renderEinkBuffer(buf);
+  free(buf);
+  recoverOledAfterEink();
+  return;
 }
+
+
 
   // =========================
   // Fallback HTML
@@ -7985,355 +9568,3 @@ return;
   sendHTML(client);
   client.stop();
 }
-/*
-//API Sync-to-discord MAXFRAME
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { PNG } from 'pngjs';
-
-type PublishPayload = {
-  secret?: string;
-  uid?: string;
-  type?: string;
-  mode?: string;
-  name?: string;
-  artist?: string;
-  timestamp?: string;
-  forSale?: boolean;
-  ethAddress?: string;
-  text?: string;
-  // format direct (browser)
-  oledBuffer?: number[];
-  frames?: Array<number[] | { buffer: number[]; delay?: number }>;
-  delays?: number[];
-  // format compact (ESP relay, petit payload)
-  oledBufferCompact?: string | string[];
-  framesCompact?: Array<{ buf: string; delay?: number }>;
-};
-
-type OledFrame = { buffer: number[]; delay: number };
-
-const DISCORD_API = 'https://discord.com/api/v10';
-
-function sanitize(s?: string, fallback = ''): string {
-  return (s || fallback).toString().trim();
-}
-function truncate(s: string, n: number): string {
-  return s.length > n ? `${s.slice(0, n - 1)}…` : s;
-}
-function buildUid(payload: PublishPayload): string {
-  if (payload.uid?.trim()) return payload.uid.trim();
-  const stamp = sanitize(payload.timestamp, new Date().toISOString())
-    .replace(/[/:\s]+/g, '-').replace(/-+/g, '-');
-  const artist = sanitize(payload.artist, 'anonyme').toLowerCase().replace(/[^a-z0-9]+/g, '-');
-  const name   = sanitize(payload.name,   'sans-titre').toLowerCase().replace(/[^a-z0-9]+/g, '-');
-  const type   = sanitize(payload.type,   'still').toLowerCase();
-  const mode   = sanitize(payload.mode,   'still').toLowerCase();
-  return `${stamp}-${type}-${mode}-${artist}-${name}`.replace(/-+/g, '-');
-}
-
-// ── Frame extraction — handles all input formats ──────────────────
-function hexStrToBuffer(hex: string): number[] | null {
-  if (typeof hex !== 'string' || hex.length !== 2048) return null;
-  const buf = new Array<number>(1024);
-  for (let i = 0; i < 1024; i++) {
-    const b = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
-    if (isNaN(b)) return null;
-    buf[i] = b;
-  }
-  return buf;
-}
-
-function extractAllFrames(payload: PublishPayload): OledFrame[] {
-  const out: OledFrame[] = [];
-
-  // 1. framesCompact [{buf:"2048hex", delay:N}]  — ESP compact format
-  if (Array.isArray(payload.framesCompact) && payload.framesCompact.length > 0) {
-    for (const f of payload.framesCompact) {
-      const buf = hexStrToBuffer(f?.buf ?? '');
-      if (buf) out.push({ buffer: buf, delay: f.delay ?? 100 });
-    }
-    if (out.length > 0) {
-      console.log(`[frames] framesCompact → ${out.length} frames`);
-      return out;
-    }
-  }
-
-  // 2. frames [{buffer:[...1024], delay}] or [[...1024]]  — JS direct
-  if (Array.isArray(payload.frames) && payload.frames.length > 0) {
-    for (let i = 0; i < payload.frames.length; i++) {
-      const f = payload.frames[i] as any;
-      let buf: number[] | null = null;
-      if (Array.isArray(f) && f.length === 1024) buf = f;
-      else if (Array.isArray(f?.buffer) && f.buffer.length === 1024) buf = f.buffer;
-      if (buf) out.push({ buffer: buf, delay: f?.delay ?? payload.delays?.[i] ?? 100 });
-    }
-    if (out.length > 0) {
-      console.log(`[frames] frames[] → ${out.length} frames`);
-      return out;
-    }
-  }
-
-  // 3. oledBufferCompact "2048hex"  — single frame compact
-  if (payload.oledBufferCompact) {
-    let buf: number[] | null = null;
-    if (typeof payload.oledBufferCompact === 'string') {
-      buf = hexStrToBuffer(payload.oledBufferCompact);
-    } else if (Array.isArray(payload.oledBufferCompact) && payload.oledBufferCompact.length === 1024) {
-      buf = (payload.oledBufferCompact as string[]).map(h => parseInt(h, 16));
-    }
-    if (buf) {
-      out.push({ buffer: buf, delay: 1000 });
-      console.log('[frames] oledBufferCompact → 1 frame');
-      return out;
-    }
-  }
-
-  // 4. oledBuffer [0..255 ×1024]  — single frame direct
-  if (Array.isArray(payload.oledBuffer) && payload.oledBuffer.length === 1024) {
-    out.push({ buffer: payload.oledBuffer, delay: 1000 });
-    console.log('[frames] oledBuffer → 1 frame');
-  }
-
-  return out;
-}
-
-// ── PNG encoder (4× scale, blue-on-black) ────────────────────────
-function oledToPng(buffer: number[]): Buffer {
-  const S = 4, W = 128 * S, H = 64 * S;
-  const png = new PNG({ width: W, height: H });
-  for (let page = 0; page < 8; page++) {
-    for (let x = 0; x < 128; x++) {
-      const b = buffer[page * 128 + x] || 0;
-      for (let bit = 0; bit < 8; bit++) {
-        const on = ((b >> bit) & 1) === 1;
-        for (let dy = 0; dy < S; dy++) for (let dx = 0; dx < S; dx++) {
-          const idx = (((page * 8 + bit) * S + dy) * W + (x * S + dx)) << 2;
-          png.data[idx]     = on ? 0x44 : 0;
-          png.data[idx + 1] = on ? 0xaa : 0;
-          png.data[idx + 2] = on ? 0xff : 0;
-          png.data[idx + 3] = 255;
-        }
-      }
-    }
-  }
-  return PNG.sync.write(png);
-}
-
-// ── GIF encoder (pure TS, 2× scale, blue-on-black) ───────────────
-function encodeAnimatedGif(frames: OledFrame[]): Buffer {
-  const S = 2, W = 128 * S, H = 64 * S;
-  const out: number[] = [];
-  const u8  = (v: number) => out.push(v & 0xff);
-  const u16 = (v: number) => { out.push(v & 0xff); out.push((v >> 8) & 0xff); };
-  const str = (s: string) => { for (let i = 0; i < s.length; i++) u8(s.charCodeAt(i)); };
-
-  str('GIF89a'); u16(W); u16(H);
-  u8(0b10000000); u8(0); u8(0);
-  out.push(0x00, 0x00, 0x00); // index 0 = black
-  out.push(0x44, 0xaa, 0xff); // index 1 = OLED blue
-
-  // Netscape loop
-  u8(0x21); u8(0xff); u8(0x0b);
-  str('NETSCAPE2.0');
-  u8(3); u8(1); u16(0); u8(0);
-
-  function lzwEncode(indices: number[]): number[] {
-    const CLEAR = 4, END = 5;
-    const res: number[] = [];
-    let bits = 0, cur = 0, codeSize = 3;
-    const dict = new Map<string, number>();
-    let next = END + 1;
-    const reset = () => { dict.clear(); next = END + 1; codeSize = 3; };
-    const emit  = (code: number) => {
-      cur |= code << bits; bits += codeSize;
-      while (bits >= 8) { res.push(cur & 0xff); cur >>= 8; bits -= 8; }
-    };
-    reset(); emit(CLEAR);
-    let buf = '';
-    for (let i = 0; i <= indices.length; i++) {
-      const c   = i < indices.length ? String.fromCharCode(indices[i]) : null;
-      const nxt = c !== null ? buf + c : null;
-      if (c !== null && dict.has(nxt!)) { buf = nxt!; }
-      else {
-        emit(buf.length === 1 ? buf.charCodeAt(0) : dict.get(buf)!);
-        if (c !== null) {
-          if (next < 4096) { dict.set(nxt!, next++); if (next > (1 << codeSize) && codeSize < 12) codeSize++; }
-          else { emit(CLEAR); reset(); }
-          buf = c;
-        }
-      }
-    }
-    emit(END);
-    if (bits > 0) res.push(cur & 0xff);
-    return res;
-  }
-
-  const writeBlocks = (data: number[]) => {
-    for (let i = 0; i < data.length; i += 255) {
-      const chunk = data.slice(i, i + 255);
-      u8(chunk.length);
-      for (const b of chunk) u8(b);
-    }
-    u8(0);
-  };
-
-  for (const frame of frames) {
-    const delay = Math.max(2, Math.round(frame.delay / 10));
-    u8(0x21); u8(0xf9); u8(0x04);
-    u8(0b00000100); u16(delay); u8(0); u8(0);
-    u8(0x2c); u16(0); u16(0); u16(W); u16(H); u8(0);
-    const indices = new Array<number>(W * H);
-    for (let page = 0; page < 8; page++) {
-      for (let x = 0; x < 128; x++) {
-        const b = frame.buffer[page * 128 + x] || 0;
-        for (let bit = 0; bit < 8; bit++) {
-          const on = (b >> bit) & 1;
-          const sy = page * 8 + bit;
-          for (let dy = 0; dy < S; dy++) for (let dx = 0; dx < S; dx++)
-            indices[(sy * S + dy) * W + (x * S + dx)] = on;
-        }
-      }
-    }
-    u8(2); writeBlocks(lzwEncode(indices));
-  }
-  u8(0x3b);
-  return Buffer.from(out);
-}
-
-// ── Discord content ───────────────────────────────────────────────
-function buildContent(payload: PublishPayload, uid: string): string {
-  const type    = sanitize(payload.type,   'still');
-  const mode    = sanitize(payload.mode,   'still');
-  const name    = sanitize(payload.name,   'Sans titre');
-  const artist  = sanitize(payload.artist, 'Anonyme');
-  const ts      = sanitize(payload.timestamp, new Date().toLocaleString('fr-FR'));
-  const eth     = sanitize(payload.ethAddress);
-  const forSale = payload.forSale ? 'oui' : 'non';
-
-  const isPoetry  = type === 'poetry';
-  const isAnim    = mode === 'anim' || mode === 'scroll';
-  const isProfile = type === 'profile';
-
-  const emoji = isProfile ? '👤' : isPoetry ? '✍️' : isAnim ? '🎬' : '🖼️';
-  const label = isProfile           ? 'Mise à jour profil'
-    : isPoetry && isAnim            ? 'Poésie scroll OLED'
-    : isPoetry                      ? 'Nouvelle poésie OLED'
-    : isAnim                        ? 'Nouvelle animation OLED'
-    :                                 'Nouvelle œuvre OLED';
-
-  const lines = [`${emoji} **${label}**`, `**Nom:** ${name}`, `**Artiste:** ${artist}`, `**Date:** ${ts}`];
-  if (!isProfile) {
-    lines.push(`**Type:** ${type} | **Mode:** ${mode}`, `**À vendre:** ${forSale}`);
-    if (eth) lines.push(`**ETH:** ${eth}`);
-  }
-  lines.push(`**UID:** \`${uid}\``);
-  if (payload.text) lines.push('', '**Texte:**', truncate(payload.text, 1200));
-  return lines.join('\n');
-}
-
-// ── Discord post (multipart with fallback) ────────────────────────
-async function postToDiscord(
-  channelId: string, token: string, content: string,
-  file?: { data: Buffer; name: string; mime: string }
-): Promise<{ ok: boolean; status: number; body: string }> {
-  const url = `${DISCORD_API}/channels/${channelId}/messages`;
-
-  if (!file) {
-    const r = await fetch(url, {
-      method: 'POST',
-      headers: { Authorization: `Bot ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content }),
-    });
-    return { ok: r.ok, status: r.status, body: await r.text() };
-  }
-
-  const boundary = `rescoe${Date.now()}`;
-  const body = Buffer.concat([
-    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="payload_json"\r\nContent-Type: application/json\r\n\r\n${JSON.stringify({ content })}\r\n`, 'utf8'),
-    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="files[0]"; filename="${file.name}"\r\nContent-Type: ${file.mime}\r\n\r\n`, 'utf8'),
-    file.data,
-    Buffer.from(`\r\n--${boundary}--\r\n`, 'utf8'),
-  ]);
-
-  console.log(`[Discord] POST ${file.name} ${file.data.length}B — total ${body.length}B`);
-
-  const r = await fetch(url, {
-    method: 'POST',
-    headers: { Authorization: `Bot ${token}`, 'Content-Type': `multipart/form-data; boundary=${boundary}` },
-    body,
-  });
-  const txt = await r.text();
-  console.log(`[Discord] ${r.status} — ${txt.slice(0, 200)}`);
-
-  if (r.status === 403) {
-    console.error('[Discord] 403 ATTACH_FILES missing');
-    const r2 = await fetch(url, {
-      method: 'POST',
-      headers: { Authorization: `Bot ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: content + '\n\n⚠️ *[image non jointe — permission ATTACH_FILES manquante]*' }),
-    });
-    return { ok: r2.ok, status: r2.status, body: await r2.text() };
-  }
-  return { ok: r.ok, status: r.status, body: txt };
-}
-
-// ── Handler ───────────────────────────────────────────────────────
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', '*');
-  if (req.method === 'OPTIONS') return res.status(204).end();
-
-  console.log('--- SYNC HIT ---');
-
-  try {
-    const payload = (req.body || {}) as PublishPayload;
-    const type = sanitize(payload.type, 'still');
-    const mode = sanitize(payload.mode, 'still');
-
-    console.log(`type=${type} mode=${mode} oledBuffer=${payload.oledBuffer?.length ?? 'none'} framesCompact=${Array.isArray(payload.framesCompact) ? payload.framesCompact.length : 'none'} frames=${Array.isArray(payload.frames) ? payload.frames.length : 'none'}`);
-
-    const token     = process.env.DISCORD_TOKEN || '';
-    const channelId = process.env.NEXT_PUBLIC_CHANNEL_EXPOS_ID || '';
-    if (!token || !channelId) return res.status(500).json({ ok: false, error: 'missing_env' });
-
-    const uid     = buildUid(payload);
-    const content = buildContent(payload, uid);
-    const frames  = extractAllFrames(payload);
-
-    console.log(`frames extracted: ${frames.length}`);
-
-    let file: { data: Buffer; name: string; mime: string } | undefined;
-    const isAnimation    = (type === 'gif' || mode === 'anim') && type !== 'poetry';
-    const isPoetryScroll = type === 'poetry' && mode === 'scroll';
-
-    if (isPoetryScroll) {
-      console.log('poetry scroll → text only');
-    } else if (isAnimation && frames.length > 1) {
-      console.log(`encoding GIF: ${frames.length} frames`);
-      const gif = encodeAnimatedGif(frames);
-      console.log(`GIF: ${gif.length}B`);
-      file = { data: gif, name: 'animation.gif', mime: 'image/gif' };
-    } else if (frames.length >= 1) {
-      const png = oledToPng(frames[0].buffer);
-      console.log(`PNG: ${png.length}B`);
-      file = { data: png, name: 'oled.png', mime: 'image/png' };
-    } else {
-      console.warn('no frames → text only');
-    }
-
-    const discord = await postToDiscord(channelId, token, content, file);
-    return res.status(200).json({ ok: discord.ok, uid, discord });
-
-  } catch (err: any) {
-    console.error('FATAL:', err);
-    return res.status(200).json({ ok: false, error: err?.message ?? 'unknown' });
-  }
-}
-
-export const config = {
-  api: { bodyParser: { sizeLimit: '8mb' } },
-};
-
-
-*/
