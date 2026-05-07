@@ -1,14 +1,15 @@
 // hooks/useHatchEgg.ts
 import { useState, useCallback, useEffect, useRef } from "react";
-import Web3 from "web3";
 import { JsonRpcProvider, Contract as EthersContract } from "ethers";
 import ABI from "@/components/ABI/ABIAdhesion.json";
 import { useAuth } from "@/utils/authContext";
-import axios from "axios";
-import getRandomInsectGif from "@/utils/GenInsect25";
+import { usePinataUpload } from "./usePinataUpload";
+import hatchEngine from "@/utils/hatchEngine";          // ✅ moteur dédié lvl0
 import colorProfilesJson from "@/data/gif_profiles_smart_colors.json";
 
-type FamilyKey = keyof typeof colorProfilesJson.families;
+/* ------------------------------------------------------------------ */
+/* TYPES                                                               */
+/* ------------------------------------------------------------------ */
 
 interface MembershipInfo {
   level: number;
@@ -26,156 +27,218 @@ interface TokenInfo {
   metadata?: any;
 }
 
-interface InsectData {
-  imageUrl: string;
-  display_name: string;
-  attributes: any[];
-  spriteName: string;
+interface HatchResult {
+  imageUri: string | null;
+  metadataUri: string | null;
+  isReady: boolean;
 }
 
-interface EvolutionOption {
-  id: string;
-  insect: InsectData;
-  family: string;
-  colorProfile?: any;
-}
+/* ------------------------------------------------------------------ */
+/* HOOK                                                                */
+/* ------------------------------------------------------------------ */
 
 export const useHatchEgg = (contractAddress: string, eggTokenId: number) => {
-  const { address: account } = useAuth();
+  const { address: account, web3, isAuthenticated } = useAuth();
+  const { uploadToIPFS } = usePinataUpload();
 
-  const [isHatching, setIsHatching] = useState(false);
-  const [txHash, setTxHash] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [isHatching, setIsHatching]   = useState(false);
+  const [isPreparing, setIsPreparing] = useState(false);
+  const [txHash, setTxHash]           = useState<string | null>(null);
+  const [error, setError]             = useState<string | null>(null);
 
-  const [evolutionOptions, setEvolutionOptions] = useState<EvolutionOption[]>([]);
-  const [selectedEvolution, setSelectedEvolution] = useState<EvolutionOption | null>(null);
+  const [hatchImageUri, setHatchImageUri]       = useState<string | null>(null);
+  const [hatchMetadataUri, setHatchMetadataUri] = useState<string | null>(null);
+  const [previewImageUrl, setPreviewImageUrl]   = useState<string | null>(null);
+  const [isReady, setIsReady]                   = useState(false);
 
   const eggInfoRef = useRef<TokenInfo | null>(null);
 
   /* ------------------------------------------------------------------ */
-  /* 1. CHECK ŒUF                                                        */
+  /* 1. CHARGE LES INFOS DE L'ŒUF                                       */
   /* ------------------------------------------------------------------ */
-  const checkIsEggReady = useCallback(async (): Promise<TokenInfo | null> => {
+  const loadEggInfo = useCallback(async (): Promise<TokenInfo | null> => {
     if (eggInfoRef.current) return eggInfoRef.current;
 
     try {
+      console.log('[HatchEgg] Chargement œuf #', eggTokenId);
+
       const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!);
       const contract = new EthersContract(contractAddress, ABI, provider);
 
-      const raw = await contract.getMembershipInfo(eggTokenId);
-      const TT = contract.getMembershipInfo(25);
-      //console.log("coucou");
-      //console.log(raw);
-      //console.log(TT);
-
+      const raw  = await contract.getMembershipInfo(eggTokenId);
       const info: MembershipInfo = {
-        level: Number(raw.level),
-        autoEvolve: Boolean(raw.autoEvolve),
-        startTimestamp: Number(raw.startTimestamp),
+        level:               Number(raw.level),
+        autoEvolve:          Boolean(raw.autoEvolve),
+        startTimestamp:      Number(raw.startTimestamp),
         expirationTimestamp: Number(raw.expirationTimestamp),
-        totalYears: Number(raw.totalYears),
-        locked: Boolean(raw.locked),
-        isEgg: Boolean(raw.isEgg),
+        totalYears:          Number(raw.totalYears),
+        locked:              Boolean(raw.locked),
+        isEgg:               Boolean(raw.isEgg),
       };
 
-      if (!info.isEgg) throw new Error("Token n'est pas un œuf");
-      if (info.level !== 0) throw new Error("Niveau invalide");
+      console.log('[HatchEgg] MembershipInfo:', info);
+
+      if (!info.isEgg)      throw new Error("Token n'est pas un œuf");
+      if (info.level !== 0) throw new Error("Niveau invalide pour un œuf");
 
       const readyTime = info.startTimestamp + 120;
-      const now = Date.now() / 1000;
+      const now       = Date.now() / 1000;
       if (now < readyTime) throw new Error(`Œuf pas encore prêt (${Math.ceil(readyTime - now)}s)`);
 
+      // Metadata de l'œuf pour récupérer la famille
       const uri = await contract.tokenURI(eggTokenId);
-      const ipfsHash = uri.split("/").pop();
-      const res = await fetch(`/api/proxyPinata?ipfsHash=${ipfsHash}`);
+      console.log('[HatchEgg] tokenURI:', uri);
+
+      const cid = uri.startsWith('ipfs://')
+        ? uri.replace('ipfs://', '').split('?')[0]
+        : uri.replace(/^https?:\/\/[^/]+\/ipfs\//, '');
+
+      const res = await fetch(`/api/metadata/${cid}`);
+      if (!res.ok) throw new Error(`Metadata fetch failed: ${res.status}`);
       const metadata = await res.json();
+      console.log('[HatchEgg] Metadata œuf:', metadata);
 
       const tokenInfo = { tokenId: eggTokenId, membershipInfo: info, metadata };
       eggInfoRef.current = tokenInfo;
-
       return tokenInfo;
     } catch (e: any) {
+      console.error('[HatchEgg] loadEggInfo error:', e.message);
       setError(e.message);
       return null;
     }
   }, [contractAddress, eggTokenId]);
 
   /* ------------------------------------------------------------------ */
-  /* 2. GÉNÉRATION DES 3 ÉVOLUTIONS (FIGÉES & UNIQUES)                   */
+  /* 2. PRÉPARE L'ÉCLOSION                                               */
+  /*    hatchEngine → insecte lvl0                                       */
+  /*    uploadToIPFS → /api/pinata/upload (scope badges, pas de 401)    */
   /* ------------------------------------------------------------------ */
-  const generateEvolutionOptions = useCallback((family: string) => {
-    const options: EvolutionOption[] = [];
-    const usedSprites = new Set<string>();
-
-    while (options.length < 3) {
-
-      const insect = getRandomInsectGif(0);
-
-      if (usedSprites.has(insect.spriteName)) continue;
-      usedSprites.add(insect.spriteName);
-
-      const colorProfile =
-        colorProfilesJson.families[family as FamilyKey]?.find(
-          p => p.filename === insect.spriteName
-        );
-
-      options.push({
-        id: crypto.randomUUID(),
-        insect,
-        family,
-        colorProfile,
-      });
+  const prepareHatch = useCallback(async (): Promise<HatchResult> => {
+    if (isReady && hatchMetadataUri) {
+      console.log('[HatchEgg] Déjà prêt, URIs en cache');
+      return { imageUri: hatchImageUri, metadataUri: hatchMetadataUri, isReady: true };
     }
 
-    setEvolutionOptions(options);
-  }, [eggTokenId]);
+    if (!account) {
+      setError('Wallet non connecté');
+      return { imageUri: null, metadataUri: null, isReady: false };
+    }
 
-  /* ------------------------------------------------------------------ */
-  /* 3. MÉTADATA FINAL (1 SOURCE DE VÉRITÉ)                              */
-  /* ------------------------------------------------------------------ */
-  const generateInsectMetadata = useCallback(async (evolution: EvolutionOption) => {
-    const { insect, family, colorProfile } = evolution;
+    setIsPreparing(true);
+    setError(null);
 
-    const attributes = [
-      ...insect.attributes.filter(a => a.trait_type !== "Niveau"),
-      { trait_type: "Niveau", value: 0 },
-      { trait_type: "Famille", value: family },
-      { trait_type: "DisplayName", value: insect.display_name },
-      { trait_type: "Sprite", value: insect.spriteName },
-      { trait_type: "Lore", value: `Insecte F1 #${eggTokenId}` },
-      ...(colorProfile
+    try {
+      const egg = await loadEggInfo();
+      if (!egg) throw new Error("Impossible de charger les infos de l'œuf");
+
+      const eggMeta = egg.metadata || {};
+
+      // Famille de l'œuf
+      const eggFamily: string =
+        eggMeta.attributes?.find((a: any) => a.trait_type === 'Famille')?.value ||
+        eggMeta.family ||
+        eggMeta.family_name ||
+        'Thalorydes';
+
+      console.log('[HatchEgg] Famille œuf:', eggFamily);
+
+      // ✅ hatchEngine — pioche un insecte lvl0 (index séparé d'evolutionEngine)
+      const insect = hatchEngine(eggFamily, account, eggTokenId);
+      console.log('[HatchEgg] Insecte choisi:', insect);
+
+      setPreviewImageUrl(insect.imageUrl);
+
+      // Profil couleur
+      const familyKey    = insect.family_name as keyof typeof colorProfilesJson.families;
+      const profiles     = (colorProfilesJson.families as any)[familyKey] as any[] | undefined;
+      const colorProfile = insect.color_profile
+        ?? profiles?.find((p) => p.filename === insect.sprite_name)
+        ?? profiles?.[0]
+        ?? null;
+
+      // Attributs — même structure que useTokenEvolution
+      const insectAttributes = [
+        ...(insect.attributes || []),
+        { trait_type: 'Famille',          value: familyKey },
+        { trait_type: '1er Propriétaire', value: account },
+        { trait_type: 'Insect name',      value: insect.display_name },
+        { trait_type: 'Lore',             value: insect.lore || 'Insecte éclos ResCoe' },
+        { trait_type: 'TotalFamille',     value: 0 },
+        { trait_type: 'Sprite',           value: insect.sprite_name },
+        { trait_type: 'EggOrigin',        value: eggTokenId },
+      ];
+
+      const colorAttributes = colorProfile
         ? [
-            { trait_type: "Couleur1", value: colorProfile.dominant_colors.hex[0] },
-            { trait_type: "Couleur2", value: colorProfile.dominant_colors.hex[1] },
+            { trait_type: 'Couleur1',    value: colorProfile.dominant_colors.hex[0] },
+            { trait_type: 'Couleur2',    value: colorProfile.dominant_colors.hex[1] },
+            { trait_type: 'Couleur3',    value: colorProfile.dominant_colors.hex[2] },
+            { trait_type: 'Couleur4',    value: colorProfile.dominant_colors.hex[3] },
+            { trait_type: 'Couleur5',    value: colorProfile.dominant_colors.hex[4] },
+            { trait_type: 'Teinte',      value: Math.round(colorProfile.hsv.mean[0]) + '°' },
+            { trait_type: 'Saturation',  value: Math.round(colorProfile.hsv.mean[1] * 100) + '%' },
+            { trait_type: 'Luminosité',  value: Math.round(colorProfile.hsv.mean[2] * 100) + '%' },
+            { trait_type: 'Colorful',    value: Math.round(colorProfile.metrics.colorfulness * 100) + '%' },
+            { trait_type: 'Contraste',   value: Math.round(colorProfile.metrics.contrast) },
+            { trait_type: 'Nettete',     value: Math.round(colorProfile.metrics.sharpness) },
+            { trait_type: 'Entropie',    value: Math.round(colorProfile.metrics.entropy * 10) / 10 },
+            { trait_type: 'Frames',      value: colorProfile.frame_count },
+            { trait_type: 'Pixels',      value: colorProfile.total_pixels_analyzed.toLocaleString() },
+            { trait_type: 'TailleBytes', value: (colorProfile.gif_info.size_bytes / 1000).toFixed(1) + 'KB' },
           ]
-        : []),
-    ];
+        : [];
 
-    const metadata = {
-      name: insect.display_name,
-      description: "Insecte lvl0 éclos",
-      image: insect.imageUrl,
-      level: 0,
-      attributes,
-      evolutionHistory: [],
-      eggOrigin: eggTokenId,
-    };
+      const fullAttributes = [
+        ...insectAttributes.filter((a) => a?.trait_type && a.trait_type !== 'Niveau'),
+        { trait_type: 'Niveau', value: 0 },
+        ...colorAttributes,
+      ];
 
-    const res = await axios.post(
-      "https://api.pinata.cloud/pinning/pinJSONToIPFS",
-      metadata,
-      { headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT_OEUVRES}` } }
-    );
+      console.log('[HatchEgg] Upload /api/pinata/upload (scope: badges) …');
 
-    return `https://harlequin-key-marmot-538.mypinata.cloud/ipfs/${res.data.IpfsHash}`;
-  }, [eggTokenId]);
+      const uploadResult = await uploadToIPFS({
+        scope:            'badges',
+        imageUrl:         insect.imageUrl,
+        name:             insect.display_name,
+        bio:              '',
+        role:             'Membre',
+        level:            0,
+        attributes:       fullAttributes,
+        family:           familyKey,
+        sprite_name:      insect.sprite_name,
+        color_profile:    colorProfile,
+        previousImage:    eggMeta.image || '',
+        evolutionHistory: [],
+        custom_data:      { lore: insect.lore },
+      });
+
+      console.log('[HatchEgg] Upload result:', uploadResult);
+
+      if (!uploadResult?.metadataUri) {
+        throw new Error('Upload IPFS échoué — pas de metadataUri retourné');
+      }
+
+      setHatchImageUri(uploadResult.imageUri);
+      setHatchMetadataUri(uploadResult.metadataUri);
+      setPreviewImageUrl(uploadResult.imageUri);
+      setIsReady(true);
+
+      return { imageUri: uploadResult.imageUri, metadataUri: uploadResult.metadataUri, isReady: true };
+    } catch (e: any) {
+      console.error('[HatchEgg] prepareHatch error:', e.message);
+      setError(e.message);
+      return { imageUri: null, metadataUri: null, isReady: false };
+    } finally {
+      setIsPreparing(false);
+    }
+  }, [account, eggTokenId, loadEggInfo, uploadToIPFS, isReady, hatchImageUri, hatchMetadataUri]);
 
   /* ------------------------------------------------------------------ */
-  /* 4. HATCH                                                           */
+  /* 3. HATCH ON-CHAIN                                                   */
   /* ------------------------------------------------------------------ */
   const hatchEgg = useCallback(async () => {
-    if (!account || !selectedEvolution) {
-      setError("Évolution non sélectionnée");
+    if (!isAuthenticated || !account || !web3) {
+      setError('Connexion requise');
       return;
     }
 
@@ -183,57 +246,61 @@ export const useHatchEgg = (contractAddress: string, eggTokenId: number) => {
     setError(null);
 
     try {
-      const egg = await checkIsEggReady();
-      if (!egg) throw new Error("Œuf invalide");
+      const result = await prepareHatch();
+      if (!result.isReady || !result.metadataUri) {
+        throw new Error('Préparation échouée — impossible d\'éclore');
+      }
 
-      const insectUri = await generateInsectMetadata(selectedEvolution);
+      console.log('[HatchEgg] Envoi tx hatchEgg, metadataUri:', result.metadataUri);
 
-      const web3 = new Web3((window as any).ethereum);
+      const gasPrice = await web3.eth.getGasPrice();
       const contract = new web3.eth.Contract(ABI as any, contractAddress);
 
-      const tx = await contract.methods
-        .hatchEgg(eggTokenId, insectUri)
-        .send({ from: account });
+      const receipt = await contract.methods
+        .hatchEgg(eggTokenId, result.metadataUri)
+        .send({ from: account, value: '0', gasPrice: gasPrice.toString() });
 
-      setTxHash(tx.transactionHash);
+      console.log('[HatchEgg] ✅ Tx OK:', receipt.transactionHash);
+
+      let newTokenId: string = (Number(eggTokenId) + 1).toString();
+      if (receipt.events?.EggHatched?.returnValues?.newTokenId) {
+        newTokenId = receipt.events.EggHatched.returnValues.newTokenId.toString();
+      } else if (receipt.events?.LevelEvolved?.returnValues?.tokenId) {
+        newTokenId = receipt.events.LevelEvolved.returnValues.tokenId.toString();
+      }
+
+      console.log('[HatchEgg] Nouveau tokenId:', newTokenId);
+      setTxHash(receipt.transactionHash);
     } catch (e: any) {
+      console.error('[HatchEgg] hatchEgg error:', e.message);
       setError(e.message);
     } finally {
       setIsHatching(false);
     }
-  }, [
-    account,
-    contractAddress,
-    eggTokenId,
-    selectedEvolution,
-    checkIsEggReady,
-    generateInsectMetadata,
-  ]);
+  }, [isAuthenticated, account, web3, contractAddress, eggTokenId, prepareHatch]);
 
   /* ------------------------------------------------------------------ */
-  /* 5. INIT                                                            */
+  /* 4. INIT                                                             */
   /* ------------------------------------------------------------------ */
   useEffect(() => {
     (async () => {
-      const egg = await checkIsEggReady();
-      if (!egg?.metadata) return;
-
-      const family =
-        egg.metadata.attributes?.find((a: any) => a.trait_type === "Famille")?.value
-        || "Thalorydes";
-
-      generateEvolutionOptions(family);
+      const egg = await loadEggInfo();
+      if (!egg) return;
+      await prepareHatch();
     })();
-  }, [checkIsEggReady, generateEvolutionOptions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return {
     isHatching,
+    isPreparing,
+    isReady,
     txHash,
     error,
-    evolutionOptions,
-    selectedEvolution,
-    setSelectedEvolution,
+    previewImageUrl,
+    hatchImageUri,
+    hatchMetadataUri,
     hatchEgg,
-    isReady: !!selectedEvolution && !error,
+    prepareHatch,
   };
 };

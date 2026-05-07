@@ -268,10 +268,24 @@ const EditProfileTab = ({ initialName, initialBio, onSave }: EditProfileTabProps
    HATCH EGG PANEL
 ========================================================= */
 
-const HatchEggPanel = ({ tokenId, hatch }: any) => {
+// Remplace uniquement le composant HatchEggPanel dans [tokenId].tsx
+
+const HatchEggPanel = ({ tokenId, hatch }: { tokenId: number; hatch: ReturnType<typeof useHatchEgg> }) => {
+  // Pendant la préparation silencieuse (upload IPFS en arrière-plan)
+  if (hatch.isPreparing) {
+    return (
+      <Box p={6} textAlign="center">
+        <Spinner size="lg" color="yellow.400" mb={4} />
+        <Text fontWeight="medium" color="yellow.700">
+          Génération de l'insecte en cours…
+        </Text>
+      </Box>
+    );
+  }
+
   if (hatch.error) {
     return (
-      <Alert status="warning" mb={4}>
+      <Alert status="warning" mb={4} borderRadius="md">
         <AlertIcon />
         {hatch.error}
       </Alert>
@@ -280,36 +294,49 @@ const HatchEggPanel = ({ tokenId, hatch }: any) => {
 
   return (
     <Box p={6} bg="yellow.50" borderRadius="lg">
-      <Heading size="lg" mb={6}>
+      <Heading size="lg" mb={4}>
         🥚 ÉCLORE L'ŒUF #{tokenId}
       </Heading>
 
+      {/* Aperçu de l'insecte généré */}
+      {hatch.previewImageUrl && (
+        <Box mb={6} textAlign="center">
+          <Image
+            src={hatch.previewImageUrl}
+            alt="Insecte à éclore"
+            maxH="160px"
+            mx="auto"
+            borderRadius="md"
+            boxShadow="md"
+          />
+          <Text mt={2} fontSize="sm" color="gray.500">
+            Votre insecte éclos
+          </Text>
+        </Box>
+      )}
+
       <Button
         colorScheme="green"
-        size="xl"
+        size="lg"
         h={16}
         fontSize="lg"
         isLoading={hatch.isHatching}
-        loadingText="Éclosion en cours..."
+        loadingText="Éclosion en cours…"
         onClick={hatch.hatchEgg}
-        disabled={!hatch.isReady}
+        isDisabled={!hatch.isReady || hatch.isHatching}
         w="full"
         boxShadow="lg"
       >
-        {hatch.isHatching
-          ? 'Éclosion...'
-          : `ÉCLORE INSECTE → ${hatch.selectedEvolution?.displayName || 'Choisir'}`}
+        {hatch.isHatching ? 'Éclosion…' : '🐛 ÉCLORE'}
       </Button>
 
       {hatch.txHash && (
         <HStack mt={6} p={4} bg="green.50" borderRadius="md">
           <Icon as={FaCheckCircle} color="green.500" boxSize={6} />
-          <Text fontWeight="bold" color="green.700">
-            Succès !
-          </Text>
+          <Text fontWeight="bold" color="green.700">Succès !</Text>
           <Link href={`https://basescan.org/tx/${hatch.txHash}`} isExternal>
             <Text fontSize="sm" color="blue.500" fontFamily="mono">
-              {hatch.txHash.slice(0, 20)}...
+              {hatch.txHash.slice(0, 20)}…
             </Text>
           </Link>
         </HStack>
@@ -493,8 +520,12 @@ const EvolutionTab = ({
             </Flex>
 
             <HStack justify="space-between" w="full" pt={2}>
+              {/* BUG 2 FIX — ne pas afficher la date si le timestamp est 0 (epoch) */}
               <Text fontSize={{ base: 'sm', md: 'md' }} opacity={0.9}>
-                Depuis {formatDateTime(membershipInfo?.startTimestamp || 0)}
+                Depuis{' '}
+                {membershipInfo?.startTimestamp
+                  ? formatDateTime(membershipInfo.startTimestamp)
+                  : '—'}
               </Text>
               <Text fontSize={{ base: '2xl', md: '3xl' }} fontWeight="extrabold" color="brand.gold">
                 {membershipInfo?.level || 0}/3
@@ -511,12 +542,27 @@ const EvolutionTab = ({
               <Text fontWeight="600" color="brand.navy" fontSize={{ base: 'xs', md: 'sm' }}>
                 État
               </Text>
+              {/* BUG 3 FIX — cas œuf traité séparément pour ne pas afficher "Préparez l'évolution" */}
               <Text
                 fontSize={{ base: 'md', md: 'lg' }}
                 fontWeight="bold"
-                color={canEvolve ? 'green.600' : 'orange.600'}
+                color={
+                  membershipInfo?.isEgg
+                    ? hatch.isReady
+                      ? 'yellow.500'
+                      : 'orange.400'
+                    : canEvolve
+                    ? 'green.600'
+                    : 'orange.600'
+                }
               >
-                {canEvolve ? '✅ PRÊT' : "Préparez l'évolution"}
+                {membershipInfo?.isEgg
+                  ? hatch.isReady
+                    ? '🥚 Prêt à éclore'
+                    : '⏳ Attente éclosion'
+                  : canEvolve
+                  ? '✅ PRÊT'
+                  : "Préparez l'évolution"}
               </Text>
             </VStack>
           </CardBody>
@@ -695,6 +741,14 @@ const TokenPage = () => {
     locked: false,
     isAnnual: false,
   });
+
+  // BONUS FIX — useColorModeValue appelé inconditionnellement au top-level,
+  // jamais à l'intérieur d'un if/callback/return conditionnel.
+  const headingGradient = useColorModeValue(
+    'linear(to-r, brand.navy, brand.blue)',
+    'linear(to-r, brand.gold, brand.cream)'
+  );
+  const imageShadow = useColorModeValue('lg', 'dark-lg');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -984,10 +1038,8 @@ const TokenPage = () => {
           as="h1"
           size="xl"
           mb={4}
-          bgGradient={useColorModeValue(
-            'linear(to-r, brand.navy, brand.blue)',
-            'linear(to-r, brand.gold, brand.cream)'
-          )}
+          // BONUS FIX — valeur issue du hook appelé au top-level, pas inline ici
+          bgGradient={headingGradient}
           bgClip="text"
         >
           Carte d'adhésion de {nftData.name}
@@ -1008,7 +1060,8 @@ const TokenPage = () => {
             maxH={{ base: '280px', sm: '340px', md: '360px' }}
             mx="auto"
             borderRadius={{ base: 2, md: 4 }}
-            boxShadow={useColorModeValue('lg', 'dark-lg')}
+            // BONUS FIX — valeur issue du hook appelé au top-level, pas inline ici
+            boxShadow={imageShadow}
             objectFit="cover"
             transition="all 0.3s ease"
           />
