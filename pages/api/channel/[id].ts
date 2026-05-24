@@ -49,6 +49,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       pinnedMessage = pinnedMessages.length > 0 ? pinnedMessages[0] : null;
     }
 
+    res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
     res.status(200).json({
       pinnedMessage,
       messages,

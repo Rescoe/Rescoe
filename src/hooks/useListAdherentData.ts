@@ -4,6 +4,7 @@ import { JsonRpcProvider, Contract } from "ethers";
 import ABI from "@/components/ABI/ABIAdhesion.json";
 import ABI_ADHESION_MANAGEMENT from "@/components/ABI/ABI_ADHESION_MANAGEMENT.json";
 import { fetchENS, fetchAdhesionPoints, fetchNFTs, fetchStatsCollection } from "@/utils/dashboardFetcher";
+import { resolveIPFS } from "@/utils/resolveIPFS";
 
 const contractAdhesion = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS as string;
 const contratAdhesionManagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGER as string;
@@ -69,7 +70,8 @@ export const useAdherentFullData = (addresses?: string[]) => {
                   ).toLocaleDateString("fr-FR");
 
                   const tokenURI = await contractAdhesionInstance.tokenURI(tokenId);
-                  const response = await fetch(tokenURI);
+                  const resolvedURI = resolveIPFS(tokenURI, true) || tokenURI;
+                  const response = await fetch(resolvedURI);
                   const metadata = await response.json();
 
                   return {

@@ -55,6 +55,23 @@ const TRANSACTIONS_ENDPOINT = (address: string) =>
   `https://deep-index.moralis.io/api/v2.2/${address}?chain=base&verbose=true&include=internal_transactions&limit=100`;
 const EUR_RATE = 0.92;
 
+const TX_FEED_TTL     = 10 * 60 * 1000; // 10 min — transactions
+const BALANCE_TTL     =  2 * 60 * 1000; //  2 min — solde on-chain
+const COLLECTIONS_TTL = 10 * 60 * 1000; // 10 min — contrats Rescoe
+
+function txCacheRead<T>(key: string, ttl: number): T | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const { data, ts } = JSON.parse(raw);
+    if (Date.now() - ts > ttl) { localStorage.removeItem(key); return null; }
+    return data as T;
+  } catch { return null; }
+}
+function txCacheWrite<T>(key: string, data: T): void {
+  try { localStorage.setItem(key, JSON.stringify({ data, ts: Date.now() })); } catch {}
+}
+
 type Props = {
   address?: string;
   walletAddress?: string;
@@ -408,6 +425,12 @@ const UserFinanceDashboard: React.FC<Props> = ({
   const fetchRescoeCollections = useCallback(
     async (userAddress: string) => {
       if (!contract) return;
+      const cacheKey = `rescoe_txcollections_${userAddress.toLowerCase()}`;
+      const cached = txCacheRead<string[]>(cacheKey, COLLECTIONS_TTL);
+      if (cached !== null) {
+        if (isMounted.current) setRescoeContracts(new Set(cached));
+        return;
+      }
       try {
         const raw = await contract.getCollectionsByUser(userAddress);
         if (!Array.isArray(raw)) return;
@@ -418,6 +441,7 @@ const UserFinanceDashboard: React.FC<Props> = ({
             )
             .filter(Boolean)
         );
+        txCacheWrite(cacheKey, Array.from(addresses));
         if (isMounted.current) {
           setRescoeContracts(addresses);
         }
@@ -439,11 +463,18 @@ const UserFinanceDashboard: React.FC<Props> = ({
 
   const fetchCurrentBalance = useCallback(
     async (userAddress: string) => {
+      const cacheKey = `rescoe_balance_${userAddress.toLowerCase()}`;
+      const cached = txCacheRead<number>(cacheKey, BALANCE_TTL);
+      if (cached !== null) {
+        if (isMounted.current) setCurrentBalance(cached);
+        return cached;
+      }
       try {
         if (!provider) return 0;
         const balanceWei = await provider.getBalance(userAddress);
         const balanceEth = parseFloat(formatUnits(balanceWei, 18));
         const rounded = Math.max(0, parseFloat(balanceEth.toFixed(6)));
+        txCacheWrite(cacheKey, rounded);
         if (isMounted.current) {
           setCurrentBalance(rounded);
         }
@@ -465,6 +496,10 @@ const UserFinanceDashboard: React.FC<Props> = ({
   );
   const fetchAllTransactions = useCallback(
     async (userAddress: string) => {
+      const txCacheKey = `rescoe_txfeed_${userAddress.toLowerCase()}`;
+      const cachedTxs = txCacheRead<RawTx[]>(txCacheKey, TX_FEED_TTL);
+      if (cachedTxs !== null) return cachedTxs;
+
       let cursor: string | null = null;
       const all: RawTx[] = [];
       const lowerUserAddress = userAddress.toLowerCase();
@@ -562,9 +597,11 @@ const UserFinanceDashboard: React.FC<Props> = ({
         }
 
         // ✅ Trie final récent → ancien
-        return all.sort((a, b) =>
+        const sorted = all.sort((a, b) =>
           new Date(b.block_timestamp).getTime() - new Date(a.block_timestamp).getTime()
         );
+        txCacheWrite(txCacheKey, sorted);
+        return sorted;
 
       } catch (error) {
         console.error("[UserFinanceDashboard] transactions error", error);

@@ -2,7 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 
 const UNIQUE_DISCORD_TOKEN = process.env.DISCORD_TOKEN;
-const CHANNEL_ID = process.env.DISCORD_CHANNEL_ID;
+const CHANNEL_ID = process.env.NEXT_PUBLIC_CHANNEL_NEWS_ID;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -23,6 +23,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const messages = await response.json();
 
+    res.setHeader("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
     res.status(200).json(messages);
   } catch (error) {
     console.error(error);

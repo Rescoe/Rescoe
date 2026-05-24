@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Box,
   Heading,
@@ -84,8 +84,8 @@ const UniqueArtGalerie: React.FC = () => {
 
   const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!;
   const FALLBACK_IMAGE = "/fallback-placeholder.png";
-  const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
-  const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
+  const provider = useMemo(() => new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS), []);
+  const contract = useMemo(() => new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider), [provider]);
 
   // ✅ AJOUTÉ : variables dérivées pour la galerie
   const featured = collections.filter(c => c.isFeatured);

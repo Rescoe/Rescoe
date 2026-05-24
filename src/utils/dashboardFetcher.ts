@@ -8,18 +8,43 @@ const contratAdhesionManagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGE
 const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT as string;
 const providerUrl = process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string;
 
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function readCache<T>(key: string): T | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const { data, ts } = JSON.parse(raw);
+    if (Date.now() - ts > CACHE_TTL_MS) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    return data as T;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache<T>(key: string, data: T): void {
+  try {
+    localStorage.setItem(key, JSON.stringify({ data, ts: Date.now() }));
+  } catch {
+    // localStorage quota atteint — on ignore silencieusement
+  }
+}
+
 /**
  * Récupère le nom ENS de l’utilisateur
  */
 export const fetchENS = async (address: string) => {
   const cacheKey = `ens_${address}`;
-  const cachedENS = localStorage.getItem(cacheKey);
-  if (cachedENS) return JSON.parse(cachedENS); // Retourner les données du cache
+  const cached = readCache<string | null>(cacheKey);
+  if (cached !== null) return cached;
 
   try {
     const provider = new ethers.JsonRpcProvider(providerUrl);
     const ensName = await provider.lookupAddress(address);
-    localStorage.setItem(cacheKey, JSON.stringify(ensName)); // Cacher les résultats
+    writeCache(cacheKey, ensName);
     return ensName;
   } catch (e) {
     console.warn("fetchENS error", e);
@@ -27,26 +52,9 @@ export const fetchENS = async (address: string) => {
   }
 };
 
-/**
- * Récupère la liste des NFTs de l’utilisateur (NFTs RESCOE ou œuvres)
- */
-export const fetchNFTs = async (address: string) => {
-  const cacheKey = `nfts_${address}`;
-  const cachedNFTs = localStorage.getItem(cacheKey);
-  if (cachedNFTs) return JSON.parse(cachedNFTs); // Retourner les données du cache
-
-  try {
-    const response = await fetch(`/api/getNFTs?address=${address}`);
-    if (!response.ok) throw new Error("Erreur fetchNFTs");
-    const data = await response.json();
-    localStorage.setItem(cacheKey, JSON.stringify(data)); // Cacher les résultats
-    return data;
-  } catch (e) {
-    console.warn("fetchNFTs error", e);
-    return [];
-  }
-};
-
+// Stub conservé pour compatibilité des imports existants — l'endpoint /api/getNFTs n'existe pas.
+// Les appelants ignorent déjà le résultat retourné.
+export const fetchNFTs = async (_address: string): Promise<any[]> => [];
 
 // Recursively convert BigInt to string & unwrap Proxy by cloning props
 function deepClean(obj: any): any {
@@ -69,10 +77,16 @@ function deepClean(obj: any): any {
 }
 
 
-export const fetchStatsCollection = async (address: string) => {
+interface StatsCollection {
+  collections: any[];
+  userCollections: number;
+  remainingCollections: number;
+}
+
+export const fetchStatsCollection = async (address: string): Promise<StatsCollection> => {
   const cacheKey = `statsCollection_${address}`;
-  const cachedStats = localStorage.getItem(cacheKey);
-  if (cachedStats) return JSON.parse(cachedStats);
+  const cached = readCache<StatsCollection>(cacheKey);
+  if (cached) return cached;
 
   try {
     const provider = new ethers.JsonRpcProvider(providerUrl);
@@ -81,46 +95,40 @@ export const fetchStatsCollection = async (address: string) => {
     const userCollectionsCount = await contract.getNumberOfCollectionsByUser(address);
     const remainingCollections = await contract.getRemainingCollections(address);
 
-    // Nettoyer chaque élément des collections
     const rawCollections = await contract.getCollectionsByUser(address);
     const collections = deepClean(rawCollections);
 
-    const stats = {
+    const stats: StatsCollection = {
       collections,
-      userCollections: userCollectionsCount.toString(),
-      remainingCollections: remainingCollections.toString(),
+      userCollections: Number(userCollectionsCount),
+      remainingCollections: Number(remainingCollections),
     };
 
-    localStorage.setItem(cacheKey, JSON.stringify(stats));
+    writeCache(cacheKey, stats);
     return stats;
   } catch (err) {
     console.error("fetchStatsCollection error:", err);
-    return {
-      collections: [],
-      userCollections: "0",
-      remainingCollections: "0",
-    };
+    return { collections: [], userCollections: 0, remainingCollections: 0 };
   }
 };
-
 
 /**
  * Récupère les points d’adhésion RESCOE de l’utilisateur
  */
- export const fetchAdhesionPoints = async (address: string) => {
-   const cacheKey = `adhesionPoints_${address}`;
-   const cachedPoints = localStorage.getItem(cacheKey);
-   if (cachedPoints) return JSON.parse(cachedPoints); // Retourner les données du cache
+export const fetchAdhesionPoints = async (address: string): Promise<number> => {
+  const cacheKey = `adhesionPoints_${address}`;
+  const cached = readCache<number>(cacheKey);
+  if (cached !== null) return cached;
 
-   try {
-     const provider = new ethers.JsonRpcProvider(providerUrl);
-     const contract = new ethers.Contract(contractAdhesion, ABI, provider);
-     const points = await contract.rewardPoints(address);
-     const pointsNumber = Number(points); // S'assurer que c'est un nombre
-     localStorage.setItem(cacheKey, JSON.stringify(pointsNumber)); // Cacher les résultats
-     return pointsNumber;
-   } catch (e) {
-     console.warn("fetchAdhesionPoints error", e);
-     return 0;
-   }
- };
+  try {
+    const provider = new ethers.JsonRpcProvider(providerUrl);
+    const contract = new ethers.Contract(contractAdhesion, ABI, provider);
+    const points = await contract.rewardPoints(address);
+    const pointsNumber = Number(points);
+    writeCache(cacheKey, pointsNumber);
+    return pointsNumber;
+  } catch (e) {
+    console.warn("fetchAdhesionPoints error", e);
+    return 0;
+  }
+};

@@ -69,9 +69,25 @@ export default function UserNFTFeed({ walletAddress }: { walletAddress: string }
     return res.json();
   };
 
+  const CONTRACT_CACHE_KEY = `rescoe_contracts_${managerAddress}`;
+  const CONTRACT_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
   const fetchManagerContracts = useCallback(async () => {
     setLoadingContracts(true);
     try {
+      // Cache sessionStorage pour éviter N appels RPC à chaque navigation
+      try {
+        const raw = sessionStorage.getItem(CONTRACT_CACHE_KEY);
+        if (raw) {
+          const { addresses, typesMap, ts } = JSON.parse(raw);
+          if (Date.now() - ts < CONTRACT_CACHE_TTL && addresses.length > 0) {
+            setContracts(addresses);
+            setCollectionTypesMap(typesMap);
+            return;
+          }
+        }
+      } catch {}
+
       const signer = await providerRef.current!.getSigner();
       const manager = new ethers.Contract(managerAddress, ABIRESCOLLECTION, signer);
       const total = Number(await manager.getTotalCollectionsMinted());
@@ -94,8 +110,10 @@ export default function UserNFTFeed({ walletAddress }: { walletAddress: string }
         } catch {}
       }
 
-      //console.log("Contracts:", addresses);
-      //console.log("TypesMap:", typesMap);
+      try {
+        sessionStorage.setItem(CONTRACT_CACHE_KEY, JSON.stringify({ addresses, typesMap, ts: Date.now() }));
+      } catch {}
+
       setContracts(addresses);
       setCollectionTypesMap(typesMap);
     } catch (e) {
@@ -106,6 +124,7 @@ export default function UserNFTFeed({ walletAddress }: { walletAddress: string }
   }, []);
 
   const fetchMetadata = useCallback(async (nft: RawNFT) => {
+    // Priorité 1 : metadata inline Moralis (déjà parsée)
     if (nft.metadata) {
       try {
         const md = JSON.parse(nft.metadata);
@@ -118,19 +137,30 @@ export default function UserNFTFeed({ walletAddress }: { walletAddress: string }
       } catch {}
     }
 
+    // Priorité 2 : cache localStorage par (token_address, token_id)
+    const cacheKey = `nft_meta_${nft.token_address}_${nft.token_id}`;
     try {
-      //console.log(`🔍 tokenURI ${nft.token_address}/${nft.token_id}`);
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) return JSON.parse(cached);
+    } catch {}
+
+    try {
       const contract = new ethers.Contract(nft.token_address, ERC721_ABI, providerRef.current!);
       const tokenURI = await contract.tokenURI(nft.token_id);
 
-      const uri = tokenURI.replace("ipfs://", "https://ipfs.io/ipfs/");
-      const res = await fetch(uri);
+      // Via proxy IPFS (fallback multi-gateway + cache HTTP)
+      const resolved = resolveIPFS(tokenURI, true);
+      const res = await fetch(resolved!);
       const md = await res.json();
 
       if (md.image?.startsWith("ipfs://")) {
-        md.image = await resolveIPFS(md.image, true);
+        md.image = resolveIPFS(md.image, true);
       }
-      //console.log(`✅ Metadata ${nft.token_id}: artist=${md?.artist}`);
+
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(md));
+      } catch {}
+
       return md;
     } catch (e) {
       console.warn(`Metadata fail ${nft.token_id}:`, e);
