@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { InfoOutlineIcon } from "@chakra-ui/icons";
 import { FaBoxes } from 'react-icons/fa'; // ajout en haut
 
@@ -24,8 +24,7 @@ import ABIRESCOLLECTION from '../../ABI/ABI_Collections.json';
 import ABI_ADHESION_MANAGEMENT from '../../ABI/ABI_ADHESION_MANAGEMENT.json';
 import CreateCollection from './CreateCollection';
 import { FilteredCollectionsCarousel } from '../galerie/art';
-import detectEthereumProvider from '@metamask/detect-provider';
-import Web3 from "web3";
+import { fetchAdhesionPoints, fetchStatsCollection } from "@/utils/dashboardFetcher";
 
 import { useRouter } from 'next/router';
 
@@ -68,18 +67,6 @@ const Dashboard = () => {
     remainingCollections?: number;
   }
 
-  interface NFTData {
-    tokenId: string;
-    metadata: {
-      image: string;
-      role?: string;
-      finAdhesion?: string;
-      [key: string]: any; // pour tout autre champ présent dans le JSON
-    };
-    remainingTime?: string;  // ✅ AJOUTÉ
-
-  }
-
   const [userData, setUserData] = useState<UserData>({
     address: authAddress || '',
     name: '',
@@ -102,38 +89,26 @@ const Dashboard = () => {
 
   const router = useRouter();
 
-  const goToToken = (tokenId: string | number) => {  // ✅ Accepte string OU number
+  const rpcProvider = useMemo(
+    () => new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string),
+    []
+  );
+
+  const goToToken = (tokenId: string | number) => {
     router.push(`/AdhesionId/${contractAdhesion}/${tokenId}`,
                undefined,
-               { shallow: true }); // ✅ Pas de re-render global
+               { shallow: true });
   };
-
-  useEffect(() => {
-    const setupWeb3 = async () => {
-      const detectedProvider = await detectEthereumProvider();
-      if (detectedProvider) {
-        const web3Instance = new Web3(detectedProvider);
-        const accounts: string[] = await web3Instance.eth.requestAccounts();
-        if (accounts.length > 0) {
-          setUserData(prev => ({ ...prev, address: accounts[0] }));
-        }
-      } else {
-        console.error("MetaMask not detected");
-      }
-    };
-    setupWeb3();
-  }, []);
 
   useEffect(() => {
     const fetchUserData = async () => {
       if (!authAddress) return; // Sortir si l'adresse est vide
       setLoading(true);
       try {
-        const [rolesAndImages, adhesionPoints, pendingsPoints, nfts, stats] = await Promise.all([
+        const [rolesAndImages, adhesionPoints, pendingsPoints, stats] = await Promise.all([
           fetchRolesAndImages(authAddress),
           fetchAdhesionPoints(authAddress),
           fetchPendingPoints(authAddress),
-          fetchNFTs(authAddress),
           fetchStatsCollection(authAddress),
         ]);
 
@@ -167,9 +142,18 @@ const Dashboard = () => {
   }, [authAddress]);
 
   const fetchRolesAndImages = async (userAddress: string) => {
-    const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
-    const contract = new Contract(contratAdhesionManagement, ABI_ADHESION_MANAGEMENT, provider);
-    const contractadhesion = new Contract(contractAdhesion, ABI, provider);
+    const cacheKey = `dashboard_roles_${userAddress}`;
+    try {
+      const raw = localStorage.getItem(cacheKey);
+      if (raw) {
+        const { data, ts } = JSON.parse(raw);
+        if (Date.now() - ts < 5 * 60 * 1000) return data;
+        localStorage.removeItem(cacheKey);
+      }
+    } catch {}
+
+    const contract = new Contract(contratAdhesionManagement, ABI_ADHESION_MANAGEMENT, rpcProvider);
+    const contractadhesion = new Contract(contractAdhesion, ABI, rpcProvider);
 
     const tokenIds = await contractadhesion.getTokensByOwner(userAddress);
     const userInfos = await contractadhesion.getUserInfo(userAddress);
@@ -207,113 +191,36 @@ const Dashboard = () => {
       })
     );
 
-    return {
+    const result = {
       name: userInfos.name,
       biography: userInfos.bio,
       roles: fetchedRolesAndImages.map((item) => item.role),
       finAdhesion: fetchedRolesAndImages[0]?.finAdhesion || "",
       nfts: fetchedRolesAndImages,
     };
-  };
-
-
-  const fetchNFTs = async (userAddress: string) => {
-    const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
-    const contractadhesionVar = new Contract(contractAdhesion, ABI, provider);
-    const contractadhesionManagementVar = new Contract(
-      contratAdhesionManagement,
-      ABI_ADHESION_MANAGEMENT,
-      provider
-    );
-
-    const nftsData: NFTData[] = [];
-
-    try {
-      const totalMinted = await contractadhesionVar.getTotalMinted();
-      const tokenIds = await contractadhesionManagementVar.getTokensByOwnerPaginated(
-        userAddress,
-        0,
-        totalMinted
-      );
-
-      await Promise.all(
-        tokenIds.map(async (tokenId: string) => {
-          try {
-            const tokenURI = await contractadhesionVar.tokenURI(tokenId);
-            const metadataUrl = resolveIPFS(tokenURI, true); // -> /api/ipfs/...
-
-            if (!metadataUrl) throw new Error("no metadataUrl");
-
-            const response = await fetch(metadataUrl);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-            const metadata = await response.json();
-
-            nftsData.push({
-              tokenId: tokenId.toString(),
-              metadata: {
-                ...metadata,
-                image: resolveIPFS(metadata.image, true) || "",
-              },
-            });
-          } catch (e) {
-            console.warn("❌ NFT metadata fetch failed:", tokenId, e);
-          }
-        })
-      );
-
-      return nftsData;
-    } catch (error) {
-      console.error("Erreur lors de la récupération des NFTs:", error);
-      return [];
-    }
-  };
-
-
-  const fetchStatsCollection = async (userAddress: string) => {
-    const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
-    const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
-
-    try {
-      const userCollections = await contract.getNumberOfCollectionsByUser(userAddress);
-      const remainingCollections = await contract.getRemainingCollections(userAddress);
-     //console.log(remainingCollections);
-      return {
-        collections: [], // Vous pouvez ajouter la logique pour récupérer les collections
-        userCollections: Number(userCollections),
-        remainingCollections: Number(remainingCollections)
-      };
-    } catch (err) {
-      console.error("Erreur de récupération des collections:", err);
-      return {
-        collections: [],
-        userCollections: 0,
-        remainingCollections: 0
-      };
-    }
-  };
-
-  const fetchAdhesionPoints = async (userAddress: string) => {
-    const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
-    const contract = new Contract(contractAdhesion, ABI, provider);
-    try {
-      const points = await contract.rewardPoints(userAddress);
-      return Number(points);
-    } catch (error) {
-      console.error("Erreur lors de la récupération des points:", error);
-      return 0; // fallback
-    }
+    try { localStorage.setItem(cacheKey, JSON.stringify({ data: result, ts: Date.now() })); } catch {}
+    return result;
   };
 
   const fetchPendingPoints = async (userAddress: string) => {
-    const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
-    const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
+    const cacheKey = `pendingPoints_${userAddress}`;
+    try {
+      const raw = localStorage.getItem(cacheKey);
+      if (raw) {
+        const { data, ts } = JSON.parse(raw);
+        if (Date.now() - ts < 5 * 60 * 1000) return data as number;
+        localStorage.removeItem(cacheKey);
+      }
+    } catch {}
+    const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, rpcProvider);
     try {
       const Pendingpoints = await contract.getPendingPoints(userAddress);
-      return Number(Pendingpoints);
+      const result = Number(Pendingpoints);
+      try { localStorage.setItem(cacheKey, JSON.stringify({ data: result, ts: Date.now() })); } catch {}
+      return result;
     } catch (error) {
       console.error("Erreur lors de la récupération des points:", error);
-      return 0; // fallback
+      return 0;
     }
   };
 
@@ -353,10 +260,11 @@ const Dashboard = () => {
 
 
 
-      // Met à jour le nombre de points après l'achat
-      const updatedPoints = await fetchAdhesionPoints(userAddress);
-
-      const updatedPointspending = await fetchPendingPoints(userAddress);
+      // Invalide le cache avant de relire les points post-transaction
+      localStorage.removeItem(`adhesionPoints_${account}`);
+      localStorage.removeItem(`pendingPoints_${account}`);
+      const updatedPoints = await fetchAdhesionPoints(account!);
+      const updatedPointspending = await fetchPendingPoints(account!);
       setUserData(prev => ({ ...prev, rewardPoints: updatedPoints, pendingPoints: updatedPointspending }));
 
 
@@ -377,8 +285,7 @@ const Dashboard = () => {
 
 
   const fetchPointPrice = async () => {
-    const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
-    const contract = new Contract(contractAdhesion, ABI, provider);
+    const contract = new Contract(contractAdhesion, ABI, rpcProvider);
     try {
       const prixPoints = await contract.pointPrice();
       return prixPoints;

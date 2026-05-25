@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Web3 from "web3";
 import { Box, Grid, GridItem, Text, Image, Tooltip, useColorMode, useColorModeValue, Center, Heading, SimpleGrid, Button } from "@chakra-ui/react";
 import Link from "next/link";
@@ -51,22 +51,42 @@ const FeaturedMembers: React.FC<FeaturedMembersProps> = ({ addresses }) => {
   const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS!;
   const RPC_URL = process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string;
 
+  const web3 = useMemo(() => new Web3(new Web3.providers.HttpProvider(RPC_URL)), []);
+  const contractManagement = useMemo(
+    () => new web3.eth.Contract(ABI_ADHESION_MANAGEMENT as any, contractAddressManagement),
+    [web3]
+  );
+  const contract = useMemo(
+    () => new web3.eth.Contract(ABI as any, contractAddress),
+    [web3]
+  );
+
   useEffect(() => {
     const fetchMembers = async () => {
       if (!addresses || addresses.length === 0) return;
 
+      // Cache session — clé basée sur les adresses
+      const cacheKey = `featured_${[...addresses].sort().join(',')}`;
+      try {
+        const raw = sessionStorage.getItem(cacheKey);
+        if (raw) {
+          const { data, ts } = JSON.parse(raw);
+          if (Date.now() - ts < 5 * 60 * 1000) {
+            setFeaturedMembersInfo(data);
+            setLoading(false);
+            return;
+          }
+          sessionStorage.removeItem(cacheKey);
+        }
+      } catch {}
+
       try {
         setLoading(true);
-        const web3 = new Web3(new Web3.providers.HttpProvider(RPC_URL));
-        const contractManagement = new web3.eth.Contract(ABI_ADHESION_MANAGEMENT as any, contractAddressManagement);
-        const contract = new web3.eth.Contract(ABI as any, contractAddress);
-
-        const membersInfoPromises = addresses.map((address) =>
-          getUserInfo(address, contractManagement, contract)
+        const membersInfo = await Promise.all(
+          addresses.map((address) => getUserInfo(address, contractManagement, contract))
         );
-
-        const membersInfo = await Promise.all(membersInfoPromises);
         setFeaturedMembersInfo(membersInfo);
+        try { sessionStorage.setItem(cacheKey, JSON.stringify({ data: membersInfo, ts: Date.now() })); } catch {}
       } catch (error) {
         console.error("Erreur lors de la récupération des membres :", error);
       } finally {
@@ -75,7 +95,7 @@ const FeaturedMembers: React.FC<FeaturedMembersProps> = ({ addresses }) => {
     };
 
     fetchMembers();
-  }, [addresses, RPC_URL]);
+  }, [addresses]);
 
   // ✅ CORRIGÉ : Récupération famille (index 14 = 15ème élément)
   const getUserInfo = async (
@@ -94,6 +114,14 @@ const FeaturedMembers: React.FC<FeaturedMembersProps> = ({ addresses }) => {
     const insects = await Promise.all(
       tokens.map(async (tokenId: number) => {
         try {
+          const id = tokenId.toString();
+          // Cache localStorage par tokenId — contenu IPFS immuable
+          const metaKey = `fm_meta_${id}`;
+          const cachedMeta = (() => {
+            try { const r = localStorage.getItem(metaKey); return r ? JSON.parse(r) : null; } catch { return null; }
+          })();
+          if (cachedMeta) return { id, ...cachedMeta } as InsectURI;
+
           const tokenURI: string = await contract.methods.tokenURI(tokenId).call();
 
           // 🔑 Résoudre tokenURI pour fetch metadata
@@ -105,20 +133,18 @@ const FeaturedMembers: React.FC<FeaturedMembersProps> = ({ addresses }) => {
 
           const metadata = await response.json();
 
-          // Famille = 15ème attribut (index 14)
-          const insectFamily = metadata.attributes?.[15]?.value || "Inconnue";
-
-          return {
-            id: tokenId.toString(),
-            image: resolveIPFS(metadata.image, true) || "", // URL HTTP pour <Image />
+          const resolved = {
+            image: resolveIPFS(metadata.image, true) || "",
             name: metadata.name,
-            family: insectFamily,
-          } as InsectURI;
+            family: metadata.attributes?.[15]?.value || "Inconnue",
+          };
+          try { localStorage.setItem(metaKey, JSON.stringify(resolved)); } catch {}
+
+          return { id, ...resolved } as InsectURI;
         } catch (err) {
           console.error("Erreur lors de la récupération du token", tokenId, err);
           return null;
         }
-
       })
     );
 

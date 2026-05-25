@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ethers } from "ethers";
 import ABI from "../../../ABI/ABIAdhesion.json";
 import ABI_ADHESION_MANAGEMENT from "../../../ABI/ABI_ADHESION_MANAGEMENT.json";
@@ -49,10 +49,24 @@ const cardBorder = useColorModeValue("brand.cream", "brand.cream");
   const contractAddressManagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGER!;
   const RPC_URL = process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!;
 
-  const provider = new ethers.JsonRpcProvider(RPC_URL);
+  const provider = useMemo(() => new ethers.JsonRpcProvider(RPC_URL), []);
 
   useEffect(() => {
     const fetchDerniersAdherents = async () => {
+      // Cache session — liste globale, pas user-spécifique
+      const SESSION_KEY = "deradh_list";
+      try {
+        const raw = sessionStorage.getItem(SESSION_KEY);
+        if (raw) {
+          const { data, ts } = JSON.parse(raw);
+          if (Date.now() - ts < 5 * 60 * 1000) {
+            setDernierAdherentsInfo(data);
+            return;
+          }
+          sessionStorage.removeItem(SESSION_KEY);
+        }
+      } catch {}
+
       try {
         const contract = new ethers.Contract(contractAddress, ABI, provider);
         const roles = [0, 1, 2, 3];
@@ -69,7 +83,7 @@ const cardBorder = useColorModeValue("brand.cream", "brand.cream");
         );
 
         setDernierAdherentsInfo(membersInfo);
-        //console.log("✅ Derniers adhérents:", membersInfo);
+        try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({ data: membersInfo, ts: Date.now() })); } catch {}
       } catch (err) {
         console.error("Erreur lors de la récupération des adhérents:", err);
       }
@@ -95,6 +109,14 @@ const cardBorder = useColorModeValue("brand.cream", "brand.cream");
       const insects = await Promise.all(
         tokens.map(async (tokenId) => {
           try {
+            const id = tokenId.toString();
+            // Cache localStorage par tokenId — contenu IPFS immuable
+            const metaKey = `deradh_meta_${id}`;
+            const cachedMeta = (() => {
+              try { const r = localStorage.getItem(metaKey); return r ? JSON.parse(r) : null; } catch { return null; }
+            })();
+            if (cachedMeta) return { id, ...cachedMeta };
+
             const tokenURI: string = await contract.tokenURI(tokenId);
 
             // Résoudre tokenURI pour fetch metadata
@@ -106,18 +128,15 @@ const cardBorder = useColorModeValue("brand.cream", "brand.cream");
 
             const metadata = await res.json();
 
-            const insectFamily = metadata.attributes?.[17]?.value || "Inconnue";
-            //console.log(metadata);
-            const insectlvl = metadata.attributes?.[21]?.value ?? "Inconnue";
-           //console.log(metadata);
-
-            return {
-              id: tokenId.toString(),
-              image: resolveIPFS(metadata.image, true) || "", // URL HTTP pour <Image />
+            const resolved = {
+              image: resolveIPFS(metadata.image, true) || "",
               name: metadata.name,
-              family: insectFamily,
-              level : insectlvl,
+              family: metadata.attributes?.[17]?.value || "Inconnue",
+              level: metadata.attributes?.[21]?.value ?? "Inconnue",
             };
+            try { localStorage.setItem(metaKey, JSON.stringify(resolved)); } catch {}
+
+            return { id, ...resolved };
           } catch (err) {
             console.error("Erreur récupération token:", err);
             return null;

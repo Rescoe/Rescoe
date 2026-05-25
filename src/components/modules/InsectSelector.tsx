@@ -1,6 +1,6 @@
 // Code Insect Selector - VERSION OPTIMISÉE
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Box,
   Button,
@@ -50,8 +50,14 @@ const SelectInsect = ({ onSelect }: { onSelect: (insect: Insect) => void }) => {
   const [selectedInsect, setSelectedInsect] = useState<Insect | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!);
-  const contract = new Contract(contractAddress, ABI, provider);
+  const provider = useMemo(
+    () => new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!),
+    []
+  );
+  const contract = useMemo(
+    () => new Contract(contractAddress, ABI, provider),
+    [provider]
+  );
   const LEVEL_MAX = 3;
 
   // =========================
@@ -61,6 +67,20 @@ const SelectInsect = ({ onSelect }: { onSelect: (insect: Insect) => void }) => {
   const loadBasicInsects = async () => {
 
     if (!address) return;
+
+    // Cache session : données complètes (basic + membership)
+    const sessionKey = `insect_data_${address}`;
+    try {
+      const raw = sessionStorage.getItem(sessionKey);
+      if (raw) {
+        const { data, ts } = JSON.parse(raw);
+        if (Date.now() - ts < 5 * 60 * 1000) {
+          setInsects(data);
+          return;
+        }
+        sessionStorage.removeItem(sessionKey);
+      }
+    } catch {}
 
     setIsLoading(true);
 
@@ -72,11 +92,19 @@ const SelectInsect = ({ onSelect }: { onSelect: (insect: Insect) => void }) => {
         tokenIds.map(async (tokenId: BigNumberish) => {
 
           try {
+            const id = Number(tokenId);
+            // Cache localStorage par tokenId — contenu IPFS immuable
+            const metaKey = `insect_meta_${id}`;
+            const cachedMeta = (() => {
+              try { const r = localStorage.getItem(metaKey); return r ? JSON.parse(r) : null; } catch { return null; }
+            })();
+
+            if (cachedMeta) return { id, name: cachedMeta.name, image: cachedMeta.image };
 
             const tokenURI = await contract.tokenURI(tokenId);
             if (!tokenURI) {
               console.warn("tokenURI invalide pour tokenId:", tokenId);
-              return null; // ou continuer sans cet insecte
+              return null;
             }
 
             const metadataUrl = resolveIPFS(tokenURI, true);
@@ -88,11 +116,13 @@ const SelectInsect = ({ onSelect }: { onSelect: (insect: Insect) => void }) => {
             const res = await fetch(metadataUrl);
             const metadata = await res.json();
 
-            return {
-              id: Number(tokenId),
+            const resolved = {
               name: metadata.name || `Insecte #${tokenId}`,
               image: resolveIPFS(metadata.image, true) || ""
             };
+            try { localStorage.setItem(metaKey, JSON.stringify(resolved)); } catch {}
+
+            return { id, ...resolved };
 
           } catch (e) {
 
@@ -174,6 +204,11 @@ const SelectInsect = ({ onSelect }: { onSelect: (insect: Insect) => void }) => {
     );
 
     setInsects(updated);
+
+    // Persiste en session pour éviter re-fetch au prochain rendu
+    try {
+      sessionStorage.setItem(`insect_data_${address}`, JSON.stringify({ data: updated, ts: Date.now() }));
+    } catch {}
 
     // Count inchangé (œufs + canEvolve)
     const evolutionCount = updated.filter(i => i.canEvolve || i.isEgg).length;

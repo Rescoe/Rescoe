@@ -10,7 +10,7 @@
     "format": "prettier . \"**/*.+(js|ts|json)\" --write --ignore-path .gitignore",
     "format:check": "prettier \"**/*.+(js|ts|json)\" --check --ignore-path .gitignore",
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/build.js",
     "lint": "next lint",
     "test:e2e": "start-server-and-test dev http://localhost:3000 test:cypress",
     "test:cypress": "cypress run --browser chrome --headless",
