@@ -6,12 +6,23 @@
  *   - FeaturedMembers (featured)
  *   - Adherent.tsx (membersByRole, totalMembersCount, totalInsectsMinted)
  *
- * Cache :
- *   - Serveur : module-level 10 min (1 seul fetch Moralis toutes les 10 min)
- *   - Vercel CDN : s-maxage=600, stale-while-revalidate=1200
- *   - Client : localStorage 30 min (dans chaque composant)
+ * Cache stratifié :
+ *   - Serveur : module-level 1h  → 1 seul fetch Moralis/heure MAX par instance
+ *   - CDN Vercel : max-age=3600, stale-while-revalidate=86400
+ *       → 1 appel serveur/heure partagé entre TOUS les utilisateurs
+ *       → pendant le refresh CDN en arrière-plan, la réponse périmée est
+ *          servie immédiatement (0 latence pour l'utilisateur)
+ *   - Navigateur : max-age=0 (pas de cache HTTP navigateur, géré par localStorage)
+ *   - Client localStorage : 24h (dans chaque composant)
  *
- * Résultat : N utilisateurs simultanés → 1 seule requête blockchain/10 min
+ * En-têtes séparés CDN / navigateur :
+ *   Cache-Control        → navigateur uniquement (max-age=0)
+ *   CDN-Cache-Control    → Vercel Edge uniquement (max-age=3600, SWR=86400)
+ *
+ * Invalidation :
+ *   - TTL 1h (filet de sécurité automatique)
+ *   - Post-transaction utilisateur → localStorage vidé côté client
+ *   - Webhook futur (Moralis Streams) → POST /api/revalidate (secret serveur uniquement)
  */
 
 import type { NextApiRequest, NextApiResponse } from "next";
@@ -77,7 +88,16 @@ interface ApiPayload {
 }
 
 let serverCache: { data: ApiPayload; ts: number } | null = null;
-const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 heure — aligné sur CDN-Cache-Control max-age
+
+/**
+ * Réinitialise le cache serveur de cette instance.
+ * Appelé par /api/revalidate sur réception d'un webhook blockchain.
+ * Portée : instance Node.js courante (les autres instances expirent sur TTL).
+ */
+export function resetCache(): void {
+  serverCache = null;
+}
 
 // ─── Fetch user data (max 4 tokens pour la vignette) ────────────────────────
 
@@ -161,10 +181,10 @@ export default async function handler(
 
   // 1. Servir depuis le cache serveur si encore frais
   if (serverCache && Date.now() - serverCache.ts < CACHE_TTL_MS) {
-    res.setHeader(
-      "Cache-Control",
-      "public, s-maxage=600, stale-while-revalidate=1200"
-    );
+    // Navigateur : pas de cache HTTP (géré par localStorage côté client)
+    // Vercel CDN : 1h frais, puis stale servi instantanément pendant 24h de refresh
+    res.setHeader("Cache-Control", "public, max-age=0, must-revalidate");
+    res.setHeader("CDN-Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
     res.setHeader("X-Cache", "HIT");
     return res.status(200).json(serverCache.data);
   }
@@ -244,10 +264,8 @@ export default async function handler(
     // 6. Stocke en cache serveur
     serverCache = { data, ts: Date.now() };
 
-    res.setHeader(
-      "Cache-Control",
-      "public, s-maxage=600, stale-while-revalidate=1200"
-    );
+    res.setHeader("Cache-Control", "public, max-age=0, must-revalidate");
+    res.setHeader("CDN-Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
     res.setHeader("X-Cache", "MISS");
     return res.status(200).json(data);
   } catch (error) {
@@ -255,10 +273,9 @@ export default async function handler(
 
     // En cas d'erreur, renvoie le cache périmé s'il existe (stale)
     if (serverCache) {
-      res.setHeader(
-        "Cache-Control",
-        "public, s-maxage=60, stale-while-revalidate=600"
-      );
+      // Cache périmé servi en urgence — TTL CDN court pour forcer refresh rapide
+      res.setHeader("Cache-Control", "public, max-age=0, must-revalidate");
+      res.setHeader("CDN-Cache-Control", "public, max-age=60, stale-while-revalidate=600");
       res.setHeader("X-Cache", "STALE");
       return res.status(200).json(serverCache.data);
     }

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { invalidatePublicCache } from "@/utils/cacheInvalidation";
 import {
   Box,
   Heading,
@@ -67,7 +68,8 @@ const roleLabels: Record<string, string> = {
 
 const LS_STATS_KEY = "adherent_stats_v2";
 const LS_INSECTS_KEY = "adherent_insects_v2";
-const LS_TTL = 30 * 60 * 1000; // 30 minutes
+// 24h : données rarement mutables, invalidées manuellement après transaction
+const LS_TTL = 24 * 60 * 60 * 1000;
 
 function readLS<T>(key: string): T | null {
   try {
@@ -90,14 +92,6 @@ function writeLS<T>(key: string, data: T) {
   } catch {}
 }
 
-function clearAdherentCache() {
-  try {
-    localStorage.removeItem(LS_STATS_KEY);
-    localStorage.removeItem(LS_INSECTS_KEY);
-    // Invalide aussi les caches des composants enfants
-    localStorage.removeItem("deradh_api_v2");
-  } catch {}
-}
 
 // ─── Composant ───────────────────────────────────────────────────────────────
 
@@ -209,7 +203,7 @@ const Adherent: React.FC = () => {
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    clearAdherentCache();
+    invalidatePublicCache(["members", "insects"]);
     await Promise.all([loadStats(true), loadInsects(true)]);
     setRefreshing(false);
   }, [loadStats, loadInsects]);

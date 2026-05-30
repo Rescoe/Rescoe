@@ -4,13 +4,19 @@
  * Remplace la boucle dans Adherent.tsx qui faisait ownerOf + tokenURI
  * pour chaque token (i=0 à getTotalMinted) — 300+ appels Moralis par visite.
  *
- * Ici : exécuté UNE seule fois côté serveur, mis en cache 10 min,
- * puis servi depuis le CDN Vercel à tous les utilisateurs.
+ * Ici : exécuté UNE seule fois côté serveur, résultat partagé via CDN.
  *
- * Cache :
- *   - Serveur : module-level 10 min
- *   - Vercel CDN : s-maxage=600, stale-while-revalidate=1200
- *   - Client : localStorage 30 min (dans Adherent.tsx)
+ * Cache stratifié :
+ *   - Serveur : module-level 1h (aligné sur CDN)
+ *   - CDN Vercel : Cache-Control navigateur = max-age=0 (pas de cache HTTP navigateur)
+ *                  CDN-Cache-Control = max-age=3600, stale-while-revalidate=86400
+ *                  → Vercel sert la réponse en cache instantanément pendant le refresh
+ *   - Client localStorage : 24h (dans Adherent.tsx)
+ *
+ * Invalidation :
+ *   - TTL 1h automatique
+ *   - Post-mint : localStorage vidé côté client par l'app
+ *   - Webhook futur : POST /api/revalidate (secret serveur, jamais exposé au client)
  */
 
 import type { NextApiRequest, NextApiResponse } from "next";
@@ -68,7 +74,12 @@ interface ApiPayload {
 // ─── Cache serveur module-level ──────────────────────────────────────────────
 
 let serverCache: { data: ApiPayload; ts: number } | null = null;
-const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 heure — aligné sur CDN-Cache-Control max-age
+
+/** Réinitialise le cache serveur de cette instance (voir /api/revalidate). */
+export function resetCache(): void {
+  serverCache = null;
+}
 
 // ─── Fetch d'un token individuel ─────────────────────────────────────────────
 
@@ -117,10 +128,8 @@ export default async function handler(
 
   // 1. Cache serveur encore frais ?
   if (serverCache && Date.now() - serverCache.ts < CACHE_TTL_MS) {
-    res.setHeader(
-      "Cache-Control",
-      "public, s-maxage=600, stale-while-revalidate=1200"
-    );
+    res.setHeader("Cache-Control", "public, max-age=0, must-revalidate");
+    res.setHeader("CDN-Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
     res.setHeader("X-Cache", "HIT");
     return res.status(200).json(serverCache.data);
   }
@@ -171,20 +180,16 @@ export default async function handler(
     // 4. Stocke en cache serveur
     serverCache = { data, ts: Date.now() };
 
-    res.setHeader(
-      "Cache-Control",
-      "public, s-maxage=600, stale-while-revalidate=1200"
-    );
+    res.setHeader("Cache-Control", "public, max-age=0, must-revalidate");
+    res.setHeader("CDN-Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
     res.setHeader("X-Cache", "MISS");
     return res.status(200).json(data);
   } catch (error) {
     console.error("[/api/data/insects] Erreur:", error);
 
     if (serverCache) {
-      res.setHeader(
-        "Cache-Control",
-        "public, s-maxage=60, stale-while-revalidate=600"
-      );
+      res.setHeader("Cache-Control", "public, max-age=0, must-revalidate");
+      res.setHeader("CDN-Cache-Control", "public, max-age=60, stale-while-revalidate=600");
       res.setHeader("X-Cache", "STALE");
       return res.status(200).json(serverCache.data);
     }

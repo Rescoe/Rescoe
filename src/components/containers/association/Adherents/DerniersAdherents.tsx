@@ -35,7 +35,8 @@ interface UserInfo {
 // ─── Cache localStorage client (30 min) ──────────────────────────────────────
 
 const LS_KEY = "deradh_api_v2";
-const LS_TTL = 30 * 60 * 1000;
+// 24h : données rarement mutables, partagées depuis CDN (même TTL que le CDN SWR)
+const LS_TTL = 24 * 60 * 60 * 1000;
 
 function readCache(): UserInfo[] | null {
   try {

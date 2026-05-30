@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Web3 from 'web3';
 import detectEthereumProvider from '@metamask/detect-provider';
 import { useRouter } from 'next/router';
 import { JsonRpcProvider, Contract, ethers, formatUnits  } from 'ethers';
+import type { ArtTokenMetadata, ArtTokenState } from '@/types/token';
 import {FilteredCollectionsCarousel} from '../galerie/art'; // Mettez à jour le chemin
 import { resolveIPFS } from '@/utils/resolveIPFS';  // ✅ TON UTILS
 
@@ -97,7 +98,6 @@ const TokenPage: React.FC = () => {
   const [web3, setWeb3] = useState<Web3 | null>(null);
   const [accounts, setAccounts] = useState<string[]>([]);
   const [isForSale, setIsForSale] = useState<boolean>(false);
-  const [nftCache, setNFTCache] = useState<NFTCache>({});
   //const [collectionId, setCollectionId] = useState<bigint>({});
   const [transacActivity, setTransacActivity] = useState<boolean>(false);
   const [tabIndex, setTabIndex] = useState(0); // Initialement l'onglet 0 (Détails)
@@ -154,169 +154,109 @@ const TokenPage: React.FC = () => {
 
 
 
+  // ─── Chargement du token : 2 appels parallèles metadata (permanent) + state (court TTL) ──
+
+  // Cache localStorage permanent pour les métadonnées d'œuvres (CID IPFS immuable)
+  const artMetaLS = contractAddress && tokenId
+    ? `art_meta_v1_${contractAddress}_${tokenId}`
+    : null;
+
+  const loadArtMeta = useCallback(async (): Promise<ArtTokenMetadata | null> => {
+    if (!artMetaLS || !contractAddress || !tokenId) return null;
+    // Cache localStorage sans TTL — les métadonnées d'œuvre sont vraiment immuables
+    try {
+      const raw = localStorage.getItem(artMetaLS);
+      if (raw) return JSON.parse(raw) as ArtTokenMetadata;
+    } catch {}
+    const r = await fetch(`/api/token/art-metadata?contract=${contractAddress}&tokenId=${tokenId}`);
+    if (!r.ok) return null;
+    const data: ArtTokenMetadata = await r.json();
+    try { localStorage.setItem(artMetaLS, JSON.stringify(data)); } catch {}
+    return data;
+  }, [contractAddress, tokenId, artMetaLS]);
+
+  const loadArtState = useCallback(async (): Promise<ArtTokenState | null> => {
+    if (!contractAddress || !tokenId) return null;
+    const r = await fetch(`/api/token/art-state?contract=${contractAddress}&tokenId=${tokenId}`);
+    if (r.status === 404) return null;
+    if (!r.ok) throw new Error(`state HTTP ${r.status}`);
+    return r.json();
+  }, [contractAddress, tokenId]);
+
   useEffect(() => {
     if (!router.isReady || !contractAddress || !tokenId) return;
 
     if (contractAddress) {
-        fetchCollectionNFTs(contractAddress);
-      }
+      fetchCollectionNFTs(contractAddress);
+    }
 
     setIsLoading(true);
 
-    const fetchNFT = async () => {
+    (async () => {
       try {
-        const data = await fetchNFTData(contractAddress, Number(tokenId));
+        const [meta, state] = await Promise.all([loadArtMeta(), loadArtState()]);
 
-            if (!data) {  // Vérifiez si `data` est `null`
-        setErrorMessage('Cette œuvre a été détruite ou n\'existe pas encore.');
-        setNftData(null);  // Optionnel, mais permet de réinitialiser les données de l'NFT
-        return; // Arrêtez l'exécution ici si le token n'existe pas
-
-        }
-        setNftData(data);
-        setIsForSale(data.forsale);
-        setMembershipStatus(data.forsale ? 'actif' : 'expiré');
-        setName(data.name);
-        setBio(data.description);
-        setFormattedTransactions(data.transactions); // Mettre à jour ici
-        //setCollectionId(data.collectionId);
-
-        setErrorMessage(''); // Réinitialiser le message d'erreur
-
-        }catch (error: unknown) {
-            const customError = error as CustomError;
-
-            console.error('Erreur lors de la récupération des détails du token :', customError);
-            if (customError.message && customError.message.includes('nonexistent')) {
-                setErrorMessage('Cette œuvre a été détruite ou n\'existe pas encore.');
-            } else {
-                setErrorMessage('Une erreur s\'est produite lors de la récupération des détails du token.');
-            }
-        }
-      finally {
-        setIsLoading(false);
-      }
-    };
-
-
-    fetchNFT();
-  }, [router.isReady, contractAddress, tokenId]);
-
-
-//################################################################ Fetch NFT DATA
-// Fonction pour raccourcir l'adresse Ethereum
-const formatAddress = (address: string) => {
-if (!address) return '';
-return `${address.slice(0, 6)}...${address.slice(-4)}`;
-};
-
-/*
-const formatAddress5lettres = (address: string) => {
-if (!address) return '';
-return `${address.slice(0, 8)}`;
-};
-*/
-
-
-const fetchNFTData = async (contractAddress: string, tokenId: number): Promise<NFTData | null> => {
-    const cacheKey = `${contractAddress}_${tokenId}`;
-    if (nftCache[cacheKey]) return nftCache[cacheKey];
-
-    const web3Instance = new Web3(new Web3.providers.HttpProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!));
-
-    try {
-        const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
-        const contract = new Contract(contractAddress, ABI, provider);
-
-        let fullDetails;
-        try {
-            fullDetails = await contract.getTokenFullDetails(tokenId);
-        } catch (error: any) { // Typage en 'any'
-            if (error.message && error.message.includes('ERC721NonexistentToken')) {
-                // Retourner null sans afficher d'erreur dans la console
-                return null; // Indique que le token n'existe pas
-            } else {
-                console.error('Erreur non prévue:', error);
-                throw error; // Relancez l'erreur pour le traitement ultérieur
-            }
+        if (!state) {
+          setErrorMessage("Cette œuvre a été détruite ou n'existe pas encore.");
+          setNftData(null);
+          return;
         }
 
-
-                if (!fullDetails) {
-                    return null;  // Si aucun détail n'est trouvé
-                }
-
-        const ownerCheck = Boolean(authAddress && fullDetails?.owner && authAddress.toLowerCase() === fullDetails.owner.toLowerCase());
+        const ownerCheck = Boolean(
+          authAddress && state.owner && authAddress.toLowerCase() === state.owner.toLowerCase()
+        );
         setIsOwner(ownerCheck);
 
-        //const resolvedOwner = await fetchENS(fullDetails.owner);
+        const artist = meta?.artist ?? '';
+        const creatorCheck = Boolean(
+          authAddress && artist && authAddress.toLowerCase() === artist.toLowerCase()
+        );
+        setIsCreator(creatorCheck);
+        setCanPurchase(!ownerCheck && state.forsale);
+        setPrice(state.price);
 
-        const owner: string = fullDetails.owner;
-        const mintDate: bigint = fullDetails.mintDate;
-        const currentPrice: bigint = fullDetails.currentPrice;
-        const forsale: boolean = fullDetails.forSale;
-        const priceHistory: bigint[] = fullDetails.priceHistory;
-        const transactions: Transaction[] = fullDetails.transactions;
-        const collectionId: bigint = fullDetails[6];
-
-        const formattedTransactions = transactions.map((transaction: Transaction) => ({
-            oldOwner: transaction.seller,
-            newOwner: transaction.buyer,
-            date: formatTimestamp(transaction.timestamp),
-            price: formatUnits(transaction.price, 18),
-        }));
-
-        if(formattedTransactions.length != 0){
-          setTransacActivity(true);
-        }
-
-        const priceInEther = formatUnits(currentPrice, 18);
-        setPrice(priceInEther);
-
-        // Dans fetchNFTData, remplace cette partie :
-        // Dans fetchNFTData, remplace :
-        const uri = await contract.tokenURI(tokenId);
-        if (!uri) throw new Error("URI invalide.");
-
-        const hash = uri.replace('ipfs://', '').split('/')[0];  // QmUUWndns...
-    const res = await fetch(`/api/metadata/${hash}`);
-    const data = await res.json();
-    data.image = resolveIPFS(data.image, true)!;  // Pour affichage
-
-       //console.log("📄 Main NFT metadata:", data);
-
+        if (state.transactions.length > 0) setTransacActivity(true);
 
         const nftData: NFTData = {
-            owner,
-            mintDate,
-            priceHistory: priceHistory.map((price) => (Number(price) / 1e18)),
-            transactions: formattedTransactions,
-            image: data.image,
-            name: data.name,
-            description: data.description,
-            artist: data.artist,
-            //artistENS: resolvedArtist,
-            forsale,
-            price: priceInEther,
-            collectionId: Number(collectionId),
+          owner: state.owner,
+          mintDate: BigInt(0),          // stocké mais non affiché, bigint non sérialisable
+          priceHistory: state.priceHistory,
+          transactions: state.transactions,
+          image: meta?.image ?? '',
+          name: meta?.name ?? '',
+          description: meta?.description ?? '',
+          artist,
+          forsale: state.forsale,
+          price: state.price,
+          collectionId: state.collectionId,
         };
 
-//console.log(nftData);
+        setNftData(nftData);
+        setIsForSale(state.forsale);
+        setMembershipStatus(state.forsale ? 'actif' : 'expiré');
+        setName(meta?.name ?? '');
+        setBio(meta?.description ?? '');
+        setFormattedTransactions(state.transactions);
+        setErrorMessage('');
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('Erreur récupération token :', msg);
+        if (msg.includes('nonexistent')) {
+          setErrorMessage("Cette œuvre a été détruite ou n'existe pas encore.");
+        } else {
+          setErrorMessage("Une erreur s'est produite lors de la récupération des détails du token.");
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, [router.isReady, contractAddress, tokenId, loadArtMeta, loadArtState]);
 
-        const creatorCheck = Boolean(authAddress && nftData.artist && authAddress.toLowerCase() === nftData.artist.toLowerCase());
-        setIsCreator(creatorCheck);
 
-
-        setCanPurchase(!ownerCheck && nftData.forsale);
-
-
-        nftCache[cacheKey] = nftData;
-        return nftData;
-
-    } catch (error: any) {
-        console.error('Erreur lors de la récupération des détails du token :', error);
-        return null; // Indiquez que l'opération a échoué sans lancer d'erreurs sur l'application
-    }
+// Fonction pour raccourcir l'adresse Ethereum
+const formatAddress = (address: string) => {
+  if (!address) return '';
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
 };
 
 const fetchCollectionNFTs = async (contractAddress: string) => {

@@ -25,6 +25,7 @@ import ABI_ADHESION_MANAGEMENT from '../../ABI/ABI_ADHESION_MANAGEMENT.json';
 import CreateCollection from './CreateCollection';
 import { FilteredCollectionsCarousel } from '../galerie/art';
 import { fetchAdhesionPoints, fetchStatsCollection } from "@/utils/dashboardFetcher";
+import { invalidateUserCache } from "@/utils/cacheInvalidation";
 
 import { useRouter } from 'next/router';
 
@@ -260,9 +261,8 @@ const Dashboard = () => {
 
 
 
-      // Invalide le cache avant de relire les points post-transaction
-      localStorage.removeItem(`adhesionPoints_${account}`);
-      localStorage.removeItem(`pendingPoints_${account}`);
+      // Invalide le cache utilisateur avant de relire les points post-transaction
+      invalidateUserCache(account!);
       const updatedPoints = await fetchAdhesionPoints(account!);
       const updatedPointspending = await fetchPendingPoints(account!);
       setUserData(prev => ({ ...prev, rewardPoints: updatedPoints, pendingPoints: updatedPointspending }));

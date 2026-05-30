@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import type { GalerieCollection } from '@/lib/collectionsData';
 import {
   Box,
   Heading,
@@ -65,9 +66,25 @@ interface NFT {
   mintContractAddress: string;
 }
 
-const UniqueArtGalerie: React.FC = () => {
+interface UniqueArtGalerieProps {
+  /** Collections pré-chargées via ISR (getStaticProps). Si absent, fetch client-side. */
+  initialCollections?: GalerieCollection[];
+}
+
+const UniqueArtGalerie: React.FC<UniqueArtGalerieProps> = ({ initialCollections = [] }) => {
   const [isMobile] = useMediaQuery('(max-width: 768px)');
-  const [collections, setCollections] = useState<Collection[]>([]);
+  const [collections, setCollections] = useState<Collection[]>(
+    // Pré-initialise depuis le SSR — évite le flash de chargement
+    initialCollections.map((c) => ({
+      id: c.id,
+      name: c.name,
+      collectionType: c.collectionType,
+      creator: c.creator,
+      imageUrl: c.imageUrl,
+      mintContractAddress: c.mintContractAddress,
+      isFeatured: c.isFeatured,
+    }))
+  );
   const [nfts, setNfts] = useState<NFT[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [currentTabIndex, setCurrentTabIndex] = useState<number>(0);
@@ -336,7 +353,11 @@ const UniqueArtGalerie: React.FC = () => {
   }, [selectedCollectionId, nfts.length]);  // ✅ Déclenche sur NFTs loaded
 
   useEffect(() => {
-    fetchCollections();
+    // Si les collections sont déjà pré-chargées via ISR, ne pas refetch
+    if (initialCollections.length === 0) {
+      fetchCollections();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import type { GalerieCollection } from "@/lib/collectionsData";
 import {
   Box,
   Heading,
@@ -76,8 +77,21 @@ interface Poem {
 
 const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!;
 
-const PoetryGallery: React.FC = () => {
-  const [collections, setCollections] = useState<Collection[]>([]);
+interface PoetryGalleryProps {
+  /** Collections pré-chargées via ISR (getStaticProps). Si absent, fetch client-side. */
+  initialCollections?: GalerieCollection[];
+}
+
+const PoetryGallery: React.FC<PoetryGalleryProps> = ({ initialCollections = [] }) => {
+  const [collections, setCollections] = useState<Collection[]>(
+    initialCollections.map((c) => ({
+      id: c.id,
+      name: c.name,
+      imageUrl: c.imageUrl,
+      mintContractAddress: c.mintContractAddress,
+      isFeatured: c.isFeatured,
+    }))
+  );
   const [poems, setPoems] = useState<Poem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
@@ -342,7 +356,11 @@ const handleBurn = async (nft: Poem, tokenId: number) => {
   };
 
   useEffect(() => {
-    fetchPoetryCollections(currentPage);
+    // Si les collections sont déjà pré-chargées via ISR, ne pas refetch à la première page
+    if (initialCollections.length === 0 || currentPage > 0) {
+      fetchPoetryCollections(currentPage);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage]);
 
   return (

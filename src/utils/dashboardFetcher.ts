@@ -8,14 +8,18 @@ const contratAdhesionManagement = process.env.NEXT_PUBLIC_RESCOE_ADHERENTSMANAGE
 const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT as string;
 const providerUrl = process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string;
 
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+// TTL par type de données :
+//   - ENS : quasi-immuable → 7 jours
+//   - Points / stats utilisateur : peuvent changer après une transaction → 5 min
+const TTL_ENS = 7 * 24 * 60 * 60 * 1000;        // 7 jours
+const TTL_USER_DATA = 5 * 60 * 1000;              // 5 min (post-transaction invalidés manuellement)
 
-function readCache<T>(key: string): T | null {
+function readCache<T>(key: string, ttl: number): T | null {
   try {
     const raw = localStorage.getItem(key);
     if (!raw) return null;
     const { data, ts } = JSON.parse(raw);
-    if (Date.now() - ts > CACHE_TTL_MS) {
+    if (Date.now() - ts > ttl) {
       localStorage.removeItem(key);
       return null;
     }
@@ -38,7 +42,7 @@ function writeCache<T>(key: string, data: T): void {
  */
 export const fetchENS = async (address: string) => {
   const cacheKey = `ens_${address}`;
-  const cached = readCache<string | null>(cacheKey);
+  const cached = readCache<string | null>(cacheKey, TTL_ENS); // ENS quasi-immuable → 7j
   if (cached !== null) return cached;
 
   try {
@@ -85,7 +89,7 @@ interface StatsCollection {
 
 export const fetchStatsCollection = async (address: string): Promise<StatsCollection> => {
   const cacheKey = `statsCollection_${address}`;
-  const cached = readCache<StatsCollection>(cacheKey);
+  const cached = readCache<StatsCollection>(cacheKey, TTL_USER_DATA); // user-specific → 5 min
   if (cached) return cached;
 
   try {
@@ -117,7 +121,7 @@ export const fetchStatsCollection = async (address: string): Promise<StatsCollec
  */
 export const fetchAdhesionPoints = async (address: string): Promise<number> => {
   const cacheKey = `adhesionPoints_${address}`;
-  const cached = readCache<number>(cacheKey);
+  const cached = readCache<number>(cacheKey, TTL_USER_DATA); // user-specific → 5 min
   if (cached !== null) return cached;
 
   try {

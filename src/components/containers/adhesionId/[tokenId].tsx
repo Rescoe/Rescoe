@@ -37,6 +37,7 @@ import { useRouter } from 'next/router';
 
 import ABI from '@/components/ABI/ABIAdhesion.json';
 import ABI_Management from '@/components/ABI/ABI_ADHESION_MANAGEMENT.json';
+import type { AdhesionTokenMetadata, AdhesionTokenState } from '@/types/token';
 import { PublicProfile } from '@/components/containers/dashboard';
 import { useHatchEgg } from '@/hooks/useHatchEgg';
 import { useTokenEvolution, MembershipInfo } from '@/hooks/useTokenEvolution';
@@ -729,7 +730,6 @@ const TokenPage = () => {
   const [isForSale, setIsForSale] = useState(false);
   const [renewPriceEth, setRenewPriceEth] = useState<string | null>(null);
   const [isBurning, setIsBurning] = useState(false);
-  const [nftCache, setNftCache] = useState<Record<string, NFTData>>({});
 
   const [membershipInfo, setMembershipInfo] = useState<MembershipInfo>({
     level: 0,
@@ -741,6 +741,92 @@ const TokenPage = () => {
     locked: false,
     isAnnual: false,
   });
+
+  // ─── Cache localStorage pour les métadonnées (24h, invalidé post-évolution) ──
+
+  const META_LS_KEY = `adhesion_meta_v1_${contractAdhesion}_${tokenId}`;
+  const META_LS_TTL = 24 * 60 * 60 * 1000;
+
+  const loadMetaFromLS = (): AdhesionTokenMetadata | null => {
+    try {
+      const raw = localStorage.getItem(META_LS_KEY);
+      if (!raw) return null;
+      const { data, ts } = JSON.parse(raw);
+      if (Date.now() - ts > META_LS_TTL) return null;
+      return data as AdhesionTokenMetadata;
+    } catch { return null; }
+  };
+
+  const saveMetaToLS = (data: AdhesionTokenMetadata) => {
+    try {
+      localStorage.setItem(META_LS_KEY, JSON.stringify({ data, ts: Date.now() }));
+    } catch {}
+  };
+
+  const evictMetaFromLS = () => {
+    try { localStorage.removeItem(META_LS_KEY); } catch {}
+  };
+
+  // ─── Chargement des données token (2 appels parallèles : metadata + state) ──
+
+  const loadTokenData = useCallback(async (force = false) => {
+    if (!router.isReady || tokenId === undefined) return;
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Metadata : localStorage d'abord (24h), API ensuite
+      const cachedMeta = force ? null : loadMetaFromLS();
+      const metaPromise: Promise<AdhesionTokenMetadata> = cachedMeta
+        ? Promise.resolve(cachedMeta)
+        : fetch(`/api/token/adhesion-metadata?tokenId=${tokenId}`)
+            .then((r) => {
+              if (!r.ok) throw new Error(`metadata HTTP ${r.status}`);
+              return r.json();
+            })
+            .then((d: AdhesionTokenMetadata): AdhesionTokenMetadata => {
+              saveMetaToLS(d);
+              return d;
+            });
+
+      // State : toujours depuis l'API (CDN 60s, pas de localStorage)
+      const statePromise: Promise<AdhesionTokenState> = fetch(
+        `/api/token/adhesion-state?tokenId=${tokenId}`
+      ).then((r) => {
+        if (!r.ok) throw new Error(`state HTTP ${r.status}`);
+        return r.json();
+      });
+
+      const [meta, state] = await Promise.all([metaPromise, statePromise]);
+
+      const nft: NFTData = {
+        owner: state.owner,
+        role: state.role,
+        mintTimestamp: state.mintTimestamp,
+        price: state.price,
+        name: state.name,
+        bio: state.bio,
+        remainingTime: state.remainingTime,
+        fin: state.fin,
+        forSale: state.forSale,
+        membership: state.membership,
+        membershipInfo: state.membershipInfo as MembershipInfo,
+        image: meta.image,
+        uri: meta.tokenURI,
+        tokenURI: meta.tokenURI,
+      };
+
+      setNftData(nft);
+      setIsForSale(state.forSale);
+      if (state.membershipInfo) setMembershipInfo(state.membershipInfo as MembershipInfo);
+      setRenewPriceEth(state.mintPrice ?? null);
+    } catch {
+      setError('Erreur lors de la récupération des données.');
+    } finally {
+      setIsLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, tokenId]);
 
   // BONUS FIX — useColorModeValue appelé inconditionnellement au top-level,
   // jamais à l'intérieur d'un if/callback/return conditionnel.
@@ -767,128 +853,10 @@ const TokenPage = () => {
     return () => window.removeEventListener('focus', restoreAuth);
   }, [auth.isAuthenticated]);
 
-  const fetchNFTData = useCallback(
-    async (contractAdhesionAddress: string, tokenIdNumber: number): Promise<NFTData> => {
-      const cacheKey = `${contractAdhesionAddress}_${tokenIdNumber}`;
-      if (nftCache[cacheKey]) return nftCache[cacheKey];
-
-      const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!);
-      const contract = new EthersContract(contractAdhesionAddress, ABI, provider);
-
-      const [
-        owner,
-        role,
-        mintTimestamp,
-        priceWei,
-        nameOnChain,
-        bioOnChain,
-        remainingTime,
-        forSale,
-      ] = await contract.getTokenDetails(tokenIdNumber);
-
-      const [membership, realName, realBio] = await contract.getUserInfo(owner);
-      const uri = await contract.tokenURI(tokenIdNumber);
-
-      let metadata: Partial<EvolutionMetadata> = {};
-      let imageUrl = '';
-
-      try {
-        const metadataUrl = resolveIPFS(uri, true);
-
-        if (metadataUrl && metadataUrl.match(/\.(png|jpg|jpeg|gif|svg)$/i)) {
-          imageUrl = metadataUrl;
-        } else if (metadataUrl) {
-          const res = await fetch(metadataUrl);
-          if (res.ok) {
-            const data = await res.json().catch(() => null);
-            if (data) {
-              metadata = data;
-              if (data.image) {
-                const resolved = resolveIPFS(data.image, true);
-                if (resolved) imageUrl = resolved;
-              }
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('Metadata fetch échoué:', e);
-      }
-
-      const finAdhesion = new Date(
-        (Number(mintTimestamp) + Number(remainingTime)) * 1000
-      ).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' });
-
-      const membershipInfoRaw = await contract.getMembershipInfo(tokenIdNumber);
-      const mi: MembershipInfo = {
-        level: Number(membershipInfoRaw.level),
-        autoEvolve: Boolean(membershipInfoRaw.autoEvolve),
-        startTimestamp: Number(membershipInfoRaw.startTimestamp),
-        expirationTimestamp: Number(membershipInfoRaw.expirationTimestamp),
-        totalYears: Number(membershipInfoRaw.totalYears),
-        locked: Boolean(membershipInfoRaw.locked),
-        isEgg: Boolean(membershipInfoRaw.isEgg),
-        isAnnual: Boolean(membershipInfoRaw.isAnnual),
-      };
-
-      const result: NFTData = {
-        ...(metadata as any),
-        image: imageUrl,
-        tokenURI: uri,
-        uri,
-        owner,
-        role: Number(role),
-        mintTimestamp: formatTimestamp(Number(mintTimestamp)),
-        price: formatUnits(priceWei as BigNumberish, 'ether'),
-        name: realName?.length > 0 ? realName : nameOnChain,
-        bio: realBio?.length > 0 ? realBio : bioOnChain,
-        remainingTime: formatSeconds(Number(remainingTime)),
-        fin: finAdhesion,
-        forSale: Boolean(forSale),
-        membership,
-        membershipInfo: mi,
-      };
-
-      setNftCache((prev) => ({ ...prev, [cacheKey]: result }));
-      return result;
-    },
-    [nftCache]
-  );
-
+  // Charge les données au montage (et lors du changement de tokenId)
   useEffect(() => {
-    if (!router.isReady || !contractAdhesion || tokenId === undefined) return;
-
-    setIsLoading(true);
-
-    fetchNFTData(contractAdhesion, Number(tokenId))
-      .then((data) => {
-        setNftData(data);
-        setIsForSale(data.forSale);
-        if (data.membershipInfo) setMembershipInfo(data.membershipInfo);
-      })
-      .catch(() => {
-        setError('Erreur lors de la récupération des données.');
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
-  }, [router.isReady, tokenId, fetchNFTData]);
-
-  useEffect(() => {
-    if (!contractAdhesion || !router.isReady) return;
-
-    const loadRenewPrice = async () => {
-      try {
-        const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!);
-        const contract = new EthersContract(contractAdhesion, ABI, provider);
-        const priceWei = await contract.mintPrice();
-        setRenewPriceEth(formatUnits(priceWei, 'ether'));
-      } catch {
-        setRenewPriceEth(null);
-      }
-    };
-
-    loadRenewPrice();
-  }, [router.isReady]);
+    loadTokenData();
+  }, [loadTokenData]);
 
   const handleRenewMembership = async () => {
     if (!authWeb3 || !authAddress) {
@@ -914,10 +882,7 @@ const TokenPage = () => {
       });
 
       alert('Adhésion renouvelée avec succès.');
-
-      const updated = await fetchNFTData(contractAdhesion, Number(tokenId));
-      setNftData(updated);
-      if (updated.membershipInfo) setMembershipInfo(updated.membershipInfo);
+      await loadTokenData(true);
     } catch (err) {
       console.error(err);
       alert('Erreur lors du renouvellement. Voir console.');
@@ -935,9 +900,7 @@ const TokenPage = () => {
       await contract.methods.setNameAndBio(Number(tokenId), name, bio).send({ from: authAddress });
 
       alert('Informations mises à jour avec succès.');
-
-      const updated = await fetchNFTData(contractAdhesion, Number(tokenId));
-      setNftData(updated);
+      await loadTokenData(true);
     } catch (err) {
       console.error(err);
       alert('Erreur lors de la mise à jour. Voir console.');
@@ -978,11 +941,11 @@ const TokenPage = () => {
   };
 
   const handleEvolutionSuccess = useCallback(async () => {
-    const updated = await fetchNFTData(contractAdhesion, Number(tokenId));
-    setNftData(updated);
-    if (updated.membershipInfo) setMembershipInfo(updated.membershipInfo);
+    // L'image change après évolution → invalider le cache localStorage métadonnées
+    evictMetaFromLS();
     sessionStorage.removeItem(`levelDurations_${contractAdhesion}`);
-  }, [fetchNFTData, tokenId]);
+    await loadTokenData(true);
+  }, [loadTokenData]);
 
   if (isLoading) {
     return (
