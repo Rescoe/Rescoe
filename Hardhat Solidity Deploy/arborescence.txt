@@ -1,0 +1,19 @@
+HardhatRescoe/
+├── contracts/                    # 13 .sol
+├── scripts/deploy/DeployOne.ts
+├── hardhat.config.js
+│
+└── deploy-ui/
+    ├── src/
+    │   └── app/                      # src/app/ = racine logique
+    │       ├── page.tsx              # DeployPage
+    │       ├── components/           # TES composants (même niveau page.tsx)
+    │       │   ├── useDeployOne.ts
+    │       │   ├── DeploymentPipeline.tsx
+    │       │   ├── ContractDetector.tsx
+    │       │   └── ...
+    │       └── api/
+    │           └── contracts/
+    │               └── deploy/
+    │                   └── route.ts
+    └── package.json

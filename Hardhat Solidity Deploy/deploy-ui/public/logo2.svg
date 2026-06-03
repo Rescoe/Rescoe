@@ -1,0 +1,45 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Dégradé cosmique -->
+  <defs>
+    <linearGradient id="cosmic" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="50%" stop-color="#2a1f5e"/>
+      <stop offset="100%" stop-color="#0f0f23"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="30%" r="50%">
+      <stop offset="0%" stop-color="#00f5ff" stop-opacity="0.4"/>
+      <stop offset="70%" stop-color="#10b981" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  
+  <!-- Fond -->
+  <rect width="120" height="120" rx="28" fill="url(#cosmic)"/>
+  
+  <!-- Aura centrale -->
+  <circle cx="60" cy="40" r="32" fill="url(#glow)" opacity="0.6"/>
+  
+  <!-- R.E.S.C.O.E hexagones interconnectés -->
+  <g stroke="#00f5ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <!-- R -->
+    <path d="M30 35 L48 35 L52 45 Q56 55 52 65 L48 75 L30 75 Z" fill="#00f5ff" fill-opacity="0.8"/>
+    <!-- E -->
+    <rect x="58" y="35" width="12" height="40" rx="4" fill="#10b981" stroke="#059669"/>
+    <rect x="70" y="35" width="30" height="10" rx="3" fill="#10b981"/>
+    <rect x="70" y="52" width="30" height="10" rx="3" fill="#10b981"/>
+    <rect x="70" y="69" width="30" height="10" rx="3" fill="#10b981"/>
+    <!-- S -->
+    <path d="M32 90 Q40 86 48 90 Q56 94 60 98 Q64 102 60 106 Q56 110 48 110 Q40 110 32 106" 
+          fill="#f59e0b" stroke="#d97706"/>
+  </g>
+  
+  <!-- Lignes blockchain -->
+  <g stroke="#3b82f6" stroke-width="1.5" opacity="0.7">
+    <path d="M20 60 Q40 55 60 60 Q80 65 100 60" stroke-dasharray="4 4"/>
+    <circle cx="60" cy="60" r="3" fill="#3b82f6"/>
+  </g>
+  
+  <!-- Bordure néon */
+  <rect width="120" height="120" rx="28" fill="none" 
+        stroke="url(#cosmic)" stroke-width="2" opacity="0.3"/>
+</svg>

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import Web3 from 'web3';
 import {
   Box,
@@ -1003,6 +1003,44 @@ const TokenPage = () => {
     historyRefreshKey
   );
 
+  // Correction des attributs du step courant :
+  //   1. Role : le contrat V3 déployé mappe role=0 → "Membre" au lieu de "Artiste"
+  //      → on utilise nftData.role (uint8 brut de getTokenDetails) avec notre propre mapping
+  //   2. Date d'adhésion : injectée depuis membershipInfo.startTimestamp (non disponible dans tokenURI)
+  const ROLE_LABELS_FR: Record<number, string> = {
+    0: "Artiste",
+    1: "Poète",
+    2: "Contributeur",
+    3: "Photographe",
+  };
+  const correctedCurrentStep = useMemo(() => {
+    if (!currentStep) return null;
+    const startTs = nftData?.membershipInfo?.startTimestamp;
+    const dateAdhesion = startTs
+      ? new Date(startTs * 1000).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
+      : null;
+    const annee = startTs ? new Date(startTs * 1000).getFullYear() : null;
+    const type = nftData?.membershipInfo?.isAnnual ? "Annuel" : "Essai";
+
+    const correctedAttrs = currentStep.attributes.map(a => {
+      if (a.trait_type === "Role" && nftData?.role !== undefined) {
+        return { ...a, value: ROLE_LABELS_FR[nftData.role] ?? a.value };
+      }
+      if (a.trait_type === "Adhesion" && annee) {
+        return { ...a, value: `${type} - ${annee}` };
+      }
+      return a;
+    });
+
+    // Injecter date d'adhésion si absente
+    const hasDate = correctedAttrs.some(a => a.trait_type === "Date adhesion");
+    if (dateAdhesion && !hasDate) {
+      correctedAttrs.push({ trait_type: "Date adhesion", value: dateAdhesion });
+    }
+
+    return { ...currentStep, attributes: correctedAttrs };
+  }, [currentStep, nftData?.role, nftData?.membershipInfo]);
+
   if (isLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
@@ -1191,7 +1229,7 @@ const TokenPage = () => {
               insectArtistAddress={insectArtistAddress}
               tokenId={tokenId as number | string}
               pastSteps={pastSteps}
-              currentStep={currentStep}
+              currentStep={correctedCurrentStep}
               genealogy={genealogy}
               evoLoading={evoLoading}
               contractAdhesion={contractAdhesion}

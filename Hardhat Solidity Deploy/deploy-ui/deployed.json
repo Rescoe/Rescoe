@@ -1,0 +1,102 @@
+{
+  "contracts": [
+    {
+      "id": "9da10bfc-1e95-4b36-8c8d-34445ff60983",
+      "name": "MasterFactory",
+      "address": "0xf74E45D6f94141F91488C9Ec8060c8116206F378",
+      "network": "hardhat",
+      "timestamp": "2026-01-15T14:22:43.166Z"
+    },
+    {
+      "id": "6e9ed86d-0df8-4445-9f93-776f113f331b",
+      "name": "AdhesionRescoe",
+      "address": "0xc94D36256F18775a90623277445c10a68c3F0953",
+      "network": "hardhat",
+      "timestamp": "2026-01-18T14:06:14.886Z"
+    },
+    {
+      "id": "7be0db6f-b0c0-4b6c-a0d9-c91046767b74",
+      "name": "TokenManagement",
+      "address": "0xBebD758d3C2E781c351F4b37Eb28534679Fb661B",
+      "network": "hardhat",
+      "timestamp": "2026-01-18T14:07:24.273Z"
+    },
+    {
+      "id": "d4f6b913-1309-4842-a043-26a10aaa7aa4",
+      "name": "ResCoellectionManager",
+      "address": "0x55dC5Bb85b93c79BBf50f0c75B1B573AfdA7702f",
+      "network": "hardhat",
+      "timestamp": "2026-01-18T14:08:30.035Z"
+    },
+    {
+      "id": "e8d341eb-83d1-436f-b5ce-009e3a52a691",
+      "name": "ArtFactory",
+      "address": "0xFaC438DCE50964046D806a6417eFA58321FE5ac5",
+      "network": "hardhat",
+      "timestamp": "2026-01-18T14:09:09.505Z"
+    },
+    {
+      "id": "a3647a64-532d-4d9b-a4c1-9d37d8bf593d",
+      "name": "PoetryFactory",
+      "address": "0x4A55cF4934e44863915eCFab743BC8E43C3b8E00",
+      "network": "hardhat",
+      "timestamp": "2026-01-18T16:18:08.597Z"
+    },
+    {
+      "id": "c042424f-30ec-4df7-aaf2-9a1a5b0a2dbe",
+      "name": "MessageFactory",
+      "address": "0xF4a74A48E69854921a442F9fD2f9cf6f632ec943",
+      "network": "hardhat",
+      "timestamp": "2026-01-24T07:57:53.485Z"
+    },
+    {
+      "id": "3906b678-9a2c-438b-b349-07d2fb36b936",
+      "name": "AdhesionRescoe",
+      "address": "0x3ae10085592E791cF9Ef7C67BcCddC0bC58ED27e",
+      "network": "hardhat",
+      "timestamp": "2026-02-07T19:21:16.025Z"
+    },
+    {
+      "id": "3b1e9358-ce1c-4ebf-9723-2efd46aa838d",
+      "name": "TokenManagement",
+      "address": "0xbA77EF7d635A3314FFa81a2AbcC8ADc2AE3885CA",
+      "network": "hardhat",
+      "timestamp": "2026-02-07T19:23:12.905Z"
+    },
+    {
+      "id": "c09b6e28-2ed0-42bc-92df-09c215dc9fc6",
+      "name": "ResCoellectionManager",
+      "address": "0x3dd795727a51F305fFa14FC37BFACCD0E8419113",
+      "network": "hardhat",
+      "timestamp": "2026-02-07T19:25:03.015Z"
+    },
+    {
+      "id": "41451375-32eb-41ea-826a-112915264ab4",
+      "name": "ArtFactory",
+      "address": "0x4479C2052c479D659301C56E8EE1067AD0F41Ed9",
+      "network": "hardhat",
+      "timestamp": "2026-02-07T19:26:30.017Z"
+    },
+    {
+      "id": "8210de80-bd00-4c16-bd4d-5dcbba03079a",
+      "name": "PoetryFactory",
+      "address": "0x3bBb2AEAC316D9E7555708CCbFd5dcfBae41B2B8",
+      "network": "hardhat",
+      "timestamp": "2026-02-07T19:27:01.151Z"
+    },
+    {
+      "id": "038693ca-9ef0-474c-b16e-8fceaffabe57",
+      "name": "MasterFactory",
+      "address": "0xC362C531D67e794059AcF5C1759Ad862B799637F",
+      "network": "hardhat",
+      "timestamp": "2026-02-07T19:27:47.260Z"
+    },
+    {
+      "id": "387d448b-f22c-4cd0-abc9-a7235ae90cfb",
+      "name": "AdhesionRescoe",
+      "address": "0xC3342C23e8f04433EDf7Dd239CB53A5aad3B8664",
+      "network": "hardhat",
+      "timestamp": "2026-02-20T19:12:42.757Z"
+    }
+  ]
+}
