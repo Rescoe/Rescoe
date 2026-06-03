@@ -67,10 +67,10 @@ export default async function handler(
 
     const tid = Number(tokenId);
 
-    // 4 appels Moralis en parallèle (ils ne se bloquent pas mutuellement)
+    // 3 appels en parallèle — getMembershipInfo n'existe plus, c'est le getter public membershipInfo(uint256)
     const [details, miRaw, mintPriceWei] = await Promise.all([
       contract.getTokenDetails(tid),
-      contract.getMembershipInfo(tid),
+      contract.membershipInfo(tid),
       contract.mintPrice(),
     ]);
 

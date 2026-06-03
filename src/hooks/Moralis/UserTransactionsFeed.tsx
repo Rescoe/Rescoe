@@ -37,6 +37,20 @@ import {
   ModalHeader,
   ModalBody,
   ModalCloseButton,
+  Input,
+  InputGroup,
+  InputRightAddon,
+  FormControl,
+  FormLabel,
+  FormHelperText,
+  Tabs,
+  TabList,
+  TabPanels,
+  Tab,
+  TabPanel,
+  Alert,
+  AlertIcon,
+  Link,
 } from "@chakra-ui/react";
 import { ChevronDownIcon, ChevronUpIcon } from "@chakra-ui/icons";
 import {
@@ -362,11 +376,12 @@ const UserFinanceDashboard: React.FC<Props> = ({
   const isMounted = useRef(true);
   const { isOpen, onOpen, onClose } = useDisclosure();
 
+  // État panneau Envoyer / Bridge
+  const [sendTo, setSendTo] = useState('');
+  const [sendAmount, setSendAmount] = useState('');
+  const [sendLoading, setSendLoading] = useState(false);
+
   // Hook pour prix historiques
-  const timestamps = useMemo(
-    () => transactions.map((tx) => tx.block_timestamp),
-    [transactions]
-  );
   const { priceHistory } = useEthPriceHistory(transactions);
 
   const provider = useMemo(() => {
@@ -698,50 +713,46 @@ const UserFinanceDashboard: React.FC<Props> = ({
     return balanceByDate;
   };
 
-  // 2. REMPLACER le useMemo normalizedLedger par celui-ci
+  // 2. normalizedLedger — reconstruction arrière correcte depuis le solde actuel
   const normalizedLedger = useMemo<LedgerEntry[]>(() => {
     if (!effectiveAddress || !transactions.length) return [];
 
     const lowerAddress = effectiveAddress.toLowerCase();
 
-    // Trier du PLUS RÉCENT au PLUS ANCIEN pour calculer les soldes en remontant
+    // Trier du PLUS RÉCENT au PLUS ANCIEN (on remonte le temps)
     const sorted = [...transactions].sort(
       (a, b) =>
         new Date(b.block_timestamp).getTime() -
         new Date(a.block_timestamp).getTime()
     );
 
-    // PARTIR du solde actuel
-    let balanceEth = currentBalance;
-    let balanceEur = currentBalance * (priceState.eurPrice || 0);
+    // Partir du solde actuel et remonter
+    let runningBalance = currentBalance;
     const eurAvailable = priceState.status === "available";
 
-    // Créer le ledger en remontant le temps
     const ledger = sorted.map((tx) => {
       const amountETH = Number(tx.value ?? "0") / 1e18;
-      const classification = classifyTransaction(
-        tx,
-        lowerAddress,
-        rescoeContracts
-      );
+      // Les frais de gas ne s'appliquent qu'aux transactions sortantes
+      const gasFeeETH = Number(tx.transaction_fee ?? "0") / 1e18;
+
+      const classification = classifyTransaction(tx, lowerAddress, rescoeContracts);
 
       // Prix à la date de la transaction
-      const dateKey = new Date(tx.block_timestamp)
-        .toISOString()
-        .slice(0, 10);
+      const dateKey = new Date(tx.block_timestamp).toISOString().slice(0, 10);
       const priceForDate = priceHistory[dateKey] || priceState.eurPrice || 0;
-      const eur =
-        eurAvailable && priceForDate > 0 ? amountETH * priceForDate : null;
+      const eur = eurAvailable && priceForDate > 0 ? amountETH * priceForDate : null;
 
-      // EN REMONTANT LE TEMPS, on fait l'inverse
-      // Si c'était une entrée, on la soustrait
-      // Si c'était une sortie, on l'ajoute
-      const directionMultiplier =
-        classification.direction === "Entrant" ? -1 : 1;
+      // On enregistre le solde APRÈS cette transaction (avant de l'annuler)
+      // C'est le solde réel du wallet au moment où la tx s'est confirmée
+      const balanceAfterTx = runningBalance;
 
-      balanceEth -= amountETH * directionMultiplier;
-      if (eur != null) {
-        balanceEur -= eur * directionMultiplier;
+      // Annuler cette transaction pour retrouver le solde d'avant
+      if (classification.direction === "Entrant") {
+        // On avait reçu de l'ETH → le solde avant était plus bas
+        runningBalance -= amountETH;
+      } else {
+        // On avait envoyé de l'ETH (+ gas) → le solde avant était plus haut
+        runningBalance += amountETH + gasFeeETH;
       }
 
       const date = new Date(tx.block_timestamp);
@@ -754,8 +765,10 @@ const UserFinanceDashboard: React.FC<Props> = ({
         direction: classification.direction,
         amountETH,
         amountEUR: eur,
-        balanceEth: Math.max(0, balanceEth),
-        balanceEur: eurAvailable ? Math.max(0, balanceEur) : null,
+        balanceEth: Math.max(0, balanceAfterTx),
+        balanceEur: eurAvailable && priceForDate > 0
+          ? Math.max(0, balanceAfterTx * priceForDate)
+          : null,
         isRescoe: classification.isRescoe,
         contract: tx.token_address ?? undefined,
         comment: classification.comment,
@@ -763,7 +776,7 @@ const UserFinanceDashboard: React.FC<Props> = ({
       };
     });
 
-    // INVERSER pour avoir du plus ancien au plus récent
+    // Inverser pour avoir du plus ancien au plus récent dans l'affichage
     return ledger.reverse();
   }, [
     transactions,
@@ -774,7 +787,7 @@ const UserFinanceDashboard: React.FC<Props> = ({
     currentBalance,
   ]);
 
-  // 3. REMPLACER le useMemo filteredLedger par celui-ci
+  // 3. filteredLedger — filtre uniquement, les balances viennent de normalizedLedger
   const filteredLedger = useMemo(() => {
     if (!normalizedLedger.length) return [];
 
@@ -786,7 +799,6 @@ const UserFinanceDashboard: React.FC<Props> = ({
       start.setDate(1);
       start.setHours(0, 0, 0, 0);
     } else if (filters.period === "year") {
-      // PARTIR DU 1er JANVIER
       start.setFullYear(now.getFullYear());
       start.setMonth(0);
       start.setDate(1);
@@ -795,8 +807,9 @@ const UserFinanceDashboard: React.FC<Props> = ({
       start.setTime(0);
     }
 
-    // Filtrer les transactions
-    const filtered = normalizedLedger.filter((entry) => {
+    // On filtre mais on conserve les balances calculées en arrière depuis le solde actuel
+    // Chaque entry.balanceEth = solde réel après cette transaction
+    return normalizedLedger.filter((entry) => {
       if (filters.rescoeOnly && !entry.isRescoe) return false;
       if (filters.salesOnly && entry.type !== "SALE_NFT") return false;
       if (
@@ -807,36 +820,7 @@ const UserFinanceDashboard: React.FC<Props> = ({
       if (entry.timestamp < start || entry.timestamp > now) return false;
       return true;
     });
-
-    // Trouver le solde au début de la période
-    const allBeforePeriod = normalizedLedger.filter(
-      (entry) => entry.timestamp < start
-    );
-    const startBalance =
-      allBeforePeriod.length > 0
-        ? allBeforePeriod[allBeforePeriod.length - 1].balanceEth
-        : 0;
-
-    let balanceEth = startBalance;
-    let balanceEur = startBalance * (priceState.eurPrice || 0);
-
-    // Recalculer les soldes cumulatifs pour les données filtrées
-    return filtered.map((entry) => {
-      const directionMultiplier =
-        entry.direction === "Entrant" ? 1 : -1;
-
-      balanceEth += entry.amountETH * directionMultiplier;
-      if (entry.amountEUR != null) {
-        balanceEur += entry.amountEUR * directionMultiplier;
-      }
-
-      return {
-        ...entry,
-        balanceEth: Math.max(0, balanceEth),
-        balanceEur: entry.amountEUR != null ? Math.max(0, balanceEur) : null,
-      };
-    });
-  }, [normalizedLedger, filters, priceState.eurPrice]);
+  }, [normalizedLedger, filters]);
 
   // 4. REMPLACER le useMemo summary pour utiliser filteredLedger
   const summary = useMemo(() => {
@@ -930,6 +914,41 @@ const UserFinanceDashboard: React.FC<Props> = ({
     link.download = "rescoe_financial_export.csv";
     link.click();
     link.remove();
+  };
+
+  // Envoi ETH via MetaMask / wallet connecté
+  const handleSendETH = async () => {
+    if (!sendTo || !sendAmount) return;
+    const eth = (window as any).ethereum;
+    if (!eth) {
+      toast({ title: 'Wallet non détecté', description: 'Ouvrez MetaMask ou connectez votre wallet.', status: 'error' });
+      return;
+    }
+    setSendLoading(true);
+    try {
+      const { BrowserProvider, parseEther } = await import('ethers');
+      const browserProvider = new BrowserProvider(eth);
+      const signer = await browserProvider.getSigner();
+      const tx = await signer.sendTransaction({
+        to: sendTo.trim(),
+        value: parseEther(sendAmount),
+      });
+      toast({ title: '⏳ Transaction envoyée', description: `Hash: ${tx.hash.slice(0, 14)}…`, status: 'info', duration: 5000 });
+      await tx.wait();
+      toast({ title: '✅ Transfert confirmé', description: `${sendAmount} ETH envoyé à ${sendTo.slice(0, 10)}…`, status: 'success', duration: 8000 });
+      setSendTo('');
+      setSendAmount('');
+      // Invalider le cache de solde pour refresh
+      if (effectiveAddress) {
+        localStorage.removeItem(`rescoe_balance_${effectiveAddress.toLowerCase()}`);
+        await fetchCurrentBalance(effectiveAddress);
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message.split('(')[0] : 'Erreur inconnue';
+      toast({ title: '❌ Échec du transfert', description: msg, status: 'error', duration: 8000 });
+    } finally {
+      setSendLoading(false);
+    }
   };
 
   const boxBg = useColorModeValue("rgba(255,255,255,0.06)", "rgba(1,28,57,0.8)");
@@ -1056,8 +1075,8 @@ const UserFinanceDashboard: React.FC<Props> = ({
           <Box
             p={4}
             borderRadius="xl"
-            border="1px solid rgba(180,166,213,0.3)"
-            bg="rgba(180,166,213,0.08)"
+            border="1px solid rgba(1,28,57,0.5)"
+            bg="rgba(1,28,57,0.3)"
           >
             <Text fontSize="xs" color="gray.400">
               Sorties totales
@@ -1101,7 +1120,7 @@ const UserFinanceDashboard: React.FC<Props> = ({
           <Box
             p={4}
             borderRadius="xl"
-            border="1px solid rgba(180,166,213,0.3)"
+            border="1px solid rgba(238,212,132,0.2)"
             bg="rgba(1,28,57,0.5)"
           >
             <Text fontSize="xs" color="gray.400">
@@ -1393,6 +1412,228 @@ const UserFinanceDashboard: React.FC<Props> = ({
           </Table>
         </TableContainer>
       </Box>
+
+      {/* ─── Envoyer & Pont / Échange ─── */}
+      <Divider borderColor="rgba(255,255,255,0.1)" my={6} />
+
+      <Tabs variant="soft-rounded" colorScheme="yellow" size="sm">
+        <TabList mb={4} gap={2}>
+          <Tab
+            _selected={{ bg: 'rgba(238,212,132,0.2)', color: 'brand.gold' }}
+            color="gray.400"
+          >
+            ✈️ Envoyer ETH
+          </Tab>
+          <Tab
+            _selected={{ bg: 'rgba(238,212,132,0.15)', color: 'brand.gold' }}
+            color="gray.400"
+          >
+            🌉 Pont & Échange
+          </Tab>
+        </TabList>
+
+        <TabPanels>
+          {/* ── Envoyer ETH ── */}
+          <TabPanel px={0}>
+            <Box
+              p={5}
+              borderRadius="xl"
+              border="1px solid rgba(238,212,132,0.2)"
+              bg="rgba(0,0,0,0.2)"
+            >
+              <Heading size="sm" mb={4} color="brand.cream">
+                Envoyer des ETH (Base)
+              </Heading>
+
+              <Alert status="info" variant="left-accent" borderRadius="md" mb={4} bg="rgba(0,80,200,0.15)" borderColor="rgba(100,160,255,0.4)">
+                <AlertIcon color="blue.300" />
+                <Text fontSize="xs" color="gray.300">
+                  Utilisez cette fonction pour envoyer de l'ETH sur le réseau Base à une autre adresse.
+                  MetaMask (ou votre wallet connecté) signera la transaction.
+                </Text>
+              </Alert>
+
+              <Stack spacing={4} maxW="480px">
+                <FormControl>
+                  <FormLabel fontSize="sm" color="gray.300">Adresse destinataire</FormLabel>
+                  <Input
+                    placeholder="0x..."
+                    value={sendTo}
+                    onChange={(e) => setSendTo(e.target.value)}
+                    fontFamily="mono"
+                    fontSize="sm"
+                    bg="rgba(0,0,0,0.3)"
+                    borderColor="rgba(255,255,255,0.15)"
+                    _hover={{ borderColor: 'rgba(238,212,132,0.4)' }}
+                    _focus={{ borderColor: 'rgba(238,212,132,0.7)', boxShadow: 'none' }}
+                    color="brand.cream"
+                  />
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel fontSize="sm" color="gray.300">Montant (ETH)</FormLabel>
+                  <InputGroup>
+                    <Input
+                      placeholder="0,001"
+                      value={sendAmount}
+                      onChange={(e) => setSendAmount(e.target.value.replace(',', '.'))}
+                      type="number"
+                      step="0.001"
+                      min="0"
+                      bg="rgba(0,0,0,0.3)"
+                      borderColor="rgba(255,255,255,0.15)"
+                      _hover={{ borderColor: 'rgba(238,212,132,0.4)' }}
+                      _focus={{ borderColor: 'rgba(238,212,132,0.7)', boxShadow: 'none' }}
+                      color="brand.cream"
+                      fontSize="sm"
+                    />
+                    <InputRightAddon bg="rgba(238,212,132,0.1)" borderColor="rgba(255,255,255,0.15)" color="brand.gold" fontSize="sm">
+                      Ξ
+                    </InputRightAddon>
+                  </InputGroup>
+                  {sendAmount && priceState.eurPrice && (
+                    <FormHelperText color="gray.400" fontSize="xs">
+                      ≈ €{(parseFloat(sendAmount || '0') * priceState.eurPrice).toFixed(2)}
+                    </FormHelperText>
+                  )}
+                </FormControl>
+
+                <Button
+                  onClick={handleSendETH}
+                  isLoading={sendLoading}
+                  loadingText="Envoi en cours…"
+                  isDisabled={!sendTo || !sendAmount || parseFloat(sendAmount) <= 0}
+                  colorScheme="yellow"
+                  variant="solid"
+                  size="md"
+                  alignSelf="flex-start"
+                >
+                  Envoyer →
+                </Button>
+
+                {currentBalance > 0 && (
+                  <Text fontSize="xs" color="gray.500">
+                    Solde disponible : {formatNumberFR(currentBalance, 4)} Ξ
+                    {priceState.eurPrice ? ` (≈ €${formatNumberFR(currentBalance * priceState.eurPrice, 2)})` : ''}
+                  </Text>
+                )}
+              </Stack>
+            </Box>
+          </TabPanel>
+
+          {/* ── Pont & Échange ── */}
+          <TabPanel px={0}>
+            <Box
+              p={5}
+              borderRadius="xl"
+              border="1px solid rgba(238,212,132,0.15)"
+              bg="rgba(0,0,0,0.2)"
+            >
+              <Heading size="sm" mb={2} color="brand.cream">
+                Pont & Échange
+              </Heading>
+              <Text fontSize="xs" color="gray.400" mb={5}>
+                Pontez de l'ETH depuis Ethereum mainnet vers Base, ou échangez des tokens sur Base via des agrégateurs tiers.
+                Compatible avec tous les wallets, y compris les wallets intégrés (Coinbase/Stripe).
+              </Text>
+
+              <SimpleGrid columns={[1, 2]} gap={4}>
+                {/* Base Bridge officiel */}
+                <Box
+                  p={4}
+                  borderRadius="xl"
+                  border="1px solid rgba(0,130,255,0.3)"
+                  bg="rgba(0,80,200,0.1)"
+                  transition="all 0.2s"
+                  _hover={{ border: '1px solid rgba(0,130,255,0.6)', bg: 'rgba(0,80,200,0.2)' }}
+                >
+                  <Text fontSize="lg" mb={1}>🌉</Text>
+                  <Text fontWeight="bold" fontSize="sm" color="blue.300" mb={1}>Base Bridge</Text>
+                  <Text fontSize="xs" color="gray.400" mb={3}>
+                    Pont officiel Ethereum → Base. Idéal pour transférer des ETH depuis le mainnet.
+                    Délai : ~15 min.
+                  </Text>
+                  <Link href="https://bridge.base.org" isExternal>
+                    <Button size="xs" colorScheme="blue" variant="outline">
+                      Ouvrir Base Bridge ↗
+                    </Button>
+                  </Link>
+                </Box>
+
+                {/* Superbridge */}
+                <Box
+                  p={4}
+                  borderRadius="xl"
+                  border="1px solid rgba(100,80,220,0.3)"
+                  bg="rgba(80,40,180,0.1)"
+                  transition="all 0.2s"
+                  _hover={{ border: '1px solid rgba(100,80,220,0.6)', bg: 'rgba(80,40,180,0.2)' }}
+                >
+                  <Text fontSize="lg" mb={1}>⚡</Text>
+                  <Text fontWeight="bold" fontSize="sm" color="brand.gold" mb={1}>Superbridge</Text>
+                  <Text fontSize="xs" color="gray.400" mb={3}>
+                    Interface alternative pour ponter vers Base. Supporte plusieurs chaînes sources avec une UI claire.
+                  </Text>
+                  <Link href="https://superbridge.app/base" isExternal>
+                    <Button size="xs" variant="outline" borderColor="brand.gold" color="brand.gold" _hover={{ bg: "rgba(238,212,132,0.1)" }}>
+                      Ouvrir Superbridge ↗
+                    </Button>
+                  </Link>
+                </Box>
+
+                {/* Jumper (LiFi) */}
+                <Box
+                  p={4}
+                  borderRadius="xl"
+                  border="1px solid rgba(238,212,132,0.3)"
+                  bg="rgba(238,212,132,0.05)"
+                  transition="all 0.2s"
+                  _hover={{ border: '1px solid rgba(238,212,132,0.6)', bg: 'rgba(238,212,132,0.1)' }}
+                >
+                  <Text fontSize="lg" mb={1}>🔄</Text>
+                  <Text fontWeight="bold" fontSize="sm" color="brand.gold" mb={1}>Jumper (LiFi)</Text>
+                  <Text fontSize="xs" color="gray.400" mb={3}>
+                    Agrégateur multi-chaînes : pont + swap en une seule interface. Trouve les meilleures routes.
+                  </Text>
+                  <Link href="https://jumper.exchange/?fromChain=1&toChain=8453" isExternal>
+                    <Button size="xs" colorScheme="yellow" variant="outline">
+                      Ouvrir Jumper ↗
+                    </Button>
+                  </Link>
+                </Box>
+
+                {/* Aerodrome (swap Base) */}
+                <Box
+                  p={4}
+                  borderRadius="xl"
+                  border="1px solid rgba(0,200,120,0.3)"
+                  bg="rgba(0,160,80,0.08)"
+                  transition="all 0.2s"
+                  _hover={{ border: '1px solid rgba(0,200,120,0.6)', bg: 'rgba(0,160,80,0.15)' }}
+                >
+                  <Text fontSize="lg" mb={1}>🚀</Text>
+                  <Text fontWeight="bold" fontSize="sm" color="green.300" mb={1}>Aerodrome (Base)</Text>
+                  <Text fontSize="xs" color="gray.400" mb={3}>
+                    DEX natif de Base. Swap ETH ↔ USDC, USDT et autres tokens directement sur Base.
+                  </Text>
+                  <Link href="https://aerodrome.finance/swap?from=eth&to=0x833589fcd6edb6e08f4c7c32d4f71b54bda02913" isExternal>
+                    <Button size="xs" colorScheme="green" variant="outline">
+                      Ouvrir Aerodrome ↗
+                    </Button>
+                  </Link>
+                </Box>
+              </SimpleGrid>
+
+              <Alert status="warning" variant="left-accent" borderRadius="md" mt={5} bg="rgba(200,140,0,0.1)" borderColor="rgba(238,212,132,0.4)">
+                <AlertIcon color="yellow.400" />
+                <Text fontSize="xs" color="gray.300">
+                  Ces services sont des tiers indépendants de Rescoe. Vérifiez toujours les URLs avant de connecter votre wallet.
+                </Text>
+              </Alert>
+            </Box>
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
 
       {/* Modal Prix EUR */}
       <Modal isOpen={isOpen} onClose={onClose}>

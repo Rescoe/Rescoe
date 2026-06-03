@@ -1,6 +1,6 @@
-// Code Insect Selector - VERSION OPTIMISÉE
+// Code Insect Selector - API-backed (no direct RPC)
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Button,
@@ -12,10 +12,6 @@ import {
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useAuth } from "../../utils/authContext";
-import { JsonRpcProvider, Contract } from "ethers";
-import ABI from "../ABI/ABIAdhesion.json";
-import { resolveIPFS } from "@/utils/resolveIPFS";
-import { BigNumberish } from "ethers";
 
 const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS as string;
 
@@ -40,6 +36,8 @@ export type Insect = {
   isEgg?: boolean;
 };
 
+const SESSION_TTL = 5 * 60 * 1000; // 5 min (aligne sur le cache API)
+
 const SelectInsect = ({ onSelect }: { onSelect: (insect: Insect) => void }) => {
 
   const { address } = useAuth();
@@ -50,230 +48,106 @@ const SelectInsect = ({ onSelect }: { onSelect: (insect: Insect) => void }) => {
   const [selectedInsect, setSelectedInsect] = useState<Insect | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const provider = useMemo(
-    () => new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!),
-    []
-  );
-  const contract = useMemo(
-    () => new Contract(contractAddress, ABI, provider),
-    [provider]
-  );
-  const LEVEL_MAX = 3;
+  // Compteur de refresh : incrémenter force un rechargement complet (ignore le cache)
+  const [refreshTick, setRefreshTick] = React.useState(0);
 
-  // =========================
-  // STEP 1 — LOAD BASIC DATA
-  // =========================
-
-  const loadBasicInsects = async () => {
-
-    if (!address) return;
-
-    // Cache session : données complètes (basic + membership)
-    const sessionKey = `insect_data_${address}`;
-    try {
-      const raw = sessionStorage.getItem(sessionKey);
-      if (raw) {
-        const { data, ts } = JSON.parse(raw);
-        if (Date.now() - ts < 5 * 60 * 1000) {
-          setInsects(data);
-          return;
-        }
-        sessionStorage.removeItem(sessionKey);
-      }
-    } catch {}
-
-    setIsLoading(true);
-
-    try {
-
-      const tokenIds: BigNumberish[] = await contract.getTokensByOwner(address);
-
-      const basicInsects = await Promise.all(
-        tokenIds.map(async (tokenId: BigNumberish) => {
-
-          try {
-            const id = Number(tokenId);
-            // Cache localStorage par tokenId — contenu IPFS immuable
-            const metaKey = `insect_meta_${id}`;
-            const cachedMeta = (() => {
-              try { const r = localStorage.getItem(metaKey); return r ? JSON.parse(r) : null; } catch { return null; }
-            })();
-
-            if (cachedMeta) return { id, name: cachedMeta.name, image: cachedMeta.image };
-
-            const tokenURI = await contract.tokenURI(tokenId);
-            if (!tokenURI) {
-              console.warn("tokenURI invalide pour tokenId:", tokenId);
-              return null;
-            }
-
-            const metadataUrl = resolveIPFS(tokenURI, true);
-            if (!metadataUrl) {
-              console.warn("metadataUrl invalide pour tokenId:", tokenId, "tokenURI:", tokenURI);
-              return null;
-            }
-
-            const res = await fetch(metadataUrl);
-            const metadata = await res.json();
-
-            const resolved = {
-              name: metadata.name || `Insecte #${tokenId}`,
-              image: resolveIPFS(metadata.image, true) || ""
-            };
-            try { localStorage.setItem(metaKey, JSON.stringify(resolved)); } catch {}
-
-            return { id, ...resolved };
-
-          } catch (e) {
-
-            console.error("Metadata error", e);
-            return null;
-
-          }
-
-        })
-      );
-
-      const valid = basicInsects.filter((i): i is Insect => i !== null);
-      setInsects(valid);
-
-      // ensuite charger les données blockchain
-      loadMembershipData(valid);
-
-    } catch (error) {
-
-      console.error("Erreur loadBasicInsects:", error);
-
-    } finally {
-
-      setIsLoading(false);
-
-    }
-
-  };
-
-  // =========================
-  // STEP 2 — LOAD ONCHAIN DATA
-  // =========================
-
-  const loadMembershipData = async (baseInsects: Insect[]) => {
-    // ✅ FETCH DURATIONS DYNAMIQUES (une seule fois)
-    const durationsRaw = await Promise.all([
-      contract.levelDurations(0),  // LVL0: 30 jours
-      contract.levelDurations(1),  // LVL1: 60 jours
-      contract.levelDurations(2)   // LVL2: 90 jours
-    ]);
-    const levelDurations = durationsRaw.map(d => Number(d));  // [2592000, 5184000, 7776000]
-
-    const updated = await Promise.all(
-      baseInsects.map(async (insect) => {
-        try {
-          const membershipInfoRaw = await contract.getMembershipInfo(insect.id);
-          const membershipInfo: MembershipInfo = {
-            level: Number(membershipInfoRaw.level),
-            autoEvolve: Boolean(membershipInfoRaw.autoEvolve),
-            startTimestamp: Number(membershipInfoRaw.startTimestamp),
-            expirationTimestamp: Number(membershipInfoRaw.expirationTimestamp),
-            totalYears: Number(membershipInfoRaw.totalYears),
-            locked: Boolean(membershipInfoRaw.locked),
-            isEgg: Boolean(membershipInfoRaw.isEgg),
-            isAnnual: Boolean(membershipInfoRaw.isAnnual),
-          };
-
-          const now = Math.floor(Date.now() / 1000);
-
-          // ✅ ALIGNÉ SUR CONTRACT canEvolve()
-          const canEvolve =
-            !membershipInfo.isEgg &&
-            membershipInfo.level < LEVEL_MAX &&
-            !membershipInfo.locked &&
-            now >= membershipInfo.startTimestamp + levelDurations[membershipInfo.level];
-
-          return {
-            ...insect,
-            level: membershipInfo.level,
-            membershipInfo,
-            canEvolve,
-            isEgg: membershipInfo.isEgg
-          };
-        } catch (e) {
-          console.error("membership error", e);
-          return insect;
-        }
-      })
-    );
-
-    setInsects(updated);
-
-    // Persiste en session pour éviter re-fetch au prochain rendu
-    try {
-      sessionStorage.setItem(`insect_data_${address}`, JSON.stringify({ data: updated, ts: Date.now() }));
-    } catch {}
-
-    // Count inchangé (œufs + canEvolve)
-    const evolutionCount = updated.filter(i => i.canEvolve || i.isEgg).length;
-    window.dispatchEvent(new CustomEvent("RESCOE_EVOLUTION_COUNT", { detail: evolutionCount }));
-  };
-
-  // =========================
+  // Écouter RESCOE_DATA_CHANGED → purge cache + re-fetch
+  useEffect(() => {
+    const handler = () => {
+      try {
+        Object.keys(sessionStorage)
+          .filter(k => k.startsWith("insect_data_"))
+          .forEach(k => sessionStorage.removeItem(k));
+      } catch {}
+      setRefreshTick(t => t + 1);
+    };
+    window.addEventListener("RESCOE_DATA_CHANGED", handler);
+    return () => window.removeEventListener("RESCOE_DATA_CHANGED", handler);
+  }, []);
 
   useEffect(() => {
+    if (!address) return;
 
-    if (address) {
-      loadBasicInsects();
+    const sessionKey = `insect_data_${address}`;
+
+    // Check sessionStorage cache (seulement si pas de refresh forcé)
+    if (refreshTick === 0) {
+      try {
+        const raw = sessionStorage.getItem(sessionKey);
+        if (raw) {
+          const { data, ts } = JSON.parse(raw);
+          if (Date.now() - ts < SESSION_TTL) {
+            setInsects(data);
+            const evolutionCount = data.filter((i: Insect) => i.canEvolve || i.isEgg).length;
+            window.dispatchEvent(new CustomEvent("RESCOE_EVOLUTION_COUNT", { detail: evolutionCount }));
+            return;
+          }
+          sessionStorage.removeItem(sessionKey);
+        }
+      } catch {}
     }
 
-  }, [address]);
+    const controller = new AbortController();
+    setIsLoading(true);
 
-  // =========================
+    // bust=1 → bypass du cache serveur (utilisé après RESCOE_DATA_CHANGED)
+    const bust = refreshTick > 0 ? "&bust=1" : "";
+    fetch(`/api/token/insects?address=${encodeURIComponent(address)}${bust}`, {
+      signal: controller.signal,
+    })
+      .then((r) => r.json())
+      .then((data: Insect[]) => {
+        setInsects(data);
+        try {
+          sessionStorage.setItem(sessionKey, JSON.stringify({ data, ts: Date.now() }));
+        } catch {}
+        const evolutionCount = data.filter((i) => i.canEvolve || i.isEgg).length;
+        window.dispatchEvent(new CustomEvent("RESCOE_EVOLUTION_COUNT", { detail: evolutionCount }));
+      })
+      .catch((err) => {
+        if (err.name !== "AbortError") {
+          console.error("Erreur chargement insectes:", err);
+        }
+      })
+      .finally(() => setIsLoading(false));
+
+    return () => controller.abort();
+  }, [address, refreshTick]);
 
   const handleOpenPage = (insect: Insect) => {
-
     router.push(`/AdhesionId/${contractAddress}/${insect.id}`);
-
   };
 
   const handleSelect = (insect: Insect) => {
-
     setSelectedInsect(insect);
     onSelect(insect);
-
     localStorage.setItem("savedInsect", JSON.stringify(insect));
-
     toast({
       title: "Insecte sélectionné",
       description: insect.name,
       status: "success",
       duration: 1500
     });
-
   };
 
   const getActionLabel = (insect: Insect) => {
-
     if (insect.isEgg) return "🥚 Éclore";
     if (insect.canEvolve) return "🧬 Évoluer";
     if (insect.membershipInfo?.locked) return "🔒 Bloqué";
     if (insect.level !== undefined) return "Niv. max";
-
     return "...";
-
   };
-
-  // =========================
-  // UI
-  // =========================
 
   return (
     <VStack spacing={3} w="100%" align="stretch" px={1}>
       {insects.length === 0 ? (
         <Box textAlign="center" py={6} color="brand.gold" fontSize="sm">
-          Aucun insecte
+          {isLoading ? "Chargement…" : "Aucun insecte"}
         </Box>
       ) : (
         insects.map((insect) => {
-          const hasAction = insect.isEgg || insect.canEvolve
-          const isSelected = selectedInsect?.id === insect.id
+          const hasAction = insect.isEgg || insect.canEvolve;
+          const isSelected = selectedInsect?.id === insect.id;
 
           return (
             <Box
@@ -302,7 +176,6 @@ const SelectInsect = ({ onSelect }: { onSelect: (insect: Insect) => void }) => {
                     borderRadius="md"
                     pointerEvents="none"
                   />
-                  {/* ACTION EMOJI */}
                   {hasAction && (
                     <Box
                       position="absolute"
@@ -358,19 +231,16 @@ const SelectInsect = ({ onSelect }: { onSelect: (insect: Insect) => void }) => {
                 </Box>
               </HStack>
 
-              {/* FOOTER LIGNE */}
+              {/* FOOTER */}
               <HStack
                 justify="space-between"
                 align="center"
                 mt={2}
                 fontSize="0.65rem"
               >
-                {/* TOKEN ID */}
                 <Box opacity={0.45} color="brand.cream">
                   #{insect.id}
                 </Box>
-
-                {/* ACTIONS */}
                 <HStack spacing={2}>
                   <Button
                     size="xs"
@@ -379,8 +249,8 @@ const SelectInsect = ({ onSelect }: { onSelect: (insect: Insect) => void }) => {
                     fontSize="0.70rem"
                     px={2}
                     onClick={(e) => {
-                      e.stopPropagation()
-                      handleOpenPage(insect)
+                      e.stopPropagation();
+                      handleOpenPage(insect);
                     }}
                   >
                     Page
@@ -388,12 +258,11 @@ const SelectInsect = ({ onSelect }: { onSelect: (insect: Insect) => void }) => {
                 </HStack>
               </HStack>
             </Box>
-          )
+          );
         })
       )}
     </VStack>
-  )
-
+  );
 };
 
 export default SelectInsect;

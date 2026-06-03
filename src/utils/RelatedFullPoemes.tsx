@@ -33,7 +33,6 @@ const RelatedFullPoems: React.FC<Props> = ({ haiku, allHaikus, title }) => {
       <Heading
         size="l"
         mb={6}
-        bgGradient="linear(to-r, pink.400, purple.400)"
         bgClip="text"
         textAlign="center"
       >

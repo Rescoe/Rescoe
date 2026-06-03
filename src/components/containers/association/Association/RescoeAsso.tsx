@@ -26,12 +26,12 @@ const RoadmapItem = ({ period, title, description, progress }: RoadmapItemProps)
     border="1px solid"
     borderColor="brand.mauve"
     transition="all 0.3s ease"
-    _hover={{ transform: 'translateY(-4px)', boxShadow: '0 0 25px rgba(180,166,213,0.35)' }}
+    _hover={{ transform: 'translateY(-4px)', boxShadow: '0 0 25px rgba(238,212,132,0.25)' }}
   >
     <Text fontSize="sm" color="brand.gold" mb={1}>{period}</Text>
     <Text fontSize="lg" fontWeight="bold" color="brand.cream" mb={2}>{title}</Text>
     <Text fontSize="sm" color="brand.cream" opacity={0.85} mb={4}>{description}</Text>
-    <Progress value={progress} size="sm" borderRadius="full" colorScheme="purple" />
+    <Progress value={progress} size="sm" borderRadius="full" colorScheme="yellow" sx={{ "& > div": { background: "linear-gradient(to-r, #FFEDA6, #EED484)" } }} />
   </Box>
 );
 
@@ -1550,10 +1550,11 @@ const AssociationPage = () => {
 
           <ModalFooter>
             <Button
-              colorScheme="purple"
               mr={3}
               onClick={onClose}
               bgGradient="linear(to-r, brand.mauve, brand.blue)"
+              color="brand.cream"
+              _hover={{ opacity: 0.9 }}
             >
               Fermer
             </Button>

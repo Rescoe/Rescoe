@@ -28,11 +28,11 @@ const FAQItem: React.FC<FAQItemProps> = ({ question, answer }) => {
       spacing={0}
       w="full"
       border="1px solid"
-      borderColor="purple.600"
+      borderColor="whiteAlpha.200"
       borderRadius="lg"
       overflow="hidden"
-      bg="gray.800"
-      _hover={{ borderColor: "purple.400", boxShadow: "lg" }}
+      bg="rgba(1,28,57,0.7)"
+      _hover={{ borderColor: "brand.gold", boxShadow: "0 0 16px rgba(238,212,132,0.15)" }}
       transition="all 0.2s"
     >
       <chakra.button
@@ -42,18 +42,27 @@ const FAQItem: React.FC<FAQItemProps> = ({ question, answer }) => {
         py={4}
         textAlign="left"
         fontWeight="bold"
-        color="white"
+        color="brand.cream"
         onClick={onToggle}
         display="flex"
         justifyContent="space-between"
         alignItems="center"
-        _hover={{ bg: "purple.900/30" }}
+        _hover={{ bg: "rgba(238,212,132,0.06)" }}
       >
         {question}
-        {isOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
+        {isOpen ? <ChevronUpIcon color="brand.gold" /> : <ChevronDownIcon color="brand.gold" />}
       </chakra.button>
       <Collapse in={isOpen} animateOpacity>
-        <Box p={6} bg="purple.900/20" color="gray.200" fontSize="sm" w="full">
+        <Box
+          p={6}
+          bg="rgba(0,65,106,0.25)"
+          borderTop="1px solid"
+          borderColor="whiteAlpha.100"
+          color="brand.cream"
+          fontSize="sm"
+          opacity={0.9}
+          w="full"
+        >
           {answer}
         </Box>
       </Collapse>

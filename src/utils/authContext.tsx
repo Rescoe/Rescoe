@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import Web3 from "web3";
 import detectEthereumProvider from "@metamask/detect-provider";
 import { Web3Auth } from "@web3auth/modal";
@@ -10,6 +10,9 @@ import Loading from "./Loading";
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS!;
 const WEB3AUTH_CLIENT_ID = process.env.NEXT_PUBLIC_WEB3AUTH_CLIENT_ID!;
+
+// Clé localStorage pour restaurer la session MetaMask entre onglets
+const LS_CONNECTOR = "rescoe_connector"; // "metamask" | "web3auth"
 
 type RoleType = "admin" | "artist" | "poet" | "contributor" | "trainee" | "non-member" | null;
 
@@ -32,6 +35,8 @@ interface AuthContextType {
   logout: () => Promise<void>;
   roleLoading: boolean;
   isLoading: boolean;
+  /** 0–100 : progression réelle de l'initialisation (pour le loader) */
+  loadingProgress: number;
 }
 
 interface MemberInfo {
@@ -60,6 +65,7 @@ const AuthContext = createContext<AuthContextType>({
   logout: async () => {},
   roleLoading: false,
   isLoading: false,
+  loadingProgress: 0,
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -80,82 +86,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [web3auth, setWeb3auth] = useState<Web3Auth | null>(null);
   const [roleLoading, setRoleLoading] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
 
   const toast = useToast();
 
-  // ✅ INIT Web3Auth + RESTAURE SESSION (MODIFIÉ : loading persistant + mobile detection)
-  useEffect(() => {
-    let mounted = true;
-
-    const initWeb3Auth = async () => {
-      try {
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-        const instance = new Web3Auth({
-          clientId: WEB3AUTH_CLIENT_ID,
-          web3AuthNetwork: "sapphire_mainnet",
-          uiConfig: {
-            loginMethodsOrder: isMobile
-              ? ["google", "facebook", "email_passwordless"]  // ✅ Sans metamask mobile
-              : ["google", "facebook", "email_passwordless", "metamask"],
-          },
-          walletServicesConfig: {
-            confirmationStrategy: "default",
-            modalZIndex: 99999,
-            enableKeyExport: false,
-            whiteLabel: {
-              showWidgetButton: true,
-              buttonPosition: "bottom-right",
-              hideNftDisplay: false,
-              hideTokenDisplay: false,
-              hideTransfers: false,
-              hideTopup: false,
-              hideReceive: false,
-              hideSwap: false,
-              hideShowAllTokens: false,
-              hideWalletConnect: false,
-              defaultPortfolio: 'token',
-            },
-          },
-        });
-
-        await instance.init();
-        if (!mounted) return;
-        setWeb3auth(instance);
-
-        // ✅ Check session + setup complet AVANT fin loading
-        const providerInstance = instance.provider;
-        if (providerInstance) {
-          const web3Instance = new Web3(providerInstance);
-          const accounts = await web3Instance.eth.getAccounts();
-
-          if (accounts.length > 0 && mounted) {
-            const userAddress = accounts[0].toLowerCase();
-            setWeb3(web3Instance);
-            setProvider(providerInstance);
-            setAddress(userAddress);
-            setIsAuthenticated(true);
-            await fetchRole(web3Instance, userAddress);  // ✅ Fetch rôle AVANT fin loading
-          }
-        }
-        // ✅ Fin loading UNIQUEMENT quand tout est prêt
-        if (mounted) setIsLoading(false);
-      } catch (err) {
-        console.error("Erreur init Web3Auth:", err);
-        if (mounted) setIsLoading(false);
-      }
-    };
-
-    initWeb3Auth();
-    return () => { mounted = false; };
-  }, []);
-
-  const fetchRole = async (web3Instance: Web3, userAddress: string) => {
+  const fetchRole = useCallback(async (web3Instance: Web3, userAddress: string) => {
     if (!web3Instance || !userAddress) {
       setRole(null);
       return;
     }
-
     setRoleLoading(true);
     try {
       const contract = new web3Instance.eth.Contract(ABI as any, CONTRACT_ADDRESS);
@@ -180,8 +119,145 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setRoleLoading(false);
     }
-  };
+  }, []);
 
+  // ─── Précache des données insectes dès que l'adresse est connue ─────────────
+  const prefetchInsects = useCallback((userAddress: string) => {
+    const sessionKey = `insect_data_${userAddress}`;
+    const SESSION_TTL = 5 * 60 * 1000;
+    try {
+      const raw = sessionStorage.getItem(sessionKey);
+      if (raw) {
+        const { ts } = JSON.parse(raw);
+        if (Date.now() - ts < SESSION_TTL) return; // déjà en cache
+      }
+    } catch {}
+    // Fire & forget — on ne bloque pas l'auth sur ça
+    fetch(`/api/token/insects?address=${encodeURIComponent(userAddress)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        try {
+          sessionStorage.setItem(sessionKey, JSON.stringify({ data, ts: Date.now() }));
+          const evolutionCount = data.filter((i: any) => i.canEvolve || i.isEgg).length;
+          window.dispatchEvent(new CustomEvent("RESCOE_EVOLUTION_COUNT", { detail: evolutionCount }));
+        } catch {}
+      })
+      .catch(() => {}); // silencieux — pas critique au chargement
+  }, []);
+
+  // ─── Init Web3Auth + restauration session ───────────────────────────────────
+  useEffect(() => {
+    let mounted = true;
+
+    const initWeb3Auth = async () => {
+      try {
+        setLoadingProgress(5);
+
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+        const instance = new Web3Auth({
+          clientId: WEB3AUTH_CLIENT_ID,
+          web3AuthNetwork: "sapphire_mainnet",
+          uiConfig: {
+            loginMethodsOrder: isMobile
+              ? ["google", "facebook", "email_passwordless"]
+              : ["google", "facebook", "email_passwordless", "metamask"],
+          },
+          walletServicesConfig: {
+            confirmationStrategy: "default",
+            modalZIndex: 99999,
+            enableKeyExport: false,
+            whiteLabel: {
+              showWidgetButton: true,
+              buttonPosition: "bottom-right",
+              hideNftDisplay: false,
+              hideTokenDisplay: false,
+              hideTransfers: false,
+              hideTopup: false,
+              hideReceive: false,
+              hideSwap: false,
+              hideShowAllTokens: false,
+              hideWalletConnect: false,
+              defaultPortfolio: "token",
+            },
+          },
+        });
+
+        setLoadingProgress(20);
+        await instance.init();
+        if (!mounted) return;
+
+        setWeb3auth(instance);
+        setLoadingProgress(40);
+
+        // ── Cas 1 : session Web3Auth active ────────────────────────────────
+        const providerInstance = instance.provider;
+        if (providerInstance) {
+          const web3Instance = new Web3(providerInstance);
+          const accounts = await web3Instance.eth.getAccounts();
+
+          if (accounts.length > 0 && mounted) {
+            const userAddress = accounts[0].toLowerCase();
+            setWeb3(web3Instance);
+            setProvider(providerInstance);
+            setAddress(userAddress);
+            setIsAuthenticated(true);
+            localStorage.setItem(LS_CONNECTOR, "web3auth");
+            setLoadingProgress(65);
+            prefetchInsects(userAddress);
+            await fetchRole(web3Instance, userAddress);
+            if (mounted) setLoadingProgress(95);
+          }
+        }
+        // ── Cas 2 : restauration session MetaMask (silencieuse, sans prompt) ─
+        else if (!isMobile && localStorage.getItem(LS_CONNECTOR) === "metamask") {
+          try {
+            const detectedProvider = await detectEthereumProvider({ silent: true });
+            if (detectedProvider && mounted) {
+              const web3Instance = new Web3(detectedProvider);
+              // eth_accounts = silencieux (pas de popup), retourne [] si révoqué
+              const accounts: string[] = await web3Instance.eth.getAccounts();
+              if (accounts.length > 0 && mounted) {
+                const userAddress = accounts[0].toLowerCase();
+                setWeb3(web3Instance);
+                setProvider(detectedProvider as any);
+                setAddress(userAddress);
+                setIsAuthenticated(true);
+                setLoadingProgress(65);
+                prefetchInsects(userAddress);
+                await fetchRole(web3Instance, userAddress);
+                if (mounted) setLoadingProgress(95);
+              } else {
+                // Permission révoquée ou wallet verrouillé — on nettoie
+                localStorage.removeItem(LS_CONNECTOR);
+              }
+            }
+          } catch {
+            localStorage.removeItem(LS_CONNECTOR);
+          }
+        }
+
+        if (mounted) {
+          setLoadingProgress(100);
+          // Petit délai pour laisser la barre atteindre 100% visuellement
+          setTimeout(() => {
+            if (mounted) setIsLoading(false);
+          }, 400);
+        }
+      } catch (err) {
+        console.error("Erreur init Web3Auth:", err);
+        if (mounted) {
+          setLoadingProgress(100);
+          setIsLoading(false);
+        }
+      }
+    };
+
+    initWeb3Auth();
+    return () => { mounted = false; };
+  }, [fetchRole, prefetchInsects]);
+
+  // ─── Connexion MetaMask ──────────────────────────────────────────────────────
   const connectWallet = async () => {
     try {
       const detectedProvider = await detectEthereumProvider();
@@ -198,18 +274,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setProvider(detectedProvider as any);
       setAddress(userAddress);
       setIsAuthenticated(true);
+      localStorage.setItem(LS_CONNECTOR, "metamask"); // ✅ Persist pour restauration
+      prefetchInsects(userAddress);
       await fetchRole(web3Instance, userAddress);
 
       toast({
         title: "Wallet connecté",
         description: userAddress.slice(0, 6) + "...",
-        status: "success"
+        status: "success",
       });
     } catch (error: any) {
       toast({ title: "Erreur wallet", description: error.message, status: "error" });
     }
   };
 
+  // ─── Connexion email / social (Web3Auth) ─────────────────────────────────────
   const connectWithEmail = async () => {
     try {
       if (!web3auth) throw new Error("Web3Auth non prêt");
@@ -218,7 +297,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       await web3auth.connect();
       const providerInstance = web3auth.provider;
-
       if (!providerInstance) throw new Error("Provider manquant");
 
       const web3Instance = new Web3(providerInstance);
@@ -229,39 +307,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setProvider(providerInstance);
       setAddress(userAddress);
       setIsAuthenticated(true);
+      localStorage.setItem(LS_CONNECTOR, "web3auth"); // ✅ Persist
+      prefetchInsects(userAddress);
       await fetchRole(web3Instance, userAddress);
 
       toast({
         title: "Connecté !",
         description: userAddress.slice(0, 6) + "...",
-        status: "success"
+        status: "success",
       });
     } catch (error: any) {
       toast({ title: "Erreur connexion", description: error.message, status: "error" });
     }
   };
 
+  // ─── Déconnexion ─────────────────────────────────────────────────────────────
   const logout = async () => {
     try {
       if (web3auth) {
         await web3auth.logout();
       }
-
       setAddress(null);
       setRole(null);
       setIsAuthenticated(false);
       setWeb3(null);
       setProvider(null);
-
+      localStorage.removeItem(LS_CONNECTOR); // ✅ Nettoie la persistance
       toast({ title: "Déconnecté", status: "info" });
     } catch (error) {
       console.error("Logout error:", error);
     }
   };
 
-  // ✅ SUPPRIMÉ : useEffect checkSession interval (cause doubles fetchRole)
-
-const isMember = role !== null && role !== "non-member";
+  const isMember = role !== null && role !== "non-member";
 
   return (
     <AuthContext.Provider
@@ -284,9 +362,10 @@ const isMember = role !== null && role !== "non-member";
         logout,
         roleLoading,
         isLoading,
+        loadingProgress,
       }}
     >
-      {(isLoading || roleLoading) ? <Loading /> : children}  {/* ✅ ET roleLoading */}
+      {isLoading ? <Loading /> : children}
     </AuthContext.Provider>
   );
 };

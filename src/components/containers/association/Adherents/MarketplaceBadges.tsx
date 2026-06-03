@@ -144,7 +144,7 @@ const MarketplaceBadges = ({
 
                   <VStack align="start" spacing={3}>
                     <HStack justify="space-between" w="full">
-                      <Badge colorScheme="purple" variant="solid">
+                      <Badge bg="brand.gold" color="brand.navy" variant="solid" borderRadius="full">
                         Rôle {token.role}
                       </Badge>
                       <Tag colorScheme="green" size="sm">

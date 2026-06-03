@@ -107,7 +107,7 @@ type RoleMenuProps = {
 };
 const RoleMenu: React.FC<RoleMenuProps> = ({ config, isResident = false }) => {
   const boxShadowHover = useColorModeValue(
-    "0 0 15px rgba(180, 166, 213, 0.25)", // light
+    "0 0 15px rgba(1, 28, 57, 0.25)",      // light — navy
     "0 0 15px rgba(238, 212, 132, 0.25)"  // dark
   );
 
@@ -218,7 +218,7 @@ const Header = () => {
 
   // ✅ boxShadowHover DÉPLACÉ ICI (FIX ERREUR)
   const boxShadowHover = useColorModeValue(
-    "0 0 15px rgba(180, 166, 213, 0.25)", // light
+    "0 0 15px rgba(1, 28, 57, 0.25)",      // light — navy
     "0 0 15px rgba(238, 212, 132, 0.25)"  // dark
   );
 
@@ -299,6 +299,18 @@ useEffect(() => {
         console.error("Erreur lors de la récupération de l'insecte : " );
       }
     }
+  }, []);
+
+  // Quand une évolution/éclosion se produit → vider l'insecte sélectionné du cache localStorage
+  // L'URL de l'image change (nouveau startTimestamp) → on force un re-select depuis InsectSelector
+  useEffect(() => {
+    const handleDataChanged = () => {
+      localStorage.removeItem("savedInsect");
+      setSelectedInsect(null);
+      setInsectImage(null);
+    };
+    window.addEventListener("RESCOE_DATA_CHANGED", handleDataChanged);
+    return () => window.removeEventListener("RESCOE_DATA_CHANGED", handleDataChanged);
   }, []);
 
   useEffect(() => {

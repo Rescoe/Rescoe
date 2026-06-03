@@ -390,7 +390,7 @@ useEffect(() => {
         (Number(mintTimestamp) + Number(remainingTime)) * 1000
       ).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' });
 
-      const membershipInfoRaw = await contract.getMembershipInfo(tokenIdNumber);
+      const membershipInfoRaw = await contract.membershipInfo(tokenIdNumber);
       const membershipInfo: MembershipInfo = {
         level: Number(membershipInfoRaw.level),
         autoEvolve: Boolean(membershipInfoRaw.autoEvolve),

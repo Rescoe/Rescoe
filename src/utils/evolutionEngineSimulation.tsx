@@ -275,7 +275,7 @@ export default function EvolutionSimulator({ insect }: EvolutionSimulatorProps) 
               />
 
               <HStack justify="center" mt={{ base: 3, md: 6 }} spacing={2} flexWrap="wrap">
-                <Badge colorScheme="purple" fontSize={{ base: "sm", md: "md" }} px={3}>
+                <Badge bg="brand.gold" color="brand.navy" borderRadius="full" fontSize={{ base: "sm", md: "md" }} px={3}>
                   {state.spriteName}
                 </Badge>
                 <Badge colorScheme="blue" fontSize={{ base: "sm", md: "md" }} px={3}>

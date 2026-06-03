@@ -41,30 +41,18 @@ import { WarningIcon, LockIcon } from '@chakra-ui/icons';  // ✅ AJOUT ICI
 
 
 import ABI from "@/components/ABI/ABIAdhesion.json";
-import getRandomInsectGif  from "@/utils/GenInsect25";
 import useEthToEur from "@/hooks/useEuro";
 import { useAuth } from "@/utils/authContext";
-import { usePinataUpload } from "@/hooks/usePinataUpload";
-import EvolutionSimulator from "@/utils/evolutionEngineSimulation";
-import colorProfilesJson from '@/data/gif_profiles_smart_colors.json';
-
-
-
-type FamilyKey = keyof typeof colorProfilesJson.families;
 
 const RoleBasedNFTPage = () => {
   const { address: account, web3, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const { convertEthToEur, loading: loadingEthPrice } = useEthToEur();
-  const { metadataUri, imageUri, isUploading, uploadToIPFS } = usePinataUpload();
   const { isOpen, onToggle } = useDisclosure();
 
   const Bananas = dynamic(() => import("@/components/modules/Bananas"), { ssr: false });
 
   const [selectedRole, setSelectedRole] = useState<string>("");
-  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
-  //const [roleConfirmed, setRoleConfirmed] = useState<boolean>(false);
-
   const [name, setName] = useState<string>("");
   const [bio, setBio] = useState<string>("");
 
@@ -77,28 +65,35 @@ const RoleBasedNFTPage = () => {
   const [autoEvolve, setAutoEvolve] = useState<boolean>(false);
 
   const [showBananas, setShowBananas] = useState<boolean>(false);
-  const [isMinting, setIsMinting] = useState<boolean>(false);
   const [nftId, setNftId] = useState<string>("");
-
   const [mintRestant, setMintRestant] = useState<number>(0);
   const [maxMint, setMaxMint] = useState<number>(0);
-
-  //const [isReadyToMint, setIsReadyToMint] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-
-  const [insectData, setInsectData] = useState<any>(null);
-
   const [isCguModalOpen, setIsCguModalOpen] = useState(false);
-const [cguAccepted, setCguAccepted] = useState(false);
+  const [cguAccepted, setCguAccepted] = useState(false);
 
-  const {
-  isOpen: isSimOpen,
-  onToggle: onToggleSim,
-} = useDisclosure();
+  // ── Génération on-chain de l'insecte (3 options, l'utilisateur choisit) ─────
 
-const [simulatedInsect, setSimulatedInsect] = useState<any | null>(null);
+  type InsectOption = {
+    tokenUri: string;
+    imageUrl: string;
+    imageDataUri: string;
+    attrsFragment: string;
+    family: string;
+    insectName: string;
+    displayName: string;
+    lore: string;
+    attributes: { trait_type: string; value: unknown }[];
+    gifSizeKb: number;
+    tokenUriSizeKb: number;
+    isStoredOnChain: boolean;
+  };
 
-
+  const [insectOptions,  setInsectOptions]  = useState<InsectOption[] | null>(null);
+  const [insectResult,   setInsectResult]   = useState<InsectOption | null>(null);
+  const [isGeneratingInsect, setIsGeneratingInsect] = useState(false);
+  const [isUploadingInsect,  setIsUploadingInsect]  = useState(false);
+  const [insectError,    setInsectError]    = useState<string>("");
 
   const contractAddress = process.env.NEXT_PUBLIC_RESCOE_ADHERENTS as string;
 
@@ -216,120 +211,163 @@ const [simulatedInsect, setSimulatedInsect] = useState<any | null>(null);
     }
   };
 
-  const generateImage = () => {
-  if (!selectedRole) return;
-
+// ── Génère 3 options d'insectes (reroll 0, 1, 2) — l'utilisateur choisit ────
+//
+// Les 3 options sont déterministes par wallet+nonce+reroll.
+// Elles sont calculées en parallèle, puis affichées sous forme de cartes.
+// Une fois le choix fait, il est verrouillé — aucune possibilité de rechoisir.
+const generateInsect = async () => {
+  if (!selectedRole || !name || !bio) {
+    alert("⚠️ Remplissez d'abord le rôle, le nom et la bio");
+    return;
+  }
+  setIsGeneratingInsect(true);
+  setInsectError("");
+  setInsectOptions(null);
+  setInsectResult(null);
   try {
-    const data = getRandomInsectGif(0);  // ✅ LVL0 uniquement
-    setGeneratedImageUrl(data.imageUrl);
-    setInsectData(data);  // attributes + family pour évolution
-  } catch (error) {
-    console.error("Erreur génération insecte:", error);
-    alert("Erreur lors de la génération de l'insecte LVL0");
+    // ── 1. Seed déterministe : keccak256(address ‖ mintNonce) ─────────────────
+    let onChainSeed = "";
+    if (web3 && account) {
+      try {
+        const contract = new web3.eth.Contract(ABI as any, contractAddress);
+        const nonce: string = await contract.methods.mintNonce(account).call();
+        const seed = web3.utils.soliditySha3(
+          { type: "address", value: account },
+          { type: "uint256", value: nonce }
+        );
+        if (seed) onChainSeed = seed;
+      } catch {
+        console.warn("mintNonce non disponible, fallback wallet seed");
+      }
+    }
+
+    const insectStorageAddress = process.env.NEXT_PUBLIC_INSECT_STORAGE as string;
+    const HAS_IMAGE_ABI = [{
+      inputs: [{ internalType: "string", name: "insectKey", type: "string" }],
+      name: "hasInsectImage",
+      outputs: [{ internalType: "bool", name: "", type: "bool" }],
+      stateMutability: "view",
+      type: "function",
+    }];
+
+    // ── 2. Fetch 3 options en parallèle ──────────────────────────────────────
+    const options = await Promise.all([0, 1, 2].map(async (reroll) => {
+      const params = new URLSearchParams({
+        wallet:     account ?? "",
+        role:       selectedRole,
+        name,
+        bio,
+        isAnnual:   isAnnual.toString(),
+        autoEvolve: autoEvolve.toString(),
+        reroll:     String(reroll),
+      });
+      if (onChainSeed) params.set("seed", onChainSeed);
+
+      const res = await fetch(`/api/token/generate-onchain-uri?${params}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+
+      // Vérif on-chain en parallèle — non-bloquant si erreur
+      let isStoredOnChain = false;
+      if (web3 && insectStorageAddress) {
+        try {
+          const sc = new web3.eth.Contract(HAS_IMAGE_ABI as any, insectStorageAddress);
+          isStoredOnChain = await sc.methods.hasInsectImage(data.insectName).call();
+        } catch {}
+      }
+      return { ...data, isStoredOnChain } as InsectOption;
+    }));
+
+    setInsectOptions(options);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    setInsectError(msg);
+    console.error("❌ generate-onchain-uri:", e);
+  } finally {
+    setIsGeneratingInsect(false);
   }
 };
 
+// ── Upload de l'insecte on-chain via le RELAYER (le relayer paie le gas) ────────
+// Le serveur lit le GIF depuis disk, l'encode en data:image/gif;base64, et appelle
+// contributeInsectMeta avec sa propre clé privée. L'adhérent ne paie rien ici.
+const uploadInsectViaRelayer = async (): Promise<boolean> => {
+  if (!insectResult) return false;
+  if (insectResult.isStoredOnChain) return true;
+
+  setIsUploadingInsect(true);
+  try {
+    const res = await fetch("/api/token/upload-insect-relayer-v3", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ insectKey: insectResult.insectName }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error ?? `HTTP ${res.status}`);
+    }
+
+    // "uploaded" ou "exists" → dans les deux cas l'image est on-chain
+    setInsectResult(prev => prev ? { ...prev, isStoredOnChain: true } : prev);
+    return true;
+  } catch (e: any) {
+    const msg: string = e?.message ?? String(e);
+    console.error("❌ upload-insect-relayer:", e);
+    alert(`❌ Erreur lors de l'enregistrement de l'image on-chain : ${msg}`);
+    return false;
+  } finally {
+    setIsUploadingInsect(false);
+  }
+};
 
 const handleAdhere = async () => {
   if (!name || !bio || !selectedRole) {
     alert("⚠️ Remplissez nom, bio et rôle");
     return;
   }
-
-  if (mintRestant <= 0) {
-    alert("❌ Quota annuel épuisé");
+  if (!insectResult?.insectName) {
+    alert("⚠️ Générez d'abord votre badge insecte");
     return;
   }
-
-  if (!web3 || !account){
-    alert("Assurez-vous d'être connecté, d'avoir généré l'IPFS et d'avoir sélectionné un rôle.");
-    return;
-  }
+  if (mintRestant <= 0) { alert("❌ Quota annuel épuisé"); return; }
+  if (!web3 || !account) { alert("Wallet non connecté"); return; }
 
   try {
     setIsProcessing(true);
 
-    // 🔥 ÉTAPE 1 : Génération insecte + attributs
-    const data = getRandomInsectGif(0);
-    if (!data || !data.attributes || !data.imageUrl) {
-      throw new Error("Génération insecte échouée");
+    // ── Étape 1 : stocker l'image on-chain via le relayer (sans MetaMask) ────
+    // Le serveur exécute contributeInsectMeta avec son propre wallet.
+    // L'adhérent ne paie pas le gas d'upload — seulement le mint.
+    if (insectResult && !insectResult.isStoredOnChain) {
+      const uploaded = await uploadInsectViaRelayer();
+      if (!uploaded) { setIsProcessing(false); return; }
     }
 
-    const familyKey = data.folder as FamilyKey;
-    const spriteFilename = data.spriteName;
-
-    const profiles = colorProfilesJson.families[familyKey];
-    const colorProfile = profiles?.find(p => p.filename === spriteFilename) ?? profiles?.[0];
-
-    const insectAttributes = [
-      ...(data.attributes || []),
-      { trait_type: "Famille", value: familyKey },
-      { trait_type: "1er Propriétaire", value: name },
-      { trait_type: "Insect name", value: data.display_name || "Insecte ResCoe" },
-      { trait_type: "Lore", value: data.lore || "Badge d'adhésion ResCoe" },
-      { trait_type: "TotalFamille", value: data.total_in_family || 0 },
-      { trait_type: "Sprite", value: spriteFilename }
-    ];
-
-    const colorAttributes = colorProfile ? [
-      { trait_type: "Couleur1", value: colorProfile.dominant_colors.hex[0] },
-      { trait_type: "Couleur2", value: colorProfile.dominant_colors.hex[1] },
-      { trait_type: "Couleur3", value: colorProfile.dominant_colors.hex[2] },
-      { trait_type: "Couleur4", value: colorProfile.dominant_colors.hex[3] },
-      { trait_type: "Couleur5", value: colorProfile.dominant_colors.hex[4] },
-      { trait_type: "Teinte", value: Math.round(colorProfile.hsv.mean[0]) + "°" },
-      { trait_type: "Saturation", value: Math.round(colorProfile.hsv.mean[1] * 100) + "%" },
-      { trait_type: "Luminosité", value: Math.round(colorProfile.hsv.mean[2] * 100) + "%" },
-      { trait_type: "Colorful", value: Math.round(colorProfile.metrics.colorfulness * 100) + "%" },
-      { trait_type: "Contraste", value: Math.round(colorProfile.metrics.contrast) },
-      { trait_type: "Nettete", value: Math.round(colorProfile.metrics.sharpness) },
-      { trait_type: "Entropie", value: Math.round(colorProfile.metrics.entropy * 10) / 10 },
-      { trait_type: "Frames", value: colorProfile.frame_count },
-      { trait_type: "Pixels", value: colorProfile.total_pixels_analyzed.toLocaleString() },
-      { trait_type: "TailleBytes", value: (colorProfile.gif_info.size_bytes / 1000).toFixed(1) + "KB" }
-    ] : [];
-
-    const fullAttributes = [
-      ...insectAttributes.filter(attr => attr?.trait_type && !["Niveau"].includes(attr.trait_type)),
-      { trait_type: "Niveau", value: 0 },
-      ...colorAttributes
-    ];
-
-    //console.log(`🚀 ${insectAttributes} attributs générés !`);
-    //console.log("INSECT DATA =", data);
-    //console.log(`🚀 ${fullAttributes.length} attributs OpenSea générés !`);
-
-    //console.log("UPLOAD IMAGE =", data.imageUrl)
-
-
-    // 📤 UPLOAD IPFS
-    await uploadToIPFS({
-      scope: "badges",
-      imageUrl: data.imageUrl,
-      name,
-      bio,
-      role: selectedRole,
-      level: 0,
-      attributes: fullAttributes,
-      family: familyKey,
-      sprite_name: spriteFilename,
-      previousImage: null,
-      evolutionHistory: [],
-      color_profile: colorProfile
-    });
-
-    if (!metadataUri) throw new Error("Upload IPFS échoué");
-
-    // 🔥 ÉTAPE 2 : MINT DIRECT
-
-const contract = new web3.eth.Contract(ABI as any, contractAddress);
-
+    // ── Étape 2 : mint ───────────────────────────────────────────────────────
+    const contract  = new web3.eth.Contract(ABI as any, contractAddress);
     const priceInWei = web3.utils.toWei(requiredPriceEth.toString(), "ether");
-    const gasPrice = await web3.eth.getGasPrice();
-
+    const gasPrice  = await web3.eth.getGasPrice();
     const roleValue = roleMapping[selectedRole as RoleKey];
-    const tx = await contract.methods
-      .safeMint(metadataUri, roleValue, name, bio, isAnnual, autoEvolve)
+
+    // Nouvelle signature : insectKey, displayName, insectFamily, role, name, bio, isAnnual, autoEvolveChoice
+    // L'image est stockée on-chain dans le contrat (setInsectImage) — zéro URI en paramètre.
+    await contract.methods
+      .safeMint(
+        insectResult.insectName,   // insectKey → clé du mapping _insectImages
+        insectResult.displayName,  // displayName → stocké par token
+        insectResult.family,       // insectFamily → stocké par token
+        roleValue,
+        name,
+        bio,
+        isAnnual,
+        autoEvolve
+      )
       .send({
         from: account,
         value: priceInWei,
@@ -338,12 +376,15 @@ const contract = new web3.eth.Contract(ABI as any, contractAddress);
         maxPriorityFeePerGas: null as any,
       });
 
-    //console.log('✅ Adhésion réussie ! Tx:', tx.transactionHash);
-
-    // 🎉 SUCCÈS
     setShowBananas(true);
+    // Purge cache InsectSelector + notification globale
+    try {
+      Object.keys(sessionStorage)
+        .filter(k => k.startsWith("insect_data_"))
+        .forEach(k => sessionStorage.removeItem(k));
+      window.dispatchEvent(new CustomEvent("RESCOE_DATA_CHANGED"));
+    } catch {}
     startLoadingAndRedirect();
-
   } catch (error: any) {
     console.error("❌ Erreur adhésion:", error);
     alert(`❌ Erreur : ${error.message || "Vérifiez console"}`);
@@ -573,26 +614,68 @@ const contract = new web3.eth.Contract(ABI as any, contractAddress);
         <Heading size="md" mb={4} textAlign="center">
           Recevez un badge d'adhérent unique !
         </Heading>
-        <Image
-          src="/gifs/chenille_noire.gif"
-          alt="Badge d'adhésion animé"
-          borderRadius="md"
-          mb={4}
-          boxSize="300px"
-          objectFit="cover"
-          mx="auto"
-        />
-        {/*
-        <Image
-          src="/OEUFS/OEUF1.gif"
-          alt="Badge d'adhésion animé"
-          borderRadius="md"
-          mb={4}
-          boxSize="300px"
-          objectFit="cover"
-          mx="auto"
-        />
-        */}
+        {/* Aperçu insecte : placeholder, sélection en cours, ou insecte choisi */}
+        <Box mx="auto" mb={4} w="300px" h="300px" position="relative">
+          <Image
+            src={insectResult?.imageUrl ?? insectOptions?.[0]?.imageUrl ?? "/gifs/chenille_noire.gif"}
+            alt={insectResult ? `Badge — ${insectResult.displayName}` : "Badge d'adhésion animé"}
+            borderRadius="md"
+            boxSize="300px"
+            objectFit="cover"
+            mx="auto"
+            opacity={insectResult ? 1 : insectOptions ? 0.6 : 0.4}
+            transition="opacity 0.4s"
+          />
+          {!insectResult && !insectOptions && (
+            <Text
+              position="absolute"
+              bottom="10px"
+              left="50%"
+              transform="translateX(-50%)"
+              fontSize="xs"
+              color="whiteAlpha.700"
+              bg="blackAlpha.700"
+              px={2}
+              py={1}
+              borderRadius="md"
+              whiteSpace="nowrap"
+            >
+              Votre insecte sera révélé ici
+            </Text>
+          )}
+          {insectOptions && !insectResult && (
+            <Text
+              position="absolute"
+              bottom="10px"
+              left="50%"
+              transform="translateX(-50%)"
+              fontSize="xs"
+              color="brand.gold"
+              bg="blackAlpha.800"
+              px={2}
+              py={1}
+              borderRadius="md"
+              whiteSpace="nowrap"
+            >
+              ↓ Choisissez ci-dessous
+            </Text>
+          )}
+        </Box>
+        {(insectResult ?? insectOptions?.[0]) && (
+          <Box mb={4} textAlign="center">
+            <Text fontWeight="bold" fontSize="sm" color="brand.gold">
+              {(insectResult ?? insectOptions![0]).displayName}
+            </Text>
+            <Text fontSize="xs" color="whiteAlpha.600">
+              Famille {(insectResult ?? insectOptions![0]).family}
+            </Text>
+            {(insectResult ?? insectOptions?.[0])?.lore && (
+              <Text fontSize="xs" color="whiteAlpha.500" mt={1} noOfLines={2} maxW="400px" mx="auto">
+                {(insectResult ?? insectOptions![0]).lore}
+              </Text>
+            )}
+          </Box>
+        )}
         <Button onClick={onToggle} width="full" mb={4}>
           {isOpen ? "Masquer les détails" : "Voir les détails de l'adhésion"}
         </Button>
@@ -646,7 +729,7 @@ const contract = new web3.eth.Contract(ABI as any, contractAddress);
 
                 <Text fontSize="s" color="brand.cream" mb={4}>
                 <strong>Assurez vous d'avoir lu les conditions générales d'utilisation</strong>{' '}
-                <Link href="./CGU" color="brand.gold" isExternal>
+                <Link href="/CGU" color="brand.gold" isExternal>
                   Voir les CGU complètes
                 </Link>
               </Text>
@@ -714,11 +797,11 @@ mb={4}
                 <FormLabel>👤 Rôle d’adhésion</FormLabel>
                 <Select
                   placeholder="Choisissez votre rôle..."
-                  value={selectedRole || ""}  // ✅ FIX BUG RÔLE
+                  value={selectedRole || ""}
                   onChange={(e) => {
-                    const newRole = e.target.value || "";  // ✅ Prise en compte immédiate
+                    const newRole = e.target.value || "";
                     setSelectedRole(newRole);
-                    if (newRole) generateImage();  // Génère seulement si rôle valide
+                    setInsectOptions(null); setInsectResult(null); // reset si rôle change
                   }}
                 >
                   {roles.map((role) => (
@@ -733,7 +816,7 @@ mb={4}
                 <FormLabel>✏️ Nom complet</FormLabel>
                 <Input
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => { setName(e.target.value); setInsectOptions(null); setInsectResult(null); }}
                   placeholder="Votre nom d'adhérent"
                 />
               </FormControl>
@@ -777,65 +860,145 @@ mb={4}
                 </Checkbox>
               </FormControl>
 
+              {/* ── Génération du badge on-chain — 3 options ── */}
+              <Box
+                border="1px solid"
+                borderColor={insectResult ? "brand.gold" : "whiteAlpha.200"}
+                borderRadius="xl"
+                p={4}
+                mb={4}
+                transition="border-color 0.3s"
+              >
+                {/* État 1 : rien encore → bouton tirage */}
+                {!insectOptions && !insectResult && (
+                  <VStack spacing={2}>
+                    <Text fontSize="sm" color="whiteAlpha.700" textAlign="center">
+                      🦋 Tirez 3 badges — choisissez le vôtre. Ce choix sera définitif.
+                    </Text>
+                    <Button
+                      w="full"
+                      colorScheme="yellow"
+                      variant="outline"
+                      onClick={() => generateInsect()}
+                      isLoading={isGeneratingInsect}
+                      loadingText="Tirage en cours…"
+                      isDisabled={!selectedRole || !name || !bio}
+                    >
+                      🎲 Révéler mes 3 options
+                    </Button>
+                    {insectError && (
+                      <Text fontSize="xs" color="red.300">{insectError}</Text>
+                    )}
+                    {(!selectedRole || !name || !bio) && (
+                      <Text fontSize="xs" color="whiteAlpha.400">
+                        ↑ Remplissez d'abord rôle, nom et bio
+                      </Text>
+                    )}
+                  </VStack>
+                )}
+
+                {/* État 2 : options chargées → sélection parmi 3 cartes */}
+                {insectOptions && !insectResult && (
+                  <VStack spacing={3}>
+                    <Text fontSize="sm" color="brand.gold" fontWeight="bold" textAlign="center">
+                      🎨 Cliquez sur l'insecte que vous souhaitez — ce choix est définitif
+                    </Text>
+                    <Stack direction={{ base: "column", md: "row" }} spacing={3} w="full">
+                      {insectOptions.map((opt, i) => (
+                        <Box
+                          key={i}
+                          flex={1}
+                          border="2px solid"
+                          borderColor="whiteAlpha.300"
+                          borderRadius="lg"
+                          p={3}
+                          cursor="pointer"
+                          _hover={{ borderColor: "brand.gold", transform: "scale(1.03)" }}
+                          transition="all 0.2s"
+                          onClick={() => {
+                            setInsectResult(opt);
+                            setInsectOptions(null);
+                          }}
+                        >
+                          <Image
+                            src={opt.imageUrl}
+                            alt={opt.displayName}
+                            borderRadius="md"
+                            objectFit="cover"
+                            w="full"
+                            h="110px"
+                            mb={2}
+                          />
+                          <Text fontSize="xs" fontWeight="bold" color="brand.gold" textAlign="center" noOfLines={1}>
+                            {opt.displayName}
+                          </Text>
+                          <Text fontSize="9px" color="whiteAlpha.500" textAlign="center">
+                            Famille {opt.family}
+                          </Text>
+                          {opt.isStoredOnChain && (
+                            <Text fontSize="9px" color="green.400" textAlign="center">
+                              🔗 Déjà on-chain
+                            </Text>
+                          )}
+                        </Box>
+                      ))}
+                    </Stack>
+                  </VStack>
+                )}
+
+                {/* État 3 : insecte choisi et verrouillé */}
+                {insectResult && (
+                  <VStack spacing={1}>
+                    <Text fontSize="sm" color="green.300" fontWeight="bold" textAlign="center">
+                      ✅ Votre insecte est déterminé — prêt à minter !
+                    </Text>
+                    <Text fontSize="xs" color="whiteAlpha.600" fontFamily="mono" textAlign="center">
+                      {insectResult.family} · {insectResult.insectName}
+                    </Text>
+                    <Text fontSize="9px" color="whiteAlpha.400" fontFamily="mono" textAlign="center">
+                      GIF {insectResult.gifSizeKb}KB animé · data URI on-chain
+                    </Text>
+                    {insectResult.isStoredOnChain ? (
+                      <Text fontSize="9px" color="green.400" textAlign="center">
+                        🔗 Image déjà stockée on-chain — 1 seule transaction requise
+                      </Text>
+                    ) : (
+                      <Text fontSize="9px" color="yellow.400" textAlign="center">
+                        ⚡ Première adhésion avec cet insecte — l'image sera enregistrée
+                        on-chain avant le mint (sans frais supplémentaires pour vous).
+                      </Text>
+                    )}
+                    <Text fontSize="9px" color="whiteAlpha.300" textAlign="center" fontStyle="italic">
+                      Ce choix est définitif — aucun retirage possible.
+                    </Text>
+                  </VStack>
+                )}
+              </Box>
+
               {/* PRIX AFFICHÉ */}
               <Box p={4} borderRadius="lg" mb={6}>
                 <Text fontSize="lg" fontWeight="bold" mb={1}>
                   💰 {requiredPriceEth.toFixed(4)} ETH (~{priceEur.toFixed(2)} €)
                 </Text>
-                {generatedImageUrl && (
-                  <Text color="green.600" fontSize="sm">
-                    ✅ Badge animé prêt !
-                  </Text>
-                )}
               </Box>
 
-              {/* BOUTONS */}
-              {/*
               <VStack spacing={3}>
-                <Button
-                  w="full"
-                  colorScheme="blue"
-                  size="lg"
-                  onClick={handleConfirmRole}
-                  isDisabled={!selectedRole || roleConfirmed || !generatedImageUrl}
-                >
-                  🎨 Confirmer rôle & générer badge
-                </Button>
-
                 <Button
                   w="full"
                   colorScheme="teal"
                   size="lg"
-                  onClick={handleMint}
-                  isLoading={isMinting || isUploading}
-                  loadingText="🔄 Création du badge ResCoe..."
-                  isDisabled={!metadataUri || !roleConfirmed || mintRestant <= 0}
+                  onClick={() => setIsCguModalOpen(true)}
+                  isLoading={isProcessing || isUploadingInsect}
+                  loadingText={isUploadingInsect ? "🖼️ Enregistrement image…" : "🔨 Mint en cours…"}
+                  isDisabled={
+                    !selectedRole || !name || !bio || mintRestant <= 0 || !insectResult
+                  }
                 >
-                  {mintRestant > 1 ? `Adhérer (${mintRestant} restantes)` : "Adhérer (dernière !)"}
+                  {mintRestant > 1
+                    ? `🎉 Adhérer (${mintRestant} restantes)`
+                    : "🎉 Adhérer (dernière !)"
+                  }
                 </Button>
-              </VStack>
-              */}
-
-              <VStack spacing={3}>
-              <Button
-                w="full"
-                colorScheme="teal"
-                size="lg"
-                onClick={() => setIsCguModalOpen(true)}  // ✅ OUVRE MODALE
-                isLoading={isProcessing || isUploading}
-                loadingText={
-                  isUploading
-                    ? "📤 Upload IPFS en cours..."
-                    : "🔨 Finalisation mint..."
-                }
-                isDisabled={!selectedRole || !name || !bio || mintRestant <= 0}
-              >
-                {mintRestant > 1
-                  ? `🎉 Adhérer (${mintRestant} restantes)`
-                  : "🎉 Adhérer (dernière !)"
-                }
-              </Button>
-
               </VStack>
 
 
@@ -929,7 +1092,7 @@ mb={4}
 
             <Text fontSize="s" mb={4}>
               <strong>Texte intégral :</strong>{' '}
-              <Link href="./CGU" color="brand.gold" isExternal>
+              <Link href="/CGU" color="brand.gold" isExternal>
                 Voir les CGU complètes
               </Link>
             </Text>

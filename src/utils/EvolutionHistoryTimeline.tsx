@@ -173,7 +173,7 @@ export default function EvolutionHistoryTimeline({
                           objectFit="cover"
                           borderRadius="md"
                           border="1px solid"
-                          borderColor="rgba(180,166,213,0.7)"
+                          borderColor="rgba(238,212,132,0.5)"
                         />
                         <VStack align="flex-start" spacing={1}>
                           <Text fontSize="xs" textTransform="uppercase" color="brand.cream">
@@ -329,7 +329,8 @@ export default function EvolutionHistoryTimeline({
                             placement="top"
                           >
                             <Badge
-                              colorScheme="purple"
+                              bg="rgba(238,212,132,0.15)"
+                              color="brand.gold"
                               p={3}
                               borderRadius="lg"
                               minH="70px"

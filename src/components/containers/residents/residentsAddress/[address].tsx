@@ -124,7 +124,7 @@ const ResidentDashboard = () => {
           </Box>
           <Box>
             <Heading size="2xl" mb={2}>{previewConfig.displayName}</Heading>
-            <Badge colorScheme="purple" fontSize="xl" px={4} py={2}>{previewConfig.role}</Badge>
+            <Badge bg="brand.gold" color="brand.navy" fontSize="xl" px={4} py={2} borderRadius="full" fontWeight="bold">{previewConfig.role}</Badge>
             <Text fontSize="lg" mt={4} color="gray.300">{previewConfig.bio}</Text>
             <Text fontSize="sm" mt={2} color="gray.500">
               {config.updatedAt ? `Mis à jour: ${new Date(config.updatedAt).toLocaleDateString('fr-FR')}` : 'Non configuré'}
@@ -135,7 +135,7 @@ const ResidentDashboard = () => {
       </Box>
 
       {/* TABS */}
-      <Tabs variant="soft-rounded" colorScheme="purple" maxW="1200px" mx="auto">
+      <Tabs variant="soft-rounded" colorScheme="yellow" maxW="1200px" mx="auto">
         <TabList>
           <Tab>👤 Profil</Tab>
           {isOwner && <Tab>✨ Éditeur</Tab>}

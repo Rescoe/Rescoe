@@ -118,18 +118,16 @@ const PublicProfile: React.FC<PublicProfileProps> = ({ address }) => {
             const metadata = await response.json();
 
 /*
-            //console.log(`📦 Token #${tokenId}:`, {
-              name: metadata.name,
-              image: metadata.image,
-              family: metadata.attributes?.[15]?.value || metadata.family_name || "Inconnue"
-            });
+            //console.log(`📦 Token #${tokenId}:`, { name: metadata.name, image: metadata.image });
 */
             return {
               tokenId,
               image: resolveIPFS(metadata.image, true) || "",
               name: metadata.name || metadata.role || `Jeton ${tokenId}`,
               role: metadata.role || "Membre",
-              family: metadata.attributes?.[15]?.value || metadata.family_name || "Inconnue"
+              family: (metadata.attributes as Array<{trait_type:string;value:unknown}>|undefined)
+                        ?.find(a => a.trait_type === "Famille")?.value
+                      || metadata.family_name || metadata.family || "Inconnue"
             } as NFTData;
           } catch (err) {
             console.error(`❌ Erreur token ${tokenId}:`, err);

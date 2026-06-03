@@ -122,12 +122,21 @@ const ContactPage: React.FC = () => {
   };
 
   return (
-    <Box minH="100vh" py={{ base: 8, md: 20 }} px={6}>
+    <Box minH="100vh" py={{ base: 8, md: 16 }} px={{ base: 4, md: 6 }}>
       <Container maxW="7xl">
         {/* Hero Association Art/Web3 */}
-        <VStack spacing={8} textAlign="center" mb={20}>
+        <VStack spacing={6} textAlign="center" mb={{ base: 10, md: 16 }}>
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-            <Badge colorScheme="purple" mb={4} px={4} py={1} borderRadius="full" fontSize="sm" fontWeight="bold">
+            <Badge
+              bg="brand.gold"
+              color="brand.navy"
+              mb={4}
+              px={4}
+              py={1}
+              borderRadius="full"
+              fontSize="sm"
+              fontWeight="bold"
+            >
               Association Loi 1901 • Art Numérique & Web3
             </Badge>
             <Heading as="h1" size={{ base: "2xl", md: "4xl" }} fontWeight="extrabold" lineHeight={1.2}>
@@ -149,7 +158,7 @@ const ContactPage: React.FC = () => {
           */}
         </VStack>
 
-        <Grid templateColumns={{ base: "1fr", lg: "1fr 1fr" }} gap={{ base: 12, md: 20 }} mb={20}>
+        <Grid templateColumns={{ base: "1fr", lg: "1fr 1fr" }} gap={{ base: 8, md: 16 }} mb={{ base: 12, md: 20 }}>
           {/* Coordonnées Bureau */}
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6, delay: 0.2 }}>
             <Box>
@@ -177,13 +186,13 @@ const ContactPage: React.FC = () => {
               </VStack>
               */}
               <HStack mt={8} spacing={6} flexWrap="wrap">
-                <VStack p={4} borderWidth={1} borderRadius="xl" align="start">
-                  <Icon as={FaUsers} boxSize={8} color="purple.400" />
+                <VStack p={4} borderWidth={1} borderColor="whiteAlpha.200" borderRadius="xl" align="start">
+                  <Icon as={FaUsers} boxSize={8} color="brand.gold" />
                   <Text fontWeight="bold">Bureau Actif</Text>
                   <Text fontSize="sm" opacity={0.9}>4 Dirigeants</Text>
                 </VStack>
-                <VStack p={4} borderWidth={1} borderRadius="xl" align="start">
-                  <Icon as={FaPalette} boxSize={8} color="purple.400" />
+                <VStack p={4} borderWidth={1} borderColor="whiteAlpha.200" borderRadius="xl" align="start">
+                  <Icon as={FaPalette} boxSize={8} color="brand.gold" />
                   <Text fontWeight="bold">Focus Art/Web3</Text>
                   <Text fontSize="sm" opacity={0.9}>NFT Artistiques</Text>
                 </VStack>
@@ -234,37 +243,54 @@ const ContactPage: React.FC = () => {
               entreprise experte blockchain et mandales.
             </Text>
           </motion.div>
-          <Grid templateColumns={{ base: "repeat(1, 1fr)", md: "repeat(2, 1fr)", lg: "repeat(4, 1fr)" }} gap={8}>
+          <Grid templateColumns={{ base: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(3, 1fr)" }} gap={{ base: 4, md: 6, lg: 8 }}>
             {teamMembers.map((member, index) => (
               <GridItem key={index}>
                 <Box
-                  p={8}
+                  p={{ base: 5, md: 8 }}
                   borderWidth={1}
-                  borderRadius="3xl"
+                  borderColor="whiteAlpha.200"
+                  borderRadius="2xl"
                   textAlign="center"
                   boxShadow="xl"
-                  _hover={{ transform: "translateY(-12px)", boxShadow: "2xl" }}
-                  transition="all 0.4s cubic-bezier(0.4, 0, 0.2, 1)"
+                  _hover={{
+                    transform: "translateY(-6px)",
+                    boxShadow: "0 0 24px rgba(238,212,132,0.2)",
+                    borderColor: "brand.gold",
+                  }}
+                  transition="all 0.3s ease"
                   position="relative"
                   overflow="hidden"
                 >
                   <Box position="absolute" top={4} right={4}>
-                    <Badge colorScheme="purple" px={3} py={1}>Rescoe</Badge>
+                    <Badge bg="brand.gold" color="brand.navy" px={3} py={1} borderRadius="full" fontSize="xs">
+                      Rescoe
+                    </Badge>
                   </Box>
                   <Image src={member.image} alt={member.name} borderRadius="2xl" boxSize="140px" mx="auto" mb={6} boxShadow="lg" />
                   <Heading as="h3" size="md" mb={2}>{member.name}</Heading>
-                  <Text fontWeight="bold" color="purple.400" mb={1}>{member.role}</Text>
+                  <Text fontWeight="bold" color="brand.gold" mb={1}>{member.role}</Text>
                   <Text opacity={0.8} mb={4} lineHeight={1.4}>{member.description}</Text>
                   <VStack spacing={1} mb={6} align="start" w="full">
                     {member.expertise.map((exp, i) => (
                       <HStack key={i} spacing={2}>
-                        <Icon as={FaPalette} boxSize={4} color="purple.400" />
+                        <Icon as={FaPalette} boxSize={4} color="brand.gold" />
                         <Text fontSize="sm">{exp}</Text>
                       </HStack>
                     ))}
                   </VStack>
                   {member.social && (
-                    <Button as={Link} href={member.social} isExternal size="sm" colorScheme="purple" w="full" leftIcon={<FaGlobe />}>
+                    <Button
+                      as={Link}
+                      href={member.social}
+                      isExternal
+                      size="sm"
+                      w="full"
+                      bg="brand.gold"
+                      color="brand.navy"
+                      _hover={{ bg: "brand.cream" }}
+                      leftIcon={<FaGlobe />}
+                    >
                       Instagram
                     </Button>
                   )}

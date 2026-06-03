@@ -226,34 +226,50 @@ const CreateSocialCollection: React.FC = () => {
   const canUpload = file && salonName.trim() && royaltyAddress;
 
   return (
-    <Box maxW="700px" mx="auto" mt={10} p={10} borderRadius="3xl" boxShadow="dark-lg" border="1px solid" borderColor="purple.300">
-      <Heading size="2xl" mb={6} textAlign="center" fontWeight="black" bgGradient="linear(to-r, purple.400, pink.400)" bgClip="text">
+    <Box
+      maxW="700px"
+      mx="auto"
+      mt={10}
+      p={{ base: 6, md: 10 }}
+      borderRadius="2xl"
+      boxShadow="dark-lg"
+      border="1px solid"
+      borderColor="brand.gold"
+      bg="rgba(1,28,57,0.8)"
+    >
+      <Heading size={{ base: "xl", md: "2xl" }} mb={6} textAlign="center" fontWeight="black" bgClip="text">
         Créer un Salon Social RESCOE
       </Heading>
 
-      <HStack mx="auto" mb={6} fontWeight="bold" color="purple.200">
+      <HStack mx="auto" mb={6} fontWeight="bold" color="brand.gold">
         <Text>Collections: {userCollections}</Text>
         <Text>— Restantes: {remainingCollections}</Text>
       </HStack>
 
-      {/* File + Preview (identique) */}
-      <FormLabel fontWeight="bold" color="gray.200">Image</FormLabel>
-      <Input type="file" onChange={handleFileChange} mb={5} border="2px dashed" borderColor="purple.400" />
+      <FormLabel fontWeight="bold" color="brand.cream">Image</FormLabel>
+      <Input
+        type="file"
+        onChange={handleFileChange}
+        mb={5}
+        border="2px dashed"
+        borderColor="brand.gold"
+        color="brand.cream"
+        _hover={{ borderColor: "brand.cream" }}
+      />
       {previewUrl && (
         <Image src={previewUrl} alt="Preview" boxSize="300px" objectFit="cover" mx="auto" mb={6} borderRadius="xl" />
       )}
 
       <VStack spacing={4} align="stretch">
-        <Input placeholder="Nom salon *" value={salonName} onChange={e => setSalonName(e.target.value)} />
-        <Input placeholder="Description" value={description} onChange={e => setDescription(e.target.value)} />
-        <Checkbox isChecked={requiresMembership} onChange={e => setRequiresMembership(e.target.checked)} colorScheme="purple">
-          <Text ml={2}>Adhésion requise</Text>
+        <Input placeholder="Nom salon *" value={salonName} onChange={e => setSalonName(e.target.value)} focusBorderColor="brand.gold" />
+        <Input placeholder="Description" value={description} onChange={e => setDescription(e.target.value)} focusBorderColor="brand.gold" />
+        <Checkbox isChecked={requiresMembership} onChange={e => setRequiresMembership(e.target.checked)} colorScheme="yellow">
+          <Text ml={2} color="brand.cream">Adhésion requise</Text>
         </Checkbox>
       </VStack>
 
-      {/* Royalties SIMPLES */}
-      <Box mt={6} p={4} border="1px solid" borderColor="purple.300" borderRadius="xl">
-        <Heading size="md" mb={4} color="purple.300">Adresse Royalties (100%)</Heading>
+      <Box mt={6} p={4} border="1px solid" borderColor="whiteAlpha.200" borderRadius="xl">
+        <Heading size="md" mb={4} color="brand.gold">Adresse Royalties (100%)</Heading>
         <Select value={royaltyAddress} onChange={e => setRoyaltyAddress(e.target.value)} bg="blackAlpha.300">
           <option value={address || ""}>Créateur ({address?.slice(0,6)}...)</option>
         </Select>
@@ -267,12 +283,21 @@ const CreateSocialCollection: React.FC = () => {
       >
         🚀 1. IPFS + Configurer
       </Button>
-      {ipfsUrl && <Text fontSize="xs" color="gray.400">{ipfsUrl}</Text>}
+      {ipfsUrl && <Text fontSize="xs" color="whiteAlpha.500">{ipfsUrl}</Text>}
 
-      <Divider my={10} />
+      <Divider my={8} borderColor="whiteAlpha.200" />
       <Button
-        w="full" px={10} py={6} fontSize="lg" bgGradient="linear(to-r, purple.700, pink.600)"
-        onClick={createSalon} isLoading={loading} isDisabled={!ipfsUrl || !salonConfigured || !isResident}
+        w="full"
+        px={10}
+        py={6}
+        fontSize="lg"
+        bg="brand.gold"
+        color="brand.navy"
+        fontWeight="bold"
+        _hover={{ bg: "brand.cream" }}
+        onClick={createSalon}
+        isLoading={loading}
+        isDisabled={!ipfsUrl || !salonConfigured || !isResident}
       >
         🎉 2. Créer Salon
       </Button>

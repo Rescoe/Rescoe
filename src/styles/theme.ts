@@ -32,10 +32,10 @@ export const colors = {
     textLight: "#F7F5EC", // texte clair pour dark mode
 
     // 🎨 aliases utilisés pour les titres et dégradés dynamiques
-    startLight: "#B4A6D5", // or doux en haut du dégradé (light)
-    endLight: "#B4A6D5",   // mauve clair en bas (light)
-    startDark: "#B4A6D5",  // mauve dominant (dark)
-    endDark: "#B4A6D5",    // bleu profond (dark)
+    startLight: "#011C39", // navy — début dégradé titres (light mode)
+    endLight: "#00416A",   // blue profond — fin dégradé titres (light mode)
+    startDark: "#FFEDA6",  // gold — début dégradé titres (dark mode)
+    endDark: "#FFFBE8",    // cream — fin dégradé titres (dark mode)
   },
 };
 
@@ -84,10 +84,10 @@ export const styles = {
 export const hoverStyles = {
   brandHover: {
     _hover: {
-      bgGradient: "linear(to-r, #EED484, #EED484)", // mauve → or (palette RESCOE)
+      bgGradient: "linear(to-r, #EED484, #EED484)", // gold — palette RESCOE
       transform: "scale(1.05)",
       transition: "all 0.3s ease-in-out",
-      boxShadow: "0 0 12px rgba(180, 166, 213, 0.5)", // halo doux
+      boxShadow: "0 0 12px rgba(238, 212, 132, 0.5)", // halo or/gold
     },
   },
 };
@@ -100,8 +100,8 @@ export const brandHover = {
 
 
 export const effects = {
-  glowLight: "0 0 25px rgba(180, 166, 213, 0.6)",
-  glowDark: "0 0 25px rgba(238, 212, 132, 0.6)",
+  glowLight: "0 0 25px rgba(1, 28, 57, 0.5)",      // navy glow — light mode
+  glowDark: "0 0 25px rgba(238, 212, 132, 0.6)",    // gold glow — dark mode
 };
 
 
@@ -174,26 +174,6 @@ export const components = {
     },
   },
 
-  Box: {
-    baseStyle: (props: StyleFunctionProps) => ({
-      bgGradient:
-        props.colorMode === "light"
-          ? `linear(to-r, ${colors.brand.navy}, ${colors.brand.navy})`
-          : `linear(to-r, ${colors.brand.gold}, ${colors.brand.gold})`,
-      bgClip: "text",
-      fontWeight: "extrabold",
-      letterSpacing: "wide",
-      lineHeight: "shorter",
-      textTransform: "uppercase",
-      transition: "color 0.3s ease, background 0.3s ease",
-    }),
-    sizes: {
-      xl: { fontSize: ["3xl", "4xl", "5xl"] },
-      lg: { fontSize: ["2xl", "3xl"] },
-      md: { fontSize: ["xl", "2xl"] },
-      sm: { fontSize: "lg" },
-    },
-  },
 };
 
 

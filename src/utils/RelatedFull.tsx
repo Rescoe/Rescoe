@@ -38,7 +38,6 @@ const RelatedFull: React.FC<Props> = ({ nft, allNFTs, title }) => {
       <Heading
         size="l"
         mb={6}
-        bgGradient="linear(to-r, purple.400, pink.400)"
         bgClip="text"
         textAlign="center"
       >

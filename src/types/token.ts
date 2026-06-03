@@ -8,6 +8,16 @@
 export interface AdhesionTokenMetadata {
   tokenURI: string;
   image: string;
+  /** Message non-bloquant (ex: InsectStorage pas encore configuré) */
+  warning?: string;
+  /** Famille de l'insecte (ex: "Vulpin") — extrait du tokenURI on-chain */
+  insectFamily?: string;
+  /** Nom d'affichage de l'insecte (ex: "VulpinSpectraAlpha | Vulpin") */
+  insectDisplayName?: string;
+  /** Niveau actuel (0-3) — redondant avec membershipInfo.level, mais pratique côté client */
+  insectLevel?: number;
+  /** Adresse wallet de l'artiste graphiste (ex: "0x1234…") — attribut "Artiste" du tokenURI */
+  insectArtistAddress?: string;
 }
 
 // ─── Adhesion state ───────────────────────────────────────────────────────────

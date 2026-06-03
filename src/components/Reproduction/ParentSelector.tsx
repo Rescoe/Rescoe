@@ -49,7 +49,7 @@ export const ParentSelector: React.FC<ParentSelectorProps> = ({
             />
             <Text fontSize="xs" fontWeight="bold" noOfLines={1}>#{token.tokenId}</Text>
             <Text fontSize="xs" color="gray.400" noOfLines={1}>{token.name}</Text>
-            <Badge size="xs" colorScheme="purple" mt={1}>{token.roleLabel}</Badge>
+            <Badge size="xs" bg="rgba(238,212,132,0.2)" color="brand.gold" mt={1} borderRadius="full">{token.roleLabel}</Badge>
           </Box>
         ))}
       </SimpleGrid>

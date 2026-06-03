@@ -21,7 +21,7 @@ const CollectionCard: React.FC<CollectionCardProps> = ({ collection, type }) => 
     const renderIcon = () => {
         switch (type) {
             case 'Art': return <Icon as={FaArtstation} boxSize={4} color="blue.500" />;
-            case 'Poesie': return <Icon as={FaFeather} boxSize={4} color="purple.500" />;
+            case 'Poesie': return <Icon as={FaFeather} boxSize={4} color="brand.gold" />;
             case 'Generative': return <Icon as={FaCode} boxSize={4} color="green.500" />;
             default: return null;
         }

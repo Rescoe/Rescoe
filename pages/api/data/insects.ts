@@ -98,6 +98,26 @@ async function fetchToken(
     }
 
     const tokenURI: string = await contract.tokenURI(i);
+
+    // ── Cas 1 : tokenUri on-chain (data:application/json;base64,…) ──────────
+    // Métadonnées embarquées — aucun appel IPFS nécessaire.
+    if (tokenURI.startsWith("data:application/json;base64,")) {
+      try {
+        const b64 = tokenURI.slice("data:application/json;base64,".length);
+        const json = Buffer.from(b64, "base64").toString("utf8");
+        const meta = JSON.parse(json);
+        return {
+          id: i.toString(),
+          image: String(meta?.image ?? ""),
+          name: String(meta?.name ?? `Carte #${i}`),
+          bio: String(meta?.bio ?? meta?.description ?? ""),
+        };
+      } catch {
+        return null;
+      }
+    }
+
+    // ── Cas 2 : tokenUri IPFS ou HTTP (ancien système) ───────────────────────
     const metaUrl = serverIPFS(tokenURI);
     if (!metaUrl) return null;
 

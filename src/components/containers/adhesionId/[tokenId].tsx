@@ -1,5 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { JsonRpcProvider, Contract as EthersContract, formatUnits, BigNumberish } from 'ethers';
+import { useEffect, useState, useCallback } from 'react';
 import Web3 from 'web3';
 import {
   Box,
@@ -41,12 +40,13 @@ import type { AdhesionTokenMetadata, AdhesionTokenState } from '@/types/token';
 import { PublicProfile } from '@/components/containers/dashboard';
 import { useHatchEgg } from '@/hooks/useHatchEgg';
 import { useTokenEvolution, MembershipInfo } from '@/hooks/useTokenEvolution';
-import { buildEvolutionHistory } from '@/utils/evolutionHistory';
 import CopyableAddress from '@/hooks/useCopyableAddress';
 import { useReproduction } from '@/hooks/useReproduction';
 import { ReproductionPanel } from '@/components/Reproduction';
-import EvolutionHistoryTimeline from '@/utils/EvolutionHistoryTimeline';
 import { resolveIPFS } from '@/utils/resolveIPFS';
+import { useEvolutionHistory } from '@/hooks/useEvolutionHistory';
+import EvolutionTimeline from '@/components/modules/EvolutionTimeline';
+import GenealogyTree from '@/components/modules/GenealogyTree';
 import { brandHover } from '@styles/theme';
 
 interface NFTData {
@@ -130,6 +130,13 @@ interface DetailsTabProps {
   isForSale: boolean;
   renewPriceEth: string | null;
   onRenew: () => void;
+  insectArtistAddress?: string | null;
+  tokenId: number | string;
+  pastSteps: import('@/hooks/useEvolutionHistory').EvolutionStep[];
+  currentStep: import('@/hooks/useEvolutionHistory').EvolutionStep | null;
+  genealogy: import('@/hooks/useEvolutionHistory').GenealogyInfo | null;
+  evoLoading: boolean;
+  contractAdhesion: string;
 }
 
 const DetailsTab = ({
@@ -139,15 +146,15 @@ const DetailsTab = ({
   isForSale,
   renewPriceEth,
   onRenew,
+  insectArtistAddress,
+  tokenId,
+  pastSteps,
+  currentStep,
+  genealogy,
+  evoLoading,
+  contractAdhesion,
 }: DetailsTabProps) => {
   const [showProfile, setShowProfile] = useState(false);
-
-  const evolutionHistory = buildEvolutionHistory({
-    ...nftData,
-    membershipInfo,
-    tokenURI: nftData.uri,
-    level: membershipInfo?.level ?? nftData.level,
-  });
 
   return (
     <VStack spacing={6} alignItems="start" w="full">
@@ -161,6 +168,12 @@ const DetailsTab = ({
         <Text fontSize="lg">
           <strong>Bio :</strong> {nftData.bio}
         </Text>
+        {insectArtistAddress && (
+          <Text fontSize="sm" color="brand.gold" opacity={0.85}>
+            🎨 <strong>Design :</strong>{" "}
+            <CopyableAddress address={insectArtistAddress} />
+          </Text>
+        )}
       </VStack>
 
       <VStack spacing={4} w="full" p={6} bg="whiteAlpha.50" borderRadius={4} alignItems="start">
@@ -195,9 +208,32 @@ const DetailsTab = ({
         )}
       </VStack>
 
-      {evolutionHistory.length > 0 && (
-        <EvolutionHistoryTimeline evolutionHistory={evolutionHistory} />
-      )}
+      {/* ── Sous-onglets Frise / Généalogie ─────────────────────────────── */}
+      <Box w="full" mt={2}>
+        <Tabs variant="soft-rounded" colorScheme="yellow" size="sm" isLazy>
+          <TabList mb={3}>
+            <Tab fontSize="xs" px={3} py={1}>🕐 Frise</Tab>
+            <Tab fontSize="xs" px={3} py={1}>🌳 Généalogie</Tab>
+          </TabList>
+          <TabPanels>
+            <TabPanel p={0}>
+              <EvolutionTimeline
+                pastSteps={pastSteps}
+                currentStep={currentStep}
+                isLoading={evoLoading}
+              />
+            </TabPanel>
+            <TabPanel p={0}>
+              <GenealogyTree
+                tokenId={tokenId}
+                genealogy={genealogy}
+                isLoading={evoLoading}
+                contractAddress={contractAdhesion}
+              />
+            </TabPanel>
+          </TabPanels>
+        </Tabs>
+      </Box>
 
       <Divider borderColor="rgba(255,255,255,0.2)" />
 
@@ -356,6 +392,8 @@ interface EvolutionTabProps {
   nftData: NFTData;
   contractAdhesion: string;
   onEvolutionSuccess: () => void;
+  /** Famille de l'insecte actuel — extraite du tokenURI on-chain */
+  currentFamily?: string | null;
 }
 
 const EvolutionTab = ({
@@ -363,6 +401,7 @@ const EvolutionTab = ({
   nftData,
   contractAdhesion,
   onEvolutionSuccess,
+  currentFamily,
 }: EvolutionTabProps) => {
   const hatch = useHatchEgg(contractAdhesion, tokenId);
   const updateCurrentMetadata = useCallback((_metadata: any) => {}, []);
@@ -370,6 +409,7 @@ const EvolutionTab = ({
   const evolutionResult = useTokenEvolution({
     contractAddress: contractAdhesion,
     tokenId,
+    currentFamily: currentFamily ?? undefined,
     currentImage: nftData?.image,
     currentName: nftData?.name || '',
     currentBio: nftData?.bio || '',
@@ -378,12 +418,13 @@ const EvolutionTab = ({
   }) as any;
 
   const rawMembershipInfo: MembershipInfo | null = evolutionResult.membershipInfo || null;
-  const evolvePriceEth = evolutionResult.evolvePriceEth || '0';
-  const isManualEvolveReady = evolutionResult.isManualEvolveReady || false;
-  const isUploadingEvolve = evolutionResult.isUploadingEvolve || false;
-  const isEvolving = evolutionResult.isEvolving || false;
-  const prepareEvolution = evolutionResult.prepareEvolution || (() => {});
-  const evolve = evolutionResult.evolve || (() => {});
+  const evolvePriceEth   = evolutionResult.evolvePriceEth   || '0';
+  const isEvolving       = evolutionResult.isEvolving       || false;
+  const evolve           = evolutionResult.evolve           || (() => {});
+  // isEvolutionReady : calculé dans le hook avec startTimestamp + levelDuration réels
+  // → jamais "true" par défaut (pas de startTimestamp=0 fantôme)
+  const isEvolutionReady: boolean = evolutionResult.isEvolutionReady ?? false;
+  const levelDuration: number     = evolutionResult.levelDuration    ?? 0;
 
   const membershipInfo: MembershipInfo = rawMembershipInfo || {
     level: Number(nftData?.level || 0),
@@ -396,69 +437,22 @@ const EvolutionTab = ({
     isAnnual: false,
   };
 
-  const [canEvolve, setCanEvolve] = useState(false);
-  const prevLevelRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (!membershipInfo || prevLevelRef.current === membershipInfo.level) return;
-    prevLevelRef.current = membershipInfo.level;
-
-    const computeCanEvolve = async () => {
-      try {
-        const cacheKey = `levelDurations_${contractAdhesion}`;
-        let levelDurations: number[];
-
-        const cached = sessionStorage.getItem(cacheKey);
-        if (cached) {
-          levelDurations = JSON.parse(cached);
-        } else {
-          const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!);
-          const contract = new EthersContract(contractAdhesion, ABI, provider);
-          const durationsRaw = await Promise.all([
-            contract.levelDurations(0),
-            contract.levelDurations(1),
-            contract.levelDurations(2),
-          ]);
-          levelDurations = durationsRaw.map((d) => Number(d));
-          sessionStorage.setItem(cacheKey, JSON.stringify(levelDurations));
-        }
-
-        const now = Math.floor(Date.now() / 1000);
-
-        setCanEvolve(
-          !membershipInfo.isEgg &&
-            membershipInfo.level < 3 &&
-            !membershipInfo.locked &&
-            now >= membershipInfo.startTimestamp + levelDurations[membershipInfo.level]
-        );
-      } catch (e) {
-        console.error('computeCanEvolve error:', e);
-        setCanEvolve(false);
-      }
-    };
-
-    computeCanEvolve();
-  }, [membershipInfo.level, membershipInfo.startTimestamp, membershipInfo.isEgg, membershipInfo.locked, contractAdhesion]);
+  // Calcul du délai restant avant évolution (affiché quand pas encore prêt)
+  const readyAt = membershipInfo.startTimestamp > 0 && levelDuration > 0
+    ? membershipInfo.startTimestamp + levelDuration
+    : null;
+  const secondsLeft = readyAt ? Math.max(0, readyAt - Math.floor(Date.now() / 1000)) : null;
+  const daysLeft    = secondsLeft !== null ? Math.ceil(secondsLeft / 86400) : null;
 
   const handleSingleEvolve = async () => {
-    if (!canEvolve) {
-      alert('Insecte pas encore éligible.');
-      return;
-    }
-
     try {
-      const result = await prepareEvolution();
-
-      if (!result?.isReady || !result.metadataUri) {
-        throw new Error('Upload IPFS échoué: ' + JSON.stringify(result));
-      }
-
-      await new Promise((r) => setTimeout(r, 500));
+      // evolve() lance déjà une erreur lisible si le délai n'est pas écoulé.
+      // Pas besoin de guard supplémentaire ici.
       await evolve();
       onEvolutionSuccess();
     } catch (e: any) {
       console.error('Evolve error:', e);
-      alert(e.message);
+      alert(e.message ?? 'Erreur lors de l\'évolution');
     }
   };
 
@@ -552,18 +546,24 @@ const EvolutionTab = ({
                     ? hatch.isReady
                       ? 'yellow.500'
                       : 'orange.400'
-                    : canEvolve
+                    : isEvolutionReady
                     ? 'green.600'
-                    : 'orange.600'
+                    : rawMembershipInfo
+                    ? 'orange.600'
+                    : 'gray.400'
                 }
               >
                 {membershipInfo?.isEgg
                   ? hatch.isReady
                     ? '🥚 Prêt à éclore'
                     : '⏳ Attente éclosion'
-                  : canEvolve
+                  : !rawMembershipInfo
+                  ? '⏳ Chargement…'
+                  : isEvolutionReady
                   ? '✅ PRÊT'
-                  : "Préparez l'évolution"}
+                  : daysLeft !== null && daysLeft > 0
+                  ? `⏳ Dans ${daysLeft} jour${daysLeft > 1 ? 's' : ''}`
+                  : '⏳ Bientôt disponible'}
               </Text>
             </VStack>
           </CardBody>
@@ -597,6 +597,23 @@ const EvolutionTab = ({
             <HatchEggPanel tokenId={tokenId} hatch={hatch} />
           ) : membershipInfo?.level < 3 ? (
             <VStack spacing={{ base: 4, md: 6 }} w="full" align="center">
+              {/* Aperçu du prochain insecte (pré-chargé si InsectStorage configuré) */}
+              {evolutionResult.previewImageUrl && (
+                <Box textAlign="center">
+                  <Image
+                    src={evolutionResult.previewImageUrl}
+                    alt="Prochain insecte"
+                    maxH="140px"
+                    mx="auto"
+                    borderRadius="md"
+                    boxShadow="md"
+                  />
+                  <Text mt={1} fontSize="xs" color="gray.500">
+                    Prochain insecte (niveau {(membershipInfo?.level ?? 0) + 1})
+                  </Text>
+                </Box>
+              )}
+
               <Button
                 size={{ base: 'lg', md: 'lg' }}
                 w="full"
@@ -607,11 +624,11 @@ const EvolutionTab = ({
                 fontWeight="extrabold"
                 borderRadius="lg"
                 onClick={handleSingleEvolve}
-                isDisabled={!canEvolve || isUploadingEvolve || isEvolving}
-                isLoading={isUploadingEvolve || isEvolving}
-                loadingText={isUploadingEvolve ? 'Génération...' : 'Transaction...'}
+                isDisabled={!isEvolutionReady || isEvolving}
+                isLoading={isEvolving}
+                loadingText="Transaction..."
               >
-                {isManualEvolveReady ? "Valider l'évolution" : 'Générer et évoluer'}
+                🧬 Évoluer
               </Button>
             </VStack>
           ) : null}
@@ -730,6 +747,7 @@ const TokenPage = () => {
   const [isForSale, setIsForSale] = useState(false);
   const [renewPriceEth, setRenewPriceEth] = useState<string | null>(null);
   const [isBurning, setIsBurning] = useState(false);
+  const [metaWarning, setMetaWarning] = useState<string | null>(null);
 
   const [membershipInfo, setMembershipInfo] = useState<MembershipInfo>({
     level: 0,
@@ -741,6 +759,13 @@ const TokenPage = () => {
     locked: false,
     isAnnual: false,
   });
+
+  /** Famille de l'insecte courant (extraite du tokenURI on-chain) */
+  const [insectFamily, setInsectFamily] = useState<string | null>(null);
+  /** Adresse wallet de l'artiste qui a créé ce design (attribut "Artiste" du tokenURI) */
+  const [insectArtistAddress, setInsectArtistAddress] = useState<string | null>(null);
+  /** Clé incrémentée pour forcer le rechargement de l'historique après évolution */
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
   // ─── Cache localStorage pour les métadonnées (24h, invalidé post-évolution) ──
 
@@ -811,17 +836,30 @@ const TokenPage = () => {
         forSale: state.forSale,
         membership: state.membership,
         membershipInfo: state.membershipInfo as MembershipInfo,
-        image: meta.image,
+        image: meta.image || '',
         uri: meta.tokenURI,
         tokenURI: meta.tokenURI,
       };
+      // Famille et artiste de l'insecte — présents dans le tokenURI on-chain après setup InsectStorage
+      setInsectFamily(meta.insectFamily ?? null);
+      setInsectArtistAddress(meta.insectArtistAddress ?? null);
+
+      // Si l'InsectStorage n'est pas encore configuré, on affiche un bandeau admin
+      if (meta.warning) {
+        console.warn('[TokenPage] metadata warning:', meta.warning);
+        setMetaWarning(meta.warning);
+      } else {
+        setMetaWarning(null);
+      }
 
       setNftData(nft);
       setIsForSale(state.forSale);
       if (state.membershipInfo) setMembershipInfo(state.membershipInfo as MembershipInfo);
       setRenewPriceEth(state.mintPrice ?? null);
-    } catch {
-      setError('Erreur lors de la récupération des données.');
+    } catch (err) {
+      console.error('[TokenPage] loadTokenData error:', err);
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Erreur lors de la récupération des données : ${msg}`);
     } finally {
       setIsLoading(false);
     }
@@ -941,11 +979,29 @@ const TokenPage = () => {
   };
 
   const handleEvolutionSuccess = useCallback(async () => {
-    // L'image change après évolution → invalider le cache localStorage métadonnées
+    // L'image change après évolution → invalider tous les caches concernés
     evictMetaFromLS();
     sessionStorage.removeItem(`levelDurations_${contractAdhesion}`);
+    // InsectSelector cache
+    Object.keys(sessionStorage)
+      .filter(k => k.startsWith("insect_data_"))
+      .forEach(k => sessionStorage.removeItem(k));
+    // Notifier les autres composants (InsectSelector, etc.)
+    try { window.dispatchEvent(new CustomEvent("RESCOE_DATA_CHANGED")); } catch {}
+    // Forcer rechargement de l'historique on-chain
+    setHistoryRefreshKey(k => k + 1);
     await loadTokenData(true);
   }, [loadTokenData]);
+
+  // ─── Historique on-chain + généalogie ────────────────────────────────────
+  // DOIT être appelé AVANT tout return conditionnel (règle des hooks React).
+  // Le hook appelle tokenURI() directement sur la chaîne pour le step courant
+  // → contourne le cache 24h de l'API adhesion-metadata.
+  const { pastSteps, currentStep, genealogy, isLoading: evoLoading } = useEvolutionHistory(
+    contractAdhesion,
+    tokenId as string | number | undefined,
+    historyRefreshKey
+  );
 
   if (isLoading) {
     return (
@@ -957,11 +1013,24 @@ const TokenPage = () => {
 
   if (error) {
     return (
-      <Box textAlign="center" mt={10}>
-        <Spinner size="lg" color="orange.400" />
-        <Text mt={4} fontSize="lg" color="gray.500">
-          Chargement des données...
-        </Text>
+      <Box textAlign="center" mt={10} maxW="620px" mx="auto" p={6}>
+        <Alert status="error" borderRadius="lg" mb={5} textAlign="left">
+          <AlertIcon />
+          <Text fontSize="sm" fontFamily="mono" whiteSpace="pre-wrap" wordBreak="break-word">
+            {error}
+          </Text>
+        </Alert>
+        <Button
+          colorScheme="brand"
+          size="md"
+          onClick={() => loadTokenData(true)}
+          borderRadius="xl"
+          bgGradient="linear(to-r, brand.gold, brand.cream)"
+          color="brand.navy"
+          _hover={brandHover}
+        >
+          ↺ Réessayer
+        </Button>
       </Box>
     );
   }
@@ -996,6 +1065,16 @@ const TokenPage = () => {
 
   return (
     <Box textAlign="center" mt={10} p={{ base: 6, md: 8 }} maxW="100vw" mx="auto">
+      {/* Bandeau admin : InsectStorage pas encore configuré */}
+      {metaWarning && (
+        <Alert status="warning" mb={6} borderRadius="lg" fontSize="sm">
+          <AlertIcon />
+          <Text>
+            <strong>Image non disponible</strong> — {metaWarning}
+          </Text>
+        </Alert>
+      )}
+
       <Box position="relative" mb={8} zIndex={1}>
         <Heading
           as="h1"
@@ -1109,6 +1188,13 @@ const TokenPage = () => {
               isForSale={isForSale}
               renewPriceEth={renewPriceEth}
               onRenew={handleRenewMembership}
+              insectArtistAddress={insectArtistAddress}
+              tokenId={tokenId as number | string}
+              pastSteps={pastSteps}
+              currentStep={currentStep}
+              genealogy={genealogy}
+              evoLoading={evoLoading}
+              contractAdhesion={contractAdhesion}
             />
           </TabPanel>
 
@@ -1135,6 +1221,7 @@ const TokenPage = () => {
                   nftData={nftData}
                   contractAdhesion={contractAdhesion}
                   onEvolutionSuccess={handleEvolutionSuccess}
+                  currentFamily={insectFamily}
                 />
               )}
             </TabPanel>

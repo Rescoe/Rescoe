@@ -65,6 +65,21 @@
     "category": "🏗 Galerie physique"
   },
   {
+    "question": "Comment fonctionne l'historique d'évolution de mon insecte ?",
+    "answer": "Chaque évolution est enregistrée de façon permanente sur la blockchain.\n\nLorsque votre insecte passe du niveau 0 au niveau 1 (et ainsi de suite), le contrat AdhesionRescoe conserve :\n- le hash de l'insecte précédent\n- l'horodatage exact de l'évolution\n- le niveau de départ\n\nL'image et les données complètes de chaque état sont stockées dans InsectImageStorageV3 et récupérables à tout moment via le hash.\n\nCes données n'apparaissent pas directement dans le tokenURI (qui ne montre que l'état actuel) car y embarquer toutes les images passeés alourdirait considérablement le badge. Mais elles restent accessibles depuis la frise chronologique de votre page de badge.",
+    "category": "🐞 L'adhésion et les insectes"
+  },
+  {
+    "question": "Comment fonctionne la généalogie d'un insecte issu d'un œuf ?",
+    "answer": "Lorsque deux insectes se reproduisent, un œuf est créé. Cet œuf conserve les références de ses deux parents directement sur la blockchain :\n- reproductionParents(eggId, 0) → tokenId du parent A\n- reproductionParents(eggId, 1) → tokenId du parent B\n\nQuand l'œuf éclot, le lien hatchedFromEgg(tokenId) → eggId est enregistré de façon immuable.\n\nCela crée une chaîne généalogique entièrement traçable sur la blockchain, visible depuis l'arbre généalogique de chaque badge. Même dans 10 ans, l'origine d'un insecte restera vérifiable.",
+    "category": "🥚 Reproduction des insectes"
+  },
+  {
+    "question": "Pourquoi ces données historiques n'apparaissent pas dans l'URI du token (OpenSea, etc.) ?",
+    "answer": "Le tokenURI d'un NFT contient uniquement l'état actuel du badge (image, famille, niveau, attributs). Intégrer toutes les images et métadonnées des niveaux précédents multiplierait la taille du token par 4, ce qui dépasserait les limites techniques et rendrait chaque lecture très coûteuse en gas.\n\nL'approche choisie : les données historiques sont stockées séparément sur la blockchain (dans AdhesionRescoe et InsectImageStorageV3) et affichées dans l'application RESCOE via la frise chronologique et l'arbre généalogique.\n\nTout est on-chain, rien n'est perdu — simplement organisé en deux couches : l'état courant dans le tokenURI, l'historique dans les mappings du contrat.",
+    "category": "🐞 L'adhésion et les insectes"
+  },
+  {
     "question": "RESCOE est-il un projet spéculatif ?",
     "answer": "Non.\n\nRESCOE est une association artistique expérimentale.\n\nL’adhésion sert à soutenir :\n- un réseau créatif\n- une recherche autour de l’art génératif\n- une hybridation entre monde physique et numérique\n\nLes mécanismes (insectes, reproduction, évolution) sont des outils artistiques et structurels, pas des instruments financiers.",
     "category": "🧭 Vision générale"

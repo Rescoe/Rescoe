@@ -46,10 +46,10 @@ export default function Residents() {
                 >
                   <CardBody p={6}>
                     <Flex align="center" mb={4}>
-                      <Avatar size="lg" src={resident.avatar} name={resident.name} bg="purple.500" />
+                      <Avatar size="lg" src={resident.avatar} name={resident.name} bg="brand.mauve" />
                       <Box ml={3} flex={1}>
                         <Heading size="md" mb={1}>{resident.name}</Heading>
-                        <Badge colorScheme="purple" variant="subtle">{resident.role}</Badge>
+                        <Badge bg="rgba(238,212,132,0.15)" color="brand.gold" variant="solid" borderRadius="full" fontSize="xs">{resident.role}</Badge>
                       </Box>
 
                       <Tooltip label="Copier adresse">

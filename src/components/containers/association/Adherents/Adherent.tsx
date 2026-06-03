@@ -310,7 +310,7 @@ const Adherent: React.FC = () => {
         index={activeTab}
         onChange={setActiveTab}
         variant="enclosed"
-        colorScheme="purple"
+        colorScheme="yellow"
         isLazy
         lazyBehavior="unmount"
         id="adherent-tabs"
@@ -394,7 +394,7 @@ const Adherent: React.FC = () => {
                   </Heading>
                 </CardHeader>
                 <CardBody>
-                  <CheckboxGroup colorScheme="purple">
+                  <CheckboxGroup colorScheme="yellow">
                     <Text fontSize="lg" mb={4}>
                       Choisissez un ou plusieurs rôles :
                     </Text>
@@ -442,7 +442,8 @@ const Adherent: React.FC = () => {
                         {getFilteredMembers().map((address, idx) => (
                           <ListItem key={idx}>
                             <Tag
-                              colorScheme="purple"
+                              bg="rgba(238,212,132,0.15)"
+                              color="brand.gold"
                               variant="subtle"
                               rounded="full"
                               px={2}

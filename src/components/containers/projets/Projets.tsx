@@ -153,7 +153,7 @@ export default function Projets({
             </HStack>
 
             <HStack spacing={2} mb={3} flexWrap="wrap">
-              {msg.parsed.label && <Badge colorScheme="purple">{msg.parsed.label}</Badge>}
+              {msg.parsed.label && <Badge bg="brand.gold" color="brand.navy" borderRadius="full">{msg.parsed.label}</Badge>}
               {msg.parsed.type && <Badge colorScheme="blue">{msg.parsed.type}</Badge>}
               {msg.parsed.mode && <Badge colorScheme="green">{msg.parsed.mode}</Badge>}
               {msg.parsed.forSale && (

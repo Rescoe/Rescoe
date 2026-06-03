@@ -388,7 +388,7 @@ const UniqueArtGalerie: React.FC<UniqueArtGalerieProps> = ({ initialCollections 
       {/* Stats */}
       <Flex justify="space-between" mb={16} flexWrap="wrap" gap={4}>
         <Heading size="xl">Galerie</Heading>
-        <Badge colorScheme="purple" fontSize="lg" p={3}>
+        <Badge bg="brand.gold" color="brand.navy" fontSize="lg" p={3} borderRadius="lg">
           {filtered.length} collections trouvées
         </Badge>
       </Flex>
@@ -494,7 +494,7 @@ const UniqueArtGalerie: React.FC<UniqueArtGalerieProps> = ({ initialCollections 
 
           {isLoading ? (
             <Flex justify="center" py={20}>
-              <Spinner size="xl" thickness="4px" color="purple.500" />
+              <Spinner size="xl" thickness="4px" color="brand.gold" />
             </Flex>
           ) : nfts.length === 0 ? (
             <VStack py={20} spacing={6} color="gray.500">

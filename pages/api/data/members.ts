@@ -45,7 +45,7 @@ function extractCID(uri: string): string | null {
   return null;
 }
 
-/** URL fetchable côté serveur (gateway public) */
+/** URL fetchable côté serveur (gateway public) — retourne null pour les data: URIs */
 function serverIPFS(uri: string): string | null {
   const cid = extractCID(uri);
   if (cid) return `https://ipfs.io/ipfs/${cid}`;
@@ -60,6 +60,50 @@ function browserIPFS(uri: string): string {
   if (cid) return `/api/ipfs/${cid}`;
   if (uri.startsWith("http")) return uri;
   return uri;
+}
+
+/**
+ * Parse un tokenURI (on-chain data: ou IPFS) et retourne nom, image, famille, niveau.
+ * Pour les tokens on-chain, l'image est une URL vers /api/token/insect-image
+ * (petite chaîne, cacheable) plutôt que le data URI complet (~150 KB).
+ */
+async function parseTokenMeta(
+  tokenId: bigint,
+  tokenURI: string
+): Promise<{ name: string; image: string; family: string; level: string } | null> {
+  try {
+    // ── On-chain : data:application/json;base64,... ───────────────────────────
+    if (tokenURI.startsWith("data:application/json;base64,")) {
+      const b64  = tokenURI.slice("data:application/json;base64,".length);
+      const meta = JSON.parse(Buffer.from(b64, "base64").toString("utf8"));
+      const attrs = meta?.attributes as Array<{ trait_type: string; value: unknown }> | undefined;
+      const find  = (name: string) => attrs?.find((a) => a.trait_type === name)?.value;
+      return {
+        name:   String(meta?.name   ?? `Insecte #${tokenId}`),
+        // URL légère vers le proxy image — évite de stocker ~150 KB dans le cache API
+        image:  `/api/token/insect-image?tokenId=${tokenId}`,
+        family: String(find("Famille") ?? find("Family") ?? meta?.family ?? "Inconnue"),
+        level:  String(find("Niveau")  ?? meta?.level  ?? "?"),
+      };
+    }
+
+    // ── Legacy IPFS ───────────────────────────────────────────────────────────
+    const ipfsUrl = serverIPFS(tokenURI);
+    if (!ipfsUrl) return null;
+    const res = await fetch(ipfsUrl, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    const meta = await res.json();
+    const attrs = meta?.attributes as Array<{ trait_type: string; value: unknown }> | undefined;
+    const find  = (name: string) => attrs?.find((a) => a.trait_type === name)?.value;
+    return {
+      name:   String(meta?.name   ?? `Insecte #${tokenId}`),
+      image:  browserIPFS(String(meta?.image ?? "")),
+      family: String(find("Famille") ?? find("Family") ?? meta?.family ?? "Inconnue"),
+      level:  String(find("Niveau")  ?? find("Level")  ?? meta?.level  ?? "?"),
+    };
+  } catch {
+    return null;
+  }
 }
 
 // ─── Cache serveur module-level ──────────────────────────────────────────────
@@ -122,22 +166,9 @@ async function fetchUserData(
     const rawInsects = await Promise.allSettled(
       rawTokens.slice(0, 4).map(async (tokenId): Promise<InsectMeta | null> => {
         const tokenURI: string = await contract.tokenURI(tokenId);
-        const metaUrl = serverIPFS(tokenURI);
-        if (!metaUrl) return null;
-
-        const res = await fetch(metaUrl, {
-          signal: AbortSignal.timeout(8000),
-        });
-        if (!res.ok) return null;
-
-        const meta = await res.json();
-        return {
-          id: tokenId.toString(),
-          image: browserIPFS(meta.image || ""),
-          name: String(meta.name || ""),
-          family: String(meta.attributes?.[17]?.value || "Inconnue"),
-          level: String(meta.attributes?.[21]?.value ?? "Inconnue"),
-        };
+        const parsed = await parseTokenMeta(tokenId, tokenURI);
+        if (!parsed) return null;
+        return { id: tokenId.toString(), ...parsed };
       })
     );
 

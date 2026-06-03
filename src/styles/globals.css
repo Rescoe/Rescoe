@@ -1,34 +1,36 @@
-/* Définition des variables CSS pour le mode clair */
+/* Variables CSS — palette RESCOE (navy, gold, cream) */
 :root {
-    --background-color: #ffffff; /* Couleur de fond clair */
-    --text-color: #000000; /* Couleur du texte clair */
-    --neon-color: rgba(0, 198, 255, 0.8); /* Couleur néon clair */
-    --button-background: linear-gradient(45deg, #00c6ff, #0072ff); /* Dégradé de boutons clair */
-    --button-hover-background: linear-gradient(45deg, #0072ff, #00ff99); /* Dégradé de boutons au survol clair */
-    --scroll-line-background: linear-gradient(to right, #00c6ff, #0072ff, #00ff99); /* Couleur de ligne de défilement clair */
+    --brand-navy: #011C39;
+    --brand-gold: #FFEDA6;
+    --brand-cream: #FFFBE8;
+    --brand-blue: #00416A;
+    --background-color: var(--brand-cream);
+    --text-color: var(--brand-navy);
+    --accent-color: var(--brand-gold);
+    --button-background: linear-gradient(45deg, var(--brand-navy), var(--brand-blue));
+    --button-hover-background: linear-gradient(45deg, var(--brand-gold), var(--brand-cream));
+    --scroll-line-background: linear-gradient(to right, var(--brand-navy), var(--brand-blue), var(--brand-gold));
 }
 
-/* Définition des variables CSS pour le mode sombre */
 [data-theme="dark"] {
-    --background-color: #000000; /* Couleur de fond sombre */
-    --text-color: #ffffff; /* Couleur du texte sombre */
-    --neon-color: rgba(255, 255, 255, 0.8); /* Couleur néon sombre */
-    --button-background: linear-gradient(45deg, #00c6ff, #00ff99); /* Dégradé de boutons sombre */
-    --button-hover-background: linear-gradient(45deg, #0072ff, #00c6ff); /* Dégradé de boutons au survol sombre */
-    --scroll-line-background: linear-gradient(to right, #00c6ff, #00ff99, #0072ff); /* Couleur de ligne de défilement sombre */
+    --background-color: var(--brand-navy);
+    --text-color: var(--brand-cream);
+    --button-background: linear-gradient(45deg, var(--brand-navy), var(--brand-blue));
+    --button-hover-background: linear-gradient(45deg, var(--brand-gold), var(--brand-cream));
+    --scroll-line-background: linear-gradient(to right, var(--brand-gold), var(--brand-cream), var(--brand-gold));
 }
 
 /* Appliquer les couleurs de fond et de texte */
 body {
     background-color: var(--background-color);
     color: var(--text-color);
-    transition: background-color 0.3s, color 0.3s; /* Animation de transition */
+    transition: background-color 0.3s, color 0.3s;
 }
 
 /* Ligne de défilement */
 .scroll-line {
     width: 100%;
-    height: 4px;
+    height: 3px;
     background: var(--scroll-line-background);
     animation: scroll-line-animation 5s linear infinite;
 }
@@ -43,77 +45,68 @@ body {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: #aaa;
+    background: rgba(255, 255, 255, 0.3);
     transition: background 0.3s, transform 0.3s;
 }
 
 .scroll-indicator.active {
-    background: var(--neon-color);
+    background: var(--brand-gold);
     transform: scale(1.2);
 }
 
-/* Titres et textes avec effet néon */
-.neon-heading, .neon-text {
+/* Titres avec effet subtil — cohérent avec la palette RESCOE */
+.neon-heading,
+.neon-text {
     color: var(--text-color);
     font-weight: bold;
-    text-shadow: 0 0 8px rgba(0, 0, 0, 0.8), 0 0 12px rgba(255, 255, 255, 0.5);
-    transition: color 0.3s ease, text-shadow 0.3s ease;
+    transition: color 0.3s ease;
 }
 
-.neon-heading:hover, .neon-text:hover {
-    color: #fde9e0;
-    text-shadow: 0 0 10px rgba(0, 255, 153, 0.8), 0 0 20px rgba(0, 255, 153, 0.5);
+.neon-heading:hover,
+.neon-text:hover {
+    color: var(--brand-gold);
 }
 
-/* Styles spécifiques aux sections */
+/* Cartes / sections */
 .grid-item {
     position: relative;
     padding: 20px;
-    background: rgba(255, 255, 255, 0.8); /* Arrière-plan clair pour le contraste */
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(1, 28, 57, 0.15);
     transition: transform 0.3s, box-shadow 0.3s;
 }
 
 [data-theme="dark"] .grid-item {
-    background: rgba(20, 20, 20, 0.8); /* Arrière-plan sombre pour le contraste */
+    background: rgba(1, 28, 57, 0.8);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .grid-item:hover {
-    transform: translateY(-5px) scale(1.05);
-    box-shadow: 0 8px 20px rgba(0, 198, 255, 0.3), 0 4px 10px rgba(0, 255, 153, 0.2);
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 8px 24px rgba(238, 212, 132, 0.2);
 }
 
-/* Styles pour les boutons */
+/* Boutons utilitaires (hors Chakra UI) */
 .button {
     display: inline-block;
     padding: 10px 20px;
     font-size: 1rem;
-    color: var(--text-color);
+    color: var(--brand-navy);
     background: var(--button-background);
     border: none;
     border-radius: 50px;
     cursor: pointer;
     transition: background 0.3s, transform 0.3s;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .button:hover {
     background: var(--button-hover-background);
-    transform: scale(1.05);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.6);
-}
-
-/* Effets d'animation pour la modernité et la fluidité */
-@keyframes button-pulse {
-    0%, 100% {
-        box-shadow: 0 0 10px rgba(0, 198, 255, 0.8), 0 0 20px rgba(0, 198, 255, 0.5);
-    }
-    50% {
-        box-shadow: 0 0 5px rgba(0, 198, 255, 0.5), 0 0 10px rgba(0, 198, 255, 0.3);
-    }
+    transform: scale(1.04);
+    box-shadow: 0 8px 20px rgba(238, 212, 132, 0.35);
 }
 
 .button:active {
-    animation: button-pulse 1s ease-in-out infinite;
+    transform: scale(0.98);
 }

@@ -1,31 +1,12 @@
-// hooks/useTokenEvolution.ts
+// hooks/useTokenEvolution.ts — full on-chain, no IPFS
 import { useState, useEffect, useCallback } from "react";
+import { JsonRpcProvider, Contract as EthersContract } from "ethers";
 import Web3 from "web3";
-import evolutionEngine from "../utils/evolutionEngine";
-import { usePinataUpload } from "./usePinataUpload";
 import ABI from "../components/ABI/ABIAdhesion.json";
 import { useAuth } from "@/utils/authContext";
-import { useRouter } from 'next/router';
-import {
-  buildEvolutionHistory,
-  EvolutionStep
-} from '@/utils/evolutionHistory';
-import { resolveIPFS } from "@/utils/resolveIPFS";
-import colorProfilesJson from '@/data/gif_profiles_smart_colors.json';
+import { useRouter } from "next/router";
 
-
-
-interface MembershipRaw {
-  level: string | number;
-  autoEvolve: boolean;
-  startTimestamp: string | number;
-  expirationTimestamp: string | number;
-  totalYears: string | number;
-  locked: boolean;
-  isEgg: boolean;
-  isAnnual: boolean;
-}
-
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface MembershipInfo {
   level: number;
@@ -38,479 +19,338 @@ export interface MembershipInfo {
   isAnnual: boolean;
 }
 
+interface PendingInsect {
+  insectKey: string;
+  displayName: string;
+  family: string;
+  imageUrl: string;
+}
 
-
+// ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export const useTokenEvolution = ({
   contractAddress,
   tokenId,
-  walletAddress,
-  currentName,
-  currentBio,
-  currentRoleLabel,
+  currentFamily,
   onMetadataLoaded,
-}: any) => {
-  /* =======================
-     STATE
-  ======================= */
+}: {
+  contractAddress: string;
+  tokenId: number | string | undefined;
+  walletAddress?: string;   // ignoré — on utilise useAuth() en interne
+  currentImage?: string;    // legacy compat
+  currentName?: string;     // legacy compat
+  currentBio?: string;      // legacy compat
+  currentRoleLabel?: string; // legacy compat
+  currentFamily?: string;   // famille actuelle pour sélectionner l'insecte suivant
+  onMetadataLoaded?: (meta: any) => void;
+}) => {
+  const [membershipInfo, setMembershipInfo]   = useState<MembershipInfo | null>(null);
+  const [evolvePriceEth, setEvolvePriceEth]   = useState(0);
+  const [levelDuration, setLevelDuration]     = useState(0); // durée minimale au niveau courant (secondes)
+  const [isEvolving, setIsEvolving]           = useState(false);
+  const [pendingInsect, setPendingInsect]     = useState<PendingInsect | null>(null);
 
-  const [membershipInfo, setMembershipInfo] = useState<MembershipInfo | null>(null);
-  const [evolvePriceEth, setEvolvePriceEth] = useState(0);
-
-  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
-  const [isManualEvolveReady, setIsManualEvolveReady] = useState(false);
-  const [isUploadingEvolve, setIsUploadingEvolve] = useState(false);
-  const [isEvolving, setIsEvolving] = useState(false);
-
-  // 🔥 AJOUT : Stocker les URIs séparément
-  const [evolveImageUri, setEvolveImageUri] = useState<string | null>(null);
-  const [evolveMetadataUri, setEvolveMetadataUri] = useState<string | null>(null);
-
-  const { uploadToIPFS, isUploading } = usePinataUpload();
   const { address: account, web3, isAuthenticated } = useAuth();
   const router = useRouter();
 
-  const [hatchPriceEth, setHatchPriceEth] = useState(0);
-
-
-  /* =======================
-     FETCH ON-CHAIN MEMBERSHIP + PRIX EXACT
-  ======================= */
+  // ── 1. Lire membershipInfo + prix d'évolution (ethers.js + Moralis RPC) ───
   useEffect(() => {
     if (!contractAddress || tokenId === undefined) return;
 
-    const fetchMembership = async () => {
+    const fetchInfo = async () => {
       try {
-        const web3Instance = new Web3((window as any).ethereum);
-        const contract = new web3Instance.eth.Contract(ABI as any, contractAddress);
+        const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!);
+        const contract = new EthersContract(contractAddress, ABI, provider);
 
-        // Info membre
-        let infoRaw: MembershipRaw = { level: '0', autoEvolve: false, startTimestamp: '0',
-          expirationTimestamp: '0', totalYears: '0', locked: false, isEgg: false, isAnnual: false };
-
-        try {
-          infoRaw = await contract.methods.getMembershipInfo(tokenId).call();
-        } catch (membershipErr) {
-          console.warn('⚠️ getMembershipInfo échoué → fallback lvl 0:', membershipErr);
-        }
+        // FIX: était contract.methods.getMembershipInfo(tokenId).call() via Web3
+        //      → remplacé par le getter public membershipInfo(uint256) via ethers.js
+        const raw = await contract.membershipInfo(Number(tokenId));
 
         const info: MembershipInfo = {
-          level: Number(infoRaw.level),
-          autoEvolve: Boolean(infoRaw.autoEvolve),
-          startTimestamp: Number(infoRaw.startTimestamp),
-          expirationTimestamp: Number(infoRaw.expirationTimestamp),
-          totalYears: Number(infoRaw.totalYears),
-          locked: Boolean(infoRaw.locked),
-          isEgg: Boolean(infoRaw.isEgg),
-          isAnnual: Boolean(infoRaw.isAnnual),
+          level:               Number(raw.level),
+          autoEvolve:          Boolean(raw.autoEvolve),
+          startTimestamp:      Number(raw.startTimestamp),
+          expirationTimestamp: Number(raw.expirationTimestamp),
+          totalYears:          Number(raw.totalYears),
+          locked:              Boolean(raw.locked),
+          isEgg:               Boolean(raw.isEgg),
+          isAnnual:            Boolean(raw.isAnnual),
         };
-
         setMembershipInfo(info);
-        //console.log('🧬 TOKEN INFO OK:', info);
 
-        // ✅ PRIX EXACT = LOGIQUE CONTRAT
-        let priceEth = 0;
+        // Prix d'évolution + durée minimale — uniquement pour les tokens non-œuf en dessous du niveau max
         if (!info.isEgg && info.level < 3) {
           try {
-            const basePriceWei = await contract.methods.baseEvolvePrice(info.level).call();
-            const basePrice = Number(basePriceWei);
-
-            let finalPriceWei = basePrice;
+            const [basePriceWei, dur] = await Promise.all([
+              contract.baseEvolvePrice(info.level),
+              contract.levelDurations(info.level),
+            ]);
+            let finalPrice = Number(basePriceWei);
+            // Réduction pour les membres fidèles sans auto-évolution
             if (!info.autoEvolve && info.totalYears >= 1) {
-              finalPriceWei = Math.floor(basePrice / 10);
+              finalPrice = Math.floor(finalPrice / 10);
             }
-
-            priceEth = finalPriceWei / 1e18;
-            setEvolvePriceEth(priceEth);
-
-            //console.log(`💰 Prix lvl${info.level}: ${priceEth.toFixed(6)} ETH (base:${(basePrice/1e18).toFixed(6)}, /10:${!info.autoEvolve && info.totalYears >= 1})`);
-          } catch (priceErr) {
-            console.error('❌ Prix fail:', priceErr);
+            setEvolvePriceEth(finalPrice / 1e18);
+            setLevelDuration(Number(dur));
+          } catch (e) {
+            console.warn("[useTokenEvolution] baseEvolvePrice/levelDurations failed:", e);
             setEvolvePriceEth(0);
           }
-        } else {
-          setHatchPriceEth(0);
         }
       } catch (e) {
-        console.error("❌ fetchMembership TOTAL error:", e);
-        setMembershipInfo({ level: 0, autoEvolve: false, startTimestamp: 0, expirationTimestamp: 0,
-          totalYears: 0, locked: false, isEgg: false, isAnnual: false });
+        console.error("[useTokenEvolution] fetchInfo error:", e);
+        setMembershipInfo({
+          level: 0, autoEvolve: false, startTimestamp: 0,
+          expirationTimestamp: 0, totalYears: 0,
+          locked: false, isEgg: false, isAnnual: false,
+        });
       }
     };
 
-    fetchMembership();
+    fetchInfo();
   }, [contractAddress, tokenId]);
 
+  // ── 2. Pré-charger l'insecte suivant (preview + params tx) ────────────────
+  //    Requiert : membershipInfo (niveau courant) + account
+  useEffect(() => {
+    if (!membershipInfo || !account) return;
+    if (membershipInfo.isEgg || membershipInfo.level >= 3) return; // pas d'évolution possible
 
-  /* =======================
-     METADATA SYNC (UI ONLY)
-  ======================= */
+    const fetchPendingInsect = async () => {
+      try {
+        const url =
+          `/api/token/next-evolution` +
+          `?currentLevel=${membershipInfo.level}` +
+          `&wallet=${account}` +
+          `&tokenId=${tokenId ?? ""}` +
+          `&reroll=0`;
+
+        const r = await fetch(url);
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
+          throw new Error(err.error ?? `HTTP ${r.status}`);
+        }
+        const d = await r.json();
+        setPendingInsect({
+          insectKey:   String(d.insectKey),
+          displayName: String(d.displayName),
+          family:      String(d.family),
+          imageUrl:    String(d.imageUrl),
+        });
+      } catch (e: any) {
+        // Non-bloquant — on peut évoluer sans preview (fetch au moment du clic)
+        console.warn("[useTokenEvolution] fetch pending insect failed:", e.message);
+      }
+    };
+
+    fetchPendingInsect();
+  }, [membershipInfo?.level, membershipInfo?.isEgg, account, tokenId]);
+
+  // ── 3. Évoluer on-chain ───────────────────────────────────────────────────
+  const evolve = useCallback(async () => {
+    if (!contractAddress || tokenId === undefined) return;
+    if (!isAuthenticated || !account || !web3) {
+      alert("Connexion requise");
+      return;
+    }
+    if (!membershipInfo) return;
+
+    // ── Guard : vérification côté client avant d'appeler le contrat ──────────
+    if (levelDuration > 0) {
+      const now = Math.floor(Date.now() / 1000);
+      const readyAt = membershipInfo.startTimestamp + levelDuration;
+      if (now < readyAt) {
+        const daysLeft = Math.ceil((readyAt - now) / 86400);
+        throw new Error(
+          `Durée minimum non écoulée. Encore ${daysLeft} jour${daysLeft > 1 ? "s" : ""} avant l'évolution.`
+        );
+      }
+    }
+
+    setIsEvolving(true);
+
+    try {
+      // Récupérer le prochain insecte si le pré-chargement a échoué
+      let insect = pendingInsect;
+      if (!insect) {
+        const url =
+          `/api/token/next-evolution` +
+          `?currentLevel=${membershipInfo.level}` +
+          `&wallet=${account}` +
+          `&tokenId=${tokenId ?? ""}` +
+          `&reroll=0`;
+
+        const r = await fetch(url);
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
+          throw new Error(err.error ?? "Impossible de sélectionner le prochain insecte");
+        }
+        const d = await r.json();
+        insect = {
+          insectKey:   String(d.insectKey),
+          displayName: String(d.displayName),
+          family:      String(d.family),
+          imageUrl:    String(d.imageUrl),
+        };
+        setPendingInsect(insect);
+      }
+
+      // ── Upload du GIF du NOUVEL insecte AVANT d'appeler evolve() ────────────
+      // Sans ça, tokenURI() retournerait une image vide après évolution
+      // (InsectImageStorage.generateTokenURI retourne "" si keyHash inconnu).
+      const uploadRes = await fetch("/api/token/upload-insect-relayer-v3", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ insectKey: insect.insectKey }),
+      });
+      if (!uploadRes.ok) {
+        const uploadErr = await uploadRes.json().catch(() => ({}));
+        throw new Error(
+          uploadErr.error ?? `Erreur upload image insecte évolué (HTTP ${uploadRes.status})`
+        );
+      }
+
+      const gasPrice = await web3.eth.getGasPrice();
+      const contract = new web3.eth.Contract(ABI as any, contractAddress);
+
+      // FIX: 4 paramètres requis — tokenId + insectKey + displayName + family
+      const receipt = await contract.methods
+        .evolve(tokenId, insect.insectKey, insect.displayName, insect.family)
+        .send({
+          from: account,
+          value: web3.utils.toWei(evolvePriceEth.toString(), "ether"),
+          gasPrice: gasPrice.toString(),
+        });
+
+      // Évolution in-place : le tokenId ne change pas.
+      setPendingInsect(null);
+
+      // Purger le cache serveur (nouvelle image + nouveau niveau)
+      try {
+        await fetch("/api/token/invalidate-insect-cache", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address: account }),
+        });
+      } catch {}
+
+      // Notifier InsectSelector + Header : cache sessionStorage → re-fetch avec bust=1
+      try { window.dispatchEvent(new CustomEvent("RESCOE_DATA_CHANGED")); } catch {}
+
+      // La navigation/refresh est gérée par l'appelant via onEvolutionSuccess()
+      // → ne pas faire router.push ici (le tokenId est identique avant/après).
+    } catch (e: any) {
+      console.error("[useTokenEvolution] evolve error:", e);
+      throw e; // ré-émet pour que l'appelant puisse afficher le message
+    } finally {
+      setIsEvolving(false);
+    }
+  }, [
+    contractAddress, tokenId, membershipInfo, evolvePriceEth, levelDuration,
+    account, web3, isAuthenticated, pendingInsect,
+  ]);
+
+  // ── 4. Éclore un œuf on-chain (legacy — preferably use useHatchEgg) ───────
+  const hatchEgg = useCallback(async () => {
+    if (!contractAddress || tokenId === undefined) return;
+    if (!isAuthenticated || !account || !web3) {
+      alert("Connexion requise");
+      return;
+    }
+
+    setIsEvolving(true);
+
+    try {
+      // Pour l'œuf : niveau 0, déterministe par wallet
+      const r = await fetch(`/api/token/generate-onchain-uri?wallet=${account}&reroll=0`);
+      if (!r.ok) throw new Error("Impossible de sélectionner un insecte pour l'éclosion");
+      const d = await r.json();
+
+      // ── Upload du GIF de l'insecte éclos AVANT d'appeler hatchEgg() ─────────
+      // Même raison que pour evolve() : sans ça tokenURI retourne image vide.
+      const uploadRes = await fetch("/api/token/upload-insect-relayer-v3", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ insectKey: String(d.insectName) }),
+      });
+      if (!uploadRes.ok) {
+        const uploadErr = await uploadRes.json().catch(() => ({}));
+        throw new Error(
+          uploadErr.error ?? `Erreur upload image insecte éclos (HTTP ${uploadRes.status})`
+        );
+      }
+
+      const gasPrice = await web3.eth.getGasPrice();
+      const contract = new web3.eth.Contract(ABI as any, contractAddress);
+
+      // FIX: 4 paramètres requis — eggId + insectKey + displayName + family
+      const receipt = await contract.methods
+        .hatchEgg(tokenId, String(d.insectName), String(d.displayName), String(d.family))
+        .send({ from: account, value: "0", gasPrice: gasPrice.toString() });
+
+      // Purger le cache serveur + sessionStorage InsectSelector
+      try {
+        await fetch("/api/token/invalidate-insect-cache", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address: account }),
+        });
+      } catch {}
+      try {
+        Object.keys(sessionStorage)
+          .filter(k => k.startsWith("insect_data_"))
+          .forEach(k => sessionStorage.removeItem(k));
+      } catch {}
+      try { window.dispatchEvent(new CustomEvent("RESCOE_DATA_CHANGED")); } catch {}
+
+      let newTokenId: string = (Number(tokenId) + 1).toString();
+      if (receipt.events?.LevelEvolved?.returnValues?.tokenId) {
+        newTokenId = receipt.events.LevelEvolved.returnValues.tokenId.toString();
+      }
+
+      router.push(`/AdhesionId/${contractAddress}/${newTokenId}`);
+    } catch (e: any) {
+      console.error("[useTokenEvolution] hatchEgg error:", e);
+      throw e;
+    } finally {
+      setIsEvolving(false);
+    }
+  }, [contractAddress, tokenId, account, web3, isAuthenticated, router]);
 
   const updateCurrentMetadata = useCallback(
-    (metadata: any) => {
-      if (!metadata) return;
-      onMetadataLoaded?.(metadata);
-    },
+    (metadata: any) => { onMetadataLoaded?.(metadata); },
     [onMetadataLoaded]
   );
 
-  /* =======================
-     PREPARE EVOLUTION (CLEAN)
-  ======================= */
-  const prepareEvolution = useCallback(async (): Promise<{
-    imageUri: string | null;
-    metadataUri: string | null;
-    isReady: boolean;
-  }> => {
-    if (isUploadingEvolve || isManualEvolveReady) {
-      return {
-        imageUri: evolveImageUri,
-        metadataUri: evolveMetadataUri,
-        isReady: !!evolveMetadataUri
-      };
-    }
-
-    if (!membershipInfo || !contractAddress || tokenId === undefined) {
-      alert("Données indisponibles");
-      return { imageUri: null, metadataUri: null, isReady: false };
-    }
-
-    try {
-      setIsUploadingEvolve(true);
-
-      const currentLevel = Number(membershipInfo.level);
-      const targetLevel = currentLevel + 1;
-      if (currentLevel >= 3) throw new Error("Niveau max atteint");
-
-      // ON-CHAIN → TOKEN URI
-      const web3Instance = new Web3((window as any).ethereum);
-      const contract = new web3Instance.eth.Contract(ABI as any, contractAddress);
-      const tokenUriRaw: any = await contract.methods.tokenURI(tokenId).call();
-      const tokenUri = Array.isArray(tokenUriRaw) ? tokenUriRaw[0] as string : tokenUriRaw as string;
-
-      // IPFS → METADATA JSON
-      const resolvedTokenUri = await resolveIPFS(tokenUri, true) as string;
-      if (!resolvedTokenUri) {
-        console.warn("❌ tokenUri invalide:", tokenId, tokenUri);
-        return { imageUri: null, metadataUri: null, isReady: false };
-      }
-
-      const response = await fetch(resolvedTokenUri);
-      const currentMetadataJson = await response.json();
-
-      // ATTRIBUTES → DICT
-      const attrsDict = Object.fromEntries(
-        (currentMetadataJson.attributes || []).map((a: any) => [a.trait_type, a.value])
-      );
-
-      const currentData = {
-        level: currentMetadataJson.level ?? 0,
-        name: currentMetadataJson.name ?? "",
-        display_name: currentMetadataJson.display_name ?? "",
-        family: currentMetadataJson.family ?? currentMetadataJson.family_name ?? "",
-        family_name: currentMetadataJson.family_name ?? "",
-        image: currentMetadataJson.image ?? "",
-        full_path: currentMetadataJson.full_path ?? "",
-        image_path: currentMetadataJson.image_path ?? "",
-        lore: currentMetadataJson.lore ?? "",
-        dominant_color: currentMetadataJson.dominant_color ?? "",
-        color_rgb: currentMetadataJson.color_rgb ?? [],
-        sprite_name: currentMetadataJson.sprite_name ?? "",
-        total_in_family: currentMetadataJson.total_in_family ?? 0,
-        evolutionHistory: currentMetadataJson.evolutionHistory || [],
-        ...attrsDict,
-        attributes: attrsDict, // 👈 Important pour evolutionEngine
-      };
-
-      // EVOLUTION ENGINE 🚀 - RETOURNE LES BONNES DONNÉES
-      const finalWallet = walletAddress || account;
-      const evolutionDataRaw = evolutionEngine(
-        currentData,
-        currentLevel,
-        targetLevel,
-        finalWallet,
-        tokenId
-      );
-
-      if (!evolutionDataRaw || !evolutionDataRaw.imageUrl) {
-        throw new Error("Génération évolution échouée");
-      }
-
-      //console.log("✅ evolutionDataRaw COMPLET:", evolutionDataRaw);
-      //console.log("✅ evolutionDataRaw.lore:", evolutionDataRaw.lore);
-      //console.log("✅ evolutionDataRaw.display_name:", evolutionDataRaw.display_name);
-
-      setPreviewImageUrl(evolutionDataRaw.imageUrl);
-
-      // 🔥 UTILISER DIRECTEMENT LES DONNÉES DE evolutionEngine
-      const familyKey = evolutionDataRaw.family_name as keyof typeof colorProfilesJson.families;
-      const spriteFilename = evolutionDataRaw.sprite_name;
-      const profiles = (colorProfilesJson.families as any)[familyKey] as any[];
-      const colorProfile = profiles?.find(p => p.filename === spriteFilename) ?? profiles?.[0];
-
-      // 👉 LES ATTRIBUTS VIENNENT DE evolutionEngine
-      const insectAttributes = [
-        ...(evolutionDataRaw.attributes || []),
-        { trait_type: "Famille", value: familyKey },
-        { trait_type: "1er Propriétaire", value: finalWallet },
-        { trait_type: "Insect name", value: evolutionDataRaw.display_name || "Insecte ResCoe" },
-        { trait_type: "Lore", value: evolutionDataRaw.lore || "Badge d'évolution ResCoe" }, // 👈 DU evolutionEngine
-        { trait_type: "TotalFamille", value: currentData.total_in_family || 0 },
-        { trait_type: "Sprite", value: spriteFilename }
-      ];
-
-      const colorAttributes = colorProfile ? [
-        { trait_type: "Couleur1", value: colorProfile.dominant_colors.hex[0] },
-        { trait_type: "Couleur2", value: colorProfile.dominant_colors.hex[1] },
-        { trait_type: "Couleur3", value: colorProfile.dominant_colors.hex[2] },
-        { trait_type: "Couleur4", value: colorProfile.dominant_colors.hex[3] },
-        { trait_type: "Couleur5", value: colorProfile.dominant_colors.hex[4] },
-        { trait_type: "Teinte", value: Math.round(colorProfile.hsv.mean[0]) + "°" },
-        { trait_type: "Saturation", value: Math.round(colorProfile.hsv.mean[1] * 100) + "%" },
-        { trait_type: "Luminosité", value: Math.round(colorProfile.hsv.mean[2] * 100) + "%" },
-        { trait_type: "Colorful", value: Math.round(colorProfile.metrics.colorfulness * 100) + "%" },
-        { trait_type: "Contraste", value: Math.round(colorProfile.metrics.contrast) },
-        { trait_type: "Nettete", value: Math.round(colorProfile.metrics.sharpness) },
-        { trait_type: "Entropie", value: Math.round(colorProfile.metrics.entropy * 10) / 10 },
-        { trait_type: "Frames", value: colorProfile.frame_count },
-        { trait_type: "Pixels", value: colorProfile.total_pixels_analyzed.toLocaleString() },
-        { trait_type: "TailleBytes", value: (colorProfile.gif_info.size_bytes / 1000).toFixed(1) + "KB" }
-      ] : [];
-
-      const fullAttributes = [
-        ...insectAttributes.filter(attr => attr?.trait_type && !["Niveau"].includes(attr.trait_type)),
-        { trait_type: "Niveau", value: targetLevel },
-        ...colorAttributes
-      ];
-
-      // HISTORIQUE
-      let history = currentData.evolutionHistory || [];
-      const startOfDayUTC = Math.floor(new Date(Date.now()).setUTCHours(0, 0, 0, 0) / 1000);
-      history.push({
-        niveau: currentLevel,
-        uri: tokenUri,
-        image: currentMetadataJson.image,
-        family: currentData.family,
-        sprite_name: currentData.sprite_name,
-        horodatage: startOfDayUTC,
-      });
-
-      //console.log(`🚀 ${fullAttributes.length} attributs générés`);
-      //console.log("✅ Lore final uploading:", evolutionDataRaw.lore);
-
-      // 📤 UPLOAD IPFS
-      const uploadResult = await uploadToIPFS({
-        scope: "badges",
-        imageUrl: evolutionDataRaw.imageUrl,
-        name: currentName || evolutionDataRaw.display_name || "Adhesion",
-        bio: currentBio || "",
-        role: currentRoleLabel || "Membre",
-        level: targetLevel,
-        attributes: fullAttributes,
-        family: familyKey,
-        sprite_name: spriteFilename,
-        color_profile: colorProfile,
-        previousImage: currentMetadataJson.image,
-        evolutionHistory: history,
-        custom_data: {
-          lore: evolutionDataRaw.lore,  // ✅ PARFAIT - sera dans JSON final
-        }
-        });
-
-      if (!uploadResult.metadataUri) throw new Error("Upload IPFS échoué");
-
-      setEvolveImageUri(uploadResult.imageUri);
-      setEvolveMetadataUri(uploadResult.metadataUri);
-      setPreviewImageUrl(uploadResult.imageUri);
-
-      // METADATA UPDATE
-      const newMetadata = {
-        ...currentMetadataJson,
-        level: targetLevel,
-        image: uploadResult.imageUri,
-        display_name: evolutionDataRaw.display_name,
-        lore: evolutionDataRaw.lore, // 👈 DU evolutionEngine
-        family_name: familyKey,
-        sprite_name: spriteFilename,
-        evolutionHistory: history,
-        attributes: fullAttributes,
-      };
-      updateCurrentMetadata(newMetadata);
-      setIsManualEvolveReady(true);
-
-      return {
-        imageUri: uploadResult.imageUri,
-        metadataUri: uploadResult.metadataUri,
-        isReady: true,
-      };
-
-    } catch (e: any) {
-      console.error("❌ prepareEvolution:", e);
-      alert(e.message || "Erreur évolution");
-      return { imageUri: null, metadataUri: null, isReady: false };
-    } finally {
-      setIsUploadingEvolve(false);
-    }
-  }, [
-    membershipInfo,
-    contractAddress,
-    tokenId,
-    walletAddress,
-    account,
-    uploadToIPFS,
-    updateCurrentMetadata,
-    currentName,
-    currentBio,
-    currentRoleLabel,
-    isUploadingEvolve,
-    isManualEvolveReady,
-    evolveImageUri,
-    evolveMetadataUri,
-    colorProfilesJson
-  ]);
-
-
-  /* =======================
-     EVOLVE ON-CHAIN - 🔥 ENVOYER LE METADATA URI
-  ======================= */
-
-  const evolve = useCallback(async () => {
-    // 🔥 UTILISER metadataUri AU LIEU DE imageUri
-    if (!evolveMetadataUri || !contractAddress || tokenId === undefined) return;
-    if (!isAuthenticated || !account || !web3) {
-      alert("Connexion requise");
-      return;
-    }
-
-    try {
-      setIsEvolving(true);
-
-      const gasPrice = await web3.eth.getGasPrice();
-      const contract = new web3.eth.Contract(ABI as any, contractAddress);
-
-      // 🔥 ENVOYER evolveMetadataUri AU CONTRAT
-      const receipt = await contract.methods.evolve(tokenId, evolveMetadataUri).send({
-        from: account,
-        value: web3.utils.toWei(evolvePriceEth.toString(), "ether"),
-        gasPrice: gasPrice.toString(),
-      });
-
-      //console.log("✅ ÉVOLUTION OK - Gas:", receipt.gasUsed.toString());
-
-      let newTokenId = null;
-
-      if (receipt.events?.LevelEvolved) {
-        newTokenId = receipt.events.LevelEvolved.returnValues.tokenId;
-      }
-
-      if (!newTokenId) {
-        const totalSupply = await contract.methods.totalSupply().call();
-        newTokenId = totalSupply;
-      }
-
-      if (!newTokenId) {
-        newTokenId = (Number(tokenId) + 1).toString();
-      }
-
-      //console.log("🎉 Nouveau token ID:", newTokenId);
-
-      router.push(`/AdhesionId/${contractAddress}/${newTokenId}`);
-
-    } catch (e) {
-      console.error("❌ evolve error:", e);
-      alert("Erreur transaction");
-    } finally {
-      setIsEvolving(false);
-    }
-  }, [evolveMetadataUri, contractAddress, tokenId, evolvePriceEth, account, web3, isAuthenticated]);
-
-
-  const refreshEvolution = useCallback(() => {
-    setPreviewImageUrl(null);
-    setIsManualEvolveReady(false);
-    setEvolveImageUri(null);
-    setEvolveMetadataUri(null);
-  }, []);
-
-
-  // ✅ HATCH EGG - 🔥 AUSSI UTILISER METADATA URI
-  const hatchEgg = useCallback(async () => {
-    // 🔥 UTILISER metadataUri AU LIEU DE imageUri
-    if (!evolveMetadataUri || !contractAddress || tokenId === undefined) return;
-    if (!isAuthenticated || !account || !web3) {
-      alert("Connexion requise");
-      return;
-    }
-
-    try {
-      setIsEvolving(true);
-      const gasPrice = await web3.eth.getGasPrice();
-      const contract = new web3.eth.Contract(ABI as any, contractAddress);
-
-      // 🔥 ENVOYER evolveMetadataUri AU CONTRAT
-      const receipt = await contract.methods.hatchEgg(tokenId, evolveMetadataUri).send({
-        from: account,
-        value: '0',
-        gasPrice: gasPrice.toString(),
-      });
-
-      //console.log("🥚 ÉCLOS OK:", receipt);
-
-      let newTokenId = (Number(tokenId) + 1).toString();
-
-      if (receipt.events?.EggHatched?.returnValues) {
-        const eventData = receipt.events.EggHatched.returnValues;
-        newTokenId = eventData.newTokenId?.toString() || newTokenId;
-      }
-
-      if (receipt.events?.LevelEvolved?.returnValues) {
-        const eventData = receipt.events.LevelEvolved.returnValues;
-        newTokenId = eventData.tokenId?.toString() || newTokenId;
-      }
-
-      router.push(`/u/dashboard`);
-
-    } catch (e) {
-      console.error("❌ hatch error:", e);
-      alert("Erreur éclosion");
-    } finally {
-      setIsEvolving(false);
-    }
-  }, [evolveMetadataUri, contractAddress, tokenId, account, web3, isAuthenticated]);
-
-
+  // Prêt à évoluer ? (temps écoulé + niveau < max + non-œuf + non-locked)
+  const isEvolutionReady = !!membershipInfo &&
+    !membershipInfo.isEgg &&
+    membershipInfo.level < 3 &&
+    !membershipInfo.locked &&
+    (levelDuration === 0 ||
+      Math.floor(Date.now() / 1000) >= membershipInfo.startTimestamp + levelDuration);
 
   return {
-    // États principaux
     membershipInfo,
     evolvePriceEth,
-    hatchPriceEth,
-
-    // États évolution
-    previewImageUrl,
-    isManualEvolveReady,
-    evolveImageUri,
-    evolveMetadataUri,
-    isUploadingEvolve,
+    hatchPriceEth: 0,
     isEvolving,
-
-    // États œuf
-    isEgg: membershipInfo?.isEgg || false,
-
-    // 🔥 NOUVEAU : getter synchrone
-    getReadyState: () => ({
-      isReady: !!evolveMetadataUri && isManualEvolveReady,
-      metadataUri: evolveMetadataUri || null,
-      imageUri: evolveImageUri || null
-    }),
-
-    // Fonctions
-    prepareEvolution,        // ✅ MAINTENANT retourne Promise<{imageUri, metadataUri, isReady}>
-    evolve,                  // utilise evolveMetadataUri interne
+    isEgg: membershipInfo?.isEgg ?? false,
+    isEvolutionReady,
+    /** Durée minimale au niveau courant (secondes) — 0 tant que non chargé */
+    levelDuration,
+    /** URL locale pour preview de l'insecte suivant */
+    previewImageUrl: pendingInsect?.imageUrl ?? null,
+    // Champs legacy (compatibilité EvolutionTab)
+    isManualEvolveReady:  false,
+    isUploadingEvolve:    false,
+    evolveImageUri:       null,
+    evolveMetadataUri:    null,
+    getReadyState:        () => ({ isReady: false, metadataUri: null, imageUri: null }),
+    prepareEvolution:     async () => ({ imageUri: null, metadataUri: null, isReady: false }),
+    refreshEvolution:     () => {},
+    evolve,
     hatchEgg,
-    refreshEvolution,
-    updateCurrentMetadata
+    updateCurrentMetadata,
   };
-
-
 };

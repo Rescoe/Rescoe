@@ -95,179 +95,137 @@ const ManageRoles: React.FC<ManageRolesProps> = ({
         setAdhesionData(updatedData);
     };
 
+    // ── Génération on-chain des insectes (remplace l'ancien IPFS/Pinata) ────────
+    // Appelle /api/token/generate-onchain-uri pour chaque destinataire.
+    // Le wallet du destinataire est utilisé comme seed → insecte déterministe.
     const handleConfirmRole = async (): Promise<void> => {
         if (adhesionData.length === 0) {
             alert('Aucune adhésion à traiter.');
             return;
         }
-        if (pinataError) {
-            alert(`Erreur Pinata: ${pinataError}`);
+        const invalid = adhesionData.find(
+            (ad, i) => !ad.address || !ad.role || !ad.name
+        );
+        if (invalid) {
+            alert('⚠️ Remplissez adresse, rôle et nom pour chaque adhésion.');
             return;
         }
         setIsUploading(true);
 
         try {
-            const generatedInsects = await Promise.all(adhesionData.map(async (adhesion, index) => {
-                const insectData = await genInsect25(0);
-                const previewUrl = resolveIPFS(insectData.imageUrl, true);
-                return { imageUrl: previewUrl, data: insectData };
-            }));
+            const results = await Promise.all(
+                adhesionData.map(async (adhesion: any) => {
+                    const params = new URLSearchParams({
+                        wallet: adhesion.address.trim(),
+                        role: adhesion.role,
+                        name: adhesion.name || 'Membre',
+                        bio: adhesion.bio || '',
+                        isAnnual: 'true',
+                        autoEvolve: 'true',
+                    });
+                    const res = await fetch(`/api/token/generate-onchain-uri?${params}`);
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.error ?? `HTTP ${res.status} pour ${adhesion.address}`);
+                    }
+                    return res.json();
+                })
+            );
 
-            const metadataUris = await Promise.all(adhesionData.map(async (adhesion, index) => {
-                const { imageUrl, data: insectData } = generatedInsects[index];
-                const spriteFilename = insectData.spriteName;
-                const familyKey = insectData.folder;
-                const profiles = colorProfilesJson.families[familyKey];
-                const colorProfile = profiles?.find((p: any) => p.filename === spriteFilename) ?? profiles?.[0];
+            setAdhesionData((prev: any[]) =>
+                prev.map((adhesion: any, i: number) => ({
+                    ...adhesion,
+                    insectKey: results[i].insectName,
+                    displayName: results[i].displayName,
+                    insectFamily: results[i].family,
+                    imageUrl: results[i].imageUrl,
+                    // Conservé pour compatibilité affichage — non utilisé dans mint
+                    metadataUri: `on-chain:${results[i].insectName}`,
+                }))
+            );
 
-                const insectAttributes = [
-                    ...insectData.attributes,
-                    { trait_type: "Famille", value: familyKey },
-                    { trait_type: "1er Propriétaire", value: adhesion.name || "Membre" },
-                    { trait_type: "Insect name", value: insectData.display_name },
-                    { trait_type: "Lore", value: insectData.lore },
-                    { trait_type: "TotalFamille", value: insectData.total_in_family },
-                    { trait_type: "Sprite", value: spriteFilename }
-                ];
-
-                const colorAttributes = colorProfile ? [
-                    { trait_type: "Couleur1", value: colorProfile.dominant_colors.hex[0] },
-                    { trait_type: "Couleur2", value: colorProfile.dominant_colors.hex[1] },
-                    { trait_type: "Couleur3", value: colorProfile.dominant_colors.hex[2] },
-                    { trait_type: "Couleur4", value: colorProfile.dominant_colors.hex[3] },
-                    { trait_type: "Couleur5", value: colorProfile.dominant_colors.hex[4] },
-                    { trait_type: "Teinte", value: Math.round(colorProfile.hsv.mean[0]) + "°" },
-                    { trait_type: "Saturation", value: Math.round(colorProfile.hsv.mean[1] * 100) + "%" },
-                    { trait_type: "Luminosité", value: Math.round(colorProfile.hsv.mean[2] * 100) + "%" },
-                    { trait_type: "Colorful", value: Math.round(colorProfile.metrics.colorfulness * 100) + "%" },
-                    { trait_type: "Contraste", value: Math.round(colorProfile.metrics.contrast) },
-                    { trait_type: "Nettete", value: Math.round(colorProfile.metrics.sharpness) },
-                    { trait_type: "Entropie", value: Math.round(colorProfile.metrics.entropy * 10) / 10 },
-                    { trait_type: "Frames", value: colorProfile.frame_count },
-                    { trait_type: "Pixels", value: colorProfile.total_pixels_analyzed.toLocaleString() },
-                    { trait_type: "TailleBytes", value: (colorProfile.gif_info.size_bytes / 1000).toFixed(1) + "KB" }
-                ] : [];
-
-                const fullAttributes = [
-                    ...insectAttributes.filter(attr => !["Niveau", "Level"].includes(attr.trait_type)),
-                    { trait_type: "Niveau", value: 0 },
-                    ...colorAttributes,
-                ];
-
-                const result = await uploadToIPFS({
-                    scope: "badges",
-                    imageUrl,
-                    name: adhesion.name || `Membre ${index + 1}`,
-                    bio: adhesion.bio || "",
-                    role: adhesion.role,
-                    level: 0,
-                    attributes: fullAttributes,
-                    family: familyKey,
-                    sprite_name: spriteFilename,
-                    previousImage: null,
-                    evolutionHistory: [],
-                    color_profile: colorProfile
-                });
-
-                return result.metadataUri;
-            }));
-
-            setAdhesionData((prev: any[]) => prev.map((adhesion: any, index: number) => ({
-                ...adhesion,
-                imageIpfsUrl: generatedInsects[index].imageUrl,
-                metadataUri: metadataUris[index],
-                insectData: generatedInsects[index].data
-            })));
-
-            if (generatedInsects[0]?.imageUrl) setGeneratedImageUrl(generatedInsects[0].imageUrl);
-            alert(`✅ ${adhesionData.length} NFTs READY !`);
+            if (results[0]?.imageUrl) setGeneratedImageUrl(results[0].imageUrl);
+            alert(`✅ ${adhesionData.length} insectes générés on-chain — prêts à minter !`);
         } catch (error: any) {
-            console.error('❌ Admin échoué:', error);
+            console.error('❌ Génération insectes échouée:', error);
             alert(`❌ Échec: ${error.message || 'Erreur inconnue'}`);
         } finally {
             setIsUploading(false);
         }
     };
 
+    // ── Mint multiple on-chain (nouvelle signature contrat) ──────────────────
+    // mintMultiple(recipients, insectKeys, displayNames, insectFamilies, roles, names, bios)
     const handleMintMultiple = async (): Promise<void> => {
-        if (window.ethereum) {
-            const web3Instance = new Web3(window.ethereum as any);
-            const contract = new web3Instance.eth.Contract(ABI, contractAdhesion);
-
-            const details = adhesionData.map(adhesion => ({
-                address: adhesion.address.trim(),
-                role: roleMapping[adhesion.role],
-                name: adhesion.name || "",
-                bio: adhesion.bio || "",
-            }));
-
-            try {
-                const accounts: string[] = await web3Instance.eth.getAccounts();
-
-                const recipientsArray: string[] = details.map(adhesion => adhesion.address);
-                const rolesArray: number[] = details.map(adhesion => adhesion.role);
-                const nameArray: string[] = details.map(adhesion => adhesion.name);
-                const bioArray: string[] = details.map(adhesion => adhesion.bio);
-                const urisArray: string[] = adhesionData
-                    .map(adhesion => adhesion.metadataUri)
-                    .filter((uri): uri is string => typeof uri === "string");
-
-                const length = recipientsArray.length;
-
-                if (length === 0) {
-                    alert('Aucune adhésion à mint.');
-                    return;
-                }
-
-                if (length > 100) {
-                    alert('Maximum 100 adhésions par batch.');
-                    return;
-                }
-
-                if (recipientsArray.length !== rolesArray.length ||
-                    recipientsArray.length !== urisArray.length ||
-                    recipientsArray.length !== nameArray.length ||
-                    recipientsArray.length !== bioArray.length) {
-                    alert('Les tableaux ont des longueurs différentes.');
-                    return;
-                }
-
-                for (let i = 0; i < length; i++) {
-                    if (!web3Instance.utils.isAddress(recipientsArray[i])) {
-                        alert(`Adresse invalide à l'index ${i}: ${recipientsArray[i]}`);
-                        return;
-                    }
-                    if (rolesArray[i] > 3) {
-                        alert(`Rôle invalide à l'index ${i}: ${rolesArray[i]} (max 3)`);
-                        return;
-                    }
-                }
-
-                setLoading(true);
-
-                const gasEstimate = await contract.methods.mintMultiple(recipientsArray, urisArray, rolesArray, nameArray, bioArray)
-                    .estimateGas({ from: accounts[0] });
-
-                const gasPrice = await web3Instance.eth.getGasPrice();
-
-                const tx = await contract.methods.mintMultiple(recipientsArray, urisArray, rolesArray, nameArray, bioArray)
-                    .send({
-                        from: accounts[0],
-                        gas: Math.floor(Number(gasEstimate) * 1).toString(),
-                        gasPrice: gasPrice.toString()
-                    });
-
-                alert(`✅ ${length} NFTs mintés avec succès!\nTX: ${tx.transactionHash}`);
-
-            } catch (error: any) {
-                console.error("Minting failed:", error);
-                const errorMsg = error.message || error.reason || 'Erreur inconnue';
-                alert(`❌ Mint échoué: ${errorMsg}`);
-            } finally {
-                setLoading(false);
-            }
-        } else {
+        if (!window.ethereum) {
             alert('MetaMask ou un autre fournisseur Web3 n\'est pas installé.');
+            return;
+        }
+
+        const missing = adhesionData.find((ad: any) => !ad.insectKey);
+        if (missing) {
+            alert('⚠️ Générez d\'abord les insectes on-chain pour chaque adhésion.');
+            return;
+        }
+
+        const web3Instance = new Web3(window.ethereum as any);
+        const contract = new web3Instance.eth.Contract(ABI, contractAdhesion);
+
+        const length = adhesionData.length;
+        if (length === 0)  { alert('Aucune adhésion à mint.'); return; }
+        if (length > 100)  { alert('Maximum 100 adhésions par batch.'); return; }
+
+        // Validation adresses et rôles
+        for (let i = 0; i < length; i++) {
+            if (!web3Instance.utils.isAddress(adhesionData[i].address?.trim())) {
+                alert(`Adresse invalide #${i + 1}: ${adhesionData[i].address}`);
+                return;
+            }
+            if (!(adhesionData[i].role in roleMapping)) {
+                alert(`Rôle invalide #${i + 1}: ${adhesionData[i].role}`);
+                return;
+            }
+        }
+
+        const recipientsArray:    string[] = adhesionData.map((ad: any) => ad.address.trim());
+        const insectKeysArray:    string[] = adhesionData.map((ad: any) => ad.insectKey);
+        const displayNamesArray:  string[] = adhesionData.map((ad: any) => ad.displayName || ad.insectKey);
+        const insectFamiliesArr:  string[] = adhesionData.map((ad: any) => ad.insectFamily || '');
+        const rolesArray:         number[] = adhesionData.map((ad: any) => roleMapping[ad.role]);
+        const nameArray:          string[] = adhesionData.map((ad: any) => ad.name || '');
+        const bioArray:           string[] = adhesionData.map((ad: any) => ad.bio || '');
+
+        try {
+            setLoading(true);
+
+            const accounts: string[] = await web3Instance.eth.getAccounts();
+            const gasPrice = await web3Instance.eth.getGasPrice();
+
+            const gasEstimate = await contract.methods
+                .mintMultiple(
+                    recipientsArray, insectKeysArray, displayNamesArray,
+                    insectFamiliesArr, rolesArray, nameArray, bioArray
+                )
+                .estimateGas({ from: accounts[0] });
+
+            const tx = await contract.methods
+                .mintMultiple(
+                    recipientsArray, insectKeysArray, displayNamesArray,
+                    insectFamiliesArr, rolesArray, nameArray, bioArray
+                )
+                .send({
+                    from: accounts[0],
+                    gas: Math.floor(Number(gasEstimate) * 1.2).toString(), // +20% marge
+                    gasPrice: gasPrice.toString(),
+                });
+
+            alert(`✅ ${length} NFTs mintés avec succès !\nTX: ${tx.transactionHash}`);
+
+        } catch (error: any) {
+            console.error('Minting failed:', error);
+            alert(`❌ Mint échoué: ${error.message || error.reason || 'Erreur inconnue'}`);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -386,11 +344,16 @@ const ManageRoles: React.FC<ManageRolesProps> = ({
                         </FormControl>
 
                         <FormControl flex="1">
-                            <FormLabel>URI IPFS</FormLabel>
+                            <FormLabel>Insecte on-chain</FormLabel>
                             <Input
-                                value={adhesion.metadataUri || 'À générer...'}
+                                value={
+                                    adhesion.insectKey
+                                        ? `${adhesion.insectFamily} — ${adhesion.displayName}`
+                                        : '🎲 À générer…'
+                                }
                                 isReadOnly
-                                title={adhesion.metadataUri || ''}
+                                color={adhesion.insectKey ? 'green.300' : 'gray.400'}
+                                title={adhesion.insectKey || ''}
                             />
                         </FormControl>
                     </HStack>
@@ -425,15 +388,18 @@ const ManageRoles: React.FC<ManageRolesProps> = ({
                 <Button
                     onClick={handleConfirmRole}
                     isLoading={isUploading}
+                    loadingText="Génération…"
                     colorScheme="blue"
+                    isDisabled={adhesionData.some((ad: any) => !ad.address || !ad.role || !ad.name)}
                 >
-                    📤 Confirmer & IPFS
+                    🎲 Générer insectes on-chain
                 </Button>
                 <Button
                     onClick={handleMintMultiple}
                     isLoading={loading}
+                    loadingText="Mint en cours…"
                     colorScheme="green"
-                    isDisabled={adhesionData.some(ad => !ad.metadataUri)}
+                    isDisabled={adhesionData.some((ad: any) => !ad.insectKey)}
                 >
                     🪲 Mint Multiple ({adhesionData.length}/100)
                 </Button>
@@ -451,7 +417,8 @@ const ManageRoles: React.FC<ManageRolesProps> = ({
 
             {adhesionData.length > 0 && (
                 <Text fontSize="sm" color="gray.500" mt={2}>
-                    Prêt pour mint: {adhesionData.filter(ad => ad.metadataUri).length}/{adhesionData.length} URIs générées
+                    Insectes prêts : {adhesionData.filter((ad: any) => ad.insectKey).length}/{adhesionData.length}
+                    {adhesionData.every((ad: any) => ad.insectKey) && ' ✅ — prêts à minter !'}
                 </Text>
             )}
 

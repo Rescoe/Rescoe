@@ -336,7 +336,7 @@ useEffect(() => {
         owner
       ] = await Promise.all([
         contract.getTokenDetails(tokenIdNumber),
-        contract.getMembershipInfo(tokenIdNumber),
+        contract.membershipInfo(tokenIdNumber),
         contract.tokenURI(tokenIdNumber),
         contract.ownerOf(tokenIdNumber)
       ]);
@@ -386,7 +386,8 @@ useEffect(() => {
         (Number(mintTimestamp) + Number(remainingTime)) * 1000
       ).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' });
 
-      const membershipInfoRaw = await contract.getMembershipInfo(tokenIdNumber);
+      // membershipRaw déjà récupéré dans le Promise.all ci-dessus — pas de 2e appel RPC
+      const membershipInfoRaw = membershipRaw;
       const membershipInfo: MembershipInfo = {
         level: Number(membershipInfoRaw.level),
         autoEvolve: Boolean(membershipInfoRaw.autoEvolve),

@@ -281,7 +281,7 @@ const CreateSocialCollection: React.FC = () => {
       borderRadius="3xl"
       boxShadow="dark-lg"
       border="1px solid"
-      borderColor="purple.300"
+      borderColor="brand.gold"
     >
 <Box>
 <Heading
@@ -350,7 +350,7 @@ const CreateSocialCollection: React.FC = () => {
           onChange={(e) => setSalonName(e.target.value)}
           bg="blackAlpha.300"
           color="white"
-          borderColor="purple.300"
+          borderColor="brand.gold"
         />
 
         <FormLabel color="gray.300" fontWeight="bold">Adhésion requise ?</FormLabel>
@@ -359,7 +359,7 @@ const CreateSocialCollection: React.FC = () => {
           onChange={(e) => setRequiresMembership(e.target.value === "yes")}
           bg="blackAlpha.300"
           color="white"
-          borderColor="purple.300"
+          borderColor="brand.gold"
         >
           <option style={{ backgroundColor: "#1A202C" }} value="no">Non</option>
           <option style={{ backgroundColor: "#1A202C" }} value="yes">Oui</option>
@@ -372,7 +372,7 @@ const CreateSocialCollection: React.FC = () => {
           onChange={(e) => setMetadata({ ...metadata, description: e.target.value })}
           bg="blackAlpha.300"
           color="white"
-          borderColor="purple.300"
+          borderColor="brand.gold"
         />
 
         <FormLabel color="gray.300" fontWeight="bold">Adresse de royaltie principale</FormLabel>

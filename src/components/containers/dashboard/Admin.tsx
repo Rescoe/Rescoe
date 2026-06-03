@@ -18,6 +18,21 @@ import detectEthereumProvider from '@metamask/detect-provider';
 import ManageContracts from './ManageSolidity/MasterFactoryManagement';
 import ManageRoles from './ManageRoles/ManageRoles';
 import ManageNFT from './ManageNFT/ManageNFT';
+import ContractBook from './ContractBook';
+import dynamic from 'next/dynamic';
+
+// Deploy Studio — lazy-loaded (child_process côté serveur, pas de SSR)
+const DeployStudio = dynamic(
+    () => import('./DeployStudio/DeployStudio'),
+    {
+        ssr: false,
+        loading: () => (
+            <Box p={8} textAlign="center" color="whiteAlpha.400" fontFamily="mono" fontSize="sm">
+                Chargement Deploy Studio…
+            </Box>
+        ),
+    }
+);
 import Settings from './ManageSettings/Settings';
 
 type FamilyKey = keyof typeof colorProfilesJson.families;
@@ -297,6 +312,14 @@ const AdminPage: React.FC = () => {
                     >
                         Contrats
                     </Button>
+                    <Button
+                        onClick={() => setActiveTab('Deploy')}
+                        variant={activeTab === 'Deploy' ? 'solid' : 'outline'}
+                        colorScheme={activeTab === 'Deploy' ? 'purple' : undefined}
+                        fontFamily="mono"
+                    >
+                        🚀 Deploy Studio
+                    </Button>
                 </HStack>
 
                 <Divider />
@@ -305,7 +328,13 @@ const AdminPage: React.FC = () => {
                     {activeTab === 'Roles' && <ManageRoles {...rolesProps} />}
                     {activeTab === 'NFT' && <ManageNFT {...nftProps} />}
                     {activeTab === 'Settings' && <Settings {...settingsProps} />}
-                    {activeTab === 'Contrats' && <ManageContracts />}
+                    {activeTab === 'Contrats' && (
+                        <VStack spacing={5} align="stretch">
+                            <ContractBook />
+                            <ManageContracts />
+                        </VStack>
+                    )}
+                    {activeTab === 'Deploy' && <DeployStudio />}
                 </Box>
             </VStack>
         </Box>

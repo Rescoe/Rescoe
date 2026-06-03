@@ -263,7 +263,9 @@ const SoldeWallet: React.FC<SoldeWalletProps> = ({
               <Button
                 size="xs"
                 mt={1}
-                colorScheme="purple"
+                bg="brand.gold"
+                color="brand.navy"
+                _hover={{ bg: "brand.cream" }}
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowSwap(true);

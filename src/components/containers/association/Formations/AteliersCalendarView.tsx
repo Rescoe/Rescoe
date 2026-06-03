@@ -279,7 +279,7 @@ const renderDayEvents = () => {
             <Button size="sm" colorScheme="teal" onClick={() => mintAtelierTicket(entry)} isLoading={mintingIds.includes(msg.id)}>
               Réserver
             </Button>
-            <Divider my={8} borderColor="purple.700" w="50%" mx="auto" />
+            <Divider orientation="vertical" h="20px" borderColor="whiteAlpha.300" />
             <Text fontSize="sm">
               <strong>Prix :</strong> {priceEur ? `${priceEur} €` : "—"}
             </Text>
