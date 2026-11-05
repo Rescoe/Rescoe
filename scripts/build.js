@@ -1,45 +1,59 @@
 /**
- * Wrapper build Next.js — gère le race condition NTFS Windows sur le cleanup
- * des pages auto-statically optimized (Next.js 15 bug).
+ * Wrapper de build Next.js.
  *
- * Comportement :
- * - Linux/Vercel : next build réussit → exit 0
- * - Windows : next build sort en erreur 1 UNIQUEMENT à cause de l'unlink ENOENT
- *   → vérifie que .next/routes-manifest.json existe (build complet)
- *   → exit 0 si oui, exit 1 sinon (vraie erreur de build)
+ * 1. Garde « secrets publics » : échoue si un secret est exposé via NEXT_PUBLIC_*.
+ * 2. Supprime les manifests .next d'un build précédent (jamais de preuve périmée).
+ * 3. Lance `next build` en relayant stdout/stderr.
+ * 4. Le code de sortie de `next build` fait foi (voir scripts/build-verdict.js pour
+ *    l'unique exception Windows/NTFS, vérifiée sur la sortie ET la fraîcheur des fichiers).
  */
 
-const { spawnSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+const { spawn } = require("child_process");
+const path = require("path");
+const { runCheck, formatReport } = require("./check-public-secrets");
+const { clearProofFiles, decideBuildExit } = require("./build-verdict");
 
-const nextBin = path.join('node_modules', '.bin', 'next');
-const result = spawnSync(
-  process.platform === 'win32' ? nextBin + '.cmd' : nextBin,
-  ['build'],
-  { stdio: 'inherit', shell: false }
-);
-
-const code = result.status ?? 1;
-
-if (code === 0) {
-  process.exit(0);
+try {
+  require("@next/env").loadEnvConfig(process.cwd());
+} catch {
+  // @next/env absent : on contrôle seulement process.env.
 }
 
-// Vérifie si le build est réellement complet malgré l'erreur
-const routesManifest = path.join('.next', 'routes-manifest.json');
-const pagesManifest = path.join('.next', 'server', 'pages-manifest.json');
-const buildComplete = fs.existsSync(routesManifest) && fs.existsSync(pagesManifest);
-
-if (buildComplete) {
-  console.log(
-    '\n⚠️  next build a terminé avec une erreur de cleanup Windows (ENOENT unlink).'
-  );
-  console.log(
-    '   Le dossier .next est complet — ce warning est un bug connu de Next.js 15 sur Windows NTFS.\n'
-  );
-  process.exit(0);
+const guard = runCheck();
+if (!guard.ok) {
+  console.error(formatReport(guard));
+  process.exit(1);
 }
 
-// Vraie erreur de build
-process.exit(code);
+clearProofFiles();
+
+const nextBin = path.join("node_modules", ".bin", process.platform === "win32" ? "next.cmd" : "next");
+const startedAt = Date.now();
+let output = "";
+
+// Sur Windows, un .cmd ne peut être lancé qu'avec un shell (Node >= 18.20 / 20.12).
+// Les arguments sont des constantes : aucune donnée externe n'est interpolée.
+const child = spawn(nextBin, ["build"], {
+  stdio: ["inherit", "pipe", "pipe"],
+  shell: process.platform === "win32",
+});
+
+const MAX_CAPTURE = 200_000; // on ne garde que la fin de la sortie pour l'analyse
+const capture = (stream, sink) =>
+  stream.on("data", (chunk) => {
+    sink.write(chunk);
+    output = (output + chunk.toString()).slice(-MAX_CAPTURE);
+  });
+capture(child.stdout, process.stdout);
+capture(child.stderr, process.stderr);
+
+child.on("error", (err) => {
+  console.error(`❌ Impossible de lancer next build : ${err.message}`);
+  process.exit(1);
+});
+
+child.on("close", (code, signal) => {
+  const verdict = decideBuildExit({ code, signal, platform: process.platform, output, startedAt });
+  if (verdict.message) (verdict.exitCode === 0 ? console.log : console.error)(`\n${verdict.message}\n`);
+  process.exit(verdict.exitCode);
+});
