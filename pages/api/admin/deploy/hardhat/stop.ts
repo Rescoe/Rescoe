@@ -1,31 +1,17 @@
 /**
  * POST /api/admin/deploy/hardhat/stop
- * Arrête le nœud Hardhat local.
+ * Arrête le nœud Hardhat local démarré par le Deploy Studio (ce processus uniquement).
+ * ADMIN LOCAL UNIQUEMENT — protégé par guardDeployStudio.
  */
 import type { NextApiRequest, NextApiResponse } from "next";
-import { exec } from "child_process";
-import { ChildProcess } from "child_process";
+import { guardDeployStudio } from "@/server/security/deployStudioGuard";
+import { requireMethod } from "@/server/security/guards";
+import { killHardhatProcess } from "@/server/deployStudio/hardhatProcess";
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") return res.status(405).end();
+  if (!requireMethod(req, res, ["POST"])) return;
+  if (!guardDeployStudio(req, res)) return;
 
-  if (process.env.VERCEL) {
-    return res.status(503).json({ error: "Disponible uniquement en local" });
-  }
-
-  // Tenter d'abord via le process référencé
-  const proc = (globalThis as any).__hardhatProcess as ChildProcess | null;
-  if (proc) {
-    try {
-      proc.kill("SIGTERM");
-      (globalThis as any).__hardhatProcess = null;
-    } catch {
-      // fallback ci-dessous
-    }
-  }
-
-  // Fallback Windows : tuer tous les node.exe (Hardhat node)
-  exec("taskkill /F /FI \"WINDOWTITLE eq hardhat*\" /T", () => {});
-
-  return res.status(200).json({ status: "stopped" });
+  const stopped = killHardhatProcess();
+  return res.status(200).json({ status: stopped ? "stopped" : "not_running" });
 }

@@ -6,12 +6,12 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import fs from "fs/promises";
 import path from "path";
+import { guardDeployStudio } from "@/server/security/deployStudioGuard";
+import { requireMethod, sendError } from "@/server/security/guards";
+import { isContractName } from "@/server/security/validators";
+import { logServerError } from "@/server/security/redact";
 
-const HARDHAT_DIR =
-  process.env.HARDHAT_DIR ||
-  "C:/Users/thibf/Documents/App-Rescoe/HardhatRescoe";
-
-async function loadArtifact(contractName: string) {
+async function loadArtifact(HARDHAT_DIR: string, contractName: string) {
   const contractsDir = path.join(HARDHAT_DIR, "artifacts", "contracts");
 
   // Cherche artifacts/contracts/<Name>.sol/<Name>.json
@@ -54,19 +54,16 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  if (req.method !== "GET") return res.status(405).end();
+  if (!requireMethod(req, res, ["GET"])) return;
+  const HARDHAT_DIR = guardDeployStudio(req, res);
+  if (!HARDHAT_DIR) return;
 
-  if (process.env.VERCEL) {
-    return res.status(503).json({ error: "Disponible uniquement en local" });
-  }
-
+  // Identifiant simple uniquement : empêche "../" dans les chemins d'artifacts.
   const { name } = req.query;
-  if (!name || typeof name !== "string") {
-    return res.status(400).json({ error: "Paramètre ?name= requis" });
-  }
+  if (!isContractName(name)) return sendError(res, 400, "invalid_name", "Paramètre ?name= invalide");
 
   try {
-    const artifact = await loadArtifact(name);
+    const artifact = await loadArtifact(HARDHAT_DIR, name);
     const abi: any[] = artifact.abi ?? [];
     const bytecode: string = artifact.bytecode ?? "";
 
@@ -120,7 +117,8 @@ export default async function handler(
         };
       }),
     });
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+  } catch (err) {
+    logServerError("deploy-studio/abi", err);
+    return sendError(res, 404, "artifact_not_found", "Artifact introuvable. Le contrat est-il compilé ?");
   }
 }

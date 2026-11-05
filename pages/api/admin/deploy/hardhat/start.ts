@@ -1,18 +1,15 @@
 /**
  * POST /api/admin/deploy/hardhat/start
  * Démarre un nœud Hardhat local sur localhost:8545.
- * ADMIN LOCAL UNIQUEMENT.
+ * ADMIN LOCAL UNIQUEMENT — protégé par guardDeployStudio.
  */
 import type { NextApiRequest, NextApiResponse } from "next";
 import { spawn, ChildProcess } from "child_process";
-import { exec } from "child_process";
-import { promisify } from "util";
-
-const execAsync = promisify(exec);
-
-const HARDHAT_DIR =
-  process.env.HARDHAT_DIR ||
-  "C:/Users/thibf/Documents/App-Rescoe/HardhatRescoe";
+import { guardDeployStudio } from "@/server/security/deployStudioGuard";
+import { requireMethod, sendError } from "@/server/security/guards";
+import { logServerError, redactSecrets } from "@/server/security/redact";
+import { IS_WINDOWS, minimalChildEnv, NPX, runHardhat } from "@/server/deployStudio/hardhat";
+import { killHardhatProcess } from "@/server/deployStudio/hardhatProcess";
 
 // Logs persistés dans globalThis pour la route /logs
 if (!(globalThis as any).__hardhatLogs) {
@@ -22,74 +19,57 @@ if (!(globalThis as any).__hardhatProcess) {
   (globalThis as any).__hardhatProcess = null as ChildProcess | null;
 }
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  if (req.method !== "POST") return res.status(405).end();
+const MAX_LOG_LINES = 1000;
+const pushLog = (line: string) => {
+  const logs = (globalThis as any).__hardhatLogs as string[];
+  logs.push(redactSecrets(line));
+  if (logs.length > MAX_LOG_LINES) logs.splice(0, logs.length - MAX_LOG_LINES);
+};
 
-  if (process.env.VERCEL) {
-    return res.status(503).json({ error: "Disponible uniquement en local" });
-  }
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (!requireMethod(req, res, ["POST"])) return;
+  const hardhatDir = guardDeployStudio(req, res);
+  if (!hardhatDir) return;
 
-  // Kill le process existant
-  const existing = (globalThis as any).__hardhatProcess as ChildProcess | null;
-  if (existing) {
-    try {
-      existing.kill("SIGTERM");
-    } catch {
-      // ignore
-    }
-  }
-
+  // Arrête le process existant (le nôtre uniquement)
+  killHardhatProcess();
   (globalThis as any).__hardhatLogs = [];
 
   // Vérifier que Hardhat est disponible
   try {
-    const { stdout } = await execAsync(
-      `cd /d "${HARDHAT_DIR}" && npx hardhat --version`
-    );
+    const { stdout } = await runHardhat(hardhatDir, ["--version"], { timeout: 30_000 });
     console.log("[Hardhat] Version:", stdout.trim());
-  } catch (e: any) {
-    return res
-      .status(500)
-      .json({ error: "Hardhat introuvable", detail: e.message });
+  } catch (e) {
+    logServerError("deploy-studio/hardhat-version", e);
+    return sendError(res, 500, "hardhat_unavailable", "Hardhat introuvable (dossier ou installation).");
   }
 
-  // Démarrer le nœud
-  const proc = spawn("npx.cmd", ["hardhat", "node"], {
-    cwd: HARDHAT_DIR,
+  // Démarrer le nœud (arguments constants, environnement minimal)
+  const proc = spawn(NPX, ["hardhat", "node"], {
+    cwd: hardhatDir,
     detached: true,
     stdio: ["ignore", "pipe", "pipe"],
-    shell: true,
+    shell: IS_WINDOWS,
     windowsHide: false,
-    env: { ...process.env, FORCE_COLOR: "0" },
+    env: minimalChildEnv(),
   });
 
   (globalThis as any).__hardhatProcess = proc;
 
-  proc.on("spawn", () => {
-    (globalThis as any).__hardhatLogs.push(`[START] PID ${proc.pid}`);
-  });
-
+  proc.on("spawn", () => pushLog(`[START] PID ${proc.pid}`));
   proc.on("error", (err) => {
-    (globalThis as any).__hardhatLogs.push(`[ERROR] ${err.message}`);
+    pushLog(`[ERROR] ${err.message}`);
     (globalThis as any).__hardhatProcess = null;
   });
-
   proc.on("exit", (code, signal) => {
-    (globalThis as any).__hardhatLogs.push(`[EXIT] code=${code} signal=${signal}`);
+    pushLog(`[EXIT] code=${code} signal=${signal}`);
     (globalThis as any).__hardhatProcess = null;
   });
-
   proc.stdout?.on("data", (data: Buffer) => {
-    const lines = data.toString().split("\n").filter((l) => l.trim());
-    lines.forEach((l) => (globalThis as any).__hardhatLogs.push(`[OUT] ${l}`));
+    data.toString().split("\n").filter((l) => l.trim()).forEach((l) => pushLog(`[OUT] ${l}`));
   });
-
   proc.stderr?.on("data", (data: Buffer) => {
-    const lines = data.toString().split("\n").filter((l) => l.trim());
-    lines.forEach((l) => (globalThis as any).__hardhatLogs.push(`[ERR] ${l}`));
+    data.toString().split("\n").filter((l) => l.trim()).forEach((l) => pushLog(`[ERR] ${l}`));
   });
 
   proc.unref();

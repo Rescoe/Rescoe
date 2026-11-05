@@ -289,6 +289,16 @@ type DeployMode = "hardhat" | "metamask";
 
 const BASE_PATH = "/api/admin/deploy";
 
+/**
+ * fetch vers /api/admin/deploy/* : ajoute l'en-tête anti-CSRF exigé par le garde serveur
+ * pour les requêtes modifiantes (un site tiers ne peut pas l'envoyer sans préflight CORS).
+ */
+const studioFetch = (url: string, init: RequestInit = {}) =>
+  fetch(url, {
+    ...init,
+    headers: { ...(init.headers as Record<string, string> | undefined), "x-requested-with": "rescoe-deploy-studio" },
+  });
+
 const RPC_URLS: Record<Network, string> = {
   baseSepolia: "https://sepolia.base.org",
   base: "https://mainnet.base.org",
@@ -332,7 +342,7 @@ export function useDeployStudio() {
   // ── Nœud Hardhat ──────────────────────────────────────────────────────────
   const checkHardhatStatus = useCallback(async () => {
     try {
-      const r = await fetch(`${BASE_PATH}/hardhat/status`);
+      const r = await studioFetch(`${BASE_PATH}/hardhat/status`);
       const { running } = await r.json();
       setHardhatRunning(running);
     } catch {
@@ -343,7 +353,7 @@ export function useDeployStudio() {
   const startHardhat = useCallback(async () => {
     addLog("🔄 Démarrage nœud Hardhat local...");
     try {
-      const r = await fetch(`${BASE_PATH}/hardhat/start`, { method: "POST" });
+      const r = await studioFetch(`${BASE_PATH}/hardhat/start`, { method: "POST" });
       const data = await r.json();
       if (data.error) throw new Error(data.error);
       addLog(`✅ Nœud démarré (PID ${data.pid})`);
@@ -356,7 +366,7 @@ export function useDeployStudio() {
   const stopHardhat = useCallback(async () => {
     addLog("🛑 Arrêt nœud Hardhat...");
     try {
-      await fetch(`${BASE_PATH}/hardhat/stop`, { method: "POST" });
+      await studioFetch(`${BASE_PATH}/hardhat/stop`, { method: "POST" });
       setHardhatRunning(false);
       addLog("✅ Nœud arrêté");
     } catch (e: unknown) {
@@ -367,7 +377,7 @@ export function useDeployStudio() {
   // ── Contrats disponibles ───────────────────────────────────────────────────
   const fetchAvailableContracts = useCallback(async () => {
     try {
-      const r = await fetch(`${BASE_PATH}/contracts/list`);
+      const r = await studioFetch(`${BASE_PATH}/contracts/list`);
       const data = await r.json();
       if (data.error) throw new Error(data.error);
       setAvailableContracts(data.contracts ?? []);
@@ -380,7 +390,7 @@ export function useDeployStudio() {
   // ── Contrats déployés (persistés) ─────────────────────────────────────────
   const fetchDeployedContracts = useCallback(async () => {
     try {
-      const r = await fetch(`${BASE_PATH}/deployed`);
+      const r = await studioFetch(`${BASE_PATH}/deployed`);
       const data = await r.json();
       setDeployedContracts(data.contracts ?? []);
     } catch {
@@ -390,7 +400,7 @@ export function useDeployStudio() {
 
   const removeDeployedContract = useCallback(async (id: string) => {
     try {
-      await fetch(`${BASE_PATH}/deployed`, {
+      await studioFetch(`${BASE_PATH}/deployed`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
@@ -407,7 +417,7 @@ export function useDeployStudio() {
     if (ids.length === 0) return;
     try {
       for (const id of ids) {
-        await fetch(`${BASE_PATH}/deployed`, {
+        await studioFetch(`${BASE_PATH}/deployed`, {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id }),
@@ -425,7 +435,7 @@ export function useDeployStudio() {
     setIsCompiling(true);
     addLog("🔨 Compilation Hardhat...");
     try {
-      const r = await fetch(`${BASE_PATH}/contracts/compile`, {
+      const r = await studioFetch(`${BASE_PATH}/contracts/compile`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode: "global" }),
@@ -451,7 +461,7 @@ export function useDeployStudio() {
     addLog(`🔍 Chargement ABI ${contractName}...`);
     let hints: ConstructorHint[] = [];
     try {
-      const r = await fetch(
+      const r = await studioFetch(
         `${BASE_PATH}/contracts/abi?name=${encodeURIComponent(contractName)}`
       );
       const data = await r.json();
@@ -504,7 +514,7 @@ export function useDeployStudio() {
     for (const tBlock of template.blocks) {
       let hints: ConstructorHint[] = [];
       try {
-        const r = await fetch(
+        const r = await studioFetch(
           `${BASE_PATH}/contracts/abi?name=${encodeURIComponent(tBlock.contractName)}`
         );
         const data = await r.json();
@@ -608,7 +618,7 @@ export function useDeployStudio() {
   ): Promise<string> => {
     addLog(`🦊 MetaMask — récupération ABI ${block.contractName}...`);
 
-    const abiRes = await fetch(
+    const abiRes = await studioFetch(
       `${BASE_PATH}/contracts/abi?name=${encodeURIComponent(block.contractName)}`
     );
     const abiData = await abiRes.json();
@@ -675,7 +685,7 @@ export function useDeployStudio() {
           address = await deployWithMetaMask(block, resolvedArgs);
         } else {
           // Hardhat script mode — existing API call
-          const r = await fetch(`${BASE_PATH}/contracts/deploy`, {
+          const r = await studioFetch(`${BASE_PATH}/contracts/deploy`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -695,7 +705,7 @@ export function useDeployStudio() {
         resolved[block.id] = address;
 
         // Sauvegarder dans l'historique
-        await fetch(`${BASE_PATH}/deployed`, {
+        await studioFetch(`${BASE_PATH}/deployed`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -746,7 +756,7 @@ export function useDeployStudio() {
       addLog("⚡ ═══════════════════════════════════════════");
 
       try {
-        const r = await fetch(`${BASE_PATH}/full-pipeline`, {
+        const r = await studioFetch(`${BASE_PATH}/full-pipeline`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ownerAddress, artistAddress, network }),
@@ -798,7 +808,7 @@ export function useDeployStudio() {
       let totalGas = 0n;
 
       for (const block of enabled) {
-        const r = await fetch(
+        const r = await studioFetch(
           `${BASE_PATH}/contracts/abi?name=${encodeURIComponent(block.contractName)}`
         );
         const data = await r.json();

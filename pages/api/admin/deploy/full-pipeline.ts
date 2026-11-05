@@ -16,72 +16,60 @@
  * }
  */
 import type { NextApiRequest, NextApiResponse } from "next";
-import { exec } from "child_process";
-import { promisify } from "util";
 import fs from "fs";
 import path from "path";
-
-const execAsync = promisify(exec);
-
-const HARDHAT_DIR =
-  process.env.HARDHAT_DIR ||
-  "C:/Users/thibf/Documents/App-Rescoe/HardhatRescoe";
-
-const NETWORK_MAP: Record<string, string> = {
-  hardhat: "localhost",
-  baseSepolia: "baseSepolia",
-  base: "base",
-};
-
-const ETH_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+import { guardDeployStudio, isMainnetAllowed } from "@/server/security/deployStudioGuard";
+import { requireJsonBody, requireMethod, sendError } from "@/server/security/guards";
+import { isEvmAddress } from "@/server/security/validators";
+import { release, tryAcquire } from "@/server/security/inflight";
+import { logServerError } from "@/server/security/redact";
+import { isStudioNetwork, NETWORK_MAP, runHardhat, sanitizeOutput } from "@/server/deployStudio/hardhat";
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  if (req.method !== "POST") return res.status(405).end();
+  if (!requireMethod(req, res, ["POST"])) return;
+  const HARDHAT_DIR = guardDeployStudio(req, res);
+  if (!HARDHAT_DIR) return;
 
-  if (process.env.VERCEL) {
-    return res.status(503).json({
-      error:
-        "La pipeline complète n'est disponible qu'en local (child_process requis).",
-    });
+  const body = requireJsonBody(req, res);
+  if (!body) return;
+
+  const { ownerAddress, artistAddress, network = "baseSepolia" } = body;
+
+  // Validation stricte (checksum inclus si adresse en casse mixte)
+  if (!isEvmAddress(ownerAddress) || !isEvmAddress(artistAddress)) {
+    return sendError(res, 400, "invalid_address", "ownerAddress et artistAddress doivent être des adresses Ethereum valides.");
+  }
+  if (!isStudioNetwork(network)) return sendError(res, 400, "invalid_network", "Réseau inconnu.");
+  if (network === "base" && !isMainnetAllowed()) {
+    return sendError(res, 403, "mainnet_disabled", "Déploiement mainnet désactivé (ENABLE_DEPLOY_STUDIO_MAINNET=true requis).");
   }
 
-  const { ownerAddress, artistAddress, network = "baseSepolia" } = req.body ?? {};
-
-  // Validation
-  if (!ownerAddress || !artistAddress) {
-    return res.status(400).json({
-      error: "ownerAddress et artistAddress sont requis.",
-    });
-  }
-  if (!ETH_ADDRESS_RE.test(ownerAddress) || !ETH_ADDRESS_RE.test(artistAddress)) {
-    return res.status(400).json({
-      error: "Adresses Ethereum invalides (format 0x + 40 hex).",
-    });
-  }
-
-  const hardhatNetwork = NETWORK_MAP[network as string] ?? "baseSepolia";
+  const hardhatNetwork = NETWORK_MAP[network];
   const configPath = path.join(HARDHAT_DIR, "pipeline-config.json");
   const resultPath = path.join(HARDHAT_DIR, "pipeline-result.json");
 
-  // Écrire la config pour le script
-  fs.writeFileSync(
-    configPath,
-    JSON.stringify({ ownerAddress, artistAddress }, null, 2)
-  );
-
-  // Supprimer l'ancien résultat pour éviter de lire un résidu
-  try {
-    fs.unlinkSync(resultPath);
-  } catch {
-    // pas de fichier précédent — ok
-  }
+  if (!tryAcquire("deploy-studio:pipeline")) return sendError(res, 409, "in_progress", "Une pipeline est déjà en cours.");
 
   try {
-    const { stdout, stderr } = await execAsync(
-      `cd /d "${HARDHAT_DIR}" && npx hardhat run scripts/full-pipeline.js --network ${hardhatNetwork}`,
+    // Écrire la config pour le script
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({ ownerAddress, artistAddress }, null, 2)
+    );
+
+    // Supprimer l'ancien résultat pour éviter de lire un résidu
+    try {
+      fs.unlinkSync(resultPath);
+    } catch {
+      // pas de fichier précédent — ok
+    }
+
+    const { stdout, stderr } = await runHardhat(
+      HARDHAT_DIR,
+      ["run", "scripts/full-pipeline.js", "--network", hardhatNetwork],
       { timeout: 600_000, maxBuffer: 20 * 1024 * 1024 } // 10 min max
     );
 
@@ -95,7 +83,7 @@ export default async function handler(
       if (match) {
         result = JSON.parse(match[1]);
       } else {
-        const debugOutput = (stderr || stdout).slice(-2000);
+        const debugOutput = sanitizeOutput((stderr || stdout).slice(-2000));
         throw new Error(
           `Résultat introuvable dans pipeline-result.json.\n${debugOutput}`
         );
@@ -131,12 +119,13 @@ export default async function handler(
 
     return res.status(200).json({
       ...result,
-      stdout: stdout.slice(-3000), // debug partiel inclus
+      stdout: sanitizeOutput(stdout.slice(-3000)), // debug partiel inclus, secrets masqués
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return res.status(500).json({ success: false, error: msg });
+    logServerError("deploy-studio/pipeline", err);
+    return res.status(500).json({ success: false, error: "pipeline_failed" });
   } finally {
+    release("deploy-studio:pipeline");
     // Toujours nettoyer la config (contient les adresses)
     try {
       fs.unlinkSync(configPath);

@@ -6,26 +6,19 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import fs from "fs";
 import path from "path";
-
-const HARDHAT_DIR =
-  process.env.HARDHAT_DIR ||
-  "C:/Users/thibf/Documents/App-Rescoe/HardhatRescoe";
+import { guardDeployStudio } from "@/server/security/deployStudioGuard";
+import { requireMethod, sendError } from "@/server/security/guards";
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "GET") return res.status(405).end();
-
-  // Guard : prod Vercel
-  if (process.env.VERCEL) {
-    return res.status(503).json({ error: "Disponible uniquement en local" });
-  }
+  if (!requireMethod(req, res, ["GET"])) return;
+  const HARDHAT_DIR = guardDeployStudio(req, res);
+  if (!HARDHAT_DIR) return;
 
   try {
     const contractsDir = path.join(HARDHAT_DIR, "contracts");
 
     if (!fs.existsSync(contractsDir)) {
-      return res.status(404).json({
-        error: `Dossier contracts introuvable : ${contractsDir}`,
-      });
+      return sendError(res, 404, "contracts_dir_missing", "Dossier contracts introuvable (vérifiez HARDHAT_DIR).");
     }
 
     // Exclure les interfaces, les contrats enfants (spawned par factories) et les utilitaires
@@ -46,7 +39,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       .map((f) => f.replace(".sol", ""));
 
     return res.status(200).json({ contracts });
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+  } catch {
+    return sendError(res, 500, "list_failed");
   }
 }

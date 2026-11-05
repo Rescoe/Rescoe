@@ -21,9 +21,10 @@ import ManageNFT from './ManageNFT/ManageNFT';
 import ContractBook from './ContractBook';
 import dynamic from 'next/dynamic';
 
-// Deploy Studio — lazy-loaded (child_process côté serveur, pas de SSR)
+// Deploy Studio — lazy-loaded (child_process côté serveur, pas de SSR).
+// La porte vérifie l'autorisation serveur (opt-in local) avant de charger l'outil.
 const DeployStudio = dynamic(
-    () => import('./DeployStudio/DeployStudio'),
+    () => import('./DeployStudio/DeployStudioGate'),
     {
         ssr: false,
         loading: () => (

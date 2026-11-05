@@ -1,97 +1,72 @@
 /**
  * POST /api/admin/deploy/contracts/deploy
- * Déploie un contrat via le script Hardhat universel.
- * ADMIN LOCAL UNIQUEMENT.
+ * Déploie un contrat via le script Hardhat universel (scripts/deploy-universal.js).
+ * ADMIN LOCAL UNIQUEMENT — protégé par guardDeployStudio. Le réseau "base" (mainnet)
+ * exige en plus ENABLE_DEPLOY_STUDIO_MAINNET=true.
  *
- * Body: { name: string, args: string[], mode: 'hardhat' | 'baseSepolia' | 'base' }
+ * Body: { name: string, args: (string|number|boolean|array)[], mode: 'hardhat' | 'baseSepolia' | 'base' }
  */
 import type { NextApiRequest, NextApiResponse } from "next";
-import { exec } from "child_process";
-import { promisify } from "util";
 import fs from "fs";
-import path from "path";
+import { guardDeployStudio, isMainnetAllowed } from "@/server/security/deployStudioGuard";
+import { requireJsonBody, requireMethod, sendError } from "@/server/security/guards";
+import { isContractName, parseDeployArgs } from "@/server/security/validators";
+import { release, tryAcquire } from "@/server/security/inflight";
+import { logServerError } from "@/server/security/redact";
+import { isStudioNetwork, NETWORK_MAP, resolveInside, runHardhat } from "@/server/deployStudio/hardhat";
 
-const execAsync = promisify(exec);
+// Augmenter la limite de body (contrats peuvent être volumineux)
+export const config = { api: { bodyParser: { sizeLimit: "2mb" } } };
 
-const HARDHAT_DIR =
-  process.env.HARDHAT_DIR ||
-  "C:/Users/thibf/Documents/App-Rescoe/HardhatRescoe";
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (!requireMethod(req, res, ["POST"])) return;
+  const hardhatDir = guardDeployStudio(req, res);
+  if (!hardhatDir) return;
 
-// Réseau mappé selon le mode
-const NETWORK_MAP: Record<string, string> = {
-  hardhat: "localhost",
-  baseSepolia: "baseSepolia",
-  base: "base",
-};
+  const body = requireJsonBody(req, res);
+  if (!body) return;
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  if (req.method !== "POST") return res.status(405).end();
-
-  if (process.env.VERCEL) {
-    return res.status(503).json({ error: "Disponible uniquement en local" });
+  const { name, args = [], mode = "baseSepolia" } = body;
+  if (!isContractName(name)) return sendError(res, 400, "invalid_name", "Nom de contrat invalide.");
+  const parsedArgs = parseDeployArgs(args);
+  if (!parsedArgs) return sendError(res, 400, "invalid_args", "Arguments de constructeur invalides.");
+  if (!isStudioNetwork(mode)) return sendError(res, 400, "invalid_network", "Réseau inconnu.");
+  if (mode === "base" && !isMainnetAllowed()) {
+    return sendError(res, 403, "mainnet_disabled", "Déploiement mainnet désactivé (ENABLE_DEPLOY_STUDIO_MAINNET=true requis).");
   }
 
-  const { name, args = [], mode = "baseSepolia" } = req.body ?? {};
+  const argsJsonPath = resolveInside(hardhatDir, "temp-deploy-args.json");
+  if (!argsJsonPath) return sendError(res, 500, "invalid_path");
 
-  if (!name) {
-    return res.status(400).json({ error: "Paramètre name requis" });
-  }
-
-  const network = NETWORK_MAP[mode] ?? "baseSepolia";
-
-  // Écrire les args pour le script
-  const argsJsonPath = path.join(HARDHAT_DIR, "temp-deploy-args.json");
-  fs.writeFileSync(
-    argsJsonPath,
-    JSON.stringify({ contractName: name, args })
-  );
+  if (!tryAcquire("deploy-studio:deploy")) return sendError(res, 409, "in_progress", "Un déploiement est déjà en cours.");
 
   try {
-    const { stdout } = await execAsync(
-      `cd /d "${HARDHAT_DIR}" && npx hardhat run scripts/deploy-universal.js --network ${network}`,
-      { timeout: 180_000, maxBuffer: 10 * 1024 * 1024 }
+    // Arguments transmis au script via un fichier (pas via la ligne de commande).
+    fs.writeFileSync(argsJsonPath, JSON.stringify({ contractName: name, args: parsedArgs }));
+
+    const { stdout } = await runHardhat(
+      hardhatDir,
+      ["run", "scripts/deploy-universal.js", "--network", NETWORK_MAP[mode]],
+      { timeout: 180_000 }
     );
 
     // Extraire le JSON de la sortie (ignore les lignes dotenv/console)
-    const jsonMatch = stdout.match(
-      /\{[^{}]*(?:\{[^{}]*\}[^{}]*)*?"success":\s*(?:true|false)[^{}]*\}/
-    );
-
-    if (!jsonMatch) {
-      throw new Error(`Réponse inattendue du script :\n${stdout.slice(-500)}`);
-    }
+    const jsonMatch = stdout.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*?"success":\s*(?:true|false)[^{}]*\}/);
+    if (!jsonMatch) throw new Error("Réponse inattendue du script de déploiement.");
 
     const parsed = JSON.parse(jsonMatch[0]);
-
-    if (!parsed.success) {
-      throw new Error(parsed.error || "Déploiement échoué");
-    }
-
-    // Nettoyer le fichier temp
-    try {
-      fs.unlinkSync(argsJsonPath);
-    } catch {
-      // non bloquant
-    }
+    if (!parsed.success) throw new Error(String(parsed.error || "Déploiement échoué"));
 
     return res.status(200).json(parsed);
-  } catch (err: any) {
-    // Nettoyer même en cas d'erreur
+  } catch (err) {
+    logServerError("deploy-studio/deploy", err);
+    return res.status(500).json({ success: false, error: "deploy_failed" });
+  } finally {
     try {
       fs.unlinkSync(argsJsonPath);
     } catch {
       // non bloquant
     }
-    return res
-      .status(500)
-      .json({ success: false, error: err.message });
+    release("deploy-studio:deploy");
   }
 }
-
-// Augmenter la limite de body (contrats peuvent être volumineux)
-export const config = {
-  api: { bodyParser: { sizeLimit: "2mb" } },
-};

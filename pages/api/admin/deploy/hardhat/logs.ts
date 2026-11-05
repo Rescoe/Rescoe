@@ -1,11 +1,15 @@
 /**
  * GET /api/admin/deploy/hardhat/logs
- * Retourne les dernières lignes de log du nœud Hardhat.
+ * Retourne les dernières lignes de log du nœud Hardhat (déjà masquées côté écriture).
+ * ADMIN LOCAL UNIQUEMENT — protégé par guardDeployStudio.
  */
 import type { NextApiRequest, NextApiResponse } from "next";
+import { guardDeployStudio } from "@/server/security/deployStudioGuard";
+import { requireMethod } from "@/server/security/guards";
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "GET") return res.status(405).end();
+  if (!requireMethod(req, res, ["GET"])) return;
+  if (!guardDeployStudio(req, res)) return;
 
   const logs: string[] = (globalThis as any).__hardhatLogs ?? [];
 

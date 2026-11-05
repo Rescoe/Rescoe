@@ -3,16 +3,15 @@
  * Vérifie si le nœud Hardhat local répond sur localhost:8545.
  */
 import type { NextApiRequest, NextApiResponse } from "next";
+import { guardDeployStudio } from "@/server/security/deployStudioGuard";
+import { requireMethod } from "@/server/security/guards";
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  if (req.method !== "GET") return res.status(405).end();
-
-  if (process.env.VERCEL) {
-    return res.status(200).json({ running: false, vercelOnly: true });
-  }
+  if (!requireMethod(req, res, ["GET"])) return;
+  if (!guardDeployStudio(req, res)) return;
 
   try {
     const response = await fetch("http://127.0.0.1:8545", {

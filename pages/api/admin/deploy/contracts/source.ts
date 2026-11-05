@@ -6,10 +6,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { readdirSync, readFileSync, statSync } from "fs";
 import path from "path";
-
-const HARDHAT_DIR =
-  process.env.HARDHAT_DIR ||
-  "C:/Users/thibf/Documents/App-Rescoe/HardhatRescoe";
+import { guardDeployStudio } from "@/server/security/deployStudioGuard";
+import { requireMethod, sendError } from "@/server/security/guards";
 
 /**
  * Recursively search for a .sol file by name within a directory.
@@ -43,13 +41,9 @@ function findSolFile(dir: string, fileName: string): string | null {
 }
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "GET") return res.status(405).end();
-
-  if (process.env.VERCEL) {
-    return res
-      .status(503)
-      .json({ error: "Disponible uniquement en local (non disponible sur Vercel)" });
-  }
+  if (!requireMethod(req, res, ["GET"])) return;
+  const HARDHAT_DIR = guardDeployStudio(req, res);
+  if (!HARDHAT_DIR) return;
 
   const { name } = req.query;
   if (!name || typeof name !== "string") {
@@ -68,16 +62,14 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   const filePath = findSolFile(contractsDir, fileName);
 
   if (!filePath) {
-    return res
-      .status(404)
-      .json({ error: `Fichier source "${fileName}" introuvable dans ${contractsDir}` });
+    return sendError(res, 404, "source_not_found", `Fichier source "${fileName}" introuvable.`);
   }
 
   let source: string;
   try {
     source = readFileSync(filePath, "utf8");
-  } catch (err: unknown) {
-    return res.status(500).json({ error: (err as Error).message });
+  } catch {
+    return sendError(res, 500, "read_failed");
   }
 
   res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);

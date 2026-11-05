@@ -1,72 +1,71 @@
 /**
  * POST /api/admin/deploy/contracts/compile
- * Lance "npx hardhat compile" dans le projet HardhatRescoe.
- * ADMIN LOCAL UNIQUEMENT — utilise child_process.exec.
+ * Lance "npx hardhat compile" dans le projet Hardhat (HARDHAT_DIR).
+ * ADMIN LOCAL UNIQUEMENT — protégé par guardDeployStudio (opt-in ENABLE_DEPLOY_STUDIO=true).
+ *
+ * Body (optionnel) : { name: string, content: string } — écrit contracts/<name>.sol avant compilation.
  */
 import type { NextApiRequest, NextApiResponse } from "next";
-import { exec } from "child_process";
-import { promisify } from "util";
 import fs from "fs/promises";
-import path from "path";
+import { guardDeployStudio } from "@/server/security/deployStudioGuard";
+import { requireJsonBody, requireMethod, sendError } from "@/server/security/guards";
+import { isContractName } from "@/server/security/validators";
+import { release, tryAcquire } from "@/server/security/inflight";
+import { logServerError } from "@/server/security/redact";
+import { resolveInside, runHardhat, sanitizeOutput } from "@/server/deployStudio/hardhat";
 
-const execAsync = promisify(exec);
+export const config = { api: { bodyParser: { sizeLimit: "1mb" } } };
 
-const HARDHAT_DIR =
-  process.env.HARDHAT_DIR ||
-  "C:/Users/thibf/Documents/App-Rescoe/HardhatRescoe";
+const MAX_SOURCE_CHARS = 500_000;
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  if (req.method !== "POST") return res.status(405).end();
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (!requireMethod(req, res, ["POST"])) return;
+  const hardhatDir = guardDeployStudio(req, res);
+  if (!hardhatDir) return;
 
-  if (process.env.VERCEL) {
-    return res.status(503).json({ error: "Disponible uniquement en local" });
+  const body = requireJsonBody(req, res);
+  if (!body) return;
+
+  const { name, content } = body;
+  const writesSource = name !== undefined || content !== undefined;
+  if (writesSource && (!isContractName(name) || typeof content !== "string" || content.length > MAX_SOURCE_CHARS)) {
+    return sendError(res, 400, "invalid_source", "name (identifiant simple) et content (<= 500 Ko) requis ensemble.");
   }
 
   try {
-    // Vérifier que le dossier existe
-    await fs.access(HARDHAT_DIR);
+    await fs.access(hardhatDir);
   } catch {
-    return res
-      .status(500)
-      .json({ error: `Dossier Hardhat introuvable : ${HARDHAT_DIR}` });
+    return sendError(res, 500, "hardhat_dir_missing", "Dossier Hardhat introuvable (vérifiez HARDHAT_DIR).");
   }
 
-  const { mode = "global", name, content } = req.body ?? {};
+  if (!tryAcquire("deploy-studio:compile")) return sendError(res, 409, "in_progress", "Compilation déjà en cours.");
 
   try {
-    // Si on fournit un contenu, on l'écrit avant de compiler
-    if (content && name) {
-      const contractsDir = path.join(HARDHAT_DIR, "contracts");
+    if (writesSource) {
+      const contractsDir = resolveInside(hardhatDir, "contracts");
+      const target = contractsDir && resolveInside(contractsDir, `${name as string}.sol`);
+      if (!contractsDir || !target) return sendError(res, 400, "invalid_source", "Chemin invalide.");
       await fs.mkdir(contractsDir, { recursive: true });
-      await fs.writeFile(path.join(contractsDir, `${name}.sol`), content);
+      await fs.writeFile(target, content as string);
     }
 
-    // Clean puis compile
-    await execAsync(`cd /d "${HARDHAT_DIR}" && npx hardhat clean`, {
-      timeout: 30_000,
-    });
-
-    const { stdout, stderr } = await execAsync(
-      `cd /d "${HARDHAT_DIR}" && npx hardhat compile`,
-      { timeout: 120_000, maxBuffer: 10 * 1024 * 1024 }
-    );
-
-    const success = stdout.includes("Compiled") || !stderr;
+    await runHardhat(hardhatDir, ["clean"], { timeout: 30_000 });
+    const { stdout, stderr } = await runHardhat(hardhatDir, ["compile"], { timeout: 120_000 });
 
     return res.status(200).json({
-      success,
-      stdout: stdout.toString(),
-      stderr: stderr.toString(),
+      success: stdout.includes("Compiled") || !stderr,
+      stdout: sanitizeOutput(stdout),
+      stderr: sanitizeOutput(stderr),
     });
   } catch (err: any) {
+    logServerError("deploy-studio/compile", err);
     return res.status(500).json({
       success: false,
-      error: err.message,
-      stdout: err.stdout?.toString() ?? "",
-      stderr: err.stderr?.toString() ?? "",
+      error: "compile_failed",
+      stdout: sanitizeOutput(err?.stdout?.toString() ?? ""),
+      stderr: sanitizeOutput(err?.stderr?.toString() ?? ""),
     });
+  } finally {
+    release("deploy-studio:compile");
   }
 }
