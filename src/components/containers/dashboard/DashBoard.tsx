@@ -9,6 +9,7 @@ import { colors, effects, hoverStyles } from '@/styles/theme'  // Ajuste chemin
 
 
 import { useAuth } from "@/utils/authContext";
+import { useWalletFetch, jsonPost } from "@/hooks/useWalletFetch";
 import { JsonRpcProvider } from 'ethers';
 import { ethers } from "ethers";
 
@@ -87,6 +88,7 @@ const Dashboard = () => {
   const [pointsToBuy, setPointsToBuy] = useState<number>(0); // État pour les points à acheter
   const toast = useToast();
   const { address: account, web3, isAuthenticated } = useAuth();
+  const walletFetch = useWalletFetch();
 
   const router = useRouter();
 
@@ -269,11 +271,7 @@ const Dashboard = () => {
 
 
       // Après tx.send() de l'achat
-      const claimResponse = await fetch('/api/claim-reward', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user: account })
-      });
+      const claimResponse = await walletFetch('/api/claim-reward', jsonPost({ user: account }));
 
       const claimData = await claimResponse.json();
       //console.log('Points distribués:', claimData);

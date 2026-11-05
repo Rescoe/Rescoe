@@ -30,6 +30,15 @@ import { resetCache as resetMembers } from "./data/members";
 import { resetCache as resetInsects } from "./data/insects";
 import { resetCache as resetCollections } from "./data/collections";
 import { evictAdhesionMetadata } from "./token/adhesion-metadata";
+import { timingSafeEqual } from "crypto";
+import { enforceRateLimit } from "@/server/security/rateLimit";
+
+/** Comparaison à temps constant (évite de deviner le secret par mesure de temps). */
+function safeEqual(a: string, b: string): boolean {
+  const ba = Buffer.from(a);
+  const bb = Buffer.from(b);
+  return ba.length === bb.length && timingSafeEqual(ba, bb);
+}
 
 const VALID_CACHES = ["members", "insects", "collections"] as const;
 type CacheName = (typeof VALID_CACHES)[number];
@@ -43,6 +52,9 @@ export default async function handler(
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  // Frein au brute-force du secret (best-effort, voir rateLimit.ts)
+  if (!enforceRateLimit(req, res, "revalidate", { limit: 60, windowMs: 60_000 })) return;
+
   // ── Authentification ────────────────────────────────────────────────────────
   // Secret UNIQUEMENT dans les variables d'env serveur — jamais NEXT_PUBLIC_
   const expectedSecret = process.env.REVALIDATE_SECRET;
@@ -51,11 +63,13 @@ export default async function handler(
     return res.status(500).json({ error: "Server misconfiguration" });
   }
 
-  const providedSecret =
-    (req.headers["x-revalidate-secret"] as string) ||
-    (req.query.secret as string);
+  // Le secret en query string finit dans les journaux d'accès : toléré hors production
+  // uniquement (tests curl). En production, seul l'en-tête est accepté.
+  const fromHeader = req.headers["x-revalidate-secret"];
+  const fromQuery = process.env.NODE_ENV === "production" ? undefined : req.query.secret;
+  const providedSecret = typeof fromHeader === "string" ? fromHeader : typeof fromQuery === "string" ? fromQuery : "";
 
-  if (!providedSecret || providedSecret !== expectedSecret) {
+  if (!providedSecret || !safeEqual(providedSecret, expectedSecret)) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
@@ -100,8 +114,9 @@ export default async function handler(
 
   // Invalidation du cache metadata d'un token d'adhésion après évolution
   // Usage : POST /api/revalidate?caches=adhesion-evolution&tokenId=123
-  const tokenId = req.query.tokenId as string | undefined;
+  const tokenId = typeof req.query.tokenId === "string" ? req.query.tokenId : undefined;
   if (tokenId && req.query.caches === "adhesion-evolution") {
+    if (!/^\d{1,18}$/.test(tokenId)) return res.status(400).json({ error: "tokenId invalide" });
     evictAdhesionMetadata(tokenId);
     console.log(`[/api/revalidate] Cache metadata adhesion invalidé pour token ${tokenId}`);
   }

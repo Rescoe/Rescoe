@@ -7,7 +7,8 @@ const CHANNEL_ID = process.env.NEXT_PUBLIC_CHANNEL_NEWS_ID;
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     // récupère ?limit=10 (par défaut 10 si non fourni)
-    const limit = parseInt((req.query.limit as string) || "10", 10);
+    const parsedLimit = parseInt(String(req.query.limit ?? "10"), 10);
+    const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 50) : 10;
 
     // appel à l’API Discord avec le limit demandé
     const response = await fetch(

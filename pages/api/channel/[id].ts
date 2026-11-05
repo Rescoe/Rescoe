@@ -1,5 +1,6 @@
 // pages/api/channel/[id].ts
 import type { NextApiRequest, NextApiResponse } from "next";
+import { logServerError } from "@/server/security/redact";
 
 const UNIQUE_DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 
@@ -10,11 +11,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: "Token Discord manquant en configuration serveur." });
   }
 
-  if (!id || Array.isArray(id)) {
+  // Identifiant Discord (snowflake) uniquement : l'id est inséré dans une URL appelée avec le jeton du bot.
+  if (!id || Array.isArray(id) || !/^\d{5,25}$/.test(id)) {
     return res.status(400).json({ error: "Paramètre 'id' invalide." });
   }
 
-  const limitParsed = parseInt(Array.isArray(limit) ? limit[0] : limit || "10", 10);
+  const parsed = parseInt(Array.isArray(limit) ? limit[0] : limit || "10", 10);
+  const limitParsed = Number.isFinite(parsed) ? Math.min(Math.max(parsed, 1), 50) : 10;
 
   try {
     // --- Récupération des messages normaux ---
@@ -27,10 +30,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!messagesResponse.ok) {
       const text = await messagesResponse.text();
-      console.error("Discord API error:", messagesResponse.status, text);
+      logServerError("channel/discord", `Discord API ${messagesResponse.status}: ${text}`);
       return res
         .status(messagesResponse.status)
-        .json({ error: "Impossible de récupérer les messages", details: text });
+        .json({ error: "Impossible de récupérer les messages" });
     }
 
     const messages = await messagesResponse.json();
@@ -55,7 +58,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       messages,
     });
   } catch (error: any) {
-    console.error("Erreur serveur API /channel/[id]:", error);
-    res.status(500).json({ error: "Erreur serveur", details: error.message });
+    logServerError("channel", error);
+    res.status(500).json({ error: "Erreur serveur" });
   }
 }

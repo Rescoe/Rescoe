@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { logServerError } from "@/server/security/redact";
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN!; //DISCORD_TOKEN!;
 const DISCORD_CHANNEL_ART_ID = process.env.NEXT_PUBLIC_CHANNEL_EXPOS_ID!; //DISCORD_CHANNEL_ART_ID!;
@@ -83,7 +84,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       return res.status(200).json(record);
     } catch (error: any) {
-      return res.status(500).json({ error: error?.message ?? "Erreur serveur" });
+      logServerError("discord/mod-status", error);
+      return res.status(500).json({ error: "Erreur serveur" });
     }
   }
 

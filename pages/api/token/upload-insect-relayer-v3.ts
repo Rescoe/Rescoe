@@ -26,6 +26,11 @@ import gifProfiles from "@/data/gif_profiles_smart_colors.json";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import { enforceRateLimit } from "@/server/security/rateLimit";
+import { requireJsonBody, requireMethod, requireWalletSession, sendError } from "@/server/security/guards";
+import { boundedString, hasOwn } from "@/server/security/validators";
+import { release, tryAcquire } from "@/server/security/inflight";
+import { hostOf, logServerError } from "@/server/security/redact";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -202,7 +207,7 @@ async function sendTx(
       const contract = new Contract(contractAddress, STORAGE_V3_ABI, wallet);
       const tx       = await txFn(contract);
       const receipt  = await tx.wait();
-      console.log(`[v3-relayer] ✅ ${label} → ${receipt.hash} (${rpc})`);
+      console.log(`[v3-relayer] ✅ ${label} → ${receipt.hash} (${hostOf(rpc)})`);
       return receipt.hash;
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -211,7 +216,7 @@ async function sendTx(
         return "already";
       }
       if (msg.includes("insufficient funds")) throw new Error(`INSUFFICIENT_FUNDS:${msg}`);
-      errors.push(`${rpc}: ${msg.slice(0, 80)}`);
+      errors.push(`${hostOf(rpc)}: ${msg.slice(0, 80)}`);
     }
   }
   throw new Error(`TOUS_RPC_ECHOUE: ${errors.join(" | ")}`);
@@ -230,20 +235,37 @@ function computeImageHash(imageDataUri: string): string {
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
+export const config = { api: { bodyParser: { sizeLimit: "2kb" } } };
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  if (!requireMethod(req, res, ["POST"])) return;
+  if (!enforceRateLimit(req, res, "upload-insect-v3", { limit: 30, windowMs: 10 * 60_000 })) return;
 
-  const { insectKey } = req.body as { insectKey?: string };
-  if (!insectKey?.trim()) return res.status(400).json({ error: "insectKey requis" });
+  // Le relayer paie le gas : réservé aux wallets connectés (session signée).
+  const session = requireWalletSession(req, res);
+  if (!session) return;
+  if (!enforceRateLimit(req, res, "upload-insect-v3-wallet", { limit: 15, windowMs: 10 * 60_000 }, session)) return;
 
-  const meta = (nftMetadata as unknown as Record<string, InsectData>)[insectKey];
-  if (!meta) return res.status(404).json({ error: `Insecte inconnu : ${insectKey}` });
+  const body = requireJsonBody(req, res);
+  if (!body) return;
+
+  const insectKey = boundedString(body.insectKey, 120);
+  if (!insectKey) return sendError(res, 400, "invalid_insect_key", "insectKey requis");
+
+  // hasOwn : évite que "constructor" / "__proto__" passent pour un insecte du catalogue.
+  const catalog = nftMetadata as unknown as Record<string, InsectData>;
+  if (!hasOwn(catalog, insectKey)) return sendError(res, 404, "unknown_insect", "Insecte inconnu");
+  const meta = catalog[insectKey];
 
   const storageAddress = process.env.NEXT_PUBLIC_INSECT_STORAGE_V3;
   const relayerPk      = process.env.RELAYER_PK;
   if (!storageAddress || !relayerPk) {
-    return res.status(500).json({ error: "NEXT_PUBLIC_INSECT_STORAGE_V3 ou RELAYER_PK manquant" });
+    console.error("[v3-relayer] config manquante", { storage: !!storageAddress, RELAYER_PK: !!relayerPk });
+    return sendError(res, 503, "not_configured", "Service temporairement indisponible.");
   }
+
+  const lockKey = `insect-v3:${insectKey}`;
+  if (!tryAcquire(lockKey)) return sendError(res, 409, "in_progress", "Upload déjà en cours pour cet insecte.");
 
   const primaryRpc = process.env.RELAYER_RPC_URL ?? "https://mainnet.base.org";
   const rpcList    = buildRpcList(primaryRpc);
@@ -256,7 +278,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // ── 1. Vérif solde relayer ────────────────────────────────────────────────
     const balance = await provider.getBalance(wallet.address);
     if (balance < 500_000_000_000_000n) {
-      return res.status(503).json({ error: `Relayer vide : ${wallet.address}. Envoyez 0.001 ETH sur Base.` });
+      console.error(`[v3-relayer] ❌ relayer à court de fonds : ${wallet.address}`);
+      return sendError(res, 503, "relayer_unfunded", "Service temporairement indisponible.");
     }
 
     // ── 2. Si insecte déjà enregistré → exit ─────────────────────────────────
@@ -344,10 +367,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
+    // Les messages d'erreur (ethers/RPC) contiennent l'URL RPC, donc éventuellement une clé API :
+    // journalisés masqués, jamais renvoyés au client.
+    logServerError("v3-relayer", e);
     if (msg.startsWith("INSUFFICIENT_FUNDS:")) {
-      return res.status(503).json({ error: "Fonds insuffisants sur le wallet relayer" });
+      return sendError(res, 503, "relayer_unfunded", "Service temporairement indisponible.");
     }
-    console.error("[v3-relayer] ❌", e);
-    return res.status(500).json({ error: msg });
+    return sendError(res, 500, "upload_failed", "L'enregistrement on-chain a échoué.");
+  } finally {
+    release(lockKey);
   }
 }

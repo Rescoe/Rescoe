@@ -4,6 +4,7 @@ import Web3 from "web3";
 import { JsonRpcProvider, Contract as EthersContract } from "ethers";
 import ABI from "@/components/ABI/ABIAdhesion.json";
 import { useAuth } from "@/utils/authContext";
+import { useWalletFetch, jsonPost } from "@/hooks/useWalletFetch";
 import { resolveIPFS } from "@/utils/resolveIPFS";
 
 export type UseReproductionReturn = {
@@ -86,6 +87,7 @@ export const useReproduction = ({
   refreshKey = "default",
 }: UseReproductionParams & { refreshKey?: string }) => {
   const { address: account, web3 } = useAuth();
+  const walletFetch = useWalletFetch();
 
   const [eligibleTokens, setEligibleTokens] = useState<TokenWithMeta[]>([]);
   const [isLoadingEligible, setIsLoadingEligible] = useState(false);
@@ -307,14 +309,10 @@ export const useReproduction = ({
         );
         const exists = (await storageContract.hasInsectImage(eggKey)) as boolean;
         if (!exists) {
-          const uploadRes = await fetch("/api/token/upload-egg-relayer", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ eggIndex }),
-          });
+          const uploadRes = await walletFetch("/api/token/upload-egg-relayer", jsonPost({ eggIndex }));
           if (!uploadRes.ok) {
-            const errData = await uploadRes.json();
-            throw new Error(errData.error || "Erreur upload œuf");
+            const errData = await uploadRes.json().catch(() => ({}));
+            throw new Error(errData.message || errData.error || "Erreur upload œuf");
           }
         }
       }
@@ -374,7 +372,7 @@ export const useReproduction = ({
     } finally {
       setIsReproducing(false);
     }
-  }, [parentA, parentB, account, userPoints, maxEggIndex, contractAddress, getReadContract, getWriteContract, startScanning, web3]);
+  }, [parentA, parentB, account, userPoints, maxEggIndex, contractAddress, getReadContract, getWriteContract, startScanning, web3, walletFetch]);
 
   const hasScanned = useMemo(
     () => hasScannedExplicitly || eligibleTokens.length > 0,

@@ -1,113 +1,91 @@
-import { NextApiRequest, NextApiResponse } from 'next';
+/**
+ * POST /api/claim-reward
+ * Le relayer (RELAYER_PK) paie le gas de la distribution des points en attente.
+ *
+ * Sécurité : session wallet obligatoire, et l'adresse visée doit être celle de la
+ * session (on ne peut déclencher une transaction relayer que pour SES propres points).
+ * Body : { user: "0x…" }
+ */
+import { NextApiRequest, NextApiResponse } from "next";
 import { ethers } from "ethers";
 import MANAGER_ABI from "@/components/ABI/ABI_Collections.json";
+import { enforceRateLimit } from "@/server/security/rateLimit";
+import { requireJsonBody, requireMethod, requireSameAddress, requireWalletSession, sendError } from "@/server/security/guards";
+import { isEvmAddress } from "@/server/security/validators";
+import { release, tryAcquire } from "@/server/security/inflight";
+import { logServerError } from "@/server/security/redact";
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method POST only' });
+export const config = { api: { bodyParser: { sizeLimit: "2kb" } } };
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (!requireMethod(req, res, ["POST"])) return;
+  if (!enforceRateLimit(req, res, "claim-reward", { limit: 10, windowMs: 60_000 })) return;
+
+  const session = requireWalletSession(req, res);
+  if (!session) return;
+
+  const body = requireJsonBody(req, res);
+  if (!body) return;
+
+  const user = body.user;
+  if (!isEvmAddress(user)) return sendError(res, 400, "invalid_address", "Adresse invalide");
+  if (!requireSameAddress(res, session, user)) return;
+  if (!enforceRateLimit(req, res, "claim-reward-user", { limit: 3, windowMs: 60_000 }, user)) return;
+
+  const RPC_URL = process.env.NEXT_PUBLIC_URL_SERVER_MORALIS;
+  const PRIVATE_KEY = process.env.RELAYER_PK;
+  const MANAGER_ADDRESS = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT;
+
+  if (!RPC_URL || !PRIVATE_KEY || !MANAGER_ADDRESS) {
+    // On journalise QUELLES variables manquent (booléens), jamais leur valeur.
+    console.error("[claim-reward] config manquante", {
+      RPC_URL: !!RPC_URL,
+      RELAYER_PK: !!PRIVATE_KEY,
+      MANAGER_ADDRESS: !!MANAGER_ADDRESS,
+    });
+    return sendError(res, 503, "not_configured", "Service temporairement indisponible.");
   }
 
+  const lockKey = `claim-reward:${user.toLowerCase()}`;
+  if (!tryAcquire(lockKey)) return sendError(res, 409, "in_progress", "Une distribution est déjà en cours.");
+
   try {
-    const { user } = req.body as { user: string }; // ✅ Type body
-
-    //console.log('Claim request for user:', user);
-
-    if (!ethers.isAddress(user)) {
-      return res.status(400).json({ error: "Adresse invalide" });
-    }
-
-    const RPC_URL = process.env.NEXT_PUBLIC_URL_SERVER_MORALIS;
-    const PRIVATE_KEY = process.env.RELAYER_PK;
-    const MANAGER_ADDRESS = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT;
-
-    if (!RPC_URL || !PRIVATE_KEY || !MANAGER_ADDRESS) {
-      console.error('Config manquante:', {
-        RPC_URL: !!RPC_URL,
-        PRIVATE_KEY: !!PRIVATE_KEY,
-        MANAGER_ADDRESS: !!MANAGER_ADDRESS
-      });
-      return res.status(500).json({ error: "Configuration manquante (.env)" });
-    }
-
     const provider = new ethers.JsonRpcProvider(RPC_URL);
-    const relayerWallet = new ethers.Wallet(PRIVATE_KEY!, provider); // ✅ Non-null
+    const relayerWallet = new ethers.Wallet(PRIVATE_KEY, provider);
 
-    //console.log('Relayer address:', await relayerWallet.getAddress());
-
-    const manager = new ethers.Contract(
-      MANAGER_ADDRESS,
-      MANAGER_ABI,
-      relayerWallet
-    ) as ethers.Contract & {
+    const manager = new ethers.Contract(MANAGER_ADDRESS, MANAGER_ABI, relayerWallet) as ethers.Contract & {
       getPendingPoints: (user: string) => Promise<bigint>;
       rewardRelayer: () => Promise<string>;
       distributeToAdhesion: (user: string, overrides?: any) => Promise<ethers.TransactionResponse>;
-    }; // ✅ ABI typing
+    };
 
     // 1. Vérif pending
     const pending = await manager.getPendingPoints(user);
-    //console.log(`Pending points for ${user}: ${pending.toString()}`);
-
-    if (pending === 0n) {
-      return res.status(400).json({ error: "Aucun point pending", pending: 0 });
-    }
+    if (pending === 0n) return sendError(res, 400, "no_pending_points", "Aucun point pending");
 
     // 2. Vérif relayer autorisé
     const currentRelayer = await manager.rewardRelayer();
-    const relayerAddress = await relayerWallet.getAddress();
-    //console.log(`Contract relayer: ${currentRelayer}, Caller: ${relayerAddress}`);
-
-    if (currentRelayer.toLowerCase() !== relayerAddress.toLowerCase()) {
-      return res.status(403).json({ error: "Relayer non autorisé", expected: currentRelayer });
+    if (currentRelayer.toLowerCase() !== (await relayerWallet.getAddress()).toLowerCase()) {
+      return sendError(res, 403, "relayer_not_authorized", "Relayer non autorisé");
     }
 
     // 3. Execute
-    //console.log('Calling distributeToAdhesion...');
-    const tx = await manager.distributeToAdhesion(user, {
-      gasLimit: 300_000
-    });
-
-    //console.log('TX sent:', tx.hash);
-
+    const tx = await manager.distributeToAdhesion(user, { gasLimit: 300_000 });
     const receipt = await tx.wait();
-    if (!receipt) {
-      throw new Error("Transaction receipt manquant");
-    }
+    if (!receipt) throw new Error("Transaction receipt manquant");
 
-    //console.log('TX confirmed:', receipt.blockNumber);
-
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       txHash: tx.hash,
       points: pending.toString(),
       block: receipt.blockNumber,
-      status: receipt.status
+      status: receipt.status,
     });
-
-
   } catch (err) {
-    // ✅ Type guard pour unknown → Error
-    const error = err as Error & {
-      reason?: string;
-      code?: string | number;
-      data?: any;
-    };
-
-    console.error("=== FULL ERROR ===");
-    console.error('Message:', error.message);
-    console.error('Reason:', error.reason ?? 'N/A');
-    console.error('Code:', error.code ?? 'N/A');
-    console.error('Data:', error.data ?? 'N/A');
-    console.error("==================");
-
-    res.status(500).json({
-      error: error.message ?? 'Erreur inconnue',
-      reason: error.reason ?? undefined,
-      code: error.code ?? undefined,
-      data: error.data ?? undefined
-    });
+    // Le message d'ethers peut contenir l'URL RPC (clé API) : jamais renvoyé au client.
+    logServerError("claim-reward", err);
+    return sendError(res, 500, "claim_failed", "La distribution a échoué.");
+  } finally {
+    release(lockKey);
   }
 }

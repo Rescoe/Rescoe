@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { ethers, BrowserProvider, Eip1193Provider, JsonRpcProvider } from "ethers";
 import { useAuth } from "@/utils/authContext";
+import { useWalletFetch, jsonPost } from "@/hooks/useWalletFetch";
 import FAUCET_ABI from "@/components/ABI/Faucet.json";
 
 import { Box, Button } from '@chakra-ui/react'; // Assurez-vous que Chakra UI est installé
@@ -11,6 +12,7 @@ const RPC_URL = process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string;
 
 export default function FaucetWidget() {
   const { address } = useAuth();
+  const walletFetch = useWalletFetch();
   const [balance, setBalance] = useState("0");
   const [cooldown, setCooldown] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -81,11 +83,7 @@ export default function FaucetWidget() {
     if (!address) return alert("Connecte ton wallet d'abord 🦊");
     setLoading(true);
     try {
-      const res = await fetch("/api/claim", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user: address }),
-      });
+      const res = await walletFetch("/api/claim", jsonPost({ user: address }));
       const data = await res.json();
       if (data.success) {
         alert("✅ 0.005 ETH Sepolia réclamé !");

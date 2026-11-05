@@ -1,23 +1,49 @@
+/**
+ * POST /api/create-onramp-session — session Stripe Crypto Onramp vers Base (ETH).
+ *
+ * Sécurité : session wallet obligatoire et adresse de destination = adresse de la
+ * session ; limite par IP ; l'IP transmise à Stripe est celle calculée côté serveur
+ * (jamais un X-Forwarded-For fourni par le client).
+ * Body : { walletAddress: "0x…" }
+ */
 import type { NextApiRequest, NextApiResponse } from "next";
 import Stripe from "stripe";
+import { enforceRateLimit } from "@/server/security/rateLimit";
+import { requireJsonBody, requireMethod, requireSameAddress, requireWalletSession, sendError } from "@/server/security/guards";
+import { getClientIp } from "@/server/security/clientIp";
+import { isEvmAddress } from "@/server/security/validators";
+import { logServerError } from "@/server/security/redact";
 
-const stripe = new Stripe(process.env.STRIPE_PRIVATE!);
-
-const OnrampSessionResource = Stripe.StripeResource.extend({
-  create: Stripe.StripeResource.method({
-    method: "POST",
-    path: "crypto/onramp_sessions",
-  }),
-});
+export const config = { api: { bodyParser: { sizeLimit: "2kb" } } };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+  if (!requireMethod(req, res, ["POST"])) return;
+  if (!enforceRateLimit(req, res, "onramp", { limit: 5, windowMs: 10 * 60_000 })) return;
+
+  const session = requireWalletSession(req, res);
+  if (!session) return;
+
+  const body = requireJsonBody(req, res);
+  if (!body) return;
+
+  const walletAddress = body.walletAddress;
+  if (!isEvmAddress(walletAddress)) return sendError(res, 400, "invalid_address", "Adresse invalide");
+  if (!requireSameAddress(res, session, walletAddress)) return;
+
+  const secretKey = process.env.STRIPE_PRIVATE;
+  if (!secretKey) {
+    console.error("[onramp] STRIPE_PRIVATE manquant");
+    return sendError(res, 503, "not_configured", "Service temporairement indisponible.");
+  }
 
   try {
-    const { walletAddress } = req.body;
+    const stripe = new Stripe(secretKey);
+    const OnrampSessionResource = Stripe.StripeResource.extend({
+      create: Stripe.StripeResource.method({ method: "POST", path: "crypto/onramp_sessions" }),
+    });
 
-    // ✅ ANY CAST (beta API pas typée)
-    const session: any = await new OnrampSessionResource(stripe).create({
+    // API bêta non typée par le SDK.
+    const onramp: any = await new OnrampSessionResource(stripe).create({
       transaction_details: {
         destination_currency: "eth",
         destination_exchange_amount: "0.01",
@@ -25,12 +51,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         supported_destination_networks: ["base"],
         wallet_address: walletAddress,
       },
-      customer_ip_address: req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || "127.0.0.1",
+      customer_ip_address: getClientIp(req),
     });
 
-    res.json({ clientSecret: session.client_secret });
-  } catch (error: any) {
-    console.error("❌", error.message);
-    res.status(500).json({ error: error.message });
+    return res.status(200).json({ clientSecret: onramp.client_secret });
+  } catch (err) {
+    logServerError("onramp", err);
+    return sendError(res, 502, "onramp_failed", "Impossible de créer la session de paiement.");
   }
 }

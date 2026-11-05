@@ -43,9 +43,11 @@ import { WarningIcon, LockIcon } from '@chakra-ui/icons';  // ✅ AJOUT ICI
 import ABI from "@/components/ABI/ABIAdhesion.json";
 import useEthToEur from "@/hooks/useEuro";
 import { useAuth } from "@/utils/authContext";
+import { useWalletFetch, jsonPost } from "@/hooks/useWalletFetch";
 
 const RoleBasedNFTPage = () => {
   const { address: account, web3, isAuthenticated, isLoading } = useAuth();
+  const walletFetch = useWalletFetch();
   const router = useRouter();
   const { convertEthToEur, loading: loadingEthPrice } = useEthToEur();
   const { isOpen, onToggle } = useDisclosure();
@@ -301,16 +303,12 @@ const uploadInsectViaRelayer = async (): Promise<boolean> => {
 
   setIsUploadingInsect(true);
   try {
-    const res = await fetch("/api/token/upload-insect-relayer-v3", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ insectKey: insectResult.insectName }),
-    });
+    const res = await walletFetch("/api/token/upload-insect-relayer-v3", jsonPost({ insectKey: insectResult.insectName }));
 
     const data = await res.json();
 
     if (!res.ok) {
-      throw new Error(data.error ?? `HTTP ${res.status}`);
+      throw new Error(data.message ?? data.error ?? `HTTP ${res.status}`);
     }
 
     // "uploaded" ou "exists" → dans les deux cas l'image est on-chain

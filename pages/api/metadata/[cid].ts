@@ -1,5 +1,7 @@
 // pages/api/metadata/[cid].ts
 import type { NextApiRequest, NextApiResponse } from "next";
+import { enforceRateLimit } from "@/server/security/rateLimit";
+import { isSafeIpfsPath } from "@/server/security/validators";
 
 const GATEWAYS = [
   "https://harlequin-key-marmot-538.mypinata.cloud/ipfs/",
@@ -9,9 +11,11 @@ const GATEWAYS = [
 ];
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (!enforceRateLimit(req, res, "metadata", { limit: 240, windowMs: 60_000 })) return;
+
   const { cid } = req.query;
 
-  if (!cid || typeof cid !== 'string') {
+  if (!cid || typeof cid !== 'string' || !isSafeIpfsPath(cid)) {
     return res.status(400).json({ error: "CID invalide" });
   }
 

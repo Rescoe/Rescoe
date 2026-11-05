@@ -13,6 +13,10 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { JsonRpcProvider, Wallet, Contract } from "ethers";
 import fs from "fs";
 import path from "path";
+import { enforceRateLimit } from "@/server/security/rateLimit";
+import { requireJsonBody, requireMethod, requireWalletSession, sendError } from "@/server/security/guards";
+import { release, tryAcquire } from "@/server/security/inflight";
+import { hostOf, logServerError } from "@/server/security/redact";
 
 const STORAGE_ABI = [
   {
@@ -131,7 +135,7 @@ async function sendWithFallback(
       const tx      = await txFn(contract);
       const receipt = await tx.wait();
 
-      console.log(`[upload-egg-relayer] ✅ ${label} → ${receipt.hash} (via ${rpcUrl})`);
+      console.log(`[upload-egg-relayer] ✅ ${label} → ${receipt.hash} (via ${hostOf(rpcUrl)})`);
       return { txHash: receipt.hash, rpcUrl };
 
     } catch (e: unknown) {
@@ -147,15 +151,15 @@ async function sendWithFallback(
       }
 
       if (isGasCapError(msg)) {
-        errors.push(`${rpcUrl}: gas cap`);
+        errors.push(`${hostOf(rpcUrl)}: gas cap`);
         continue;
       }
       if (isNetworkError(msg)) {
-        errors.push(`${rpcUrl}: network`);
+        errors.push(`${hostOf(rpcUrl)}: network`);
         continue;
       }
 
-      console.error(`[upload-egg-relayer] ❌ ${rpcUrl} [${label}]:`, e);
+      logServerError(`upload-egg-relayer ${hostOf(rpcUrl)} [${label}]`, e);
       throw e;
     }
   }
@@ -163,15 +167,23 @@ async function sendWithFallback(
   throw new Error(`GAS_CAP_ALL_RPCS:${errors.join("; ")}`);
 }
 
+export const config = { api: { bodyParser: { sizeLimit: "2kb" } } };
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
+  if (!requireMethod(req, res, ["POST"])) return;
+  if (!enforceRateLimit(req, res, "upload-egg", { limit: 30, windowMs: 10 * 60_000 })) return;
 
-  const { eggIndex } = req.body as { eggIndex?: number };
+  // Le relayer paie le gas : réservé aux wallets connectés (session signée).
+  const session = requireWalletSession(req, res);
+  if (!session) return;
+  if (!enforceRateLimit(req, res, "upload-egg-wallet", { limit: 15, windowMs: 10 * 60_000 }, session)) return;
 
-  if (!eggIndex || typeof eggIndex !== "number" || eggIndex < 1 || eggIndex > 9) {
-    return res.status(400).json({ error: "eggIndex requis (1-9)" });
+  const body = requireJsonBody(req, res);
+  if (!body) return;
+
+  const eggIndex = body.eggIndex;
+  if (typeof eggIndex !== "number" || !Number.isInteger(eggIndex) || eggIndex < 1 || eggIndex > 9) {
+    return sendError(res, 400, "invalid_egg_index", "eggIndex requis (entier 1-9)");
   }
 
   const insectKey = `OEUF${eggIndex}`;
@@ -180,10 +192,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const relayerPk            = process.env.RELAYER_PK;
 
   if (!insectStorageAddress || !relayerPk) {
-    return res.status(500).json({
-      error: "Relayer non configuré (NEXT_PUBLIC_INSECT_STORAGE / RELAYER_PK manquants)",
-    });
+    console.error("[upload-egg-relayer] config manquante", { storage: !!insectStorageAddress, RELAYER_PK: !!relayerPk });
+    return sendError(res, 503, "not_configured", "Service temporairement indisponible.");
   }
+
+  const lockKey = `egg:${insectKey}`;
+  if (!tryAcquire(lockKey)) return sendError(res, 409, "in_progress", "Upload déjà en cours pour cet œuf.");
 
   const primaryRpc = process.env.RELAYER_RPC_URL ?? "https://mainnet.base.org";
   const rpcList    = buildRpcList(primaryRpc);
@@ -195,11 +209,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const balance     = await primaryProvider.getBalance(primaryWallet.address);
     const MIN_BALANCE = 500_000_000_000_000n;
     if (balance < MIN_BALANCE) {
-      return res.status(503).json({
-        error: `Relayer wallet vide (${primaryWallet.address}). Envoyez au moins 0.001 ETH sur Base.`,
-        relayerAddress: primaryWallet.address,
-        currentBalanceWei: balance.toString(),
-      });
+      console.error(`[upload-egg-relayer] ❌ relayer à court de fonds : ${primaryWallet.address}`);
+      return sendError(res, 503, "relayer_unfunded", "Service temporairement indisponible.");
     }
 
     const primaryContract = new Contract(insectStorageAddress, STORAGE_ABI, primaryWallet);
@@ -275,23 +286,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
+    // Messages d'erreur (ethers/RPC) = URL RPC avec clé API possible : journalisés masqués,
+    // jamais renvoyés au client (l'ancien champ `details` exposait la liste des RPC).
+    logServerError("upload-egg-relayer", e);
 
     if (msg.startsWith("INSUFFICIENT_FUNDS:")) {
-      const primaryProvider = new JsonRpcProvider(primaryRpc);
-      const primaryWallet   = new Wallet(relayerPk!, primaryProvider);
-      return res.status(503).json({
-        error: `Relayer wallet : fonds insuffisants. Adresse : ${primaryWallet.address}.`,
-      });
+      return sendError(res, 503, "relayer_unfunded", "Service temporairement indisponible.");
     }
-
     if (msg.startsWith("GAS_CAP_ALL_RPCS:")) {
-      return res.status(503).json({
-        error: "Tous les RPCs ont rejeté la transaction (cap gas). Configurez RELAYER_RPC_URL avec Alchemy.",
-        details: msg.slice("GAS_CAP_ALL_RPCS:".length),
-      });
+      // Piste ops (côté serveur uniquement) : définir RELAYER_RPC_URL vers un RPC dédié.
+      return sendError(res, 503, "rpc_unavailable", "Réseau momentanément indisponible, réessayez plus tard.");
     }
-
-    console.error("[upload-egg-relayer] ❌", e);
-    return res.status(500).json({ error: msg });
+    return sendError(res, 500, "upload_failed", "L'enregistrement on-chain a échoué.");
+  } finally {
+    release(lockKey);
   }
 }

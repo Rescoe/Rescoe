@@ -29,6 +29,7 @@ import { signIn, signOut } from "next-auth/react";
 import { useAuthRequestChallengeEvm } from "@moralisweb3/next";
 import { getEllipsisTxt } from "../../../utils/format";
 import { useAuth } from "../../../utils/authContext";
+import { useWalletFetch, jsonPost } from "@/hooks/useWalletFetch";
 import Web3 from "web3";
 import detectEthereumProvider from "@metamask/detect-provider";
 import { formatUnits } from "@ethersproject/units";
@@ -42,6 +43,7 @@ import {
 const MotionMenuButton = motion(MenuButton);
 
 const ConnectBouton: React.FC = () => {
+  const walletFetch = useWalletFetch();
   const { requestChallengeAsync } = useAuthRequestChallengeEvm();
   const toast = useToast();
 
@@ -142,16 +144,13 @@ const ConnectBouton: React.FC = () => {
    if (!address) return toast({ title: "Connecte-toi d'abord !", status: "warning" });
 
    try {
-     const res = await fetch("/api/create-onramp-session", {
-       method: "POST",
-       headers: { "Content-Type": "application/json" },
-       body: JSON.stringify({
-         walletAddress: address, // ✅ WALLET CONNECTÉ (Web3Auth/MetaMask)
-       }),
-     });
+     const res = await walletFetch(
+       "/api/create-onramp-session",
+       jsonPost({ walletAddress: address }) // ✅ WALLET CONNECTÉ (Web3Auth/MetaMask)
+     );
 
      const data = await res.json();
-     if (data.error) throw new Error(data.error);
+     if (!res.ok || data.error) throw new Error(data.message || "Impossible de créer la session de paiement.");
 
      // Embedded modal OU hosted redirect
      setClientSecret(data.clientSecret);

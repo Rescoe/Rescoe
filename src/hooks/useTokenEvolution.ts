@@ -4,6 +4,7 @@ import { JsonRpcProvider, Contract as EthersContract } from "ethers";
 import Web3 from "web3";
 import ABI from "../components/ABI/ABIAdhesion.json";
 import { useAuth } from "@/utils/authContext";
+import { useWalletFetch, jsonPost } from "@/hooks/useWalletFetch";
 import { useRouter } from "next/router";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -51,6 +52,7 @@ export const useTokenEvolution = ({
   const [pendingInsect, setPendingInsect]     = useState<PendingInsect | null>(null);
 
   const { address: account, web3, isAuthenticated } = useAuth();
+  const walletFetch = useWalletFetch();
   const router = useRouter();
 
   // ── 1. Lire membershipInfo + prix d'évolution (ethers.js + Moralis RPC) ───
@@ -198,15 +200,11 @@ export const useTokenEvolution = ({
       // ── Upload du GIF du NOUVEL insecte AVANT d'appeler evolve() ────────────
       // Sans ça, tokenURI() retournerait une image vide après évolution
       // (InsectImageStorage.generateTokenURI retourne "" si keyHash inconnu).
-      const uploadRes = await fetch("/api/token/upload-insect-relayer-v3", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ insectKey: insect.insectKey }),
-      });
+      const uploadRes = await walletFetch("/api/token/upload-insect-relayer-v3", jsonPost({ insectKey: insect.insectKey }));
       if (!uploadRes.ok) {
         const uploadErr = await uploadRes.json().catch(() => ({}));
         throw new Error(
-          uploadErr.error ?? `Erreur upload image insecte évolué (HTTP ${uploadRes.status})`
+          uploadErr.message ?? uploadErr.error ?? `Erreur upload image insecte évolué (HTTP ${uploadRes.status})`
         );
       }
 
@@ -247,7 +245,7 @@ export const useTokenEvolution = ({
     }
   }, [
     contractAddress, tokenId, membershipInfo, evolvePriceEth, levelDuration,
-    account, web3, isAuthenticated, pendingInsect,
+    account, web3, isAuthenticated, pendingInsect, walletFetch,
   ]);
 
   // ── 4. Éclore un œuf on-chain (legacy — preferably use useHatchEgg) ───────
@@ -268,15 +266,11 @@ export const useTokenEvolution = ({
 
       // ── Upload du GIF de l'insecte éclos AVANT d'appeler hatchEgg() ─────────
       // Même raison que pour evolve() : sans ça tokenURI retourne image vide.
-      const uploadRes = await fetch("/api/token/upload-insect-relayer-v3", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ insectKey: String(d.insectName) }),
-      });
+      const uploadRes = await walletFetch("/api/token/upload-insect-relayer-v3", jsonPost({ insectKey: String(d.insectName) }));
       if (!uploadRes.ok) {
         const uploadErr = await uploadRes.json().catch(() => ({}));
         throw new Error(
-          uploadErr.error ?? `Erreur upload image insecte éclos (HTTP ${uploadRes.status})`
+          uploadErr.message ?? uploadErr.error ?? `Erreur upload image insecte éclos (HTTP ${uploadRes.status})`
         );
       }
 
@@ -315,7 +309,7 @@ export const useTokenEvolution = ({
     } finally {
       setIsEvolving(false);
     }
-  }, [contractAddress, tokenId, account, web3, isAuthenticated, router]);
+  }, [contractAddress, tokenId, account, web3, isAuthenticated, router, walletFetch]);
 
   const updateCurrentMetadata = useCallback(
     (metadata: any) => { onMetadataLoaded?.(metadata); },

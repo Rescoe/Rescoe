@@ -39,6 +39,11 @@ import nftMetadata from "@/data/nft_metadata_clean.json";
 import gifProfiles from "@/data/gif_profiles_smart_colors.json";
 import fs from "fs";
 import path from "path";
+import { enforceRateLimit } from "@/server/security/rateLimit";
+import { requireJsonBody, requireMethod, requireWalletSession, sendError } from "@/server/security/guards";
+import { boundedString, hasOwn } from "@/server/security/validators";
+import { release, tryAcquire } from "@/server/security/inflight";
+import { hostOf, logServerError } from "@/server/security/redact";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -279,7 +284,7 @@ async function sendWithFallback(
       const tx      = await txFn(contract);
       const receipt = await tx.wait();
 
-      console.log(`[upload-insect-relayer] ✅ ${label} → ${receipt.hash} (via ${rpcUrl})`);
+      console.log(`[upload-insect-relayer] ✅ ${label} → ${receipt.hash} (via ${hostOf(rpcUrl)})`);
       return { txHash: receipt.hash, rpcUrl };
 
     } catch (e: unknown) {
@@ -287,7 +292,7 @@ async function sendWithFallback(
 
       // Déjà stocké — pas une erreur
       if (msg.includes("Already finalized") || msg.includes("Already uploaded")) {
-        console.log(`[upload-insect-relayer] ℹ️  ${label} déjà présent (${rpcUrl})`);
+        console.log(`[upload-insect-relayer] ℹ️  ${label} déjà présent (${hostOf(rpcUrl)})`);
         return { txHash: "already", rpcUrl };
       }
 
@@ -297,18 +302,18 @@ async function sendWithFallback(
       }
 
       if (isGasCapError(msg)) {
-        console.warn(`[upload-insect-relayer] ⚠️  ${rpcUrl} → cap gas pour ${label}, essai suivant…`);
-        errors.push(`${rpcUrl}: gas cap`);
+        console.warn(`[upload-insect-relayer] ⚠️  ${hostOf(rpcUrl)} → cap gas pour ${label}, essai suivant…`);
+        errors.push(`${hostOf(rpcUrl)}: gas cap`);
         continue;
       }
       if (isNetworkError(msg)) {
-        console.warn(`[upload-insect-relayer] ⚠️  ${rpcUrl} → réseau (${msg.slice(0, 80)}), essai suivant…`);
-        errors.push(`${rpcUrl}: network`);
+        console.warn(`[upload-insect-relayer] ⚠️  ${hostOf(rpcUrl)} → réseau (${msg.slice(0, 80)}), essai suivant…`);
+        errors.push(`${hostOf(rpcUrl)}: network`);
         continue;
       }
 
       // Autre erreur non récupérable
-      console.error(`[upload-insect-relayer] ❌ ${rpcUrl} [${label}]:`, e);
+      logServerError(`upload-insect-relayer ${hostOf(rpcUrl)} [${label}]`, e);
       throw e;
     }
   }
@@ -318,34 +323,41 @@ async function sendWithFallback(
 
 // ─── Handler principal ────────────────────────────────────────────────────────
 
+export const config = { api: { bodyParser: { sizeLimit: "2kb" } } };
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
+  if (!requireMethod(req, res, ["POST"])) return;
+  if (!enforceRateLimit(req, res, "upload-insect", { limit: 30, windowMs: 10 * 60_000 })) return;
 
-  const { insectKey } = req.body as { insectKey?: string };
+  // Le relayer paie le gas : réservé aux wallets connectés (session signée).
+  const session = requireWalletSession(req, res);
+  if (!session) return;
+  if (!enforceRateLimit(req, res, "upload-insect-wallet", { limit: 15, windowMs: 10 * 60_000 }, session)) return;
 
-  if (!insectKey || typeof insectKey !== "string" || insectKey.trim().length === 0) {
-    return res.status(400).json({ error: "insectKey requis" });
-  }
+  const body = requireJsonBody(req, res);
+  if (!body) return;
 
-  // Validation : l'insecte doit être connu dans notre catalogue
-  const meta = (nftMetadata as unknown as Record<string, InsectData>)[insectKey];
-  if (!meta) {
-    return res.status(404).json({ error: `Insecte inconnu : ${insectKey}` });
-  }
+  const insectKey = boundedString(body.insectKey, 120);
+  if (!insectKey) return sendError(res, 400, "invalid_insect_key", "insectKey requis");
+
+  // Validation : l'insecte doit être connu dans notre catalogue (hasOwn : pas de "constructor"…)
+  const catalog = nftMetadata as unknown as Record<string, InsectData>;
+  if (!hasOwn(catalog, insectKey)) return sendError(res, 404, "unknown_insect", "Insecte inconnu");
+  const meta = catalog[insectKey];
 
   const insectStorageAddress = process.env.NEXT_PUBLIC_INSECT_STORAGE;
   const relayerPk            = process.env.RELAYER_PK;
 
   if (!insectStorageAddress || !relayerPk) {
-    return res.status(500).json({
-      error: "Relayer non configuré (NEXT_PUBLIC_INSECT_STORAGE / RELAYER_PK manquants)",
-    });
+    console.error("[upload-insect-relayer] config manquante", { storage: !!insectStorageAddress, RELAYER_PK: !!relayerPk });
+    return sendError(res, 503, "not_configured", "Service temporairement indisponible.");
   }
+
+  const lockKey = `insect:${insectKey}`;
+  if (!tryAcquire(lockKey)) return sendError(res, 409, "in_progress", "Upload déjà en cours pour cet insecte.");
 
   const primaryRpc = process.env.RELAYER_RPC_URL ?? "https://mainnet.base.org";
   const rpcList    = buildRpcList(primaryRpc);
@@ -361,11 +373,7 @@ export default async function handler(
       console.error(
         `[upload-insect-relayer] ❌ Solde insuffisant: ${primaryWallet.address} = ${balance} wei`
       );
-      return res.status(503).json({
-        error: `Relayer wallet vide (${primaryWallet.address}). Envoyez au moins 0.001 ETH sur Base.`,
-        relayerAddress: primaryWallet.address,
-        currentBalanceWei: balance.toString(),
-      });
+      return sendError(res, 503, "relayer_unfunded", "Service temporairement indisponible.");
     }
 
     // ── 2. Vérif on-chain : déjà finalisé ? ────────────────────────────────
@@ -488,28 +496,19 @@ export default async function handler(
 
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
+    // Messages d'erreur (ethers/RPC) = URL RPC avec clé API possible : journalisés masqués,
+    // jamais renvoyés au client (l'ancien champ `details` exposait la liste des RPC).
+    logServerError("upload-insect-relayer", e);
 
     if (msg.startsWith("INSUFFICIENT_FUNDS:")) {
-      const primaryProvider = new JsonRpcProvider(primaryRpc);
-      const primaryWallet   = new Wallet(relayerPk!, primaryProvider);
-      return res.status(503).json({
-        error: `Relayer wallet : fonds insuffisants. Adresse : ${primaryWallet.address}. Envoyez 0.001+ ETH sur Base.`,
-      });
+      return sendError(res, 503, "relayer_unfunded", "Service temporairement indisponible.");
     }
-
     if (msg.startsWith("GAS_CAP_ALL_RPCS:")) {
-      console.error("[upload-insect-relayer] ❌ Tous les RPCs ont rejeté (cap gas)");
-      return res.status(503).json({
-        error:
-          "Tous les RPCs publics ont rejeté la transaction (limite gas). " +
-          "Solution : inscrivez-vous gratuitement sur https://alchemy.com, créez une app " +
-          '"Base Mainnet", copiez l\'URL HTTPS et définissez ' +
-          "RELAYER_RPC_URL=https://base-mainnet.g.alchemy.com/v2/<votre_clé> dans votre .env",
-        details: msg.slice("GAS_CAP_ALL_RPCS:".length),
-      });
+      // Piste ops (côté serveur uniquement) : définir RELAYER_RPC_URL vers un RPC dédié.
+      return sendError(res, 503, "rpc_unavailable", "Réseau momentanément indisponible, réessayez plus tard.");
     }
-
-    console.error("[upload-insect-relayer] ❌", e);
-    return res.status(500).json({ error: msg });
+    return sendError(res, 500, "upload_failed", "L'enregistrement on-chain a échoué.");
+  } finally {
+    release(lockKey);
   }
 }

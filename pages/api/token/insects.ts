@@ -12,6 +12,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { ethers } from "ethers";
 import ABI from "@/components/ABI/ABIAdhesion.json";
+import { logServerError } from "@/server/security/redact";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -180,7 +181,7 @@ export default async function handler(
     res.setHeader("X-Cache", "MISS");
     return res.status(200).json(insects);
   } catch (error: any) {
-    console.error("[/api/token/insects]", error);
-    return res.status(500).json({ error: "Erreur blockchain", detail: error?.message });
+    logServerError("/api/token/insects", error);
+    return res.status(500).json({ error: "Erreur blockchain" });
   }
 }

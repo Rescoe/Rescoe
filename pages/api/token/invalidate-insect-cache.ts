@@ -13,12 +13,17 @@
 
 import type { NextApiRequest, NextApiResponse } from "next";
 import { evictInsectsCache } from "./insects";
+import { enforceRateLimit } from "@/server/security/rateLimit";
+import { isEvmAddress } from "@/server/security/validators";
+
+export const config = { api: { bodyParser: { sizeLimit: "2kb" } } };
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+  if (!enforceRateLimit(req, res, "invalidate-insect-cache", { limit: 30, windowMs: 60_000 })) return;
 
-  const { address } = req.body as { address?: string };
-  if (!address || !/^0x[0-9a-fA-F]{40}$/.test(address)) {
+  const { address } = (req.body ?? {}) as { address?: unknown };
+  if (!isEvmAddress(address)) {
     return res.status(400).json({ error: "address invalide" });
   }
 

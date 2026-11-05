@@ -6,6 +6,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Default } from "components/layouts/Default";
 import { useAuth } from "@/utils/authContext";
+import { useWalletFetch } from "@/hooks/useWalletFetch";
 import {
   Box,
   Button,
@@ -130,6 +131,7 @@ function LevelCard({
 
 const InsectStoragePage: React.FC = () => {
   const { address, isLoading: authLoading } = useAuth();
+  const walletFetch = useWalletFetch();
 
   const [status, setStatus] = useState<StorageStatus | null>(null);
   const [loading, setLoading] = useState(false);
@@ -147,12 +149,10 @@ const InsectStoragePage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(
-        `/api/admin/insect-storage-status?address=${address}`
-      );
+      const res = await walletFetch("/api/admin/insect-storage-status");
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? `HTTP ${res.status}`);
+        throw new Error(body.message ?? body.error ?? `HTTP ${res.status}`);
       }
       const data: StorageStatus = await res.json();
       setStatus(data);
@@ -161,7 +161,7 @@ const InsectStoragePage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [address]);
+  }, [address, walletFetch]);
 
   // Auto-fetch on mount when address is ready
   useEffect(() => {

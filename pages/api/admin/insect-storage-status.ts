@@ -19,6 +19,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { ethers } from "ethers";
 import nftMetadata from "@/data/nft_metadata_clean.json";
+import { enforceRateLimit } from "@/server/security/rateLimit";
+import { requireMethod, requireSameAddress, requireWalletSession } from "@/server/security/guards";
+import { logServerError } from "@/server/security/redact";
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -85,18 +88,13 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  if (req.method !== "GET") return res.status(405).end();
+  if (!requireMethod(req, res, ["GET"])) return;
+  if (!enforceRateLimit(req, res, "insect-storage-status", { limit: 20, windowMs: 60_000 })) return;
 
-  // Auth gate
-  const { address } = req.query;
-  if (
-    typeof address !== "string" ||
-    address.toLowerCase() !== OWNER_ADDRESS.toLowerCase()
-  ) {
-    return res
-      .status(403)
-      .json({ error: "Accès réservé à l'admin" });
-  }
+  // Auth gate : l'adresse vient de la session wallet signée, plus d'un paramètre d'URL forgeable.
+  const session = requireWalletSession(req, res);
+  if (!session) return;
+  if (!requireSameAddress(res, session, OWNER_ADDRESS)) return;
 
   // Cache hit
   if (cache && Date.now() - cache.ts < CACHE_TTL_MS) {
@@ -161,8 +159,7 @@ export default async function handler(
       .setHeader("X-Cache", "MISS")
       .json(data);
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error("[insect-storage-status] Error:", msg);
-    return res.status(500).json({ error: "Erreur RPC", details: msg });
+    logServerError("insect-storage-status", err);
+    return res.status(500).json({ error: "rpc_error" });
   }
 }

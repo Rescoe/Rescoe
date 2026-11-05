@@ -1,5 +1,7 @@
 // pages/api/ipfs/[...cid].ts
 import type { NextApiRequest, NextApiResponse } from "next";
+import { enforceRateLimit } from "@/server/security/rateLimit";
+import { isSafeIpfsPath } from "@/server/security/validators";
 
 const GATEWAYS = [
   // Publics recurseurs GRATUITS d'abord (pas de limite bande passante pour toi)
@@ -17,12 +19,16 @@ const GATEWAYS = [
 ];
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== "GET" && req.method !== "HEAD") return res.status(405).send("Method not allowed");
+  if (!enforceRateLimit(req, res, "ipfs", { limit: 240, windowMs: 60_000 })) return;
+
   const cidParts = req.query.cid;
   if (!cidParts) {
     return res.status(400).send("CID invalide");
   }
 
   const cidPath = Array.isArray(cidParts) ? cidParts.join("/") : cidParts;
+  if (!isSafeIpfsPath(cidPath)) return res.status(400).send("CID invalide");
 
   for (const gateway of GATEWAYS) {
     try {
