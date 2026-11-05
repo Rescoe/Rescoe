@@ -1,4 +1,4 @@
-STATUT DE REPRISE : PARTIEL — 135 tests verts (Adhesion 41, ArtNFT 31, Manager 12, Message 27, Artefacts/boîte noire 24) ; restent what-if Adhesion, invariants/fuzz, rapport docs/SMART_CONTRACT_AUDIT.md
+STATUT DE REPRISE : PARTIEL — voir docs/CLAUDE_HANDOFF_SOLIDITY.md (fichier de reprise à jour) et docs/SMART_CONTRACT_AUDIT.md
 
 # CLAUDE_HANDOFF — Audit Solidity/Hardhat RESCOE
 
