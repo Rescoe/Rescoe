@@ -1,108 +1,120 @@
-STATUT DE REPRISE : PARTIEL (sources récupérées + committées ; en cours : lecture/audit des sources puis config Hardhat d'audit)
+STATUT DE REPRISE : PARTIEL — Adhesion testé (41 verts) ; restent ArtNFT/Manager/Message/invariants/artefacts/rapport
 
 # CLAUDE_HANDOFF — Audit Solidity/Hardhat RESCOE
 
-> Fichier de continuité. Mis à jour après chaque étape significative.
-> Aucun secret / clé / URL RPC confidentielle / contenu de `.env` ne doit apparaître ici.
+> Fichier de continuité, mis à jour après chaque étape. Aucun secret / clé / URL RPC / contenu `.env` ici.
 
-## 1. Mission et périmètre exacts de cette session
+## 1. Mission et périmètre exacts
 
-Session PARALLÈLE à une autre session qui gère frontend / build Next.js / API.
-**Ne JAMAIS toucher** aux fichiers frontend/API (`pages/`, `src/`, `public/`, `scripts/` racine, `package.json` racine, etc.).
+Session PARALLÈLE à une session « frontend/Next/API ». **Ne JAMAIS toucher** `pages/`, `src/`, `public/`, `scripts/` (racine), `package.json` racine.
+Périmètre autorisé : `Hardhat Solidity Deploy/` (tests, scripts d'analyse, contrats d'attaque, snapshot récupéré), `docs/SMART_CONTRACT_AUDIT.md`, `docs/CLAUDE_HANDOFF.md`, `docs/CLAUDE_UNCOMMITTED_DIFF.patch`.
+Interdit : tx Base/Base Sepolia, déploiement public, modif `.env`, reset/stash/force-push, supprimer des artefacts, modifier les contrats pour masquer un finding, RPC non read-only.
+Objectif : audit exécutable + vraie suite Hardhat (le « 0 passing » n'est pas acceptable) + `docs/SMART_CONTRACT_AUDIT.md`.
 
-Périmètre autorisé :
-- `Hardhat Solidity Deploy/` (tests, scripts d'analyse, contrats d'attaque, snapshot récupéré)
-- `Contrats_Solidity_Fonctionnels/` si présent (ABSENT à ce jour)
-- `docs/SMART_CONTRACT_AUDIT.md`, `docs/CLAUDE_HANDOFF.md`, `docs/CLAUDE_UNCOMMITTED_DIFF.patch`
+## 2. Git
 
-Interdictions : aucune tx Base/Base Sepolia, aucun déploiement public, aucun changement de `.env`,
-aucun reset/stash global/force push/suppression d'artefacts, ne pas modifier les contrats pour masquer un finding,
-RPC éventuel strictement read-only.
-
-Objectif : audit exécutable des contrats RESCOE + vraie suite de tests Hardhat (le "0 passing" actuel est inacceptable)
-+ `docs/SMART_CONTRACT_AUDIT.md`.
-
-## 2. Branche Git et commit de départ
-
-- Branche : `claude/compassionate-edison-gecvpi`
-- Commit de départ : `15ae68551f83f5cf3c98e337eb51cf6d2960d116` ("feat: adhésions Rescoe 100% on-chain — passage de l'IPFS au stockage natif Base")
-- Working tree propre au départ.
+- Branche : `claude/compassionate-edison-gecvpi` — commit de départ `15ae68551f83f5cf3c98e337eb51cf6d2960d116`.
+- Commits de session : voir §13.
 
 ## 3. État d'avancement
 
-Terminé :
-- Étape 0 : vérification des sources (Cas B confirmé).
-- `scripts/audit/recover-sources.js` : extrait les sources des 6 build-info vers `audit-recovered-contracts/build-info/<id>/`, vérifie keccak256 vs métadonnées Remix, associe chaque artifact à son build-info (bytecode identique).
-- `npm ci` OK (hardhat 2.28.3, OZ 4.9.6 installé mais NON utilisé par les sources) + `solc@0.8.30` ajouté en devDependency exacte (solcjs, `0.8.30+commit.73712a01`, identique au compilateur d'origine).
-- Lecture complète de : Adhesion.sol, RescollectionFactory.sol, ArtFactory.sol, mintArt.sol, IReward.sol.
+**Terminé**
+- Étape 0 : Cas B confirmé (AUCUN `.sol` suivi ni jamais committé ; `*.sol` gitignoré racine l.22). Seuls artefacts Remix + 6 build-info.
+- Récupération + provenance : `scripts/audit/recover-sources.js` → `audit-recovered-contracts/` (+ MANIFEST.json). 6 artifacts Remix ↔ build-info **bytecode identique**.
+- Recompilation exacte solcjs 0.8.30 : `scripts/audit/recompile-exact.js` → **44/44 contrats identiques (création + déployé)** aux build-info (`audit-recovered-contracts/RECOMPILE_RESULT.json`).
+- Staging compilable : `scripts/audit/stage-sources.js` → `audit-src/recovered` (9 sources, 0 conflit de versions) + `audit-vendor/@openzeppelin` (22 fichiers exacts). Config `hardhat.audit.config.js` (solcjs local, remapping natif OZ, réseau hardhat seul).
+- Compilation Hardhat locale : OK (32 fichiers, 35 s). Bytecode Hardhat = Remix hors hash métadonnées.
+- Contrats d'attaque : `audit-src/attackers/Attackers.sol` (RejectingReceiver, StorageWritingReceiver, ReentrantReceiver, ForceSend, RewardMock).
+- Fixtures : `test/audit/helpers/fixtures.js`.
+- `test/audit/01_adhesion.test.js` : **41 passing**.
 
-En cours :
-- Lecture MessageEditions.sol / MessageFactory.sol / FaucetSepolia.sol.
-- Config Hardhat d'audit (`hardhat.audit.config.js`) : solcjs local (binaires solc bloqués par le proxy) + OZ vendorisé.
+**En cours / à faire (ordre)**
+1. `02_artnft.test.js` (ArtFactory+ArtNFT) : listing périmé, push-payments bloquants, wiring association=manager, burn O(n), dust bloqué, évasion de frais, mettreAJourPoints hard-dependency, réentrance, conservation des fonds.
+2. `03_manager_factories.test.js` (ResCoellectionManager, permissions factories, createDynamicCollection ouvert).
+3. `04_message_editions.test.js`.
+4. What-if Adhesion (copie avec `_exists` corrigé, générée par script, jamais présentée comme source réelle) pour atteindre buyNFT/renew/list : vente, état vendeur/acheteur, points wash-trading, reentrancy.
+5. `05_invariants.test.js` (fuzz seedé : conservation ETH ArtNFT/MessageEditions, level ≤ MAX_LEVEL, cohérence ownership/liste, pas de double comptage points).
+6. `scripts/audit/analyze-artifacts.js` + `06_artifacts.test.js` : tailles bytecode/EIP-170, ABI Remix vs ABI frontend (`src/components/ABI/*`, LECTURE SEULE), divergences ArtFactory/Poetry/Haiku, MasterFactory/TokenManagement (bytecode Remix, tests boîte noire).
+7. `docs/SMART_CONTRACT_AUDIT.md` (rapport final) ; mettre à jour `package.json` `test` → `hardhat --config hardhat.audit.config.js test`.
 
-Non commencé : fixtures, tests, invariants/fuzz, analyse bytecode/ABI (script), rapport `docs/SMART_CONTRACT_AUDIT.md`.
-
-Bloqué / impossible (réseau) : Sourcify, IPFS, binaires solc et tous les RPC publics Base/Base Sepolia sont refusés par le proxy (HTTP 403 sur CONNECT). Donc : pas de bytecode on-chain, pas de sources vérifiées. Seul npm registry est joignable.
+**Bloqué / impossible**
+- Réseau : Sourcify, IPFS, binaires solc, tous les RPC publics Base/Base Sepolia sont refusés par le proxy (403). Seul npm joignable ⇒ pas de bytecode on-chain, pas de comparaison déployé/compilé, pas de sources vérifiées.
+- Sources ABSENTES (ni .sol ni build-info) : InsectEvolution, InsectImageStorageV3, HaikuEditions, PoetryFactory, MasterFactory, TokenManagement. Seulement ABI frontend (+ bytecode/ABI Remix pour MasterFactory & TokenManagement).
 
 ## 4. Fichiers créés / modifiés
 
-- `docs/CLAUDE_HANDOFF.md` (créé) — ce fichier.
+| Fichier | Raison |
+|---|---|
+| `docs/CLAUDE_HANDOFF.md` | continuité |
+| `Hardhat Solidity Deploy/.gitignore` | ré-inclure `.sol` d'audit (`audit-recovered-contracts`, `audit-src`, `audit-vendor`, `test/audit`) + ignorer `cache-audit`, `artifacts-audit` |
+| `Hardhat Solidity Deploy/package.json`, `package-lock.json` | `solc@0.8.30` devDependency exacte (solcjs, compilateur identique à l'origine) |
+| `Hardhat Solidity Deploy/scripts/audit/{recover-sources,stage-sources,recompile-exact}.js` | provenance / staging / recompilation exacte |
+| `Hardhat Solidity Deploy/audit-recovered-contracts/**` | sources RÉCUPÉRÉES (CRLF préservé via `.gitattributes -text`), MANIFEST.json, RECOMPILE_RESULT.json, README |
+| `Hardhat Solidity Deploy/audit-src/**`, `audit-vendor/**` | arbre compilable (généré) + attackers (écrit à la main) |
+| `Hardhat Solidity Deploy/hardhat.audit.config.js` | config d'audit hors-ligne |
+| `Hardhat Solidity Deploy/test/audit/**` | tests |
 
-## 5. Commandes exécutées et résultats
+## 5. Commandes exécutées / résultats exacts
 
-- `git status` → propre. `git ls-files "*.sol"` → **vide**.
-- `git check-ignore -v "Hardhat Solidity Deploy/contracts/AdhesionRescoe.sol"` → `.gitignore:22:*.sol` (racine). **Tous les .sol sont ignorés par Git.**
-- `git log --all --name-only | grep .sol` → **aucun .sol n'a jamais été committé** (50 commits).
-- `find /home/user/Rescoe -name "*.sol"` (hors node_modules) → **aucun**.
-- Inventaire `contracts/` : uniquement `.deploys/`, `.states/vm-prague/`, `artifacts/` (style Remix : `X.json` + `X_metadata.json`) et `artifacts/build-info/` (6 fichiers, format `hh-sol-build-info-1`, solc 0.8.30+commit.73712a01, viaIR=true, optimizer runs=200).
+- `git ls-files "*.sol"` → vide ; `git check-ignore -v …/AdhesionRescoe.sol` → `.gitignore:22:*.sol` ; historique : aucun .sol jamais committé.
+- `cd "Hardhat Solidity Deploy" && npm ci` → 590 paquets. `npm i -D -E solc@0.8.30` → `0.8.30+commit.73712a01.Emscripten.clang`.
+- `node scripts/audit/recover-sources.js` → 6 artifacts mappés (SepoliaFaucet, AdhesionRescoe, ResCoellectionManager, MessageFactory, ArtFactory, ArtNFT) ; sans build-info : MasterFactory, TokenManagement, IAdhesionContract, ICollectionFactory. Hash `Adhesion.sol` ≠ celui référencé par la métadonnée de TokenManagement.
+- `node scripts/audit/stage-sources.js` → 9 sources métier, 22 OZ, 0 conflit.
+- `npx hardhat --config hardhat.audit.config.js compile --force` → 32 fichiers OK en 35 s.
+- `node scripts/audit/recompile-exact.js` → 44/44 identiques.
+- `npx hardhat --config hardhat.audit.config.js test test/audit/01_adhesion.test.js` → **41 passing, 0 failing**.
 
 ## 6. Décisions techniques
 
-- CAS B (sources absentes) → reconstitution depuis `input.sources` des build-info dans `Hardhat Solidity Deploy/audit-recovered-contracts/`.
-- Les `.sol` étant gitignorés, ajouter une règle de ré-inclusion dans `Hardhat Solidity Deploy/.gitignore` (périmètre autorisé) plutôt que toucher le `.gitignore` racine.
+- Config d'audit séparée (`hardhat.audit.config.js`) ; `hardhat.config.js` de prod NON modifiée.
+- solcjs (npm) car binaires solc bloqués ; version identique à l'origine, vérifiée par recompilation exacte.
+- OZ vendorisé à l'identique via `TASK_COMPILE_GET_REMAPPINGS` (TASK_COMPILE_TRANSFORM_IMPORT_NAME déprécié, HH215). Alternative écartée : `npm i @openzeppelin/contracts@5` (les sources utilisent un mélange 4.x/5.x : `Counters`, `security/ReentrancyGuard`).
+- Convention tests : `[F-XXX-nn]` = test qui DÉMONTRE un bug (vert tant que le bug existe ; rougira une fois corrigé).
+- `.gitattributes -text` local pour préserver les octets CRLF (sinon hashes du MANIFEST faux).
 
 ## 7. Hypothèses métier
 
-(à compléter)
+- 1 point = 0.001 ETH de vente (ArtNFT) ; reproduction = 100 pts ; quota collections = points/5 ; membre trial 7 j, annuel 365 j.
+- L'ABI frontend (`ABIAdhesion.json`, 141 entrées) décrit une version PLUS RÉCENTE d'Adhesion que la source récupérée (87 entrées). Les constats ci-dessous valent pour la source récupérée = artifact Remix `AdhesionRescoe.json`.
 
-## 8. Risques / vulnérabilités découverts (même non corrigés)
+## 8. Findings déjà PROUVÉS par test (voir tests `[F-…]`)
 
-- **[Process/Critical-pour-l'audit]** Les sources Solidity métier ne sont versionnées nulle part dans Git (`*.sol` ignoré globalement). Seules les artefacts compilés existent. L'audit porte donc sur des sources RÉCUPÉRÉES depuis build-info, pas sur les "dernières sources métier".
-- Les 6 build-info ne couvrent PAS : InsectEvolution, InsectImageStorageV3, HaikuEditions, PoetryFactory, MasterFactory, TokenManagement (à confirmer : artifacts Remix présents pour MasterFactory/TokenManagement sans build-info correspondant).
+Adhesion (source récupérée) : F-ADH-01 `mettreAJourPoints` sans contrôle d'accès (Critical) ; F-ADH-02 `_exists` lit un mapping jamais écrit ⇒ getUserInfo/getTokenDetails/getRemaining…/renew/list/buyNFT/buyRewardPoints revert (High/Critical dispo) ; F-ADH-03 `totalSupply()` récursif ; F-ADH-04 `burnAndUpgrade` sans délai (niveau 3 immédiat) ; F-ADH-05 listes obsolètes après burn ; F-ADH-06/06b ETH brûlé si relayer=0, burnNFT payé par le contrat (DoS si solde<DUST) ; F-ADH-07 `.transfer` incompatible wallets intelligents ; F-ADH-08 adhésion active/œuf transférables ; F-ADH-09 `_totalMinted` mort ; F-ADH-10 reproduction illimitée, généalogie absente, `Reproduced` jamais émis ; F-ADH-11 trop-perçu non remboursé (evolve/burnUpgrade) ; F-ADH-12 limite annuelle = bucket époque ; F-ADH-14 `membersByRole` doublons ; F-ADH-15 URI libre ; F-ADH-17 constructeur impose initialOwner==msg.sender ; **F-ADH-18 `evolveManual` : `delete` avant lecture ⇒ niveau bloqué à 1, totalYears/autoEvolve perdus**.
 
-## 9. Modifications partielles / potentiellement cassées
+Suspicions lues dans le code (à prouver) : ArtNFT listing périmé après transfert (High) ; ArtNFT push-payments bloquants ; wiring `full-deploy.ts` (association = ResCoellectionManager sans receive ⇒ ventes ArtNFT bloquées) ; factories `createDynamicCollection` ouvertes ; Manager `admin` immuable ≠ owner, `addAdhesionContract` irréversible ; MessageEditions `_haikuIdFromToken` faux, haikuId 0 = sentinelle, prix non vérifié sur éditions existantes, surpaiement bloqué, pas de ReentrancyGuard malgré la doc, `getRemainingEditions` underflow ; `full-deploy.ts` référence des noms de contrats inexistants.
 
-Aucune.
+## 9. Modifications partielles / cassées
+
+Aucune connue. Les tests `01_adhesion` sont verts.
 
 ## 10. Prochaine action précise
 
-1. Extraire les `input.sources` de chaque build-info (script `scripts/audit/recover-sources.js`).
-2. Chercher les ABI InsectEvolution / InsectImageStorageV3 / HaikuEditions / PoetryFactory dans le frontend (lecture seule).
+Écrire `test/audit/02_artnft.test.js` (voir §3 point 1) puis lancer : `cd "Hardhat Solidity Deploy" && npx hardhat --config hardhat.audit.config.js test test/audit/02_artnft.test.js`.
 
 ## 11. Commande de reprise
 
 ```bash
-cd /home/user/Rescoe && git status --short && sed -n 1,200p docs/CLAUDE_HANDOFF.md
+cd "/home/user/Rescoe/Hardhat Solidity Deploy" && npm ci && node scripts/audit/stage-sources.js \
+ && npx hardhat --config hardhat.audit.config.js test
 ```
 
-## 12. Fichiers à lire en premier
+## 12. À lire en premier
 
-1. `docs/CLAUDE_HANDOFF.md`
-2. `Hardhat Solidity Deploy/contracts/artifacts/build-info/*.json` (sources via `input.sources`)
-3. `Hardhat Solidity Deploy/hardhat.config.js`
+1. ce fichier ; 2. `audit-recovered-contracts/README.md` ; 3. `audit-src/recovered/*.sol` ; 4. `test/audit/helpers/fixtures.js` ; 5. `test/audit/01_adhesion.test.js` ; 6. `hardhat.audit.config.js`.
 
 ## 13. État Git
 
-- `git status --short` : (propre au départ, hors docs/CLAUDE_HANDOFF.md)
-- Dernier commit : `15ae685`
-- Commits créés pendant la session : aucun
+- Commits de session : `5a7c526` (récupération), `2d2bd1b` (CRLF), + commits suivants (voir `git log --oneline 15ae685..HEAD`).
+- `git status --short` : voir fin de session.
 
-## 14. Confiance par chantier
+## 14. Confiance
 
-- Diagnostic des sources : élevée (vérifié par commandes).
-- Le reste : non évalué.
+- Provenance sources↔artifacts : très élevée (44/44 identiques).
+- Tests Adhesion : élevée (exécutés, verts).
+- Tout le reste : non évalué.
 
 ## 15. Non vérifié
 
-- Version exacte d'OpenZeppelin (mélange v4/v5 apparent dans les build-info).
-- Disponibilité d'un RPC read-only (non testé).
+- Comportement du contrat réellement déployé sur Base / Base Sepolia (aucun RPC).
+- Contrats sans source (Insect*, Haiku/Poetry/Master/TokenManagement).
+- Existence/ABI exactes des versions plus récentes que celles récupérées.

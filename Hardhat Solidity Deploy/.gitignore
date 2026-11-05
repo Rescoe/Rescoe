@@ -24,3 +24,5 @@ ignition/deployments/chain-31337
 # Sorties de compilation de la config d audit (jamais versionnées)
 /cache-audit
 /artifacts-audit
+!audit-src/**/*.sol
+!audit-vendor/**/*.sol

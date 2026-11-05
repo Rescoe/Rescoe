@@ -1,0 +1,464 @@
+{
+  "solc": "0.8.30+commit.73712a01.Emscripten.clang",
+  "builds": [
+    {
+      "id": "1bb837b7f243b38cc11e87aeb9c2b718",
+      "seconds": 1.085,
+      "compileErrors": [],
+      "contracts": [
+        {
+          "source": "FaucetSepolia.sol",
+          "contract": "SepoliaFaucet",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 2355,
+          "artifactMatch": {
+            "deployedEqualsRemixArtifact": true,
+            "creationEqualsRemixArtifact": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "62c65c2725c5f8e7a251e20ca5f75b4b",
+      "seconds": 7.819,
+      "compileErrors": [],
+      "contracts": [
+        {
+          "source": "@openzeppelin/contracts/token/ERC721/utils/ERC721Utils.sol",
+          "contract": "ERC721Utils",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/Counters.sol",
+          "contract": "Counters",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/Panic.sol",
+          "contract": "Panic",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/Strings.sol",
+          "contract": "Strings",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/math/Math.sol",
+          "contract": "Math",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/math/SafeCast.sol",
+          "contract": "SafeCast",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/math/SignedMath.sol",
+          "contract": "SignedMath",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "Adhesion.sol",
+          "contract": "AdhesionRescoe",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 18434,
+          "artifactMatch": {
+            "deployedEqualsRemixArtifact": true,
+            "creationEqualsRemixArtifact": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "a6daef4aad03a7efa2b02383993f611a",
+      "seconds": 5.04,
+      "compileErrors": [],
+      "contracts": [
+        {
+          "source": "@openzeppelin/contracts/token/ERC721/utils/ERC721Utils.sol",
+          "contract": "ERC721Utils",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/Counters.sol",
+          "contract": "Counters",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/Panic.sol",
+          "contract": "Panic",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/Strings.sol",
+          "contract": "Strings",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/math/Math.sol",
+          "contract": "Math",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/math/SafeCast.sol",
+          "contract": "SafeCast",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/math/SignedMath.sol",
+          "contract": "SignedMath",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "RescollectionFactory.sol",
+          "contract": "ResCoellectionManager",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 12744,
+          "artifactMatch": {
+            "deployedEqualsRemixArtifact": true,
+            "creationEqualsRemixArtifact": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "d6da86064fab1a7b67a461342738ad26",
+      "seconds": 10.648,
+      "compileErrors": [],
+      "contracts": [
+        {
+          "source": "@openzeppelin/contracts/token/ERC721/utils/ERC721Utils.sol",
+          "contract": "ERC721Utils",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/Base64.sol",
+          "contract": "Base64",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/Counters.sol",
+          "contract": "Counters",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/Panic.sol",
+          "contract": "Panic",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/Strings.sol",
+          "contract": "Strings",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/math/Math.sol",
+          "contract": "Math",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/math/SafeCast.sol",
+          "contract": "SafeCast",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/math/SignedMath.sol",
+          "contract": "SignedMath",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "MessageEditions.sol",
+          "contract": "MessageEditions",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 18104,
+          "artifactMatch": null
+        },
+        {
+          "source": "MessageFactory.sol",
+          "contract": "MessageFactory",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 23680,
+          "artifactMatch": {
+            "deployedEqualsRemixArtifact": true,
+            "creationEqualsRemixArtifact": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "e7e63d83b71107699b601bbabf24d633",
+      "seconds": 9.688,
+      "compileErrors": [],
+      "contracts": [
+        {
+          "source": "@openzeppelin/contracts/token/ERC721/utils/ERC721Utils.sol",
+          "contract": "ERC721Utils",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/Counters.sol",
+          "contract": "Counters",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/Panic.sol",
+          "contract": "Panic",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/Strings.sol",
+          "contract": "Strings",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/math/Math.sol",
+          "contract": "Math",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/math/SafeCast.sol",
+          "contract": "SafeCast",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/math/SignedMath.sol",
+          "contract": "SignedMath",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "ArtFactory.sol",
+          "contract": "ArtFactory",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 19743,
+          "artifactMatch": {
+            "deployedEqualsRemixArtifact": true,
+            "creationEqualsRemixArtifact": true
+          }
+        },
+        {
+          "source": "mintArt.sol",
+          "contract": "ArtNFT",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 12406,
+          "artifactMatch": {
+            "deployedEqualsRemixArtifact": true,
+            "creationEqualsRemixArtifact": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "f248304931c349a3454c072f67d0dbe2",
+      "seconds": 5.582,
+      "compileErrors": [],
+      "contracts": [
+        {
+          "source": "@openzeppelin/contracts/token/ERC721/utils/ERC721Utils.sol",
+          "contract": "ERC721Utils",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/Counters.sol",
+          "contract": "Counters",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/Panic.sol",
+          "contract": "Panic",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/Strings.sol",
+          "contract": "Strings",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/math/Math.sol",
+          "contract": "Math",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/math/SafeCast.sol",
+          "contract": "SafeCast",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "@openzeppelin/contracts/utils/math/SignedMath.sol",
+          "contract": "SignedMath",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 57,
+          "artifactMatch": null
+        },
+        {
+          "source": "mintArt.sol",
+          "contract": "ArtNFT",
+          "deployedExactVsBuildInfo": true,
+          "creationExactVsBuildInfo": true,
+          "abiEqualsBuildInfo": true,
+          "deployedBytes": 12406,
+          "artifactMatch": {
+            "deployedEqualsRemixArtifact": true,
+            "creationEqualsRemixArtifact": true
+          }
+        }
+      ]
+    }
+  ]
+}
