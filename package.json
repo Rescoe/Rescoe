@@ -11,6 +11,12 @@
     "format:check": "prettier \"**/*.+(js|ts|json)\" --check --ignore-path .gitignore",
     "dev": "next dev",
     "build": "node scripts/build.js",
+    "typecheck": "tsc --noEmit --incremental false",
+    "check:secrets": "node scripts/check-public-secrets.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "smoke": "node scripts/smoke.mjs",
+    "smoke:studio": "node scripts/smoke-deploy-studio.mjs",
     "lint": "next lint",
     "test:e2e": "start-server-and-test dev http://localhost:3000 test:cypress",
     "test:cypress": "cypress run --browser chrome --headless",
@@ -81,7 +87,8 @@
     "cypress": "^12.17.4",
     "prettier": "^3.3.3",
     "start-server-and-test": "^2.0.0",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vitest": "^3.2.7"
   },
   "engines": {
     "node": ">=22.0.0"
