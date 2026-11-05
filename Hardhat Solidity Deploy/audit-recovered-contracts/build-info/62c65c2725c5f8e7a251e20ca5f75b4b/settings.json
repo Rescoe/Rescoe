@@ -1,0 +1,33 @@
+{
+  "buildInfoId": "62c65c2725c5f8e7a251e20ca5f75b4b",
+  "solcLongVersion": "0.8.30+commit.73712a01",
+  "language": "Solidity",
+  "settings": {
+    "viaIR": true,
+    "optimizer": {
+      "enabled": true,
+      "runs": 200
+    },
+    "outputSelection": {
+      "*": {
+        "": [
+          "ast"
+        ],
+        "*": [
+          "abi",
+          "metadata",
+          "devdoc",
+          "userdoc",
+          "storageLayout",
+          "evm.legacyAssembly",
+          "evm.bytecode",
+          "evm.deployedBytecode",
+          "evm.methodIdentifiers",
+          "evm.gasEstimates",
+          "evm.assembly"
+        ]
+      }
+    },
+    "remappings": []
+  }
+}

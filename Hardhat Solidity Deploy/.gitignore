@@ -15,3 +15,12 @@ node_modules
 
 # Hardhat Ignition default folder for deployments against a local node
 ignition/deployments/chain-31337
+
+# --- Audit Solidity (session audit) ---
+# Le .gitignore racine ignore *.sol : on ré-inclut explicitement les sources récupérées depuis build-info
+# et les contrats d attaque / mocks de test, sinon ils ne seraient jamais versionnés.
+!audit-recovered-contracts/**/*.sol
+!test/audit/**/*.sol
+# Sorties de compilation de la config d audit (jamais versionnées)
+/cache-audit
+/artifacts-audit
