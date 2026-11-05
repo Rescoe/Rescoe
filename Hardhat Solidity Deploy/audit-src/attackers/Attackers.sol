@@ -98,6 +98,11 @@ contract RewardMock is IReward {
     uint256 public calls;
     bool public revertOnUpdate;
 
+    /// @dev Permet au mock de servir aussi d'IAdhesionContract (ResCoellectionManager lit rewardPoints()).
+    function rewardPoints(address u) external view returns (uint256) {
+        return points[u];
+    }
+
     function setValid(address u, bool v) external {
         valid[u] = v;
     }

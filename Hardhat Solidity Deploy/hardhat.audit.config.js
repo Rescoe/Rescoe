@@ -56,6 +56,7 @@ module.exports = {
       hardfork: "prague",
       allowUnlimitedContractSize: false, // on veut voir EIP-170 en vrai
       blockGasLimit: 100_000_000,
+      gas: 90_000_000, // gros mints d'éditions (ArtNFT.mint boucle) : on veut mesurer, pas échouer sur le gas par défaut
     },
   },
   gasReporter: { enabled: false },
