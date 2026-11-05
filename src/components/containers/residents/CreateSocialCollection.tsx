@@ -3,9 +3,10 @@ import {
   Box, Heading, VStack, Divider, Flex, HStack, Input, Button, Text,
   FormLabel, useToast, Image, Checkbox, Select
 } from "@chakra-ui/react";
-import axios from "axios";
 import Web3 from "web3";
 import { useAuth } from "@/utils/authContext";
+import { useWalletFetch } from "@/hooks/useWalletFetch";
+import { pinFileToIpfs, pinJsonToIpfs } from "@/utils/pinata";
 import { handleMessageTransactions } from "@/utils/handleMessageTransactions"; // ← AJOUTÉ !
 
 import ABIRESCOLLECTION from "@/components/ABI/ABI_Collections.json";
@@ -15,6 +16,7 @@ import ABI_SOCIAL_FACTORY from "@/components/ABI/Factories/ABI_SOCIAL_FACTORY.js
 const CreateSocialCollection: React.FC = () => {
   const toast = useToast();
   const { web3, address } = useAuth();
+  const walletFetch = useWalletFetch();
 
   const RESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!;
   const MASTER_FACTORY = process.env.NEXT_PUBLIC_MASTERFACTORY_CONTRACT!;
@@ -118,19 +120,9 @@ const CreateSocialCollection: React.FC = () => {
     }
   };
 
-  const createPinataHeaders = (isJson = false) => ({
-    headers: {
-      Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT_OEUVRES}`,
-      "Content-Type": isJson ? "application/json" : "multipart/form-data",
-    },
-  });
-
-  const uploadFile = async (file: File): Promise<string> => {
-    const formData = new FormData();
-    formData.append("file", file);
-    const response = await axios.post("https://api.pinata.cloud/pinning/pinFileToIPFS", formData, createPinataHeaders());
-    return `https://gateway.pinata.cloud/ipfs/${response.data.IpfsHash}`;
-  };
+  // Upload via /api/pinata/pin : le JWT Pinata reste côté serveur.
+  const uploadFile = async (file: File): Promise<string> =>
+    `https://gateway.pinata.cloud/ipfs/${await pinFileToIpfs(walletFetch, file)}`;
 
   // ✅ MODIFIÉ: Upload + configure (comme Art/Poesie)
   const uploadMetadataToIPFS = async () => {
@@ -153,13 +145,7 @@ const CreateSocialCollection: React.FC = () => {
         royaltyAddress,
       };
 
-      const metaResponse = await axios.post(
-        "https://api.pinata.cloud/pinning/pinJSONToIPFS",
-        metadata,
-        createPinataHeaders(true)
-      );
-
-      const metadataUrl = `https://gateway.pinata.cloud/ipfs/${metaResponse.data.IpfsHash}`;
+      const metadataUrl = `https://gateway.pinata.cloud/ipfs/${await pinJsonToIpfs(walletFetch, metadata)}`;
       setIpfsUrl(metadataUrl);
       toast({ title: "IPFS prêt", status: "success" });
 

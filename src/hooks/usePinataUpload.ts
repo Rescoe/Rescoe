@@ -1,6 +1,7 @@
 // ✅ VERSION INTELLIGENTE : badges (level+history) / oeuvres (artist+simple)
 
 import { useState } from "react";
+import { useWalletFetch, jsonPost } from "@/hooks/useWalletFetch";
 
 export type UploadScope = "badges" | "oeuvres";
 
@@ -75,6 +76,7 @@ async function fileToBase64(file: File): Promise<string> {
 }
 
 export const usePinataUpload = (): UsePinataUploadReturn => {
+  const walletFetch = useWalletFetch();
   const [metadataUri, setMetadataUri] = useState<string | null>(null);
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -149,15 +151,11 @@ export const usePinataUpload = (): UsePinataUploadReturn => {
       }
 
       // 5. Backend
-      const res = await fetch("/api/pinata/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scope, fileBase64, metadata })
-      });
+      const res = await walletFetch("/api/pinata/upload", jsonPost({ scope, fileBase64, metadata }));
 
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err?.error || "Upload IPFS échoué");
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.message || err?.error || "Upload IPFS échoué");
       }
 
       const data = await res.json();

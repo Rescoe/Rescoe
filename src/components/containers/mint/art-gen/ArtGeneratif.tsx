@@ -1,6 +1,7 @@
 import React, { useState, useEffect, ChangeEvent } from "react";
 import { Box, Button, Input, Text, VStack, Select, Image } from "@chakra-ui/react";
-import axios from "axios";
+import { useWalletFetch } from "@/hooks/useWalletFetch";
+import { pinFileToIpfs } from "@/utils/pinata";
 import JSZip from "jszip";
 import detectEthereumProvider from "@metamask/detect-provider";
 import contractABI from '../../../ABI/ABI_GENERATIVE_ART.json';
@@ -44,6 +45,7 @@ interface CollectionDetails {
 }
 
 const GenerativeArtUploader: React.FC = () => {
+  const walletFetch = useWalletFetch();
   const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT as string;
 
   const [canvasName, setCanvasName] = useState<string>('');
@@ -273,21 +275,9 @@ const GenerativeArtUploader: React.FC = () => {
       for (const zipFile of files) {
         if (!zipFile.dir) {
           const fileData = await zipFile.async('blob');
-          const formData = new FormData();
-          formData.append('file', fileData, zipFile.name);
-
           try {
-            const response = await axios.post<{ IpfsHash: string }>(
-              "https://api.pinata.cloud/pinning/pinFileToIPFS",
-              formData,
-              {
-                headers: {
-                  Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT_OEUVRES}`,
-                  "Content-Type": "multipart/form-data",
-                },
-              }
-            );
-            cids.push(response.data.IpfsHash);
+            // Upload via /api/pinata/pin : le JWT Pinata reste côté serveur.
+            cids.push(await pinFileToIpfs(walletFetch, fileData, zipFile.name));
           } catch (error) {
             console.error('Error uploading file to IPFS:');
           }

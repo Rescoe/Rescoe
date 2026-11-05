@@ -15,8 +15,9 @@ import {
 } from "@chakra-ui/react";
 import Web3 from "web3";
 import detectEthereumProvider from "@metamask/detect-provider";
-import axios from "axios";
 import { useAuth } from '../../../../utils/authContext';
+import { useWalletFetch } from '@/hooks/useWalletFetch';
+import { pinFileToIpfs, pinJsonToIpfs } from '@/utils/pinata';
 
 import ABI_MESSAGE_FACTORY from '../../../ABI/Factories/ABI_SOCIAL_FACTORY.json';
 import ABI_RESCOLLECTION from "../../../ABI/ABI_Collections.json";
@@ -24,6 +25,7 @@ import ABI_RESCOLLECTION from "../../../ABI/ABI_Collections.json";
 const CreateSocialCollection: React.FC = () => {
   const toast = useToast();
   const { address: authAddress } = useAuth();
+  const walletFetch = useWalletFetch();
 
   const MESSAGE_FACTORY_ADDRESS = "0x02Efd59066618bDE4582021037938a55aBea08E6";
   const RESCOLLECTION_FACTORY_ADDRESS = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!;
@@ -171,16 +173,9 @@ const CreateSocialCollection: React.FC = () => {
 
     setIsUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const fileRes = await axios.post("https://api.pinata.cloud/pinning/pinFileToIPFS", formData, {
-        headers: {
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT_OEUVRES}`,
-        },
-      });
-
-      const imageUrl = `https://harlequin-key-marmot-538.mypinata.cloud/ipfs/${fileRes.data.IpfsHash}`;
+      // Upload via /api/pinata/pin : le JWT Pinata reste côté serveur.
+      const imageCid = await pinFileToIpfs(walletFetch, file);
+      const imageUrl = `https://harlequin-key-marmot-538.mypinata.cloud/ipfs/${imageCid}`;
 
       const meta = {
         name: metadata.name,
@@ -188,13 +183,9 @@ const CreateSocialCollection: React.FC = () => {
         image: imageUrl,
       };
 
-      const metaRes = await axios.post("https://api.pinata.cloud/pinning/pinJSONToIPFS", meta, {
-        headers: {
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT_OEUVRES}`,
-        },
-      });
+      const metaCid = await pinJsonToIpfs(walletFetch, meta);
 
-      const url = `https://harlequin-key-marmot-538.mypinata.cloud/ipfs/${metaRes.data.IpfsHash}`;
+      const url = `https://harlequin-key-marmot-538.mypinata.cloud/ipfs/${metaCid}`;
       setIpfsUrl(url);
 
       toast({

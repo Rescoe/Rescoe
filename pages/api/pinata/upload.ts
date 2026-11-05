@@ -1,143 +1,74 @@
-// /api/pinata/upload.ts - VERSION TOTALE FLEXIBLE
+/**
+ * POST /api/pinata/upload — épingle une image + ses métadonnées sur IPFS (Pinata).
+ *
+ * Sécurité : session wallet obligatoire, limite par IP et par wallet, corps limité,
+ * image décodée et identifiée par ses octets (GIF/PNG/JPEG/WebP), métadonnées bornées.
+ * Le CID de l'image est imposé par le serveur (`image` n'est jamais pris du client).
+ *
+ * Body : { scope: "badges" | "oeuvres", fileBase64: string, metadata: object }
+ * Réponse : { image, metadata, imageHash, metadataHash }
+ *
+ * Décision : pas de contrôle « membre on-chain » ici, car le flux d'adhésion envoie le
+ * badge AVANT que l'adresse soit membre. Voir docs/security.md (« Pinata »).
+ */
 import type { NextApiRequest, NextApiResponse } from "next";
-import axios from "axios";
-import FormData from "form-data";
+import { enforceRateLimit } from "@/server/security/rateLimit";
+import { requireJsonBody, requireMethod, requireWalletSession, sendError } from "@/server/security/guards";
+import { decodeBase64Limited, detectFileType, isPlainObject } from "@/server/security/validators";
+import { logServerError } from "@/server/security/redact";
+import { buildMetadata, getPinataJwt, MAX_IMAGE_BYTES, MAX_METADATA_BYTES, pinFile, pinJson } from "@/server/pinata";
 
-type UploadScope = "badges" | "oeuvres";
+const IMAGE_TYPES = new Set(["image/gif", "image/png", "image/jpeg", "image/webp"]);
+const EXT: Record<string, string> = { "image/gif": "gif", "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" };
 
-function getPinataJwt(scope: UploadScope) {
-  if (scope === "badges") return process.env.PINATA_JWT_BADGES;
-  if (scope === "oeuvres") return process.env.PINATA_JWT_ARTWORKS;
-  return null;
-}
+export const config = { api: { bodyParser: { sizeLimit: "4mb" } } };
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (!requireMethod(req, res, ["POST"])) return;
+  if (!enforceRateLimit(req, res, "pinata-upload", { limit: 20, windowMs: 10 * 60_000 })) return;
+
+  const session = requireWalletSession(req, res);
+  if (!session) return;
+  if (!enforceRateLimit(req, res, "pinata-upload-wallet", { limit: 10, windowMs: 10 * 60_000 }, session)) return;
+
+  const body = requireJsonBody(req, res);
+  if (!body) return;
+
+  const scope = body.scope;
+  if (scope !== "badges" && scope !== "oeuvres") return sendError(res, 400, "invalid_scope", "Scope invalide");
+
+  const metadata = body.metadata;
+  if (!isPlainObject(metadata) || JSON.stringify(metadata).length > MAX_METADATA_BYTES) {
+    return sendError(res, 400, "invalid_metadata", "Métadonnées invalides ou trop volumineuses");
+  }
+
+  const decoded = decodeBase64Limited(body.fileBase64, MAX_IMAGE_BYTES);
+  if (!decoded.ok) {
+    return sendError(res, decoded.reason === "too_large" ? 413 : 400, `image_${decoded.reason}`, "Image invalide");
+  }
+  const type = detectFileType(decoded.bytes);
+  if (!type || !IMAGE_TYPES.has(type)) {
+    return sendError(res, 415, "image_type_unsupported", "Formats acceptés : GIF, PNG, JPEG, WebP");
+  }
+
+  const jwt = getPinataJwt(scope);
+  if (!jwt) {
+    console.error(`[pinata-upload] JWT serveur absent pour le scope "${scope}"`);
+    return sendError(res, 503, "not_configured", "Service temporairement indisponible.");
   }
 
   try {
-    const { fileBase64, metadata, scope } = req.body as {
-      fileBase64: string;
-      metadata: any;
-      scope: UploadScope;
-    };
-
-    if (!scope || !["badges", "oeuvres"].includes(scope)) {
-      throw new Error("Scope invalide");
-    }
-
-    const pinataJwt = getPinataJwt(scope);
-    if (!pinataJwt) {
-      throw new Error(`JWT manquant: ${scope}`);
-    }
-
-    // 🔥 1. UPLOAD IMAGE
-    console.time("pinata_image");
-    const formData = new FormData();
-    formData.append(
-      "file",
-      Buffer.from(fileBase64, "base64"),
-      scope === "oeuvres" ? "artwork.png" : "badge.gif"
-    );
-
-    const imageRes = await axios.post(
-      "https://api.pinata.cloud/pinning/pinFileToIPFS",
-      formData,
-      {
-        headers: {
-          Authorization: `Bearer ${pinataJwt}`,
-          ...formData.getHeaders(),
-        },
-        timeout: 60000
-      }
-    );
-    console.timeEnd("pinata_image");
-
-    const imageCid = imageRes.data.IpfsHash;
-
-    // 🔥 2. METADATA FLEXIBLE PAR SCOPE
-    let cleanMetadata: any;
-
-    if (scope === "badges") {
-      // ✅ BADGES : BASE + TOUT CE QUI VIENT DE PREPAREEVOLUTION
-      cleanMetadata = {
-        name: metadata.name || "Badge Rescoe",
-        description: `Badge ${metadata.role || "Membre"}. ${metadata.bio || "Aucune bio."}`,
-        image: `ipfs://${imageCid}`,
-        bio: metadata.bio || "",
-        role: metadata.role || "Membre",
-        level: metadata.level,
-        tags: ["Adhesion", metadata.role || "Membre"],
-        family: metadata.family,
-        sprite_name: metadata.sprite_name,
-        color_profile: metadata.color_profile,
-        previousImage: metadata.previousImage,
-        evolutionHistory: Array.isArray(metadata.evolutionHistory) ? metadata.evolutionHistory : [],
-        attributes: Array.isArray(metadata.attributes)
-          ? metadata.attributes.filter((attr: any) => attr?.trait_type && attr.value !== undefined)
-          : [],
-        breeding: metadata.breeding && typeof metadata.breeding === "object" ? metadata.breeding : {},
-        ...metadata
-      };
-
-      // Nettoyage (supprime les undefined/null)
-      Object.keys(cleanMetadata).forEach(key => {
-        if (cleanMetadata[key] === null || cleanMetadata[key] === undefined || cleanMetadata[key] === "") {
-          delete cleanMetadata[key];
-        }
-      });
-
-    } else {
-      // OEUVRES (inchangé)
-      cleanMetadata = {
-        name: metadata.name || "Untitled",
-        description: metadata.description || "",
-        image: `ipfs://${imageCid}`,
-        artist: metadata.artist || "",
-        tags: Array.isArray(metadata.tags) ? metadata.tags : ["Oeuvre"],
-        collectionType: metadata.collectionType || "solo",
-        maxEditions: metadata.maxEditions || 1,
-        attributes: Array.isArray(metadata.attributes)
-          ? metadata.attributes.filter((attr: any) => attr?.trait_type && attr.value !== undefined)
-          : [],
-        ...metadata.custom_data
-      };
-    }
-
-    //console.log(`📄 [${scope.toUpperCase()}] Keys finales:`, Object.keys(cleanMetadata));
-
-    // 🔥 3. UPLOAD METADATA
-    console.time("pinata_metadata");
-    const metadataRes = await axios.post(
-      "https://api.pinata.cloud/pinning/pinJSONToIPFS",
-      cleanMetadata,
-      {
-        headers: { Authorization: `Bearer ${pinataJwt}` },
-        timeout: 30000
-      }
-    );
-    console.timeEnd("pinata_metadata");
+    const imageHash = await pinFile(jwt, decoded.bytes, `${scope === "oeuvres" ? "artwork" : "badge"}.${EXT[type]}`);
+    const metadataHash = await pinJson(jwt, buildMetadata(scope, metadata, imageHash));
 
     return res.status(200).json({
-      image: `ipfs://${imageCid}`,
-      metadata: `ipfs://${metadataRes.data.IpfsHash}`,
-      imageHash: imageCid,
-      metadataHash: metadataRes.data.IpfsHash
+      image: `ipfs://${imageHash}`,
+      metadata: `ipfs://${metadataHash}`,
+      imageHash,
+      metadataHash,
     });
-
-  } catch (err: any) {
-    console.error("🚨 API ERROR:", {
-      scope: req.body.scope,
-      message: err.message,
-      status: err.response?.status,
-      data: err.response?.data
-    });
-    return res.status(500).json({
-      error: err.message || "Upload failed"
-    });
+  } catch (err) {
+    logServerError("pinata-upload", err);
+    return sendError(res, 502, "upload_failed", "Upload IPFS échoué");
   }
 }
