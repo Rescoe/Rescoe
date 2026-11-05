@@ -86,4 +86,18 @@ cd "/home/user/Rescoe/Hardhat Solidity Deploy" && npm ci && node scripts/audit/s
 
 ## 6. État Git final
 
-GIT_FINAL
+- Branche : `claude/compassionate-edison-gecvpi` ; commit de départ : `15ae68551f83f5cf3c98e337eb51cf6d2960d116`.
+- Commits créés pendant la session (avant ce dernier commit de handoff) :
+```
+d6f71ac docs(audit): rapport SMART_CONTRACT_AUDIT.md + handoff de reprise Solidity
+1f6dfba audit(solidity): analyse des artefacts + tests boîte noire MasterFactory/TokenManagement (24)
+68d3890 audit(solidity): suites ResCoellectionManager (12) et MessageEditions/Factory (27)
+5d3ac72 audit(solidity): suite ArtFactory/ArtNFT (31 tests verts)
+90851f2 audit(solidity): config Hardhat d'audit hors-ligne + suite Adhesion (41 tests verts)
+2d2bd1b audit(solidity): préserver les octets CRLF exacts des sources récupérées
+5a7c526 audit(solidity): récupération des sources depuis build-info + preuve de provenance
+```
+- `git status --short` avant le commit final du handoff : `(propre)` (seulement ce fichier mis à jour).
+- Fichiers non committés : aucun (hors ce handoff, committé juste après). `node_modules/`, `cache-audit/`, `artifacts-audit/` sont ignorés (non suivis). Aucun `.env`, secret, JWT ni URL RPC suivi (vérifié par `git ls-files | grep -E "\.env|node_modules"` → vide).
+- Push : `git push -u origin claude/compassionate-edison-gecvpi` (sans force) ; résultat consigné dans le message de fin de session.
+
