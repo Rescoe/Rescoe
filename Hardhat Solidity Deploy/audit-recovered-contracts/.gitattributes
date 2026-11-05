@@ -1,0 +1,3 @@
+# Préserver les octets EXACTS des sources récupérées (CRLF d origine) :
+# les keccak256/sha256 du MANIFEST.json et des *_metadata.json Remix en dépendent.
+* -text
