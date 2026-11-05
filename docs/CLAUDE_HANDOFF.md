@@ -1,4 +1,4 @@
-STATUT DE REPRISE : PARTIEL — Adhesion testé (41 verts) ; restent ArtNFT/Manager/Message/invariants/artefacts/rapport
+STATUT DE REPRISE : PARTIEL — 135 tests verts (Adhesion 41, ArtNFT 31, Manager 12, Message 27, Artefacts/boîte noire 24) ; restent what-if Adhesion, invariants/fuzz, rapport docs/SMART_CONTRACT_AUDIT.md
 
 # CLAUDE_HANDOFF — Audit Solidity/Hardhat RESCOE
 
@@ -26,15 +26,15 @@ Objectif : audit exécutable + vraie suite Hardhat (le « 0 passing » n'est pas
 - Compilation Hardhat locale : OK (32 fichiers, 35 s). Bytecode Hardhat = Remix hors hash métadonnées.
 - Contrats d'attaque : `audit-src/attackers/Attackers.sol` (RejectingReceiver, StorageWritingReceiver, ReentrantReceiver, ForceSend, RewardMock).
 - Fixtures : `test/audit/helpers/fixtures.js`.
-- `test/audit/01_adhesion.test.js` : **41 passing**.
+- `test/audit/01_adhesion.test.js` : **41 passing** ; `02_artnft` : **31** ; `03_manager` : **12** ; `04_message_editions` : **27** ; `06_artifacts_blackbox` : **24** (dont MasterFactory et TokenManagement testés en boîte noire depuis le bytecode Remix).
+- `scripts/audit/analyze-artifacts.js` → `audit-reports/abi-bytecode-report.{json,md}` (tailles EIP-170, ABI compilée vs épinglée Base Sepolia vs frontend).
+- `scripts/audit/probe-master.js` (sonde MasterFactory).
 
 **En cours / à faire (ordre)**
-1. `02_artnft.test.js` (ArtFactory+ArtNFT) : listing périmé, push-payments bloquants, wiring association=manager, burn O(n), dust bloqué, évasion de frais, mettreAJourPoints hard-dependency, réentrance, conservation des fonds.
-2. `03_manager_factories.test.js` (ResCoellectionManager, permissions factories, createDynamicCollection ouvert).
-3. `04_message_editions.test.js`.
+1. (FAIT) 02_artnft, 03_manager, 04_message_editions, 06_artifacts_blackbox.
 4. What-if Adhesion (copie avec `_exists` corrigé, générée par script, jamais présentée comme source réelle) pour atteindre buyNFT/renew/list : vente, état vendeur/acheteur, points wash-trading, reentrancy.
 5. `05_invariants.test.js` (fuzz seedé : conservation ETH ArtNFT/MessageEditions, level ≤ MAX_LEVEL, cohérence ownership/liste, pas de double comptage points).
-6. `scripts/audit/analyze-artifacts.js` + `06_artifacts.test.js` : tailles bytecode/EIP-170, ABI Remix vs ABI frontend (`src/components/ABI/*`, LECTURE SEULE), divergences ArtFactory/Poetry/Haiku, MasterFactory/TokenManagement (bytecode Remix, tests boîte noire).
+6. (FAIT) analyse artefacts + boîte noire.
 7. `docs/SMART_CONTRACT_AUDIT.md` (rapport final) ; mettre à jour `package.json` `test` → `hardhat --config hardhat.audit.config.js test`.
 
 **Bloqué / impossible**
@@ -81,7 +81,10 @@ Objectif : audit exécutable + vraie suite Hardhat (le « 0 passing » n'est pas
 
 Adhesion (source récupérée) : F-ADH-01 `mettreAJourPoints` sans contrôle d'accès (Critical) ; F-ADH-02 `_exists` lit un mapping jamais écrit ⇒ getUserInfo/getTokenDetails/getRemaining…/renew/list/buyNFT/buyRewardPoints revert (High/Critical dispo) ; F-ADH-03 `totalSupply()` récursif ; F-ADH-04 `burnAndUpgrade` sans délai (niveau 3 immédiat) ; F-ADH-05 listes obsolètes après burn ; F-ADH-06/06b ETH brûlé si relayer=0, burnNFT payé par le contrat (DoS si solde<DUST) ; F-ADH-07 `.transfer` incompatible wallets intelligents ; F-ADH-08 adhésion active/œuf transférables ; F-ADH-09 `_totalMinted` mort ; F-ADH-10 reproduction illimitée, généalogie absente, `Reproduced` jamais émis ; F-ADH-11 trop-perçu non remboursé (evolve/burnUpgrade) ; F-ADH-12 limite annuelle = bucket époque ; F-ADH-14 `membersByRole` doublons ; F-ADH-15 URI libre ; F-ADH-17 constructeur impose initialOwner==msg.sender ; **F-ADH-18 `evolveManual` : `delete` avant lecture ⇒ niveau bloqué à 1, totalYears/autoEvolve perdus**.
 
-Suspicions lues dans le code (à prouver) : ArtNFT listing périmé après transfert (High) ; ArtNFT push-payments bloquants ; wiring `full-deploy.ts` (association = ResCoellectionManager sans receive ⇒ ventes ArtNFT bloquées) ; factories `createDynamicCollection` ouvertes ; Manager `admin` immuable ≠ owner, `addAdhesionContract` irréversible ; MessageEditions `_haikuIdFromToken` faux, haikuId 0 = sentinelle, prix non vérifié sur éditions existantes, surpaiement bloqué, pas de ReentrancyGuard malgré la doc, `getRemainingEditions` underflow ; `full-deploy.ts` référence des noms de contrats inexistants.
+ArtNFT/Factories (PROUVÉS) : F-ART-01 listing périmé ⇒ vol de NFT (High) ; F-ART-02/02b push-payments bloquants ; F-ART-03 burn O(n) (~4.8k gas/élément, 808k gas pour burn d'un token en fin de 150) ; F-ART-04 poussière bloquée ; F-ART-05 évasion de frais 10%→3% ; F-ART-06 rareté réécrivable ; F-ART-07 dépendance dure au contrat de points ; F-ART-09 plafond 50% des extras seulement en primaire ; F-ART-10 ETH brûlé vers address(0) ; F-ART-11 adhésion immuable par collection ; F-ART-12 plafond sur supply vivant ; F-ART-13 MessageFactory à 96.4% EIP-170 ; F-FAC-01/01b createDynamicCollection ouvert (Art & Message) ; F-FAC-02 wiring full-deploy.ts (association = manager) ; F-FAC-03 symbole UTF-8 invalide ; F-FAC-04 association share mort.
+Manager (PROUVÉS) : F-MGR-01 createCollection impossible avec le vrai Adhesion ; F-MGR-02 quota = points gratuits ; F-MGR-03/03b admin ≠ owner immuable ; F-MGR-04 addAdhesionContract irréversible ; F-MGR-05 droits update.
+MessageEditions (PROUVÉS) : F-MSG-01/01b/01c _haikuIdFromToken ; F-MSG-02 id 0 sentinelle ; F-MSG-03/03b prix/texte fournis par le minteur + squat ; F-MSG-04/04b fonds bloqués ; F-MSG-05 pas de ReentrancyGuard (sûr par accident) ; F-MSG-06 boucle owners (~2.6k gas/détenteur) ; F-MSG-07 compteurs ; F-MSG-08/08b/08c injection JSON/SVG ; F-MSG-09 salon à adhésion inutilisable avec le vrai Adhesion ; F-MSG-10 ; F-MSG-11.
+Boîte noire : F-MST-01 MasterFactory.createDynamicCollection ouvert ; F-MST-02 pas de transferOwnership ; F-TMG-01 TokenManagement incompatible avec l'Adhesion récupéré ; F-TMG-02 même défaut de constructeur qu'Adhesion. ABI-01..08 : 3 versions d'Adhesion (87/71/141 entrées), ArtFactory/Manager/MasterFactory frontend attendent des fonctions de contrôle d'accès absentes du déployé.
 
 ## 9. Modifications partielles / cassées
 
@@ -89,7 +92,7 @@ Aucune connue. Les tests `01_adhesion` sont verts.
 
 ## 10. Prochaine action précise
 
-Écrire `test/audit/02_artnft.test.js` (voir §3 point 1) puis lancer : `cd "Hardhat Solidity Deploy" && npx hardhat --config hardhat.audit.config.js test test/audit/02_artnft.test.js`.
+Écrire `scripts/audit/make-whatif.js` + `test/audit/07_adhesion_whatif.test.js` (Adhesion avec _exists réparé, pour atteindre buyNFT/renew/list), puis `test/audit/05_invariants.test.js` (fuzz seedé), puis `docs/SMART_CONTRACT_AUDIT.md`. Lancer : `cd "Hardhat Solidity Deploy" && npx hardhat --config hardhat.audit.config.js test`.
 
 ## 11. Commande de reprise
 

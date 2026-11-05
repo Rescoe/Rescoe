@@ -1,0 +1,1499 @@
+{
+  "eip170": 24576,
+  "eip3860": 49152,
+  "sizes": [
+    {
+      "contract": "MessageFactory",
+      "origin": "artifact Remix",
+      "deployedBytes": 23680,
+      "creationBytes": 23830,
+      "eip170Percent": 96.4,
+      "eip170Headroom": 896,
+      "eip3860Percent": 48.5,
+      "eip3860Headroom": 25322
+    },
+    {
+      "contract": "ArtFactory",
+      "origin": "artifact Remix",
+      "deployedBytes": 19743,
+      "creationBytes": 19931,
+      "eip170Percent": 80.3,
+      "eip170Headroom": 4833,
+      "eip3860Percent": 40.5,
+      "eip3860Headroom": 29221
+    },
+    {
+      "contract": "AdhesionRescoe",
+      "origin": "artifact Remix",
+      "deployedBytes": 18434,
+      "creationBytes": 19557,
+      "eip170Percent": 75,
+      "eip170Headroom": 6142,
+      "eip3860Percent": 39.8,
+      "eip3860Headroom": 29595
+    },
+    {
+      "contract": "MessageEditions",
+      "origin": "build-info d6da8606",
+      "deployedBytes": 18104,
+      "creationBytes": 20204,
+      "eip170Percent": 73.7,
+      "eip170Headroom": 6472,
+      "eip3860Percent": 41.1,
+      "eip3860Headroom": 28948
+    },
+    {
+      "contract": "ResCoellectionManager",
+      "origin": "artifact Remix",
+      "deployedBytes": 12744,
+      "creationBytes": 13864,
+      "eip170Percent": 51.9,
+      "eip170Headroom": 11832,
+      "eip3860Percent": 28.2,
+      "eip3860Headroom": 35288
+    },
+    {
+      "contract": "ArtNFT",
+      "origin": "artifact Remix",
+      "deployedBytes": 12406,
+      "creationBytes": 14773,
+      "eip170Percent": 50.5,
+      "eip170Headroom": 12170,
+      "eip3860Percent": 30.1,
+      "eip3860Headroom": 34379
+    },
+    {
+      "contract": "TokenManagement",
+      "origin": "artifact Remix",
+      "deployedBytes": 2825,
+      "creationBytes": 3171,
+      "eip170Percent": 11.5,
+      "eip170Headroom": 21751,
+      "eip3860Percent": 6.5,
+      "eip3860Headroom": 45981
+    },
+    {
+      "contract": "SepoliaFaucet",
+      "origin": "artifact Remix",
+      "deployedBytes": 2355,
+      "creationBytes": 2533,
+      "eip170Percent": 9.6,
+      "eip170Headroom": 22221,
+      "eip3860Percent": 5.2,
+      "eip3860Headroom": 46619
+    },
+    {
+      "contract": "MasterFactory",
+      "origin": "artifact Remix",
+      "deployedBytes": 1424,
+      "creationBytes": 1768,
+      "eip170Percent": 5.8,
+      "eip170Headroom": 23152,
+      "eip3860Percent": 3.6,
+      "eip3860Headroom": 47384
+    }
+  ],
+  "abiReport": [
+    {
+      "contract": "AdhesionRescoe",
+      "frontendFile": "src/components/ABI/ABIAdhesion.json",
+      "compiledEntries": 87,
+      "frontendEntries": 141,
+      "compiledVsFrontend": {
+        "function": {
+          "onlyA": [
+            "DUST_ETH()",
+            "burnAndUpgrade(uint256,string)",
+            "buyRewardPoints(address,uint256)",
+            "evolveManual(uint256,string)",
+            "feePercentage()",
+            "getTotalMembersByRole(uint256)",
+            "mintMultiple(address[],string[],uint256[],string[],string[])",
+            "pointPrice()",
+            "renewMembership(uint256,bool)",
+            "reproduce(uint256,uint256)",
+            "safeMint(string,uint256,string,string,bool,bool)",
+            "setPointPrice(uint256)",
+            "totalSupply()"
+          ],
+          "onlyB": [
+            "FEE_DENOMINATOR()",
+            "annualDuration()",
+            "artist()",
+            "baseEvolvePrice(uint256)",
+            "evolutionHistory(uint256,uint256)",
+            "evolve(uint256,string,string,string)",
+            "hatchEgg(uint256,string,string,string)",
+            "hatchedFromEgg(uint256)",
+            "insectStorage()",
+            "lockAndExtendOneYear(uint256)",
+            "lockPriceFactorDen()",
+            "lockPriceFactorNum()",
+            "maxMintsPerYear()",
+            "mintMultiple(address[],string[],string[],string[],uint256[],string[],string[])",
+            "mintNonce(address)",
+            "mintRelayer()",
+            "relayerMint(address,string,string,string,uint256,string,string,bool,bool)",
+            "renewMembership(uint256)",
+            "reproduce(uint256,uint256,uint8)",
+            "reproductionParents(uint256,uint256)",
+            "rescoeManager()",
+            "safeMint(string,string,string,uint256,string,string,bool,bool)",
+            "setAnnualDuration(uint256)",
+            "setArtist(address)",
+            "setBaseEvolvePrices(uint256[])",
+            "setInsectStorage(address)",
+            "setLockPriceFactor(uint256,uint256)",
+            "setMaxMintsPerYear(uint8)",
+            "setMintRelayer(address)",
+            "setRescoeManager(address)",
+            "spendPoints(uint256)"
+          ],
+          "common": 43,
+          "mutabilityChanged": []
+        },
+        "event": {
+          "onlyA": [
+            "MembershipRenewed(uint256,address,uint256)",
+            "MembershipUpdated(uint256,address,string,string)",
+            "NFTTransfer(address,address,uint256)",
+            "PointsPurchased(address,uint256,uint256)",
+            "Reproduced(uint256,uint256,uint256)"
+          ],
+          "onlyB": [
+            "ArtistUpdated(address,address)",
+            "EggHatched(uint256,address)",
+            "InsectStorageUpdated(address,address)",
+            "MaxMintsPerYearChanged(uint8)",
+            "MembershipRenewed(uint256,address,bool)",
+            "MintRelayerUpdated(address,address)",
+            "RescoeManagerUpdated(address,address)"
+          ],
+          "common": 15
+        },
+        "error": {
+          "onlyA": [
+            "ERC721IncorrectOwner(address,uint256,address)",
+            "ERC721InsufficientApproval(address,uint256)",
+            "ERC721InvalidApprover(address)",
+            "ERC721InvalidOperator(address)",
+            "ERC721InvalidOwner(address)",
+            "ERC721InvalidReceiver(address)",
+            "ERC721InvalidSender(address)",
+            "ERC721NonexistentToken(uint256)",
+            "OwnableInvalidOwner(address)",
+            "OwnableUnauthorizedAccount(address)"
+          ],
+          "onlyB": [
+            "AlreadyLocked()",
+            "ArraysMismatch()",
+            "AutoEvolveDisabled()",
+            "DenominatorZero()",
+            "DifferentParents()",
+            "EggAlreadyHatched()",
+            "EggNotReady()",
+            "EggNotTransferable()",
+            "EmptyInsectKey()",
+            "EvolvePricesNotSet()",
+            "ExpectThreePrices()",
+            "InsectStorageNotSet()",
+            "InsufficientFunds()",
+            "InvalidPrice()",
+            "InvalidRecipient()",
+            "InvalidRole()",
+            "InvalidTokenId()",
+            "LockedInsect()",
+            "MaxBatch()",
+            "MaxLevelReached()",
+            "MaxMintsConfig()",
+            "MaxMintsReached()",
+            "MembershipActive()",
+            "NeedMaxLevel()",
+            "NeedOneYear()",
+            "NoETH()",
+            "NonIncreasingPrices()",
+            "NotAnEgg()",
+            "NotEnoughPoints()",
+            "NotForSale()",
+            "NotReady()",
+            "OnlyManager()",
+            "OnlyRelayer()",
+            "OwnerUpdateOnly()",
+            "RelayerShouldNotPay()",
+            "TokenNotExist()",
+            "TooManyPerYear()",
+            "TransferFailed()",
+            "TrialCannotBeAuto()",
+            "Unauthorized()",
+            "UserNotMember()",
+            "ZeroAddress()",
+            "ZeroOwner()",
+            "ZeroPoints()"
+          ],
+          "common": 0
+        },
+        "constructor": {
+          "A": "(address initialOwner)",
+          "B": "(address initialOwner,address _artist,address _insectStorage)",
+          "same": false
+        }
+      },
+      "pinnedBaseSepolia": {
+        "address": "0x83848a57947b36e51787ded31554d43fd2417eaa",
+        "entries": 71,
+        "pinnedAt": 1764500590428
+      },
+      "compiledVsPinned": {
+        "function": {
+          "onlyA": [
+            "BURN_POINTS_REWARD()",
+            "DUST_ETH()",
+            "MAX_LEVEL()",
+            "REPRODUCE_POINTS_COST()",
+            "burnAndUpgrade(uint256,string)",
+            "evolveManual(uint256,string)",
+            "levelDurations(uint256)",
+            "membershipInfo(uint256)",
+            "mintsPerYear(address,uint256)",
+            "relayer()",
+            "renewMembership(uint256,bool)",
+            "reproduce(uint256,uint256)",
+            "safeMint(string,uint256,string,string,bool,bool)",
+            "setLevelDurations(uint256[4])",
+            "setRelayer(address)",
+            "totalSupply()"
+          ],
+          "onlyB": [
+            "renewMembership(uint256)",
+            "safeMint(string,uint256,string,string)",
+            "duration()"
+          ],
+          "common": 40,
+          "mutabilityChanged": []
+        },
+        "event": {
+          "onlyA": [
+            "LevelEvolved(uint256,uint8)",
+            "Reproduced(uint256,uint256,uint256)",
+            "RewardsDeducted(address,uint256)"
+          ],
+          "onlyB": [],
+          "common": 17
+        },
+        "error": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 10
+        },
+        "constructor": {
+          "A": "(address initialOwner)",
+          "B": "(address initialOwner)",
+          "same": true
+        }
+      },
+      "pinnedVsFrontend": {
+        "function": {
+          "onlyA": [
+            "buyRewardPoints(address,uint256)",
+            "mintMultiple(address[],string[],uint256[],string[],string[])",
+            "safeMint(string,uint256,string,string)",
+            "setPointPrice(uint256)",
+            "duration()",
+            "feePercentage()",
+            "getTotalMembersByRole(uint256)",
+            "pointPrice()"
+          ],
+          "onlyB": [
+            "BURN_POINTS_REWARD()",
+            "FEE_DENOMINATOR()",
+            "MAX_LEVEL()",
+            "REPRODUCE_POINTS_COST()",
+            "annualDuration()",
+            "artist()",
+            "baseEvolvePrice(uint256)",
+            "evolutionHistory(uint256,uint256)",
+            "evolve(uint256,string,string,string)",
+            "hatchEgg(uint256,string,string,string)",
+            "hatchedFromEgg(uint256)",
+            "insectStorage()",
+            "levelDurations(uint256)",
+            "lockAndExtendOneYear(uint256)",
+            "lockPriceFactorDen()",
+            "lockPriceFactorNum()",
+            "maxMintsPerYear()",
+            "membershipInfo(uint256)",
+            "mintMultiple(address[],string[],string[],string[],uint256[],string[],string[])",
+            "mintNonce(address)",
+            "mintRelayer()",
+            "mintsPerYear(address,uint256)",
+            "relayer()",
+            "relayerMint(address,string,string,string,uint256,string,string,bool,bool)",
+            "reproduce(uint256,uint256,uint8)",
+            "reproductionParents(uint256,uint256)",
+            "rescoeManager()",
+            "safeMint(string,string,string,uint256,string,string,bool,bool)",
+            "setAnnualDuration(uint256)",
+            "setArtist(address)",
+            "setBaseEvolvePrices(uint256[])",
+            "setInsectStorage(address)",
+            "setLevelDurations(uint256[4])",
+            "setLockPriceFactor(uint256,uint256)",
+            "setMaxMintsPerYear(uint8)",
+            "setMintRelayer(address)",
+            "setRelayer(address)",
+            "setRescoeManager(address)",
+            "spendPoints(uint256)"
+          ],
+          "common": 35,
+          "mutabilityChanged": []
+        },
+        "event": {
+          "onlyA": [
+            "MembershipRenewed(uint256,address,uint256)",
+            "MembershipUpdated(uint256,address,string,string)",
+            "NFTTransfer(address,address,uint256)",
+            "PointsPurchased(address,uint256,uint256)"
+          ],
+          "onlyB": [
+            "ArtistUpdated(address,address)",
+            "EggHatched(uint256,address)",
+            "InsectStorageUpdated(address,address)",
+            "LevelEvolved(uint256,uint8)",
+            "MaxMintsPerYearChanged(uint8)",
+            "MembershipRenewed(uint256,address,bool)",
+            "MintRelayerUpdated(address,address)",
+            "RescoeManagerUpdated(address,address)",
+            "RewardsDeducted(address,uint256)"
+          ],
+          "common": 13
+        },
+        "error": {
+          "onlyA": [
+            "ERC721IncorrectOwner(address,uint256,address)",
+            "ERC721InsufficientApproval(address,uint256)",
+            "ERC721InvalidApprover(address)",
+            "ERC721InvalidOperator(address)",
+            "ERC721InvalidOwner(address)",
+            "ERC721InvalidReceiver(address)",
+            "ERC721InvalidSender(address)",
+            "ERC721NonexistentToken(uint256)",
+            "OwnableInvalidOwner(address)",
+            "OwnableUnauthorizedAccount(address)"
+          ],
+          "onlyB": [
+            "AlreadyLocked()",
+            "ArraysMismatch()",
+            "AutoEvolveDisabled()",
+            "DenominatorZero()",
+            "DifferentParents()",
+            "EggAlreadyHatched()",
+            "EggNotReady()",
+            "EggNotTransferable()",
+            "EmptyInsectKey()",
+            "EvolvePricesNotSet()",
+            "ExpectThreePrices()",
+            "InsectStorageNotSet()",
+            "InsufficientFunds()",
+            "InvalidPrice()",
+            "InvalidRecipient()",
+            "InvalidRole()",
+            "InvalidTokenId()",
+            "LockedInsect()",
+            "MaxBatch()",
+            "MaxLevelReached()",
+            "MaxMintsConfig()",
+            "MaxMintsReached()",
+            "MembershipActive()",
+            "NeedMaxLevel()",
+            "NeedOneYear()",
+            "NoETH()",
+            "NonIncreasingPrices()",
+            "NotAnEgg()",
+            "NotEnoughPoints()",
+            "NotForSale()",
+            "NotReady()",
+            "OnlyManager()",
+            "OnlyRelayer()",
+            "OwnerUpdateOnly()",
+            "RelayerShouldNotPay()",
+            "TokenNotExist()",
+            "TooManyPerYear()",
+            "TransferFailed()",
+            "TrialCannotBeAuto()",
+            "Unauthorized()",
+            "UserNotMember()",
+            "ZeroAddress()",
+            "ZeroOwner()",
+            "ZeroPoints()"
+          ],
+          "common": 0
+        },
+        "constructor": {
+          "A": "(address initialOwner)",
+          "B": "(address initialOwner,address _artist,address _insectStorage)",
+          "same": false
+        }
+      },
+      "pinnedRemixVm": {
+        "address": "0xd9145CCE52D386f254917e481eB44e9943F39138",
+        "entries": 87,
+        "sameAsCompiled": false
+      }
+    },
+    {
+      "contract": "TokenManagement",
+      "frontendFile": "src/components/ABI/ABI_ADHESION_MANAGEMENT.json",
+      "compiledEntries": 16,
+      "frontendEntries": 16,
+      "compiledVsFrontend": {
+        "function": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 11,
+          "mutabilityChanged": []
+        },
+        "event": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 2
+        },
+        "error": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 2
+        },
+        "constructor": {
+          "A": "(address _adhesionAddress,address initialOwner)",
+          "B": "(address _adhesionAddress,address initialOwner)",
+          "same": true
+        }
+      },
+      "pinnedBaseSepolia": {
+        "address": "0x7610cb956354a790758158473d23704db2fa9ad8",
+        "entries": 16,
+        "pinnedAt": 1764500753112
+      },
+      "compiledVsPinned": {
+        "function": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 11,
+          "mutabilityChanged": []
+        },
+        "event": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 2
+        },
+        "error": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 2
+        },
+        "constructor": {
+          "A": "(address _adhesionAddress,address initialOwner)",
+          "B": "(address _adhesionAddress,address initialOwner)",
+          "same": true
+        }
+      },
+      "pinnedVsFrontend": {
+        "function": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 11,
+          "mutabilityChanged": []
+        },
+        "event": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 2
+        },
+        "error": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 2
+        },
+        "constructor": {
+          "A": "(address _adhesionAddress,address initialOwner)",
+          "B": "(address _adhesionAddress,address initialOwner)",
+          "same": true
+        }
+      }
+    },
+    {
+      "contract": "ArtNFT",
+      "frontendFile": "src/components/ABI/ABI_ART.json",
+      "compiledEntries": 71,
+      "frontendEntries": 57,
+      "compiledVsFrontend": {
+        "function": {
+          "onlyA": [
+            "OWNER_FEE_PERCENTAGE()",
+            "getTokenLightMetadata(uint256)",
+            "maxCreatorFee()",
+            "minCreatorFee()",
+            "pendingWithdrawals(address)",
+            "setTokenMetadataOnChain(uint256,uint8)",
+            "tokenRarity(uint256)",
+            "userFeePercentage(address)"
+          ],
+          "onlyB": [
+            "hiddenMetadataURI()",
+            "mintBatch(string[],uint256[])",
+            "revealed()",
+            "setHiddenMetadataURI(string)",
+            "setReveal(bool)"
+          ],
+          "common": 41,
+          "mutabilityChanged": []
+        },
+        "event": {
+          "onlyA": [
+            "NFTMinted(uint256,address,string,uint8,uint256)",
+            "RewardPointsCalculated(address,uint256)"
+          ],
+          "onlyB": [
+            "NFTMinted(uint256,address,string,uint256)"
+          ],
+          "common": 9
+        },
+        "error": {
+          "onlyA": [
+            "ERC721IncorrectOwner(address,uint256,address)",
+            "ERC721InsufficientApproval(address,uint256)",
+            "ERC721InvalidApprover(address)",
+            "ERC721InvalidOperator(address)",
+            "ERC721InvalidOwner(address)",
+            "ERC721InvalidReceiver(address)",
+            "ERC721InvalidSender(address)",
+            "ERC721NonexistentToken(uint256)",
+            "OwnableInvalidOwner(address)",
+            "OwnableUnauthorizedAccount(address)"
+          ],
+          "onlyB": [],
+          "common": 0
+        },
+        "constructor": {
+          "A": "(address initialOwner,string collectionName,string collectionSymbol,uint256 _collectionId,string _collectionType,address _adhesionContractAddress,address _associationAddress,uint8 _associationFeeSharePercent,uint256 _maxSupply,address[] _extraRecipients,uint256[] _extraPercents)",
+          "B": "(address initialOwner,string name_,string symbol_,uint256 _collectionId,string _collectionType,address _rescollection,address _association,uint8 _associationShare,uint256 _maxSupply,address[] _extraRecipients,uint256[] _extraPercents)",
+          "same": false
+        }
+      },
+      "pinnedBaseSepolia": {
+        "address": "0xd0b6772E0DE3e9772492ebF15764744ACD9a3964",
+        "entries": 71,
+        "pinnedAt": 1764584403796
+      },
+      "compiledVsPinned": {
+        "function": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 49,
+          "mutabilityChanged": []
+        },
+        "event": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 11
+        },
+        "error": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 10
+        },
+        "constructor": {
+          "A": "(address initialOwner,string collectionName,string collectionSymbol,uint256 _collectionId,string _collectionType,address _adhesionContractAddress,address _associationAddress,uint8 _associationFeeSharePercent,uint256 _maxSupply,address[] _extraRecipients,uint256[] _extraPercents)",
+          "B": "(address initialOwner,string collectionName,string collectionSymbol,uint256 _collectionId,string _collectionType,address _adhesionContractAddress,address _associationAddress,uint8 _associationFeeSharePercent,uint256 _maxSupply,address[] _extraRecipients,uint256[] _extraPercents)",
+          "same": true
+        }
+      },
+      "pinnedVsFrontend": {
+        "function": {
+          "onlyA": [
+            "setTokenMetadataOnChain(uint256,uint8)",
+            "getTokenLightMetadata(uint256)",
+            "maxCreatorFee()",
+            "minCreatorFee()",
+            "OWNER_FEE_PERCENTAGE()",
+            "pendingWithdrawals(address)",
+            "tokenRarity(uint256)",
+            "userFeePercentage(address)"
+          ],
+          "onlyB": [
+            "hiddenMetadataURI()",
+            "mintBatch(string[],uint256[])",
+            "revealed()",
+            "setHiddenMetadataURI(string)",
+            "setReveal(bool)"
+          ],
+          "common": 41,
+          "mutabilityChanged": []
+        },
+        "event": {
+          "onlyA": [
+            "NFTMinted(uint256,address,string,uint8,uint256)",
+            "RewardPointsCalculated(address,uint256)"
+          ],
+          "onlyB": [
+            "NFTMinted(uint256,address,string,uint256)"
+          ],
+          "common": 9
+        },
+        "error": {
+          "onlyA": [
+            "ERC721IncorrectOwner(address,uint256,address)",
+            "ERC721InsufficientApproval(address,uint256)",
+            "ERC721InvalidApprover(address)",
+            "ERC721InvalidOperator(address)",
+            "ERC721InvalidOwner(address)",
+            "ERC721InvalidReceiver(address)",
+            "ERC721InvalidSender(address)",
+            "ERC721NonexistentToken(uint256)",
+            "OwnableInvalidOwner(address)",
+            "OwnableUnauthorizedAccount(address)"
+          ],
+          "onlyB": [],
+          "common": 0
+        },
+        "constructor": {
+          "A": "(address initialOwner,string collectionName,string collectionSymbol,uint256 _collectionId,string _collectionType,address _adhesionContractAddress,address _associationAddress,uint8 _associationFeeSharePercent,uint256 _maxSupply,address[] _extraRecipients,uint256[] _extraPercents)",
+          "B": "(address initialOwner,string name_,string symbol_,uint256 _collectionId,string _collectionType,address _rescollection,address _association,uint8 _associationShare,uint256 _maxSupply,address[] _extraRecipients,uint256[] _extraPercents)",
+          "same": false
+        }
+      }
+    },
+    {
+      "contract": "ResCoellectionManager",
+      "frontendFile": "src/components/ABI/ABI_Collections.json",
+      "compiledEntries": 64,
+      "frontendEntries": 71,
+      "compiledVsFrontend": {
+        "function": {
+          "onlyA": [],
+          "onlyB": [
+            "POINT_PRICE()",
+            "addPendingPoints(address,uint256)",
+            "authorizedCollections(address)",
+            "buyPendingPoints(uint256)",
+            "claimPendingToRewards()",
+            "distributeToAdhesion(address)",
+            "getPendingPoints(address)",
+            "pendingRewardPoints(address)",
+            "registerCollection(address)",
+            "rewardRelayer()",
+            "setRewardRelayer(address)"
+          ],
+          "common": 42,
+          "mutabilityChanged": []
+        },
+        "event": {
+          "onlyA": [],
+          "onlyB": [
+            "CollectionAuthorized(address)",
+            "PendingPointsClaimed(address,uint256)",
+            "PointsDistributed(address,uint256)",
+            "PointsPending(address,uint256)",
+            "PointsPurchased(address,uint256,uint256)",
+            "PointsReadyForRelayer(address,uint256)"
+          ],
+          "common": 11
+        },
+        "error": {
+          "onlyA": [
+            "ERC721IncorrectOwner(address,uint256,address)",
+            "ERC721InsufficientApproval(address,uint256)",
+            "ERC721InvalidApprover(address)",
+            "ERC721InvalidOperator(address)",
+            "ERC721InvalidOwner(address)",
+            "ERC721InvalidReceiver(address)",
+            "ERC721InvalidSender(address)",
+            "ERC721NonexistentToken(uint256)",
+            "OwnableInvalidOwner(address)",
+            "OwnableUnauthorizedAccount(address)"
+          ],
+          "onlyB": [],
+          "common": 0
+        },
+        "constructor": {
+          "A": "(address initialOwner,address _factoryContractAddress)",
+          "B": "(address initialOwner,address _factoryContractAddress)",
+          "same": true
+        }
+      },
+      "pinnedBaseSepolia": {
+        "address": "0xc06670dccae878d67a7ed596e8e35298d8b91ade",
+        "entries": 64,
+        "pinnedAt": 1764490185537
+      },
+      "compiledVsPinned": {
+        "function": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 42,
+          "mutabilityChanged": []
+        },
+        "event": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 11
+        },
+        "error": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 10
+        },
+        "constructor": {
+          "A": "(address initialOwner,address _factoryContractAddress)",
+          "B": "(address initialOwner,address _factoryContractAddress)",
+          "same": true
+        }
+      },
+      "pinnedVsFrontend": {
+        "function": {
+          "onlyA": [],
+          "onlyB": [
+            "POINT_PRICE()",
+            "addPendingPoints(address,uint256)",
+            "authorizedCollections(address)",
+            "buyPendingPoints(uint256)",
+            "claimPendingToRewards()",
+            "distributeToAdhesion(address)",
+            "getPendingPoints(address)",
+            "pendingRewardPoints(address)",
+            "registerCollection(address)",
+            "rewardRelayer()",
+            "setRewardRelayer(address)"
+          ],
+          "common": 42,
+          "mutabilityChanged": []
+        },
+        "event": {
+          "onlyA": [],
+          "onlyB": [
+            "CollectionAuthorized(address)",
+            "PendingPointsClaimed(address,uint256)",
+            "PointsDistributed(address,uint256)",
+            "PointsPending(address,uint256)",
+            "PointsPurchased(address,uint256,uint256)",
+            "PointsReadyForRelayer(address,uint256)"
+          ],
+          "common": 11
+        },
+        "error": {
+          "onlyA": [
+            "ERC721IncorrectOwner(address,uint256,address)",
+            "ERC721InsufficientApproval(address,uint256)",
+            "ERC721InvalidApprover(address)",
+            "ERC721InvalidOperator(address)",
+            "ERC721InvalidOwner(address)",
+            "ERC721InvalidReceiver(address)",
+            "ERC721InvalidSender(address)",
+            "ERC721NonexistentToken(uint256)",
+            "OwnableInvalidOwner(address)",
+            "OwnableUnauthorizedAccount(address)"
+          ],
+          "onlyB": [],
+          "common": 0
+        },
+        "constructor": {
+          "A": "(address initialOwner,address _factoryContractAddress)",
+          "B": "(address initialOwner,address _factoryContractAddress)",
+          "same": true
+        }
+      }
+    },
+    {
+      "contract": "ArtFactory",
+      "frontendFile": "src/components/ABI/Factories/ABI_ART_FACTORY.json",
+      "compiledEntries": 17,
+      "frontendEntries": 19,
+      "compiledVsFrontend": {
+        "function": {
+          "onlyA": [
+            "allCollectionNames(uint256)",
+            "collectionConfigs(string)",
+            "getAllCollectionNames()",
+            "getCollectionConfig(string)"
+          ],
+          "onlyB": [
+            "getUserCollectionConfig(address,string)",
+            "masterFactoryAuthorized()",
+            "resCollectionsAuthorized()",
+            "setAuthorizedCallers(address,address)"
+          ],
+          "common": 9,
+          "mutabilityChanged": []
+        },
+        "event": {
+          "onlyA": [
+            "CollectionConfigured(string,uint256,address[],uint256[])"
+          ],
+          "onlyB": [
+            "AuthorizedCallersUpdated(address,address)",
+            "CollectionConfigured(address,string,uint256,address[],uint256[])",
+            "OwnershipTransferred(address,address)"
+          ],
+          "common": 2
+        },
+        "error": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 0
+        },
+        "constructor": {
+          "A": "(address _adhesion,address _association)",
+          "B": "(address _adhesion,address _association)",
+          "same": true
+        }
+      },
+      "pinnedBaseSepolia": {
+        "address": "0xe9aa1178ef6c14DAc173a11e35d51ACeaF09D9Fc",
+        "entries": 17,
+        "pinnedAt": 1764584668563
+      },
+      "compiledVsPinned": {
+        "function": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 13,
+          "mutabilityChanged": []
+        },
+        "event": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 3
+        },
+        "error": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 0
+        },
+        "constructor": {
+          "A": "(address _adhesion,address _association)",
+          "B": "(address _adhesion,address _association)",
+          "same": true
+        }
+      },
+      "pinnedVsFrontend": {
+        "function": {
+          "onlyA": [
+            "allCollectionNames(uint256)",
+            "collectionConfigs(string)",
+            "getAllCollectionNames()",
+            "getCollectionConfig(string)"
+          ],
+          "onlyB": [
+            "getUserCollectionConfig(address,string)",
+            "masterFactoryAuthorized()",
+            "resCollectionsAuthorized()",
+            "setAuthorizedCallers(address,address)"
+          ],
+          "common": 9,
+          "mutabilityChanged": []
+        },
+        "event": {
+          "onlyA": [
+            "CollectionConfigured(string,uint256,address[],uint256[])"
+          ],
+          "onlyB": [
+            "AuthorizedCallersUpdated(address,address)",
+            "CollectionConfigured(address,string,uint256,address[],uint256[])",
+            "OwnershipTransferred(address,address)"
+          ],
+          "common": 2
+        },
+        "error": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 0
+        },
+        "constructor": {
+          "A": "(address _adhesion,address _association)",
+          "B": "(address _adhesion,address _association)",
+          "same": true
+        }
+      }
+    },
+    {
+      "contract": "MasterFactory",
+      "frontendFile": "src/components/ABI/Factories/ABI_MasterFactory.json",
+      "compiledEntries": 10,
+      "frontendEntries": 11,
+      "compiledVsFrontend": {
+        "function": {
+          "onlyA": [],
+          "onlyB": [
+            "generativeFactory()"
+          ],
+          "common": 7,
+          "mutabilityChanged": []
+        },
+        "event": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 2
+        },
+        "error": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 0
+        },
+        "constructor": {
+          "A": "(address artFactoryAddress,address poetryFactoryAddress,address messageFactoryAddress)",
+          "B": "(address artFactoryAddress,address poetryFactoryAddress,address messageFactoryAddress,address generativeFactoryAddress)",
+          "same": false
+        }
+      },
+      "pinnedBaseSepolia": {
+        "address": "0x449f77c72c359ec52391830babb22eb5823aeeac",
+        "entries": 10,
+        "pinnedAt": 1764489980725
+      },
+      "compiledVsPinned": {
+        "function": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 7,
+          "mutabilityChanged": []
+        },
+        "event": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 2
+        },
+        "error": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 0
+        },
+        "constructor": {
+          "A": "(address artFactoryAddress,address poetryFactoryAddress,address messageFactoryAddress)",
+          "B": "(address artFactoryAddress,address poetryFactoryAddress,address messageFactoryAddress)",
+          "same": true
+        }
+      },
+      "pinnedVsFrontend": {
+        "function": {
+          "onlyA": [],
+          "onlyB": [
+            "generativeFactory()"
+          ],
+          "common": 7,
+          "mutabilityChanged": []
+        },
+        "event": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 2
+        },
+        "error": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 0
+        },
+        "constructor": {
+          "A": "(address artFactoryAddress,address poetryFactoryAddress,address messageFactoryAddress)",
+          "B": "(address artFactoryAddress,address poetryFactoryAddress,address messageFactoryAddress,address generativeFactoryAddress)",
+          "same": false
+        }
+      }
+    },
+    {
+      "contract": "MessageFactory",
+      "frontendFile": "src/components/ABI/Factories/ABI_SOCIAL_FACTORY.json",
+      "compiledEntries": 15,
+      "frontendEntries": 17,
+      "compiledVsFrontend": {
+        "function": {
+          "onlyA": [],
+          "onlyB": [
+            "renounceOwnership()"
+          ],
+          "common": 10,
+          "mutabilityChanged": []
+        },
+        "event": {
+          "onlyA": [],
+          "onlyB": [
+            "OwnershipTransferred(address,address)"
+          ],
+          "common": 4
+        },
+        "error": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 0
+        },
+        "constructor": {
+          "A": "(address _adhesionContractAddress)",
+          "B": "(address initialOwner,address _adhesionContractAddress)",
+          "same": false
+        }
+      },
+      "pinnedBaseSepolia": {
+        "address": "0x72b5547985e1d764681b0788879e0a4c7707e4fe",
+        "entries": 15,
+        "pinnedAt": 1764500891496
+      },
+      "compiledVsPinned": {
+        "function": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 10,
+          "mutabilityChanged": []
+        },
+        "event": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 4
+        },
+        "error": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 0
+        },
+        "constructor": {
+          "A": "(address _adhesionContractAddress)",
+          "B": "(address _adhesionContractAddress)",
+          "same": true
+        }
+      },
+      "pinnedVsFrontend": {
+        "function": {
+          "onlyA": [],
+          "onlyB": [
+            "renounceOwnership()"
+          ],
+          "common": 10,
+          "mutabilityChanged": []
+        },
+        "event": {
+          "onlyA": [],
+          "onlyB": [
+            "OwnershipTransferred(address,address)"
+          ],
+          "common": 4
+        },
+        "error": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 0
+        },
+        "constructor": {
+          "A": "(address _adhesionContractAddress)",
+          "B": "(address initialOwner,address _adhesionContractAddress)",
+          "same": false
+        }
+      }
+    },
+    {
+      "contract": "MessageEditions",
+      "frontendFile": "src/components/ABI/MessageEditions.json",
+      "compiledEntries": 71,
+      "frontendEntries": 56,
+      "compiledVsFrontend": {
+        "function": {
+          "onlyA": [
+            "burnMultiple(uint256[])",
+            "defaultRules()",
+            "defineRoyalties(address[],uint256[])",
+            "getHaikuInfoUnique(uint256)",
+            "getHaikuRoyalties(uint256)",
+            "getLastMintedTokenId()",
+            "getLastUniqueHaikusMinted()",
+            "getRemainingEditions(uint256)",
+            "getSalonRoyalties()",
+            "getTokenFullDetails(uint256)",
+            "getTransactionHistory(uint256)",
+            "haikuRoyaltyAddress(uint256)",
+            "isNFTForSale(uint256)",
+            "messageMintCount(bytes32)",
+            "mint(bytes32,string,uint256,address,string,uint256,uint256,uint256,bool,address[],uint256[])",
+            "removeEditionFromSale(uint256)",
+            "salonRules(uint256)",
+            "setDefaultRoyalties(address[],uint256[])",
+            "updateDefaultRoyaltyAddress(address)"
+          ],
+          "onlyB": [
+            "addResidentManager(address)",
+            "associationAddress()",
+            "associationFeeSharePercent()",
+            "convertToSoulbound(uint256)",
+            "createHaikuResident(string,uint256,uint256,uint256,address[],uint256[],string)",
+            "extraPercents(uint256)",
+            "extraRecipients(uint256)",
+            "isListed(uint256)",
+            "isSoulbound(uint256)",
+            "mintDiscord(bytes32,string,uint256,string,uint256,uint256,uint256,bool,address[],uint256[])",
+            "mintEdition(uint256,string)",
+            "residentManagers(address)"
+          ],
+          "common": 29,
+          "mutabilityChanged": []
+        },
+        "event": {
+          "onlyA": [
+            "NFTMinted(uint256,address,string)",
+            "NFTRemoved(uint256)",
+            "RewardPointsCalculated(address,uint256)"
+          ],
+          "onlyB": [
+            "HaikuCreated(uint256,bytes32)",
+            "NFTMinted(uint256,uint256,address,string)",
+            "ResidentAdded(address)",
+            "RewardPointsCalculated(address,uint256,bool)",
+            "TokenSoulbound(uint256,address)"
+          ],
+          "common": 8
+        },
+        "error": {
+          "onlyA": [
+            "ERC721IncorrectOwner(address,uint256,address)",
+            "ERC721InsufficientApproval(address,uint256)",
+            "ERC721InvalidApprover(address)",
+            "ERC721InvalidOperator(address)",
+            "ERC721InvalidOwner(address)",
+            "ERC721InvalidReceiver(address)",
+            "ERC721InvalidSender(address)",
+            "ERC721NonexistentToken(uint256)",
+            "OwnableInvalidOwner(address)",
+            "OwnableUnauthorizedAccount(address)",
+            "StringsInsufficientHexLength(uint256,uint256)"
+          ],
+          "onlyB": [],
+          "common": 0
+        },
+        "constructor": {
+          "A": "(address initialOwner,string collectionName,string collectionSymbol,uint256 _collectionId,string _collectionType,address _adhesionContractAddress,string _salonName,bool _requiresMembership,address _defaultRoyaltyAddress)",
+          "B": "(address initialOwner,string collectionName,string collectionSymbol,uint256 _collectionId,string _collectionType,address _adhesionContractAddress,string _salonName,bool _requiresMembership,address _defaultRoyaltyAddress)",
+          "same": true
+        }
+      }
+    },
+    {
+      "contract": "SepoliaFaucet",
+      "frontendFile": "src/components/ABI/Faucet.json",
+      "compiledEntries": 22,
+      "frontendEntries": 22,
+      "compiledVsFrontend": {
+        "function": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 14,
+          "mutabilityChanged": []
+        },
+        "event": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 5
+        },
+        "error": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 0
+        },
+        "constructor": {
+          "A": "(uint256 _dispenseAmount,uint256 _cooldown,uint256 _maxClaimsPerAddress,address _relayer)",
+          "B": "(uint256 _dispenseAmount,uint256 _cooldown,uint256 _maxClaimsPerAddress,address _relayer)",
+          "same": true
+        }
+      },
+      "pinnedBaseSepolia": {
+        "address": "0xe14968f7ce8be32ee79aa37f82599ffadf55ddba",
+        "entries": 22,
+        "pinnedAt": 1764499175919
+      },
+      "compiledVsPinned": {
+        "function": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 14,
+          "mutabilityChanged": []
+        },
+        "event": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 5
+        },
+        "error": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 0
+        },
+        "constructor": {
+          "A": "(uint256 _dispenseAmount,uint256 _cooldown,uint256 _maxClaimsPerAddress,address _relayer)",
+          "B": "(uint256 _dispenseAmount,uint256 _cooldown,uint256 _maxClaimsPerAddress,address _relayer)",
+          "same": true
+        }
+      },
+      "pinnedVsFrontend": {
+        "function": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 14,
+          "mutabilityChanged": []
+        },
+        "event": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 5
+        },
+        "error": {
+          "onlyA": [],
+          "onlyB": [],
+          "common": 0
+        },
+        "constructor": {
+          "A": "(uint256 _dispenseAmount,uint256 _cooldown,uint256 _maxClaimsPerAddress,address _relayer)",
+          "B": "(uint256 _dispenseAmount,uint256 _cooldown,uint256 _maxClaimsPerAddress,address _relayer)",
+          "same": true
+        }
+      }
+    }
+  ],
+  "frontendOnly": [
+    {
+      "contract": "HaikuEditions",
+      "fe": "HaikuEditions.json",
+      "entries": 60,
+      "functions": 37,
+      "events": 11,
+      "errors": 11,
+      "constructor": "(address initialOwner,string collectionName,string collectionSymbol,uint256 _collectionId,string _collectionType,address _adhesionContractAddress,address _associationAddress,uint8 _associationFeeSharePercent,uint256 _maxSupply,address[] _extraRecipients,uint256[] _extraPercents)",
+      "sourceAvailable": false
+    },
+    {
+      "contract": "PoetryFactory",
+      "fe": "Factories/ABI_POESIE_FACTORY.json",
+      "entries": 19,
+      "functions": 13,
+      "events": 5,
+      "errors": 0,
+      "constructor": "(address _adhesion,address _association)",
+      "sourceAvailable": false
+    },
+    {
+      "contract": "InsectImageStorageV3",
+      "fe": "ABIInsectStorage.json",
+      "entries": 29,
+      "functions": 21,
+      "events": 7,
+      "errors": 0,
+      "constructor": "(address initialOwner)",
+      "sourceAvailable": false
+    },
+    {
+      "contract": "GenerativeArt (inconnu)",
+      "fe": "ABI_GENERATIVE_ART.json",
+      "entries": 57,
+      "functions": 35,
+      "events": 11,
+      "errors": 10,
+      "constructor": "(address _creator,string _name,string _symbol,uint256 _collectionId,string _collectionType,address _adhesionContract)",
+      "sourceAvailable": false
+    }
+  ],
+  "cross": {
+    "artFactoryVsPoetryFactoryFrontendIdentical": true,
+    "artFactoryVsPoetryFactoryDiff": {
+      "function": {
+        "onlyA": [],
+        "onlyB": [],
+        "common": 13,
+        "mutabilityChanged": []
+      },
+      "event": {
+        "onlyA": [],
+        "onlyB": [],
+        "common": 5
+      },
+      "error": {
+        "onlyA": [],
+        "onlyB": [],
+        "common": 0
+      },
+      "constructor": {
+        "A": "(address _adhesion,address _association)",
+        "B": "(address _adhesion,address _association)",
+        "same": true
+      }
+    },
+    "haikuEditionsVsCompiledArtNFT": {
+      "function": {
+        "onlyA": [
+          "burnMultiple(uint256[])",
+          "buyEdition(uint256)",
+          "getHaikuInfoUnique(uint256)",
+          "getLastUniqueHaikusMinted()",
+          "getRemainingEditions(uint256)",
+          "haikuIdToTokenId(uint256)",
+          "haikus(uint256)",
+          "listEditionForSale(uint256,uint256)",
+          "mint(uint256,string,uint256,uint256)",
+          "removeEditionFromSale(uint256)",
+          "tokenIdToHaikuId(uint256)"
+        ],
+        "onlyB": [
+          "OWNER_FEE_PERCENTAGE()",
+          "_getCollectionMaxSupplyFallback()",
+          "burn(uint256)",
+          "buyNFT(uint256)",
+          "doesTokenExist(uint256)",
+          "getMintDate(uint256)",
+          "getPriceHistory(uint256)",
+          "getTokenLightMetadata(uint256)",
+          "getTokenPaginated(uint256,uint256)",
+          "getTokenPrice(uint256)",
+          "getTokenUniquesPaginated(uint256,uint256)",
+          "getTokensByCollection(uint256)",
+          "lastMintedTokenId()",
+          "listNFTForSale(uint256,uint256)",
+          "maxCreatorFee()",
+          "minCreatorFee()",
+          "mint(string,uint256)",
+          "pendingWithdrawals(address)",
+          "setTokenMetadataOnChain(uint256,uint8)",
+          "tokenCreator(uint256)",
+          "tokenRarity(uint256)",
+          "totalSupply()",
+          "userFeePercentage(address)"
+        ],
+        "common": 26,
+        "mutabilityChanged": []
+      },
+      "event": {
+        "onlyA": [
+          "NFTMinted(uint256,address,string)"
+        ],
+        "onlyB": [
+          "NFTMinted(uint256,address,string,uint8,uint256)"
+        ],
+        "common": 10
+      },
+      "error": {
+        "onlyA": [
+          "StringsInsufficientHexLength(uint256,uint256)"
+        ],
+        "onlyB": [],
+        "common": 10
+      },
+      "constructor": {
+        "A": "(address initialOwner,string collectionName,string collectionSymbol,uint256 _collectionId,string _collectionType,address _adhesionContractAddress,address _associationAddress,uint8 _associationFeeSharePercent,uint256 _maxSupply,address[] _extraRecipients,uint256[] _extraPercents)",
+        "B": "(address initialOwner,string collectionName,string collectionSymbol,uint256 _collectionId,string _collectionType,address _adhesionContractAddress,address _associationAddress,uint8 _associationFeeSharePercent,uint256 _maxSupply,address[] _extraRecipients,uint256[] _extraPercents)",
+        "same": true
+      }
+    },
+    "haikuEditionsVsFrontendArt": {
+      "function": {
+        "onlyA": [
+          "burnMultiple(uint256[])",
+          "buyEdition(uint256)",
+          "getHaikuInfoUnique(uint256)",
+          "getLastUniqueHaikusMinted()",
+          "getRemainingEditions(uint256)",
+          "haikuIdToTokenId(uint256)",
+          "haikus(uint256)",
+          "listEditionForSale(uint256,uint256)",
+          "mint(uint256,string,uint256,uint256)",
+          "removeEditionFromSale(uint256)",
+          "tokenIdToHaikuId(uint256)"
+        ],
+        "onlyB": [
+          "_getCollectionMaxSupplyFallback()",
+          "burn(uint256)",
+          "buyNFT(uint256)",
+          "doesTokenExist(uint256)",
+          "getMintDate(uint256)",
+          "getPriceHistory(uint256)",
+          "getTokenPaginated(uint256,uint256)",
+          "getTokenPrice(uint256)",
+          "getTokenUniquesPaginated(uint256,uint256)",
+          "getTokensByCollection(uint256)",
+          "hiddenMetadataURI()",
+          "lastMintedTokenId()",
+          "listNFTForSale(uint256,uint256)",
+          "mint(string,uint256)",
+          "mintBatch(string[],uint256[])",
+          "revealed()",
+          "setHiddenMetadataURI(string)",
+          "setReveal(bool)",
+          "tokenCreator(uint256)",
+          "totalSupply()"
+        ],
+        "common": 26,
+        "mutabilityChanged": []
+      },
+      "event": {
+        "onlyA": [
+          "NFTMinted(uint256,address,string)",
+          "RewardPointsCalculated(address,uint256)"
+        ],
+        "onlyB": [
+          "NFTMinted(uint256,address,string,uint256)"
+        ],
+        "common": 9
+      },
+      "error": {
+        "onlyA": [
+          "ERC721IncorrectOwner(address,uint256,address)",
+          "ERC721InsufficientApproval(address,uint256)",
+          "ERC721InvalidApprover(address)",
+          "ERC721InvalidOperator(address)",
+          "ERC721InvalidOwner(address)",
+          "ERC721InvalidReceiver(address)",
+          "ERC721InvalidSender(address)",
+          "ERC721NonexistentToken(uint256)",
+          "OwnableInvalidOwner(address)",
+          "OwnableUnauthorizedAccount(address)",
+          "StringsInsufficientHexLength(uint256,uint256)"
+        ],
+        "onlyB": [],
+        "common": 0
+      },
+      "constructor": {
+        "A": "(address initialOwner,string collectionName,string collectionSymbol,uint256 _collectionId,string _collectionType,address _adhesionContractAddress,address _associationAddress,uint8 _associationFeeSharePercent,uint256 _maxSupply,address[] _extraRecipients,uint256[] _extraPercents)",
+        "B": "(address initialOwner,string name_,string symbol_,uint256 _collectionId,string _collectionType,address _rescollection,address _association,uint8 _associationShare,uint256 _maxSupply,address[] _extraRecipients,uint256[] _extraPercents)",
+        "same": false
+      }
+    },
+    "compiledArtFactoryVsFrontendArtFactory": {
+      "function": {
+        "onlyA": [
+          "allCollectionNames(uint256)",
+          "collectionConfigs(string)",
+          "getAllCollectionNames()",
+          "getCollectionConfig(string)"
+        ],
+        "onlyB": [
+          "getUserCollectionConfig(address,string)",
+          "masterFactoryAuthorized()",
+          "resCollectionsAuthorized()",
+          "setAuthorizedCallers(address,address)"
+        ],
+        "common": 9,
+        "mutabilityChanged": []
+      },
+      "event": {
+        "onlyA": [
+          "CollectionConfigured(string,uint256,address[],uint256[])"
+        ],
+        "onlyB": [
+          "AuthorizedCallersUpdated(address,address)",
+          "CollectionConfigured(address,string,uint256,address[],uint256[])",
+          "OwnershipTransferred(address,address)"
+        ],
+        "common": 2
+      },
+      "error": {
+        "onlyA": [],
+        "onlyB": [],
+        "common": 0
+      },
+      "constructor": {
+        "A": "(address _adhesion,address _association)",
+        "B": "(address _adhesion,address _association)",
+        "same": true
+      }
+    }
+  }
+}
