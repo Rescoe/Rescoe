@@ -18,6 +18,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { ethers } from "ethers";
 import ABI from "@/components/ABI/ABIAdhesion.json";
+import { getServerProvider } from "@/server/rpc";
 
 // ─── Helpers IPFS (identiques aux autres routes) ──────────────────────────────
 
@@ -93,7 +94,7 @@ export default async function handler(
 
   // 2. Fetch on-chain (1 appel Moralis)
   try {
-    const provider = new ethers.JsonRpcProvider(rpcUrl);
+    const provider = getServerProvider();
     const contract = new ethers.Contract(contractAddress, ABI, provider);
 
     // ── tokenURI on-chain ─────────────────────────────────────────────────────

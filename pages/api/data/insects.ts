@@ -22,6 +22,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { ethers } from "ethers";
 import ABI from "@/components/ABI/ABIAdhesion.json";
+import { getServerProvider } from "@/server/rpc";
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -161,7 +162,7 @@ export default async function handler(
     return res.status(500).json({ error: "Missing env vars" });
   }
 
-  const provider = new ethers.JsonRpcProvider(rpcUrl);
+  const provider = getServerProvider();
   const contract = new ethers.Contract(contractAddress, ABI, provider);
 
   try {

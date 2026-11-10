@@ -22,6 +22,7 @@ import { ethers } from "ethers";
 import ABIRESCOLLECTION from "@/components/ABI/ABI_Collections.json";
 import ABI_ART from "@/components/ABI/ABI_ART.json";
 import ABI_HAIKU from "@/components/ABI/HaikuEditions.json";
+import { getServerProvider } from "@/server/rpc";
 
 // ─── Helpers IPFS (identiques aux autres routes) ─────────────────────────────
 
@@ -107,7 +108,7 @@ export function resetCache(): void {
 
 async function fetchArtNFTs(
   contractAddress: string,
-  provider: ethers.JsonRpcProvider
+  provider: ethers.Provider
 ): Promise<NftData[]> {
   if (!contractAddress || contractAddress === "0x0000000000000000000000000000000000000000") {
     return [];
@@ -149,7 +150,7 @@ async function fetchArtNFTs(
 
 async function fetchPoems(
   contractAddress: string,
-  provider: ethers.JsonRpcProvider
+  provider: ethers.Provider
 ): Promise<HaikuData[]> {
   if (!contractAddress || contractAddress === "0x0000000000000000000000000000000000000000") {
     return [];
@@ -225,12 +226,22 @@ export default async function handler(
     return res.status(500).json({ error: "Missing env vars" });
   }
 
-  const provider = new ethers.JsonRpcProvider(rpcUrl);
+  const provider = getServerProvider();
   const registry = new ethers.Contract(registryAddress, ABIRESCOLLECTION, provider);
 
   try {
     // 2. Récupère le registre des collections (2 appels)
     const total = Number(await registry.getTotalCollectionsMinted());
+
+    // Registre vide : getCollectionsPaginated(0, 0) revert « Start ID out of range ».
+    // Ce n'est pas une erreur, il n'y a simplement aucune collection à afficher.
+    if (total === 0) {
+      const empty: ApiPayload = { collections: [], totalCollections: 0 };
+      serverCache = { data: empty, ts: Date.now() };
+      setCacheHeaders(res, "MISS");
+      return res.status(200).json(empty);
+    }
+
     const paginated: unknown[][] = await registry.getCollectionsPaginated(0, total);
 
     // 3. Filtre les collections featured et les hydrate en parallèle

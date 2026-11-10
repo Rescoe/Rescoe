@@ -11,6 +11,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { ethers } from "ethers";
 import ABI from "@/components/ABI/ABIAdhesion.json";
+import { getServerProvider } from "@/server/rpc";
 
 function extractCID(uri: string): string | null {
   if (!uri) return null;
@@ -34,7 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!contractAddress || !rpcUrl) return res.status(500).end();
 
   try {
-    const provider = new ethers.JsonRpcProvider(rpcUrl);
+    const provider = getServerProvider();
     const contract = new ethers.Contract(contractAddress, ABI, provider);
     const tokenURI: string = await contract.tokenURI(Number(tokenId));
 
