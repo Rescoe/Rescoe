@@ -6,9 +6,12 @@
  * Ce module essaie les fournisseurs dans l'ordre et bascule sur le suivant en cas d'échec.
  *
  * Ordre :
- *   1. NEXT_PUBLIC_BASE_RPC_URL        (nouveau nom neutre, à privilégier)
- *   2. NEXT_PUBLIC_URL_SERVER_MORALIS  (ancien nom, conservé pour compatibilité)
- *   3. RPC publics gratuits            (secours : limités, sans garantie de service)
+ *   1. BASE_RPC_URL                    (PRIVÉE, serveur uniquement : à utiliser pour une URL avec clé,
+ *                                       sans préfixe NEXT_PUBLIC_ donc jamais envoyée au navigateur)
+ *   2. NEXT_PUBLIC_BASE_RPC_URL        (publique : lue aussi par le navigateur, sans clé ou clé
+ *                                       restreinte à votre domaine)
+ *   3. NEXT_PUBLIC_URL_SERVER_MORALIS  (ancien nom, conservé pour compatibilité)
+ *   4. RPC publics gratuits            (secours : limités, sans garantie de service)
  *
  * Les RPC publics ne remplacent pas un fournisseur avec clé pour un vrai trafic.
  */
@@ -21,7 +24,12 @@ export const PUBLIC_FALLBACK_RPCS = ["https://base-rpc.publicnode.com", "https:/
 
 /** URLs RPC à essayer, dans l'ordre, sans doublon ni valeur invalide. */
 export function getRpcUrls(env: NodeJS.ProcessEnv = process.env): string[] {
-  const candidates = [env.NEXT_PUBLIC_BASE_RPC_URL, env.NEXT_PUBLIC_URL_SERVER_MORALIS, ...PUBLIC_FALLBACK_RPCS];
+  const candidates = [
+    env.BASE_RPC_URL,
+    env.NEXT_PUBLIC_BASE_RPC_URL,
+    env.NEXT_PUBLIC_URL_SERVER_MORALIS,
+    ...PUBLIC_FALLBACK_RPCS,
+  ];
   const valid = candidates
     .map((u) => (u ?? "").trim())
     .filter((u) => /^https?:\/\//i.test(u));
