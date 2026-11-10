@@ -17,6 +17,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { ethers, formatUnits } from "ethers";
 import ABI from "@/components/ABI/ABI_ART.json";
+import { getServerProvider } from "@/server/rpc";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -52,7 +53,7 @@ export default async function handler(
   if (!rpcUrl) return res.status(500).json({ error: "Missing env vars" });
 
   try {
-    const provider = new ethers.JsonRpcProvider(rpcUrl);
+    const provider = getServerProvider();
     const artContract = new ethers.Contract(contract, ABI, provider);
 
     // 1 seul appel Moralis

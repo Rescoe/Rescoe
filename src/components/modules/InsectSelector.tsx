@@ -76,7 +76,9 @@ const SelectInsect = ({ onSelect }: { onSelect: (insect: Insect) => void }) => {
         const raw = sessionStorage.getItem(sessionKey);
         if (raw) {
           const { data, ts } = JSON.parse(raw);
-          if (Date.now() - ts < SESSION_TTL) {
+          // Cache valide uniquement s'il contient un tableau (une ancienne réponse d'erreur
+          // mise en cache faisait planter l'affichage : « l.map is not a function »).
+          if (Array.isArray(data) && Date.now() - ts < SESSION_TTL) {
             setInsects(data);
             const evolutionCount = data.filter((i: Insect) => i.canEvolve || i.isEgg).length;
             window.dispatchEvent(new CustomEvent("RESCOE_EVOLUTION_COUNT", { detail: evolutionCount }));
@@ -95,8 +97,13 @@ const SelectInsect = ({ onSelect }: { onSelect: (insect: Insect) => void }) => {
     fetch(`/api/token/insects?address=${encodeURIComponent(address)}${bust}`, {
       signal: controller.signal,
     })
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((data: Insect[]) => {
+        // Une réponse d'erreur ({ error: ... }) n'est pas une liste : ne jamais la mettre dans l'état.
+        if (!Array.isArray(data)) throw new Error("Réponse inattendue de /api/token/insects");
         setInsects(data);
         try {
           sessionStorage.setItem(sessionKey, JSON.stringify({ data, ts: Date.now() }));

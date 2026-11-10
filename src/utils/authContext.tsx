@@ -134,8 +134,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch {}
     // Fire & forget — on ne bloque pas l'auth sur ça
     fetch(`/api/token/insects?address=${encodeURIComponent(userAddress)}`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((data) => {
+        // Ne jamais mettre en cache une réponse d'erreur : elle ferait planter l'affichage au rechargement.
+        if (!Array.isArray(data)) return;
         try {
           sessionStorage.setItem(sessionKey, JSON.stringify({ data, ts: Date.now() }));
           const evolutionCount = data.filter((i: any) => i.canEvolve || i.isEgg).length;

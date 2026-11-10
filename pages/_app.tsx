@@ -1,5 +1,6 @@
 import { ChakraProvider } from "@chakra-ui/react";
 import { AuthProvider } from "../src/utils/authContext";
+import AppErrorBoundary from "../src/components/modules/AppErrorBoundary";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SessionProvider } from "next-auth/react";
 import type { AppProps } from "next/app";
@@ -18,15 +19,17 @@ export default function MyApp({ Component, pageProps }: AppProps) {
         <QueryClientProvider client={queryClient}>
           <SessionProvider session={pageProps.session} refetchInterval={0}>
             <AuthProvider>
-                {isMobile ? (
-                  <div className="mobile-layout">
-                    <Component {...pageProps} />
-                  </div>
-                ) : (
-                  <div className="desktop-layout">
-                    <Component {...pageProps} />
-                  </div>
-                )}
+                <AppErrorBoundary>
+                  {isMobile ? (
+                    <div className="mobile-layout">
+                      <Component {...pageProps} />
+                    </div>
+                  ) : (
+                    <div className="desktop-layout">
+                      <Component {...pageProps} />
+                    </div>
+                  )}
+                </AppErrorBoundary>
                 <Analytics />
                 <SpeedInsights />
             </AuthProvider>

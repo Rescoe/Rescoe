@@ -18,6 +18,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { ethers } from "ethers";
 import ABI from "@/components/ABI/ABI_ART.json";
+import { getServerProvider } from "@/server/rpc";
 
 // ─── Helpers IPFS ─────────────────────────────────────────────────────────────
 
@@ -91,7 +92,7 @@ export default async function handler(
 
   // 2. Fetch on-chain (1 appel tokenURI) + IPFS (1 fetch)
   try {
-    const provider = new ethers.JsonRpcProvider(rpcUrl);
+    const provider = getServerProvider();
     const artContract = new ethers.Contract(contract, ABI, provider);
 
     const tokenURI: string = await artContract.tokenURI(Number(tokenId));

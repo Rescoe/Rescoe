@@ -12,6 +12,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { ethers } from "ethers";
 import ABI from "@/components/ABI/ABIAdhesion.json";
+import { getServerProvider } from "@/server/rpc";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -108,7 +109,7 @@ export default async function handler(
   }
 
   try {
-    const provider = new ethers.JsonRpcProvider(rpcUrl);
+    const provider = getServerProvider();
     const contract = new ethers.Contract(contractAddress, ABI, provider);
 
     // 1 appel : liste des tokens

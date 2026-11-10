@@ -28,6 +28,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { ethers } from "ethers";
 import ABI from "@/components/ABI/ABIAdhesion.json";
+import { getServerProvider } from "@/server/rpc";
 
 // ─── Adresses "featured" hardcodées (identiques à Home.tsx) ─────────────────
 const FEATURED_ADDRESSES = [
@@ -229,7 +230,7 @@ export default async function handler(
       .json({ error: "Missing env vars RESCOE_ADHERENTS or MORALIS_URL" });
   }
 
-  const provider = new ethers.JsonRpcProvider(rpcUrl);
+  const provider = getServerProvider();
   const contract = new ethers.Contract(contractAddress, ABI, provider);
 
   try {
