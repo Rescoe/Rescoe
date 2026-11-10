@@ -13,6 +13,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { ethers } from "ethers";
 import ABI from "@/components/ABI/ABIAdhesion.json";
 import { getServerProvider } from "@/server/rpc";
+import { multicall } from "@/server/multicall";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -41,6 +42,10 @@ export interface InsectData {
 
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min
 const insectCache = new Map<string, { data: InsectData[]; ts: number }>();
+
+// Durées de niveau : quasi constantes → lues une fois par heure et par instance.
+const LEVEL_DURATIONS_TTL_MS = 60 * 60 * 1000;
+let levelDurationsCache: { v: number[]; ts: number } | null = null;
 
 export function evictInsectsCache(address: string): void {
   insectCache.delete(address.toLowerCase());
@@ -121,26 +126,54 @@ export default async function handler(
       return res.status(200).json([]);
     }
 
-    // Fetch levelDurations (3 appels) + tokenURI + membershipInfo par token — en parallèle
-    const [dur0, dur1, dur2, ...tokenResults] = await Promise.all([
-      contract.levelDurations(0),
-      contract.levelDurations(1),
-      contract.levelDurations(2),
-      ...tokenIds.map(async (tokenId) => {
-        const id = Number(tokenId);
-        try {
-          const [tokenURI, membershipInfoRaw] = await Promise.all([
-            contract.tokenURI(tokenId),
-            contract.membershipInfo(tokenId),
-          ]);
-          return { id, tokenURI, membershipInfoRaw };
-        } catch {
-          return { id, tokenURI: null, membershipInfoRaw: null };
-        }
-      }),
-    ]);
+    // Lecture EN LOT (Multicall3) des données légères : membershipInfo de chaque token, et les 3
+    // levelDurations seulement si elles ne sont pas déjà en cache (quasi constantes : 1 h).
+    // Avant : 3 + 1 par token appels RPC ; maintenant 1 appel pour tous les tokens.
+    const needDurations =
+      !levelDurationsCache || Date.now() - levelDurationsCache.ts > LEVEL_DURATIONS_TTL_MS;
+    const reads = await multicall(
+      provider,
+      [
+        ...(needDurations
+          ? [0, 1, 2].map((lvl) => ({
+              target: contractAddress, iface: contract.interface, fn: "levelDurations", args: [lvl],
+            }))
+          : []),
+        ...tokenIds.map((tokenId) => ({
+          target: contractAddress, iface: contract.interface, fn: "membershipInfo", args: [tokenId],
+        })),
+      ],
+      100
+    );
 
-    const levelDurations = [Number(dur0), Number(dur1), Number(dur2)];
+    // tokenURI : NON batchable (il génère l'image on-chain, plusieurs millions de gaz : deux dans le
+    // même eth_call dépassent le plafond de gaz des nœuds). Appels séparés, en parallèle.
+    const uris = await Promise.all(
+      tokenIds.map(async (tokenId): Promise<string | null> => {
+        try {
+          return await contract.tokenURI(tokenId);
+        } catch {
+          return null;
+        }
+      })
+    );
+
+    let offset = 0;
+    if (needDurations) {
+      const d = reads.slice(0, 3);
+      if (d.some((r) => !r.ok)) throw new Error("levelDurations indisponible");
+      levelDurationsCache = { v: d.map((r) => Number(r.value)), ts: Date.now() };
+      offset = 3;
+    }
+    const levelDurations = levelDurationsCache!.v;
+
+    const tokenResults = tokenIds.map((tokenId, k) => {
+      const info = reads[offset + k];
+      const tokenURI = uris[k];
+      return tokenURI && info.ok
+        ? { id: Number(tokenId), tokenURI, membershipInfoRaw: info.value }
+        : { id: Number(tokenId), tokenURI: null, membershipInfoRaw: null };
+    });
     const now = Math.floor(Date.now() / 1000);
 
     const insects: InsectData[] = (tokenResults as Array<{ id: number; tokenURI: string | null; membershipInfoRaw: any }>)

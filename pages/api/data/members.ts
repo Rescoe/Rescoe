@@ -29,6 +29,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { ethers } from "ethers";
 import ABI from "@/components/ABI/ABIAdhesion.json";
 import { getServerProvider } from "@/server/rpc";
+import { multicall } from "@/server/multicall";
 
 // ─── Adresses "featured" hardcodées (identiques à Home.tsx) ─────────────────
 const FEATURED_ADDRESSES = [
@@ -146,58 +147,77 @@ export function resetCache(): void {
 
 // ─── Fetch user data (max 4 tokens pour la vignette) ────────────────────────
 
-async function fetchUserData(
-  address: string,
-  contract: ethers.Contract
-): Promise<MemberData> {
-  try {
-    const [membershipValid, name, bio] = await contract.getUserInfo(address);
-    const rawTokens: bigint[] = await contract.getTokensByOwner(address);
-    const tokens = rawTokens.map(Number);
+/**
+ * Hydrate plusieurs adhérents EN LOT (Multicall3) : 2 appels RPC au total (infos + tokens, puis tokenURI)
+ * au lieu de 2 + 1 par token et par adhérent.
+ * Un adhérent dont la lecture échoue revient « vide », comme avant.
+ */
+async function hydrateUsers(
+  addresses: string[],
+  provider: ethers.Provider,
+  contract: ethers.Contract,
+  contractAddress: string
+): Promise<MemberData[]> {
+  const iface = contract.interface;
+  const emptyUser = (address: string): MemberData => ({
+    address,
+    membershipValid: false,
+    name: "",
+    bio: "",
+    tokens: [],
+    insects: [],
+  });
 
-    // Fetch metadata pour les 4 premiers tokens seulement (vignette)
-    type InsectMeta = {
-      id: string;
-      image: string;
-      name: string;
-      family: string;
-      level: string;
-    };
+  // Lot 1 : getUserInfo + getTokensByOwner de chaque adresse
+  const base = await multicall(
+    provider,
+    addresses.flatMap((a) => [
+      { target: contractAddress, iface, fn: "getUserInfo", args: [a] },
+      { target: contractAddress, iface, fn: "getTokensByOwner", args: [a] },
+    ])
+  );
 
-    const rawInsects = await Promise.allSettled(
-      rawTokens.slice(0, 4).map(async (tokenId): Promise<InsectMeta | null> => {
-        const tokenURI: string = await contract.tokenURI(tokenId);
-        const parsed = await parseTokenMeta(tokenId, tokenURI);
-        if (!parsed) return null;
-        return { id: tokenId.toString(), ...parsed };
-      })
-    );
+  // Lot 2 : les 4 premiers tokens de chaque adresse (vignette)
+  const refs: { addrIdx: number; tokenId: bigint }[] = [];
+  addresses.forEach((_, idx) => {
+    const info = base[idx * 2];
+    const toks = base[idx * 2 + 1];
+    if (info.ok && toks.ok) {
+      (toks.value as bigint[]).slice(0, 4).forEach((tokenId) => refs.push({ addrIdx: idx, tokenId }));
+    }
+  });
+  // tokenURI : NON batchable (il génère l'image on-chain, plusieurs millions de gaz : deux dans le
+  // même eth_call dépassent le plafond de gaz des nœuds). Appels séparés, en parallèle.
+  const metas = await Promise.all(
+    refs.map(async (r) => {
+      try {
+        const tokenURI: string = await contract.tokenURI(r.tokenId);
+        const parsed = await parseTokenMeta(r.tokenId, tokenURI);
+        return parsed ? { id: r.tokenId.toString(), ...parsed } : null;
+      } catch {
+        return null;
+      }
+    })
+  );
 
-    const insects: InsectMeta[] = rawInsects
-      .filter(
-        (r): r is PromiseFulfilledResult<InsectMeta> =>
-          r.status === "fulfilled" && r.value !== null
-      )
-      .map((r) => r.value);
-
+  return addresses.map((address, idx) => {
+    const info = base[idx * 2];
+    const toks = base[idx * 2 + 1];
+    if (!info.ok || !toks.ok) return emptyUser(address);
+    const [membershipValid, name, bio] = info.value;
+    const insects = refs
+      .map((r, k) => ({ r, m: metas[k] }))
+      .filter((x) => x.r.addrIdx === idx && x.m !== null)
+      .map((x) => x.m!);
     return {
       address,
       membershipValid: Boolean(membershipValid),
       name: String(name || ""),
       bio: String(bio || ""),
-      tokens,
+      tokens: (toks.value as bigint[]).map(Number),
       insects: insects as MemberData["insects"],
     };
-  } catch {
-    return {
-      address,
-      membershipValid: false,
-      name: "",
-      bio: "",
-      tokens: [],
-      insects: [],
-    };
-  }
+  });
 }
 
 // ─── Handler ─────────────────────────────────────────────────────────────────
@@ -242,9 +262,17 @@ export default async function handler(
       3: "Trainee",
     };
 
-    const roleResults = await Promise.all(
-      [0, 1, 2, 3].map((roleId) => contract.getMembersByRole(roleId))
-    );
+    // Lot 1 (Multicall3) : les 4 rôles + le total minté en UN seul appel RPC
+    // (avant : 4 appels pour les rôles, puis 1 pour le total).
+    const first = await multicall(provider, [
+      ...[0, 1, 2, 3].map((roleId) => ({
+        target: contractAddress, iface: contract.interface, fn: "getMembersByRole", args: [roleId],
+      })),
+      { target: contractAddress, iface: contract.interface, fn: "getTotalMinted" },
+    ]);
+    if (first.some((r) => !r.ok)) throw new Error("lecture des rôles ou du total impossible");
+    const roleResults = first.slice(0, 4).map((r) => r.value as string[]);
+    const totalInsectsMinted = Number(first[4].value);
 
     const membersByRole: Record<string, string[]> = {};
     const uniqueSet = new Set<string>();
@@ -257,8 +285,7 @@ export default async function handler(
     const allMembers = Array.from(uniqueSet);
     const totalMembersCount = allMembers.length;
 
-    // 3. Total minté (1 appel)
-    const totalInsectsMinted = Number(await contract.getTotalMinted());
+    // 3. Le total minté a déjà été lu dans le lot 1 (totalInsectsMinted).
 
     // 4. Sélectionne les adresses à hydrater
     const lastFourAddresses = allMembers.slice(-4);
@@ -267,9 +294,7 @@ export default async function handler(
     );
 
     // 5. Hydrate en parallèle (getUserInfo + getTokensByOwner + tokenURI + IPFS)
-    const userDataArray = await Promise.all(
-      allAddresses.map((addr) => fetchUserData(addr, contract))
-    );
+    const userDataArray = await hydrateUsers(allAddresses, provider, contract, contractAddress);
     const userDataMap = new Map(userDataArray.map((u) => [u.address, u]));
 
     const empty = (addr: string): MemberData => ({

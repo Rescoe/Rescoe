@@ -23,6 +23,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { ethers } from "ethers";
 import ABI from "@/components/ABI/ABIAdhesion.json";
 import { getServerProvider } from "@/server/rpc";
+import { multicall } from "@/server/multicall";
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -84,21 +85,23 @@ export function resetCache(): void {
 
 // ─── Fetch d'un token individuel ─────────────────────────────────────────────
 
-async function fetchToken(
+/**
+ * Construit la carte d'un token à partir de son propriétaire et de son tokenURI,
+ * déjà lus en lot (voir le handler : Multicall3).
+ */
+async function buildCard(
   i: number,
-  contract: ethers.Contract
+  owner: string,
+  tokenURI: string
 ): Promise<InsectCard | null> {
   try {
-    // Vérifie que le token n'est pas brûlé
-    const owner: string = await contract.ownerOf(i);
+    // Token brûlé : pas de propriétaire
     if (
       !owner ||
       owner === "0x0000000000000000000000000000000000000000"
     ) {
       return null;
     }
-
-    const tokenURI: string = await contract.tokenURI(i);
 
     // ── Cas 1 : tokenUri on-chain (data:application/json;base64,…) ──────────
     // Métadonnées embarquées — aucun appel IPFS nécessaire.
@@ -170,20 +173,29 @@ export default async function handler(
     const totalMinted = Number(await contract.getTotalMinted());
     const limit = Math.min(totalMinted, MAX_DISPLAY);
 
-    // 3. Récupère les tokens par batches pour ne pas saturer le RPS
+    // 3a. ownerOf de TOUS les tokens en lot (Multicall3) : 1 appel RPC au lieu de `limit`.
+    //     Un token brûlé (ownerOf qui revert) échoue seul, sans faire échouer le lot.
+    const indices = Array.from({ length: limit }, (_, j) => j);
+    const owners = await multicall(
+      provider,
+      indices.map((i) => ({ target: contractAddress, iface: contract.interface, fn: "ownerOf", args: [i] })),
+      100
+    );
+
+    // 3b. tokenURI : NON batchable. Il génère l'image/le JSON on-chain (~260 Ko, plusieurs
+    //     millions de gaz) : deux dans le même eth_call dépassent le plafond de gaz des nœuds.
+    //     Appels séparés par petits lots parallèles, uniquement pour les tokens non brûlés.
     const insects: InsectCard[] = [];
-
     for (let batchStart = 0; batchStart < limit; batchStart += BATCH_SIZE) {
-      const batchEnd = Math.min(batchStart + BATCH_SIZE, limit);
-      const indices = Array.from(
-        { length: batchEnd - batchStart },
-        (_, j) => batchStart + j
-      );
-
+      const batch = indices.slice(batchStart, batchStart + BATCH_SIZE);
       const batchResults = await Promise.allSettled(
-        indices.map((i) => fetchToken(i, contract))
+        batch.map(async (i) => {
+          const owner = owners[i];
+          if (!owner.ok) return null;
+          const tokenURI: string = await contract.tokenURI(i);
+          return buildCard(i, String(owner.value), tokenURI);
+        })
       );
-
       for (const result of batchResults) {
         if (result.status === "fulfilled" && result.value !== null) {
           insects.push(result.value);
