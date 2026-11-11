@@ -1,3 +1,4 @@
+import { getReadProvider } from "@/utils/baseProvider";
 import { useEffect, useState } from "react";
 import { Box, Flex, Image, Text } from "@chakra-ui/react";
 import { Contract, JsonRpcProvider } from "ethers";
@@ -15,7 +16,7 @@ type CollectionOnChain = {
 
 const CollectionsVignettes: React.FC<{ creator: string }> = ({ creator }) => {
   const [collections, setCollections] = useState<CollectionOnChain[]>([]);
-  const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!);
+  const provider = getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!);
   const contract = new Contract(
     process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!,
     ABIRESCOLLECTION,

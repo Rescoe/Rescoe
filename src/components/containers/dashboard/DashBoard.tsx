@@ -1,3 +1,4 @@
+import { getReadProvider } from "@/utils/baseProvider";
 import React, { useState, useEffect, useMemo } from 'react';
 import { InfoOutlineIcon } from "@chakra-ui/icons";
 import { FaBoxes } from 'react-icons/fa'; // ajout en haut
@@ -91,7 +92,7 @@ const Dashboard = () => {
   const router = useRouter();
 
   const rpcProvider = useMemo(
-    () => new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string),
+    () => getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string),
     []
   );
 

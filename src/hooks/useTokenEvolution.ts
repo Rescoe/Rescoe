@@ -1,3 +1,4 @@
+import { getReadProvider } from "@/utils/baseProvider";
 // hooks/useTokenEvolution.ts — full on-chain, no IPFS
 import { useState, useEffect, useCallback } from "react";
 import { JsonRpcProvider, Contract as EthersContract } from "ethers";
@@ -59,7 +60,7 @@ export const useTokenEvolution = ({
 
     const fetchInfo = async () => {
       try {
-        const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!);
+        const provider = getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!);
         const contract = new EthersContract(contractAddress, ABI, provider);
 
         // FIX: était contract.methods.getMembershipInfo(tokenId).call() via Web3

@@ -1,3 +1,4 @@
+import { getReadProvider } from "@/utils/baseProvider";
 import React, { useState, useEffect } from "react";
 import { Box, Heading, VStack, Divider, Flex, HStack, Input, Button, Text, FormLabel, useToast, Image, Select, Progress, useColorModeValue, useColorMode, useTheme } from "@chakra-ui/react";
 import { JsonRpcProvider, Contract } from "ethers";
@@ -96,7 +97,7 @@ const CreateCollection: React.FC = () => {
   // Fetch user collections
   const fetchCollections = async (userAddress: string): Promise<void> => {
     setIsLoading(true);
-    const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+    const provider = getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
     const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
 
     try {
@@ -117,7 +118,7 @@ const CreateCollection: React.FC = () => {
   };
 
   const fetchStatsCollection = async (userAddress: string) => {
-    const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
+    const provider = getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
     const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
 
     try {

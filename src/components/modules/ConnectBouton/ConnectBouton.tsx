@@ -129,7 +129,10 @@ const ConnectBouton: React.FC = () => {
     };
 
     fetchBalance();
-    const interval = setInterval(fetchBalance, 10000);
+    // Pas de requêtes tant que l'onglet est en arrière-plan.
+    const interval = setInterval(() => {
+      if (!document.hidden) fetchBalance();
+    }, 10000);
     return () => clearInterval(interval);
   }, [web3, address]);
 

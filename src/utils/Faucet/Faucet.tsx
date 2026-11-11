@@ -1,3 +1,4 @@
+import { getReadProvider } from "@/utils/baseProvider";
 import { useState, useEffect, useMemo } from "react";
 import { ethers, BrowserProvider, Eip1193Provider, JsonRpcProvider } from "ethers";
 import { useAuth } from "@/utils/authContext";
@@ -24,7 +25,7 @@ export default function FaucetWidget() {
   };
 
 
-  const readProvider = useMemo(() => new JsonRpcProvider(RPC_URL), []);
+  const readProvider = useMemo(() => getReadProvider(RPC_URL), []);
   const faucetRead = useMemo(
     () => new ethers.Contract(FAUCET_ADDRESS, FAUCET_ABI, readProvider),
     [readProvider]

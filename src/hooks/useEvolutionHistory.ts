@@ -1,3 +1,4 @@
+import { getReadProvider } from "@/utils/baseProvider";
 /**
  * useEvolutionHistory
  *
@@ -247,7 +248,7 @@ export function useEvolutionHistory(
     const load = async () => {
       setIsLoading(true);
       try {
-        const provider = new JsonRpcProvider(rpc);
+        const provider = getReadProvider(rpc);
         const contract = new Contract(contractAddress, EVO_ABI, provider);
         const hashMap  = getHashMap();
 

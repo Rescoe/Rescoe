@@ -1,3 +1,4 @@
+import { getReadProvider } from "@/utils/baseProvider";
 // hooks/useHatchEgg.ts — full on-chain, no IPFS
 import { useState, useCallback, useEffect } from "react";
 import { JsonRpcProvider, Contract as EthersContract } from "ethers";
@@ -37,7 +38,7 @@ export const useHatchEgg = (contractAddress: string, eggTokenId: number) => {
 
     const load = async () => {
       try {
-        const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!);
+        const provider = getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!);
         const contract = new EthersContract(contractAddress, ABI, provider);
 
         // FIX: était getMembershipInfo → remplacé par le getter public membershipInfo(uint256)

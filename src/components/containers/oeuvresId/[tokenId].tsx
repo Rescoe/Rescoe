@@ -1,3 +1,4 @@
+import { getReadProvider } from "@/utils/baseProvider";
 import { useEffect, useState, useCallback } from 'react';
 import Web3 from 'web3';
 import detectEthereumProvider from '@metamask/detect-provider';
@@ -262,7 +263,7 @@ const formatAddress = (address: string) => {
 const fetchCollectionNFTs = async (contractAddress: string) => {
   try {
     setIsLoadingCollection(true);
-    const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+    const provider = getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
     const collectionContract = new Contract(contractAddress, ABI, provider);
 
     const tokenIds: string[] = await collectionContract.getTokenPaginated(0, 19);
@@ -320,7 +321,7 @@ const fetchCollectionNFTs = async (contractAddress: string) => {
 
 /*
 const fetchENS = async (userAddress: string): Promise<string> => {
-  const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
+  const provider = getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
   try {
     const resolvedEnsName = await provider.lookupAddress(userAddress);
     return resolvedEnsName || formatAddress(userAddress);
@@ -332,7 +333,7 @@ const fetchENS = async (userAddress: string): Promise<string> => {
 */
 
 const fetchHistory = async (contractAddress: string, tokenId: number): Promise<HistoryData> => {
-    const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+    const provider = getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
     const contract = new Contract(contractAddress, ABI, provider);
 
     try {

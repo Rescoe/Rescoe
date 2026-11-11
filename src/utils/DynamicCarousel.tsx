@@ -1,3 +1,4 @@
+import { getReadProvider } from "@/utils/baseProvider";
 // src/components/containers/home/GridLayout.tsx
 // ✅ VERSION COMPLÈTE - Force 10 NFTs + 10 Haikus (duplication si besoin)
 
@@ -124,7 +125,7 @@ const GridLayout: React.FC<GridLayoutProps> = ({
 
 /*
   const fetchENSForAddresses = async (addresses: string[]) => {
-    const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
+    const provider = getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
     const newMap: Record<string, string> = {};
 
     await Promise.all(addresses.map(async (addr) => {

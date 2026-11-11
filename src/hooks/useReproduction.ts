@@ -1,3 +1,4 @@
+import { getReadProvider } from "@/utils/baseProvider";
 // hooks/useReproduction.ts
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Web3 from "web3";
@@ -109,7 +110,7 @@ export const useReproduction = ({
 
   useEffect(() => {
     if (process.env.NEXT_PUBLIC_URL_SERVER_MORALIS) {
-      providerRef.current = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!);
+      providerRef.current = getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!);
     }
     if ((window as any).ethereum) {
       web3Ref.current = new Web3((window as any).ethereum);

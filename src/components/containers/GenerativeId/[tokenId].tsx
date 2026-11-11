@@ -1,3 +1,4 @@
+import { getReadProvider } from "@/utils/baseProvider";
 import { useEffect, useState } from 'react';
 import Web3 from 'web3';
 import detectEthereumProvider from '@metamask/detect-provider';
@@ -69,7 +70,7 @@ const TokenPage: React.FC = () => {
     setIsLoading(true);
     const fetchNFTData = async () => {
       try {
-        const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+        const provider = getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
         const contract = new Contract(contractAddress, ABI_MINT_CONTRACT, provider);
 
 /*
