@@ -21,7 +21,8 @@ import { useAuth } from "../../../utils/authContext";
 import { getEllipsisTxt } from "../../../utils/format";
 import { setup1inchWidget } from "@1inch/embedded-widget";
 import detectEthereumProvider from "@metamask/detect-provider";
-import { JsonRpcProvider, formatEther } from "ethers";
+import { formatEther } from "ethers";
+import { getReadProvider } from "@/utils/baseProvider";
 
 interface SoldeWalletProps {
   showAddress?: boolean;
@@ -34,9 +35,10 @@ const ETH_RPCS = [
   "https://eth.llamarpc.com",
 ];
 
+// mainnet.base.org est limité en débit (« request limit reached ») : on essaie publicnode d'abord.
 const BASE_RPCS = [
-  "https://mainnet.base.org",
   "https://base-rpc.publicnode.com",
+  "https://mainnet.base.org",
 ];
 
 const SoldeWallet: React.FC<SoldeWalletProps> = ({
@@ -60,12 +62,15 @@ const SoldeWallet: React.FC<SoldeWalletProps> = ({
   const toastErrorShownRef = useRef(false);
   const widgetCleanupRef = useRef<null | (() => void)>(null);
 
-  const getBalanceWithFallback = useCallback(async (rpcUrls: string[], wallet: string) => {
+  const getBalanceWithFallback = useCallback(async (rpcUrls: string[], wallet: string, chainId: number) => {
     let lastError: unknown = null;
 
     for (const rpc of rpcUrls) {
       try {
-        const provider = new JsonRpcProvider(rpc);
+        // Provider partagé et à réseau fixé : auparavant un NOUVEAU provider était créé ici à chaque
+        // tick (30 s) et jamais détruit ; chaque RPC en échec bouclait « failed to detect network »
+        // toutes les secondes, pour toujours (57 000 messages et des centaines de Mo en une journée).
+        const provider = getReadProvider(rpc, chainId);
         const balance = await provider.getBalance(wallet);
         return formatEther(balance);
       } catch (err) {
@@ -92,8 +97,8 @@ const SoldeWallet: React.FC<SoldeWalletProps> = ({
       setIsLoading(true);
 
       const [baseRaw, ethRaw] = await Promise.all([
-        getBalanceWithFallback(BASE_RPCS, address),
-        getBalanceWithFallback(ETH_RPCS, address),
+        getBalanceWithFallback(BASE_RPCS, address, 8453),
+        getBalanceWithFallback(ETH_RPCS, address, 1),
       ]);
 
       const newBase = parseFloat(baseRaw).toFixed(4);
@@ -135,7 +140,11 @@ const SoldeWallet: React.FC<SoldeWalletProps> = ({
     }
 
     fetchBalances();
-    const interval = setInterval(fetchBalances, 30000);
+    // Pas de requêtes tant que l'onglet est en arrière-plan (un onglet laissé ouvert toute la nuit
+    // interrogeait les RPC sans que personne ne regarde).
+    const interval = setInterval(() => {
+      if (!document.hidden) fetchBalances();
+    }, 30000);
     return () => clearInterval(interval);
   }, [isAuthenticated, address, fetchBalances]);
 

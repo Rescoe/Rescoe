@@ -1,3 +1,4 @@
+import { getReadProvider } from "@/utils/baseProvider";
 import React, { useState, useEffect, ChangeEvent } from "react";
 import Web3 from "web3";
 import { JsonRpcProvider, Contract } from 'ethers';
@@ -200,7 +201,7 @@ const [percent, setPercent] = useState<number[]>([]);
 
 
   const fetchUserCollections = async () => {
-      const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS); // Utilisation du fournisseur JSON-RPC
+      const provider = getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS); // Utilisation du fournisseur JSON-RPC
 
       if (!contractRESCOLLECTION) {
           console.error("L'adresse du contrat de collection n'est pas définie.");
@@ -241,7 +242,7 @@ const [percent, setPercent] = useState<number[]>([]);
     try {
       setLoadingInfo(true);
 
-      const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+      const provider = getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
       const resCollections = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
 
       if (!masterFactoryAddress) {

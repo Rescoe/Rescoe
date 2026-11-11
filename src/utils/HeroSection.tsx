@@ -1,3 +1,4 @@
+import { getReadProvider } from "@/utils/baseProvider";
 import React, { useEffect, useState } from "react";
 import { Box, Image, Text, VStack, HStack, Button, Divider, Stack, Heading } from "@chakra-ui/react";
 import { ChevronDownIcon, ChevronUpIcon } from "@chakra-ui/icons";
@@ -57,7 +58,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ nfts, haikus }) => {
   };
 
   const fetchENSForAddresses = async (addresses: string[]) => {
-    const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
+    const provider = getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
     const newMap: Record<string, string> = {};
 
     await Promise.all(addresses.map(async (addr) => {

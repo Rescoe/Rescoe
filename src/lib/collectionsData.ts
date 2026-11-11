@@ -1,3 +1,4 @@
+import { getReadProvider } from "@/utils/baseProvider";
 /**
  * collectionsData.ts — Logique de fetch collections partagée
  *
@@ -81,7 +82,7 @@ export async function fetchGalerieCollections(): Promise<GalerieCollection[]> {
     return [];
   }
 
-  const provider = new ethers.JsonRpcProvider(rpcUrl);
+  const provider = getReadProvider(rpcUrl);
   const registry = new ethers.Contract(registryAddress, ABIRESCOLLECTION, provider);
 
   // 2 appels Moralis : total + liste complète

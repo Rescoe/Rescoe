@@ -1,3 +1,4 @@
+import { getReadProvider } from "@/utils/baseProvider";
 import { useState } from "react";
 import { ethers } from "ethers";
 import axios from "axios";
@@ -23,7 +24,7 @@ const useEstimateGas = () => {
     setEstimatedCostEuro(null);
 
     try {
-      const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+      const provider = getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
       const contract = new ethers.Contract(contractAddress, abis, provider);
 
       const data = contract.interface.encodeFunctionData(methodName, args);

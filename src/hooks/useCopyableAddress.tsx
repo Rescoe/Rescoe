@@ -1,3 +1,4 @@
+import { getReadProvider } from "@/utils/baseProvider";
 import { Text, useToast } from "@chakra-ui/react";
 import React, { useEffect, useState, useCallback } from "react";
 import { JsonRpcProvider, Contract } from "ethers";
@@ -22,7 +23,7 @@ const CopyableAddress: React.FC<Props> = ({
 
     setIsLoading(true);
     try {
-      const provider = new JsonRpcProvider(
+      const provider = getReadProvider(
         process.env.NEXT_PUBLIC_RPC_URL || "https://mainnet.base.org"
       );
 

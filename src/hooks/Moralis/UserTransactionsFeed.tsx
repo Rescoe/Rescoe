@@ -1,3 +1,4 @@
+import { getReadProvider } from "@/utils/baseProvider";
 import React, {
   useEffect,
   useState,
@@ -386,7 +387,7 @@ const UserFinanceDashboard: React.FC<Props> = ({
 
   const provider = useMemo(() => {
     if (!process.env.NEXT_PUBLIC_URL_SERVER_MORALIS) return null;
-    return new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+    return getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
   }, []);
 
   const contract = useMemo(() => {

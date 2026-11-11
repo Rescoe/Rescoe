@@ -1,4 +1,5 @@
 "use client";
+import { getReadProvider } from "@/utils/baseProvider";
 import { useState, useEffect } from "react";
 import { ethers } from "ethers";
 import ABI from "../../../ABI/ABIAdhesion.json"; // Ajoute l'ABI pour _tokenForSale
@@ -40,7 +41,7 @@ const MarketplaceBadges = ({
 
   useEffect(() => {
     const init = async () => {
-      const jsonProvider = new ethers.JsonRpcProvider(rpcUrl);
+      const jsonProvider = getReadProvider(rpcUrl);
       const contr = new ethers.Contract(contractAddress, [...ABI, tokenForSaleABI], jsonProvider);
       setProvider(jsonProvider);
       setContract(contr);

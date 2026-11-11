@@ -1,3 +1,4 @@
+import { getReadProvider } from "@/utils/baseProvider";
 import { ethers } from "ethers";
 import ABI_ADHESION_MANAGEMENT from "@/components/ABI/ABI_ADHESION_MANAGEMENT.json";
 import ABI from "@/components/ABI/ABIAdhesion.json";
@@ -46,7 +47,7 @@ export const fetchENS = async (address: string) => {
   if (cached !== null) return cached;
 
   try {
-    const provider = new ethers.JsonRpcProvider(providerUrl);
+    const provider = getReadProvider(providerUrl);
     const ensName = await provider.lookupAddress(address);
     writeCache(cacheKey, ensName);
     return ensName;
@@ -93,7 +94,7 @@ export const fetchStatsCollection = async (address: string): Promise<StatsCollec
   if (cached) return cached;
 
   try {
-    const provider = new ethers.JsonRpcProvider(providerUrl);
+    const provider = getReadProvider(providerUrl);
     const contract = new ethers.Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
 
     const userCollectionsCount = await contract.getNumberOfCollectionsByUser(address);
@@ -125,7 +126,7 @@ export const fetchAdhesionPoints = async (address: string): Promise<number> => {
   if (cached !== null) return cached;
 
   try {
-    const provider = new ethers.JsonRpcProvider(providerUrl);
+    const provider = getReadProvider(providerUrl);
     const contract = new ethers.Contract(contractAdhesion, ABI, provider);
     const points = await contract.rewardPoints(address);
     const pointsNumber = Number(points);

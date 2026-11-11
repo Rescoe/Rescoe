@@ -1,3 +1,4 @@
+import { getReadProvider } from "@/utils/baseProvider";
 // src/hooks/useAdherentFullData.ts
 import { useEffect, useState } from "react";
 import { JsonRpcProvider, Contract } from "ethers";
@@ -43,7 +44,7 @@ export const useAdherentFullData = (addresses?: string[]) => {
 
     const fetchAll = async () => {
       setLoading(true);
-      const provider = new JsonRpcProvider(providerUrl);
+      const provider = getReadProvider(providerUrl);
       const contract = new Contract(contratAdhesionManagement, ABI_ADHESION_MANAGEMENT, provider);
       const contractAdhesionInstance = new Contract(contractAdhesion, ABI, provider);
 

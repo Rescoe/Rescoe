@@ -1,3 +1,4 @@
+import { getReadProvider } from "@/utils/baseProvider";
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Web3 from 'web3';
@@ -132,7 +133,7 @@ const PoemPage: React.FC = () => {
 
     const fetchPoemData = async () => {
             try {
-              const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+              const provider = getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
               const contract = new Contract(contractAddress, ABI, provider);
               const contractCollection = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
 

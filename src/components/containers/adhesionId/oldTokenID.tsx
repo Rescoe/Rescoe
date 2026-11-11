@@ -1,3 +1,4 @@
+import { getReadProvider } from "@/utils/baseProvider";
 import { useEffect, useState, useCallback } from 'react'; // ✅ ERREUR 1: useCallback ajouté
 import { JsonRpcProvider, Contract as EthersContract, formatUnits, BigNumberish } from 'ethers';
 import { getProvider } from '@/utils/provider';
@@ -230,7 +231,7 @@ const [canEvolve, setCanEvolve] = useState(false);
 
     const loadRenewPrice = async () => {
       try {
-        const provider = new JsonRpcProvider(
+        const provider = getReadProvider(
   process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!
 );
 
@@ -338,7 +339,7 @@ useEffect(() => {
     if (nftCache[cacheKey]) return nftCache[cacheKey];
 
     try {
-      const provider = new JsonRpcProvider(
+      const provider = getReadProvider(
   process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!
 );
       const contract = new EthersContract(contractAdhesionAddress, ABI, provider);
@@ -447,7 +448,7 @@ useEffect(() => {
         if (!membershipInfo) return;
 
         try {
-          const provider = new JsonRpcProvider(
+          const provider = getReadProvider(
   process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!
 );
           const contract = new EthersContract(contractAdhesion, ABI, provider);

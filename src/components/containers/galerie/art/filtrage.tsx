@@ -1,3 +1,4 @@
+import { getReadProvider } from "@/utils/baseProvider";
 import React, {
   useEffect,
   useState,
@@ -332,7 +333,7 @@ const CollectionsByType: React.FC<{ creator: string }> = ({ creator }) => {
   const btnHoverBg = useColorModeValue("gray.100", "gray.600");
 
 
-  const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!);
+  const provider = getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS!);
   const contract = new Contract(
     process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!,
     ABIRESCOLLECTION,

@@ -1,16 +1,9 @@
-import { JsonRpcProvider } from "ethers";
 import { rpcCache } from "./rpcCache";
+import { getReadProvider } from "./baseProvider";
 
-let globalProvider: JsonRpcProvider | null = null;
-
-export const getProvider = () => {
-  if (!globalProvider) {
-    globalProvider = new JsonRpcProvider(
-      process.env.NEXT_PUBLIC_RPC_URL || "https://mainnet.base.org"
-    );
-  }
-  return globalProvider;
-};
+// Provider partagé à réseau fixé (pas de boucle « failed to detect network »).
+export const getProvider = () =>
+  getReadProvider(process.env.NEXT_PUBLIC_RPC_URL || process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
 
 export const cachedCall = async <T = unknown>(
   contract: any,

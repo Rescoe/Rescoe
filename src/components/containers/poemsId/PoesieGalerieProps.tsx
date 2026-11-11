@@ -1,3 +1,4 @@
+import { getReadProvider } from "@/utils/baseProvider";
 import React, { useState, useEffect } from "react";
 import { Box, Spinner } from "@chakra-ui/react";
 import { JsonRpcProvider, Contract, BigNumberish } from "ethers";
@@ -29,7 +30,7 @@ const PoetryGallery: React.FC<PoetryGalleryProps> = ({ collectionAddress }) => {
   const [isLoading, setIsLoading] = useState(false);
   const { web3, address } = useAuth();
 
-  const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+  const provider = getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
   const contract = new Contract(collectionAddress, ABI, provider);
 
   const { convertEthToEur, loading: loadingEthPrice, error: ethPriceError } = useEthToEur();

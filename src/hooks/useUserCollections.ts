@@ -1,3 +1,5 @@
+import { safeSetJson } from "@/utils/safeStorage";
+import { getReadProvider } from "@/utils/baseProvider";
 // hooks/useUserCollections.ts
 import { useState, useEffect } from "react";
 import { JsonRpcProvider, Contract } from "ethers";
@@ -20,7 +22,7 @@ export function useUserCollections(userAddress?: string) {
     //console.log(userAddress);
     const fetchCollections = async () => {
       setIsLoading(true);
-      const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
+      const provider = getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string);
       const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
 
       try {
@@ -39,7 +41,7 @@ export function useUserCollections(userAddress?: string) {
 
             const response = await fetch(`/api/proxyPinata_Oeuvres?ipfsHash=${uri.split("/").pop()}`);
             const metadata = await response.json();
-            localStorage.setItem(uri, JSON.stringify(metadata));
+            safeSetJson(uri, metadata);
 
             return { id: id.toString(), name, imageUrl: metadata.image };
           })

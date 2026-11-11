@@ -1,3 +1,4 @@
+import { getReadProvider } from "@/utils/baseProvider";
 // src/pages/Adhesion/RoleBasedNFTPage.tsx
 import { useState, useEffect } from "react";
 import Web3 from "web3";
@@ -153,7 +154,7 @@ const RoleBasedNFTPage = () => {
 
   const fetchPrices = async () => {
     try {
-      const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+      const provider = getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
       const contract = new Contract(contractAddress, ABI, provider);
 
       const mintPriceWei: BigNumberish = await contract.mintPrice();

@@ -1,3 +1,5 @@
+import { safeSetJson } from "@/utils/safeStorage";
+import { getReadProvider } from "@/utils/baseProvider";
 import React, { useState, useEffect } from "react";
 import type { GalerieCollection } from "@/lib/collectionsData";
 import {
@@ -105,7 +107,7 @@ const PoetryGallery: React.FC<PoetryGalleryProps> = ({ initialCollections = [] }
   const { convertEthToEur, loading: loadingEthPrice, error: ethPriceError } = useEthToEur();
 
 
-  const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+  const provider = getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
   const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
 
 {/* Pn passe les information au composant */}
@@ -176,7 +178,7 @@ const fetchPoetryCollections = async (page: number) => {
         const hash = uri.replace('ipfs://', '').split('/')[0];
         const res = await fetch(`/api/metadata/${hash}`); // Même API Art
         const metadata = await res.json();
-        localStorage.setItem(uri, JSON.stringify(metadata));
+        safeSetJson(uri, metadata);
        //console.log(metadata);
 
         return {

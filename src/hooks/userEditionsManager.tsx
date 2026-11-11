@@ -1,3 +1,4 @@
+import { getReadProvider } from "@/utils/baseProvider";
 // src/components/UserEditionsManager.tsx
 import React, { useEffect, useState } from "react";
 import {
@@ -118,7 +119,7 @@ export default function UserEditionsManager({
       setLoading(true);
       setError(null);
       try {
-        const provider = new JsonRpcProvider(
+        const provider = getReadProvider(
           process.env.NEXT_PUBLIC_URL_SERVER_MORALIS
         );
         const contract = new Contract(mintContractAddress, ABI, provider);
@@ -288,7 +289,7 @@ export default function UserEditionsManager({
 
   const fetchENSForAddresses = async (addresses: string[]) => {
     try {
-      const provider = new JsonRpcProvider(
+      const provider = getReadProvider(
         process.env.NEXT_PUBLIC_URL_SERVER_MORALIS as string
       );
       const newMap: Record<string, string> = {};

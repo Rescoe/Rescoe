@@ -1,3 +1,5 @@
+import { safeSetJson } from "@/utils/safeStorage";
+import { getReadProvider } from "@/utils/baseProvider";
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { GalerieCollection } from '@/lib/collectionsData';
 import {
@@ -101,7 +103,7 @@ const UniqueArtGalerie: React.FC<UniqueArtGalerieProps> = ({ initialCollections 
 
   const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!;
   const FALLBACK_IMAGE = "/fallback-placeholder.png";
-  const provider = useMemo(() => new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS), []);
+  const provider = useMemo(() => getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS), []);
   const contract = useMemo(() => new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider), [provider]);
 
   // ✅ AJOUTÉ : variables dérivées pour la galerie
@@ -114,6 +116,12 @@ const UniqueArtGalerie: React.FC<UniqueArtGalerieProps> = ({ initialCollections 
     setIsLoading(true);
     try {
       const total: number = await contract.getTotalCollectionsMinted();
+      // Registre vide : getCollectionsPaginated(0, 0) revert « Start ID out of range » (ce n'est pas une
+      // erreur, il n'y a simplement rien à afficher).
+      if (Number(total) === 0) {
+        setCollections([]);
+        return;
+      }
       const collectionsPaginated: any[] = await contract.getCollectionsPaginated(0, total);
 
       const collectionsData = (await Promise.all(
@@ -144,7 +152,7 @@ const UniqueArtGalerie: React.FC<UniqueArtGalerieProps> = ({ initialCollections 
             const hash = uri.replace('ipfs://', '').split('/')[0];
             const res = await fetch(`/api/metadata/${hash}`);
             const metadata = await res.json();
-            localStorage.setItem(uri, JSON.stringify(metadata));
+            safeSetJson(uri, metadata);
 
             return {
               id: id.toString(),
@@ -236,7 +244,7 @@ const UniqueArtGalerie: React.FC<UniqueArtGalerieProps> = ({ initialCollections 
                 return null;
               }
 
-              localStorage.setItem(tokenURI, JSON.stringify(metadata));
+              safeSetJson(tokenURI, metadata);
             }
 
             const priceInWei = await collectionContract.getTokenPrice(tokenId);

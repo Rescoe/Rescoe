@@ -1,3 +1,5 @@
+import { safeSetJson } from "@/utils/safeStorage";
+import { getReadProvider } from "@/utils/baseProvider";
 import React, { useState, useEffect } from 'react';
 import { Box, Heading, Spinner, Grid, Tab, TabList, TabPanel, TabPanels, Tabs, Text } from '@chakra-ui/react';
 import { JsonRpcProvider, Contract, ethers } from 'ethers';
@@ -36,13 +38,19 @@ const UniqueGenerativeArtGallery: React.FC = () => {
   const router = useRouter();
 
   const contractRESCOLLECTION = process.env.NEXT_PUBLIC_RESCOLLECTIONS_CONTRACT!;
-  const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+  const provider = getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
   const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
 
   const fetchCollections = async () => {
     setIsLoading(true);
     try {
       const total: number = await contract.getTotalCollectionsMinted();
+      // Registre vide : getCollectionsPaginated(0, 0) revert « Start ID out of range » (ce n'est pas une
+      // erreur, il n'y a simplement rien à afficher).
+      if (Number(total) === 0) {
+        setCollections([]);
+        return;
+      }
       const collectionsPaginated: any[] = await contract.getCollectionsPaginated(0, total);
 
       const collectionsData = (await Promise.all(
@@ -101,7 +109,7 @@ const UniqueGenerativeArtGallery: React.FC = () => {
               : await (await fetch(`/api/proxyPinata_Oeuvres?ipfsHash=${tokenURI.split('/').pop()}`)).json();
 
             if (!cachedMetadata) {
-              localStorage.setItem(tokenURI, JSON.stringify(metadata));
+              safeSetJson(tokenURI, metadata);
             }
 
             return {

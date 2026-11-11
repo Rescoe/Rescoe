@@ -1,3 +1,4 @@
+import { getReadProvider } from "@/utils/baseProvider";
 import React, { useState, useEffect } from "react";
 import {
   Box,
@@ -66,7 +67,7 @@ const PoemMintingPage: React.FC = () => {
     const fetchUserCollections = async () => {
       if (web3 && address) {
         setLoading(true);
-        const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+        const provider = getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
         const contract = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
         try {
           const result: any = await contract.getCollectionsByUser(address);
@@ -113,7 +114,7 @@ const PoemMintingPage: React.FC = () => {
   const fetchMintingContractAddress = async (collectionId: string) => {
     if (!web3) return;
     try {
-      const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
+      const provider = getReadProvider(process.env.NEXT_PUBLIC_URL_SERVER_MORALIS);
       const contractResCollection = new Contract(contractRESCOLLECTION, ABIRESCOLLECTION, provider);
       const collectionDetails: any = await contractResCollection.getCollection(collectionId);
       const collectionMintAddress: string = collectionDetails.collectionAddress;
